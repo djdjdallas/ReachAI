@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
-import { generateReply } from "@/lib/openai";
+import { generateReply } from "@/lib/anthropic";
 import { sendMessage, getParticipantProfile } from "@/lib/instagram";
 import { decrypt } from "@/lib/encryption";
 
