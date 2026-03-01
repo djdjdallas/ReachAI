@@ -101,15 +101,24 @@ export default function DashboardPage() {
       const uid = userId || user?.id;
       if (!uid) return;
 
-      // Fetch conversations
+      // Fix 8: Join messages to derive last_message since the column doesn't exist
       const { data: convos } = await supabase
         .from("conversations")
-        .select("*")
+        .select("*, messages(content, created_at)")
         .eq("user_id", uid)
         .order("updated_at", { ascending: false })
         .limit(20);
 
-      const convList = convos || [];
+      const convList = (convos || []).map((convo) => {
+        const sorted = (convo.messages || []).sort(
+          (a, b) => new Date(b.created_at) - new Date(a.created_at)
+        );
+        return {
+          ...convo,
+          last_message: sorted[0]?.content || null,
+          messages: undefined,
+        };
+      });
       setConversations(convList);
 
       // Calculate stats

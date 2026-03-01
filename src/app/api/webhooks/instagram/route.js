@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import { generateReply } from "@/lib/openai";
-import { sendMessage } from "@/lib/instagram";
+import { sendMessage, getParticipantProfile } from "@/lib/instagram";
 import { decrypt } from "@/lib/encryption";
 
 export async function GET(request) {
@@ -43,7 +43,6 @@ export async function POST(request) {
 
         const senderId = event.sender.id;
         const messageText = event.message.text;
-        const timestamp = event.timestamp;
 
         if (!messageText) continue;
 
@@ -62,6 +61,35 @@ export async function POST(request) {
             continue;
           }
 
+          // Fix 4: Check if AI is globally active for this user
+          if (!user.ai_active) continue;
+
+          // Fix 5: Check subscription status — only serve active/trialing users
+          if (!["active", "trialing"].includes(user.subscription_status)) {
+            console.log("Inactive subscription for user:", user.id);
+            continue;
+          }
+
+          // Fix 7: Lazy-reset monthly DM count if we've rolled into a new month
+          const now = new Date();
+          const resetAt = user.dm_count_reset_at
+            ? new Date(user.dm_count_reset_at)
+            : null;
+          if (
+            !resetAt ||
+            now.getMonth() !== resetAt.getMonth() ||
+            now.getFullYear() !== resetAt.getFullYear()
+          ) {
+            await supabase
+              .from("users")
+              .update({
+                dm_count_this_month: 0,
+                dm_count_reset_at: now.toISOString(),
+              })
+              .eq("id", user.id);
+            user.dm_count_this_month = 0;
+          }
+
           // Find or create conversation
           let { data: conversation, error: convError } = await supabase
             .from("conversations")
@@ -71,13 +99,29 @@ export async function POST(request) {
             .single();
 
           if (convError || !conversation) {
+            // Fix 9: Try to fetch sender profile for sender_name
+            let senderName = null;
+            try {
+              const accessToken = decrypt(user.instagram_token);
+              const profile = await getParticipantProfile(
+                senderId,
+                accessToken
+              );
+              senderName = profile?.name || null;
+            } catch (profileErr) {
+              console.warn("Could not fetch sender profile:", profileErr.message);
+            }
+
+            // Fix 1: Use valid status "qualifying" and provide instagram_thread_id
             const { data: newConv, error: createError } = await supabase
               .from("conversations")
               .insert({
                 user_id: user.id,
                 instagram_sender_id: senderId,
-                status: "open",
+                instagram_thread_id: `${pageId}_${senderId}`,
+                status: "qualifying",
                 ai_paused: false,
+                sender_name: senderName,
               })
               .select()
               .single();
@@ -89,34 +133,31 @@ export async function POST(request) {
             conversation = newConv;
           }
 
-          // If AI is paused, skip AI reply
+          // If AI is paused for this conversation, skip AI reply
           if (conversation.ai_paused) {
             // Still save the incoming message
+            // Fix 2: Remove nonexistent instagram_message_id and timestamp columns
             await supabase.from("messages").insert({
               conversation_id: conversation.id,
               role: "user",
               content: messageText,
-              instagram_message_id: event.message.mid,
-              timestamp: new Date(timestamp).toISOString(),
             });
             continue;
           }
 
-          // Check DM count against plan limit
-          const dmLimit =
-            user.subscription_plan === "unlimited" ? Infinity : 500;
+          // Fix 3: Check DM count against plan limit using correct column name
+          const dmLimit = user.plan === "unlimited" ? Infinity : 500;
           if (user.dm_count_this_month >= dmLimit) {
             console.log("DM limit reached for user:", user.id);
             continue;
           }
 
           // Save incoming message
+          // Fix 2: Remove nonexistent instagram_message_id and timestamp columns
           await supabase.from("messages").insert({
             conversation_id: conversation.id,
             role: "user",
             content: messageText,
-            instagram_message_id: event.message.mid,
-            timestamp: new Date(timestamp).toISOString(),
           });
 
           // Add random delay 1-3 seconds to appear more natural
@@ -182,19 +223,30 @@ Instructions:
             accessToken
           );
 
-          // Update conversation status based on AI analysis
+          // Fix 11: Improved status detection — only escalate forward, use word boundaries
+          const statusOrder = ["qualifying", "interested", "booked"];
+          const currentIdx = statusOrder.indexOf(conversation.status);
           let newStatus = conversation.status;
+
+          // Primary signal: Calendly URL presence means "interested"
+          const hasCalendlyLink =
+            user.calendly_url && aiReply.includes(user.calendly_url);
+          // Word-boundary regex for booking keywords to avoid "Facebook", "ebook" etc.
+          const hasBookKeyword = /\b(book|schedule|appointment)\b/i.test(
+            aiReply
+          );
+          const hasBookedKeyword =
+            /\b(confirmed|booked|see you|looking forward)\b/i.test(aiReply);
+
           if (
-            aiReply.includes(user.calendly_url) ||
-            aiReply.toLowerCase().includes("book") ||
-            aiReply.toLowerCase().includes("schedule")
+            (hasCalendlyLink || hasBookKeyword) &&
+            statusOrder.indexOf("interested") > currentIdx
           ) {
             newStatus = "interested";
           }
           if (
-            aiReply.toLowerCase().includes("confirmed") ||
-            aiReply.toLowerCase().includes("see you") ||
-            aiReply.toLowerCase().includes("looking forward")
+            hasBookedKeyword &&
+            statusOrder.indexOf("booked") > currentIdx
           ) {
             newStatus = "booked";
           }

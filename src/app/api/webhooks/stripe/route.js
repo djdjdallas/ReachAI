@@ -1,6 +1,14 @@
 import { NextResponse } from "next/server";
-import { getStripe } from "@/lib/stripe";
+import { getStripe, PLANS } from "@/lib/stripe";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
+
+// Map a Stripe price ID to the plan key ("base" or "unlimited")
+function getPlanFromPriceId(priceId) {
+  for (const [key, plan] of Object.entries(PLANS)) {
+    if (plan.priceId === priceId) return key;
+  }
+  return "base";
+}
 
 export async function POST(request) {
   try {
@@ -29,12 +37,27 @@ export async function POST(request) {
         const userId = session.metadata?.userId;
 
         if (userId) {
+          // Fix 6: Retrieve line items to determine which plan was purchased
+          let plan = "base";
+          try {
+            const lineItems = await getStripe().checkout.sessions.listLineItems(
+              session.id,
+              { limit: 1 }
+            );
+            if (lineItems.data.length > 0) {
+              plan = getPlanFromPriceId(lineItems.data[0].price.id);
+            }
+          } catch (err) {
+            console.error("Failed to retrieve checkout line items:", err.message);
+          }
+
           await supabase
             .from("users")
             .update({
               subscription_status: "active",
               stripe_customer_id: session.customer,
               stripe_subscription_id: session.subscription,
+              plan,
             })
             .eq("id", userId);
         }
@@ -63,9 +86,20 @@ export async function POST(request) {
             subscriptionStatus = subscription.status;
         }
 
+        // Fix 6: Also sync plan on subscription changes (portal upgrades/downgrades)
+        let plan;
+        if (subscription.items?.data?.length > 0) {
+          plan = getPlanFromPriceId(subscription.items.data[0].price.id);
+        }
+
+        const updateData = { subscription_status: subscriptionStatus };
+        if (plan) {
+          updateData.plan = plan;
+        }
+
         await supabase
           .from("users")
-          .update({ subscription_status: subscriptionStatus })
+          .update(updateData)
           .eq("stripe_customer_id", customerId);
         break;
       }

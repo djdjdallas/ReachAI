@@ -115,13 +115,24 @@ function ConversationsPage() {
       const uid = userId || user?.id;
       if (!uid) return;
 
+      // Fix 8: Join messages to derive last_message since the column doesn't exist
       const { data: convos } = await supabase
         .from("conversations")
-        .select("*")
+        .select("*, messages(content, created_at)")
         .eq("user_id", uid)
         .order("updated_at", { ascending: false });
 
-      setConversations(convos || []);
+      const mapped = (convos || []).map((convo) => {
+        const sorted = (convo.messages || []).sort(
+          (a, b) => new Date(b.created_at) - new Date(a.created_at)
+        );
+        return {
+          ...convo,
+          last_message: sorted[0]?.content || null,
+          messages: undefined,
+        };
+      });
+      setConversations(mapped);
     },
     [supabase, user?.id]
   );
@@ -160,13 +171,23 @@ function ConversationsPage() {
 
       setUser(authUser);
 
+      // Fix 8: Join messages to derive last_message since the column doesn't exist
       const { data: convos } = await supabase
         .from("conversations")
-        .select("*")
+        .select("*, messages(content, created_at)")
         .eq("user_id", authUser.id)
         .order("updated_at", { ascending: false });
 
-      const convoList = convos || [];
+      const convoList = (convos || []).map((convo) => {
+        const sorted = (convo.messages || []).sort(
+          (a, b) => new Date(b.created_at) - new Date(a.created_at)
+        );
+        return {
+          ...convo,
+          last_message: sorted[0]?.content || null,
+          messages: undefined,
+        };
+      });
       setConversations(convoList);
 
       // Auto-select conversation from query param

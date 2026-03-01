@@ -24,6 +24,19 @@ export async function getMessages(conversationId, accessToken) {
   return res.json();
 }
 
+// Fix 9: Fetch participant profile to get sender_name
+export async function getParticipantProfile(userId, accessToken) {
+  try {
+    const res = await fetch(
+      `${GRAPH_API_BASE}/${userId}?fields=name,profile_pic&access_token=${accessToken}`
+    );
+    if (!res.ok) return null;
+    return res.json();
+  } catch {
+    return null;
+  }
+}
+
 export async function sendMessage(igUserId, recipientId, message, accessToken) {
   const res = await fetch(`${GRAPH_API_BASE}/${igUserId}/messages`, {
     method: "POST",
