@@ -1,0 +1,113 @@
+/* ==========================================================================
+   ReachAI Landing Page Design System
+   Font import lives in globals.css (must precede all rules)
+   ========================================================================== */
+
+/* --------------------------------------------------------------------------
+   Landing Theme Scope
+   -------------------------------------------------------------------------- */
+.landing-theme {
+  --brand: #ff7e67;
+  --brand-dark: #e8664f;
+  --brand-soft: #fff5f2;
+  --bg: #fafaf9;
+  --bg-white: #ffffff;
+  --primary-text: #1c1917;
+  --muted-text: #78716c;
+  --light-border: #f5f5f4;
+  --stone-100: #f5f5f4;
+  --stone-200: #e7e5e4;
+  --emerald-50: #ecfdf5;
+  --emerald-100: #d1fae5;
+  --emerald-600: #059669;
+  --emerald-800: #065f46;
+
+  /* Override shadcn vars so Button etc. pick up coral */
+  --primary: #ff7e67;
+  --primary-foreground: #ffffff;
+  --background: #fafaf9;
+  --foreground: #1c1917;
+  --ring: #ff7e67;
+
+  font-family: 'Satoshi', system-ui, sans-serif;
+  color: var(--primary-text);
+  background-color: var(--bg);
+}
+
+.landing-theme h1,
+.landing-theme h2,
+.landing-theme h3,
+.landing-theme h4 {
+  font-family: 'Cabinet Grotesk', system-ui, sans-serif;
+  letter-spacing: -0.02em;
+}
+
+/* --------------------------------------------------------------------------
+   Utility Classes
+   -------------------------------------------------------------------------- */
+.soft-shadow {
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.05);
+}
+
+.soft-shadow-sm {
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.04);
+}
+
+/* --------------------------------------------------------------------------
+   Floating Animation
+   -------------------------------------------------------------------------- */
+.floating {
+  animation: floating 3s ease-in-out infinite;
+}
+
+@keyframes floating {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-10px); }
+}
+
+/* --------------------------------------------------------------------------
+   FAQ Accordion
+   -------------------------------------------------------------------------- */
+.faq-answer {
+  max-height: 0;
+  overflow: hidden;
+  transition: max-height 0.35s ease-out, padding-top 0.35s ease-out;
+}
+
+.faq-item.open .faq-answer {
+  max-height: 500px;
+  padding-top: 1rem;
+}
+
+.faq-item.open .faq-icon {
+  transform: rotate(180deg);
+}
+
+.faq-icon {
+  transition: transform 0.3s ease;
+}
+
+/* --------------------------------------------------------------------------
+   How It Works — Connector Lines
+   -------------------------------------------------------------------------- */
+.connector-line {
+  position: absolute;
+  top: 2rem;
+  left: 100%;
+  width: calc(100% - 4rem);
+  height: 2px;
+  background-image: linear-gradient(to right, #ff7e67 30%, transparent 30%);
+  background-position: bottom;
+  background-size: 8px 1px;
+  background-repeat: repeat-x;
+  z-index: 0;
+}
+
+/* --------------------------------------------------------------------------
+   GSAP Reveal Helpers — initial hidden state set by JS,
+   these provide a no-JS fallback.
+   -------------------------------------------------------------------------- */
+.reveal-up,
+.reveal-scale {
+  will-change: transform, opacity;
+}

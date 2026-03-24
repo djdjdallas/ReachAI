@@ -1,4 +1,6 @@
+@import url('https://api.fontshare.com/v2/css?f[]=cabinet-grotesk@100,200,300,400,500,700,800,900&f[]=satoshi@300,400,500,700,900&display=swap');
 @import "tailwindcss";
+@import "../styles/landing.css";
 
 @theme inline {
   --color-background: var(--background);
