@@ -68,11 +68,6 @@ export function getOAuthUrl() {
 }
 
 export async function exchangeCodeForToken(code) {
-  const res = await fetch(`${GRAPH_API_BASE}/oauth/access_token`, {
-    method: "GET",
-    headers: { "Content-Type": "application/json" },
-  });
-
   const params = new URLSearchParams({
     client_id: process.env.FACEBOOK_APP_ID,
     client_secret: process.env.FACEBOOK_APP_SECRET,
@@ -80,11 +75,11 @@ export async function exchangeCodeForToken(code) {
     code,
   });
 
-  const tokenRes = await fetch(
+  const res = await fetch(
     `${GRAPH_API_BASE}/oauth/access_token?${params.toString()}`
   );
-  if (!tokenRes.ok) throw new Error("Failed to exchange code for token");
-  return tokenRes.json();
+  if (!res.ok) throw new Error("Failed to exchange code for token");
+  return res.json();
 }
 
 export async function getLongLivedToken(shortLivedToken) {
