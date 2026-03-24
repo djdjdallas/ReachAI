@@ -14,9 +14,13 @@ const geistMono = localFont({
 });
 
 export const metadata = {
-  title: "Clinchd - The AI Setter for Coaches | Book Discovery Calls on Autopilot",
+  title: {
+    default: "Clinchd — AI Instagram DM Automation for Coaches",
+    template: "%s | Clinchd",
+  },
   description:
     "Clinchd is the AI setter that qualifies leads, handles objections, and books discovery calls in your Instagram DMs — replacing your $5K/mo setter for just $97.",
+  metadataBase: new URL("https://clinchd.io"),
 };
 
 export default function RootLayout({ children }) {

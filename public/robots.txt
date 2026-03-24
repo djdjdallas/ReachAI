@@ -1,0 +1,9 @@
+# *
+User-agent: *
+Allow: /
+
+# Host
+Host: https://clinchd.io
+
+# Sitemaps
+Sitemap: https://clinchd.io/sitemap.xml

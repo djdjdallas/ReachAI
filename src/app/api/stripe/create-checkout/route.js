@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
-import { createCheckoutSession, createCustomer } from "@/lib/stripe";
+import { createCheckoutSession, createCustomer, PLANS } from "@/lib/stripe";
 
 export async function POST(request) {
   try {
@@ -16,14 +16,18 @@ export async function POST(request) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const { priceId } = await request.json();
+    const { planId } = await request.json();
 
-    if (!priceId) {
+    // Validate plan ID against known plans (server-side only)
+    const plan = PLANS[planId];
+    if (!plan?.priceId) {
       return NextResponse.json(
-        { error: "priceId is required" },
+        { error: "Invalid plan" },
         { status: 400 }
       );
     }
+
+    const priceId = plan.priceId;
 
     // Fetch user profile to check for existing Stripe customer
     const { data: userProfile, error: profileError } = await getSupabaseAdmin()

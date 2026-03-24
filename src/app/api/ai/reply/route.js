@@ -2,8 +2,7 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import { generateReply } from "@/lib/anthropic";
-import { sendMessage } from "@/lib/instagram";
-import { decrypt } from "@/lib/encryption";
+import { sendUnipileMessage } from "@/lib/unipile";
 
 export async function POST(request) {
   try {
@@ -56,7 +55,13 @@ export async function POST(request) {
       );
     }
 
-    const accessToken = decrypt(userProfile.instagram_token);
+    if (!conversation.unipile_chat_id) {
+      return NextResponse.json(
+        { error: "Conversation has no Unipile chat ID" },
+        { status: 400 }
+      );
+    }
+
     let replyContent;
 
     if (manual) {
@@ -130,13 +135,8 @@ Instructions:
       );
     }
 
-    // Send via Instagram
-    await sendMessage(
-      userProfile.instagram_user_id,
-      conversation.instagram_sender_id,
-      replyContent,
-      accessToken
-    );
+    // Send via Unipile
+    await sendUnipileMessage(conversation.unipile_chat_id, replyContent);
 
     return NextResponse.json({ message: savedMessage }, { status: 200 });
   } catch (error) {

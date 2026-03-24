@@ -9,6 +9,8 @@ import {
   Loader2,
   Search,
   Bot,
+  User,
+  CheckCircle,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -17,11 +19,19 @@ import {
   CardTitle,
   CardContent,
 } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Input } from "@/components/ui/input";
+import { Skeleton } from "@/components/ui/skeleton";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import StatusBadge from "@/components/app/StatusBadge";
 
 function getInitials(name) {
   if (!name) return "?";
@@ -38,7 +48,6 @@ function timeAgo(dateString) {
   const now = new Date();
   const date = new Date(dateString);
   const seconds = Math.floor((now - date) / 1000);
-
   if (seconds < 60) return "just now";
   const minutes = Math.floor(seconds / 60);
   if (minutes < 60) return `${minutes}m ago`;
@@ -48,42 +57,24 @@ function timeAgo(dateString) {
   return `${days}d ago`;
 }
 
-function statusVariant(status) {
-  switch (status?.toLowerCase()) {
-    case "qualifying":
-    case "interested":
-      return "warning";
-    case "booked":
-      return "success";
-    case "not a fit":
-    case "not_a_fit":
-      return "muted";
-    default:
-      return "default";
-  }
-}
-
-function statusLabel(status) {
-  switch (status?.toLowerCase()) {
-    case "qualifying":
-      return "Qualifying";
-    case "interested":
-      return "Interested";
-    case "booked":
-      return "Booked";
-    case "not a fit":
-    case "not_a_fit":
-      return "Not a Fit";
-    case "manual":
-      return "Manual";
-    default:
-      return status || "New";
-  }
-}
+const STATUS_FILTERS = [
+  { value: "all", label: "All" },
+  { value: "qualifying", label: "Qualifying" },
+  { value: "interested", label: "Interested" },
+  { value: "booked", label: "Booked" },
+  { value: "not_a_fit", label: "Not a Fit" },
+  { value: "manual", label: "Human Takeover" },
+];
 
 export default function ConversationsPageWrapper() {
   return (
-    <Suspense fallback={<div className="flex items-center justify-center h-64"><Loader2 className="h-8 w-8 animate-spin text-muted-foreground" /></div>}>
+    <Suspense
+      fallback={
+        <div className="flex items-center justify-center h-64">
+          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+        </div>
+      }
+    >
       <ConversationsPage />
     </Suspense>
   );
@@ -104,18 +95,17 @@ function ConversationsPage() {
   const [newMessage, setNewMessage] = useState("");
   const [sending, setSending] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState("all");
 
   const scrollToBottom = useCallback(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, []);
 
-  // Fetch conversations list
   const fetchConversations = useCallback(
     async (userId) => {
       const uid = userId || user?.id;
       if (!uid) return;
 
-      // Fix 8: Join messages to derive last_message since the column doesn't exist
       const { data: convos } = await supabase
         .from("conversations")
         .select("*, messages(content, created_at)")
@@ -137,27 +127,22 @@ function ConversationsPage() {
     [supabase, user?.id]
   );
 
-  // Fetch messages for a conversation
   const fetchMessages = useCallback(
     async (conversationId) => {
       if (!conversationId) return;
-
       setMessagesLoading(true);
       const { data: msgs } = await supabase
         .from("messages")
         .select("*")
         .eq("conversation_id", conversationId)
         .order("created_at", { ascending: true });
-
       setMessages(msgs || []);
       setMessagesLoading(false);
-
       setTimeout(() => scrollToBottom(), 100);
     },
     [supabase, scrollToBottom]
   );
 
-  // Initialize: auth check, fetch conversations, auto-select from query param
   useEffect(() => {
     async function init() {
       const {
@@ -171,7 +156,6 @@ function ConversationsPage() {
 
       setUser(authUser);
 
-      // Fix 8: Join messages to derive last_message since the column doesn't exist
       const { data: convos } = await supabase
         .from("conversations")
         .select("*, messages(content, created_at)")
@@ -190,22 +174,17 @@ function ConversationsPage() {
       });
       setConversations(convoList);
 
-      // Auto-select conversation from query param
       const threadId = searchParams.get("thread");
       if (threadId) {
         const match = convoList.find((c) => c.id === threadId);
-        if (match) {
-          setSelectedConvo(match);
-        }
+        if (match) setSelectedConvo(match);
       }
 
       setLoading(false);
     }
-
     init();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Fetch messages when selected conversation changes
   useEffect(() => {
     if (selectedConvo?.id) {
       fetchMessages(selectedConvo.id);
@@ -214,10 +193,8 @@ function ConversationsPage() {
     }
   }, [selectedConvo?.id, fetchMessages]);
 
-  // Realtime subscription on conversations table
   useEffect(() => {
     if (!user?.id) return;
-
     const channel = supabase
       .channel("conversations")
       .on(
@@ -230,7 +207,6 @@ function ConversationsPage() {
         },
         (payload) => {
           fetchConversations();
-          // If the updated conversation is the selected one, refresh its data
           if (
             payload.new &&
             selectedConvo &&
@@ -241,16 +217,11 @@ function ConversationsPage() {
         }
       )
       .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
+    return () => supabase.removeChannel(channel);
   }, [user?.id, supabase, fetchConversations, selectedConvo]);
 
-  // Realtime subscription on messages table for the selected conversation
   useEffect(() => {
     if (!selectedConvo?.id) return;
-
     const channel = supabase
       .channel(`messages-${selectedConvo.id}`)
       .on(
@@ -261,18 +232,12 @@ function ConversationsPage() {
           table: "messages",
           filter: `conversation_id=eq.${selectedConvo.id}`,
         },
-        () => {
-          fetchMessages(selectedConvo.id);
-        }
+        () => fetchMessages(selectedConvo.id)
       )
       .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
+    return () => supabase.removeChannel(channel);
   }, [selectedConvo?.id, supabase, fetchMessages]);
 
-  // Scroll to bottom when messages change
   useEffect(() => {
     scrollToBottom();
   }, [messages, scrollToBottom]);
@@ -280,7 +245,6 @@ function ConversationsPage() {
   const handleSelectConversation = (convo) => {
     setSelectedConvo(convo);
     setNewMessage("");
-    // Update URL without full navigation
     router.replace(`/conversations?thread=${convo.id}`, { scroll: false });
   };
 
@@ -292,7 +256,6 @@ function ConversationsPage() {
     setSending(true);
     setNewMessage("");
 
-    // Optimistically add the message
     const optimisticMessage = {
       id: `temp-${Date.now()}`,
       conversation_id: selectedConvo.id,
@@ -304,15 +267,7 @@ function ConversationsPage() {
     setTimeout(() => scrollToBottom(), 50);
 
     try {
-      // Insert message into messages table
-      await supabase.from("messages").insert({
-        conversation_id: selectedConvo.id,
-        role: "assistant",
-        content: messageText,
-      });
-
-      // Send via API route
-      await fetch("/api/ai/reply", {
+      const res = await fetch("/api/ai/reply", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -321,12 +276,10 @@ function ConversationsPage() {
           manual: true,
         }),
       });
-
-      // Refresh messages from server to get canonical data
+      if (!res.ok) throw new Error("Failed to send message");
       await fetchMessages(selectedConvo.id);
     } catch (error) {
       console.error("Failed to send message:", error);
-      // Remove optimistic message on error
       setMessages((prev) =>
         prev.filter((m) => m.id !== optimisticMessage.id)
       );
@@ -338,12 +291,10 @@ function ConversationsPage() {
 
   const handleResumeAi = async () => {
     if (!selectedConvo) return;
-
     await supabase
       .from("conversations")
       .update({ ai_paused: false, status: "qualifying" })
       .eq("id", selectedConvo.id);
-
     setSelectedConvo((prev) => ({
       ...prev,
       ai_paused: false,
@@ -351,31 +302,64 @@ function ConversationsPage() {
     }));
   };
 
-  // Filter conversations by search query
+  const handleStatusChange = async (newStatus) => {
+    if (!selectedConvo) return;
+    await supabase
+      .from("conversations")
+      .update({ status: newStatus })
+      .eq("id", selectedConvo.id);
+    setSelectedConvo((prev) => ({ ...prev, status: newStatus }));
+
+    if (newStatus === "booked") {
+      await supabase.from("bookings").insert({
+        user_id: user.id,
+        conversation_id: selectedConvo.id,
+      });
+    }
+  };
+
   const filteredConversations = conversations.filter((convo) => {
-    if (!searchQuery.trim()) return true;
-    const query = searchQuery.toLowerCase();
-    return (
-      convo.sender_name?.toLowerCase().includes(query) ||
-      convo.last_message?.toLowerCase().includes(query)
-    );
+    const matchesSearch =
+      !searchQuery.trim() ||
+      convo.sender_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      convo.last_message?.toLowerCase().includes(searchQuery.toLowerCase());
+
+    const matchesStatus =
+      statusFilter === "all" ||
+      convo.status?.toLowerCase() === statusFilter;
+
+    return matchesSearch && matchesStatus;
   });
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-[60vh]">
-        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      <div className="flex h-[calc(100vh-4rem)] overflow-hidden -m-4 md:-m-8">
+        <div className="w-96 border-r flex flex-col bg-background p-4 space-y-4">
+          <Skeleton className="h-8 w-48" />
+          <Skeleton className="h-10 w-full" />
+          {[...Array(5)].map((_, i) => (
+            <div key={i} className="flex items-center gap-3">
+              <Skeleton className="h-9 w-9 rounded-full" />
+              <div className="flex-1 space-y-2">
+                <Skeleton className="h-4 w-32" />
+                <Skeleton className="h-3 w-48" />
+              </div>
+            </div>
+          ))}
+        </div>
+        <div className="flex-1 flex items-center justify-center">
+          <Skeleton className="h-12 w-64" />
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="flex h-[calc(100vh-4rem)] overflow-hidden -m-8">
+    <div className="flex h-[calc(100vh-4rem)] overflow-hidden -m-4 md:-m-8">
       {/* Left Panel: Conversation List */}
-      <div className="w-96 border-r flex flex-col bg-background">
-        {/* Search Header */}
-        <div className="p-4 border-b">
-          <h2 className="font-semibold text-lg mb-3">Conversations</h2>
+      <div className="w-full md:w-96 border-r flex flex-col bg-background">
+        <div className="p-4 border-b space-y-3">
+          <h2 className="font-semibold text-lg">Conversations</h2>
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
@@ -385,15 +369,32 @@ function ConversationsPage() {
               className="pl-9"
             />
           </div>
+          {/* Status filter tabs */}
+          <div className="flex gap-1 overflow-x-auto pb-1">
+            {STATUS_FILTERS.map((filter) => (
+              <button
+                key={filter.value}
+                onClick={() => setStatusFilter(filter.value)}
+                className={`px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-colors ${
+                  statusFilter === filter.value
+                    ? "bg-primary text-primary-foreground"
+                    : "bg-muted text-muted-foreground hover:bg-muted/80"
+                }`}
+              >
+                {filter.label}
+              </button>
+            ))}
+          </div>
         </div>
 
-        {/* Conversation List */}
         <ScrollArea className="flex-1">
           {filteredConversations.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
               <MessageSquare className="h-8 w-8 mb-2" />
               <p className="text-sm">
-                {searchQuery ? "No conversations found" : "No conversations yet"}
+                {searchQuery || statusFilter !== "all"
+                  ? "No conversations found"
+                  : "No conversations yet"}
               </p>
             </div>
           ) : (
@@ -422,9 +423,7 @@ function ConversationsPage() {
                         </span>
                       </div>
                       <div className="flex items-center gap-2 mt-1">
-                        <Badge variant={statusVariant(convo.status)} className="shrink-0">
-                          {statusLabel(convo.status)}
-                        </Badge>
+                        <StatusBadge status={convo.status} />
                       </div>
                       <p className="text-xs text-muted-foreground truncate mt-1">
                         {convo.last_message
@@ -443,12 +442,20 @@ function ConversationsPage() {
       </div>
 
       {/* Right Panel: Message Thread */}
-      <div className="flex-1 flex flex-col bg-background">
+      <div className={`flex-1 flex flex-col bg-background ${selectedConvo ? "" : "hidden md:flex"}`}>
         {selectedConvo ? (
           <>
             {/* Conversation Header */}
             <div className="flex items-center justify-between px-6 py-4 border-b">
               <div className="flex items-center gap-3">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="md:hidden"
+                  onClick={() => setSelectedConvo(null)}
+                >
+                  &larr;
+                </Button>
                 <Avatar className="h-10 w-10">
                   <AvatarFallback>
                     {getInitials(selectedConvo.sender_name)}
@@ -459,9 +466,21 @@ function ConversationsPage() {
                     {selectedConvo.sender_name || "Unknown"}
                   </h3>
                   <div className="flex items-center gap-2">
-                    <Badge variant={statusVariant(selectedConvo.status)}>
-                      {statusLabel(selectedConvo.status)}
-                    </Badge>
+                    <Select
+                      value={selectedConvo.status || "qualifying"}
+                      onValueChange={handleStatusChange}
+                    >
+                      <SelectTrigger className="h-7 text-xs w-auto border-none p-0 focus:ring-0">
+                        <StatusBadge status={selectedConvo.status} />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="qualifying">Qualifying</SelectItem>
+                        <SelectItem value="interested">Interested</SelectItem>
+                        <SelectItem value="booked">Booked</SelectItem>
+                        <SelectItem value="not_a_fit">Not a Fit</SelectItem>
+                        <SelectItem value="manual">Human Takeover</SelectItem>
+                      </SelectContent>
+                    </Select>
                     {selectedConvo.ai_paused && (
                       <span className="text-xs text-muted-foreground">
                         AI paused
@@ -470,24 +489,46 @@ function ConversationsPage() {
                   </div>
                 </div>
               </div>
-              {selectedConvo.ai_paused && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={handleResumeAi}
-                  className="gap-2"
-                >
-                  <Bot className="h-4 w-4" />
-                  Resume AI
-                </Button>
-              )}
+              <div className="flex items-center gap-2">
+                {selectedConvo.status !== "booked" && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleStatusChange("booked")}
+                    className="gap-1.5"
+                  >
+                    <CheckCircle className="h-3.5 w-3.5" />
+                    Mark Booked
+                  </Button>
+                )}
+                {selectedConvo.ai_paused && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleResumeAi}
+                    className="gap-1.5"
+                  >
+                    <Bot className="h-3.5 w-3.5" />
+                    Resume AI
+                  </Button>
+                )}
+              </div>
             </div>
 
             {/* Messages Area */}
             <ScrollArea className="flex-1 p-6">
               {messagesLoading ? (
-                <div className="flex items-center justify-center py-12">
-                  <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                <div className="space-y-4">
+                  {[...Array(4)].map((_, i) => (
+                    <div
+                      key={i}
+                      className={`flex ${
+                        i % 2 === 0 ? "justify-start" : "justify-end"
+                      }`}
+                    >
+                      <Skeleton className="h-12 w-48 rounded-2xl" />
+                    </div>
+                  ))}
                 </div>
               ) : messages.length === 0 ? (
                 <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
@@ -496,33 +537,52 @@ function ConversationsPage() {
                 </div>
               ) : (
                 <div className="space-y-4">
-                  {messages.map((msg) => (
-                    <div
-                      key={msg.id}
-                      className={`flex ${
-                        msg.role === "assistant" ? "justify-end" : "justify-start"
-                      }`}
-                    >
+                  {messages.map((msg) => {
+                    const isOutbound = msg.role === "assistant";
+                    return (
                       <div
-                        className={`max-w-[70%] rounded-2xl px-4 py-2.5 ${
-                          msg.role === "assistant"
-                            ? "bg-primary text-primary-foreground"
-                            : "bg-muted"
+                        key={msg.id}
+                        className={`flex ${
+                          isOutbound ? "justify-end" : "justify-start"
                         }`}
                       >
-                        <p className="text-sm whitespace-pre-wrap">{msg.content}</p>
-                        <p
-                          className={`text-xs mt-1 ${
-                            msg.role === "assistant"
-                              ? "text-primary-foreground/70"
-                              : "text-muted-foreground"
-                          }`}
-                        >
-                          {timeAgo(msg.created_at)}
-                        </p>
+                        <div className="max-w-[70%]">
+                          <div
+                            className={`rounded-2xl px-4 py-2.5 ${
+                              isOutbound
+                                ? "bg-primary text-primary-foreground"
+                                : "bg-muted"
+                            }`}
+                          >
+                            <p className="text-sm whitespace-pre-wrap">
+                              {msg.content}
+                            </p>
+                          </div>
+                          <div
+                            className={`flex items-center gap-1.5 mt-1 ${
+                              isOutbound ? "justify-end" : "justify-start"
+                            }`}
+                          >
+                            {isOutbound && (
+                              <span className="text-[10px] font-medium text-muted-foreground flex items-center gap-0.5">
+                                <Bot className="h-2.5 w-2.5" />
+                                AI
+                              </span>
+                            )}
+                            {msg.role === "user" && (
+                              <span className="text-[10px] font-medium text-muted-foreground flex items-center gap-0.5">
+                                <User className="h-2.5 w-2.5" />
+                                Lead
+                              </span>
+                            )}
+                            <span className="text-[10px] text-muted-foreground">
+                              {timeAgo(msg.created_at)}
+                            </span>
+                          </div>
+                        </div>
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                   <div ref={messagesEndRef} />
                 </div>
               )}
@@ -556,10 +616,11 @@ function ConversationsPage() {
             </div>
           </>
         ) : (
-          /* Empty State */
           <div className="flex-1 flex flex-col items-center justify-center text-muted-foreground">
             <MessageSquare className="h-12 w-12 mb-4" />
-            <h3 className="text-lg font-medium mb-1">No conversation selected</h3>
+            <h3 className="text-lg font-medium mb-1">
+              No conversation selected
+            </h3>
             <p className="text-sm">
               Choose a conversation from the list to view messages
             </p>

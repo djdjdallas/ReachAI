@@ -35,7 +35,6 @@ const PLANS = [
     price: "$97",
     period: "/mo",
     dmLimit: "500 DMs/month",
-    priceId: process.env.NEXT_PUBLIC_STRIPE_BASE_PRICE_ID,
     features: [
       "500 AI-powered DM responses per month",
       "Lead qualification automation",
@@ -52,7 +51,6 @@ const PLANS = [
     price: "$197",
     period: "/mo",
     dmLimit: "Unlimited DMs",
-    priceId: process.env.NEXT_PUBLIC_STRIPE_UNLIMITED_PRICE_ID,
     features: [
       "Unlimited AI-powered DM responses",
       "Lead qualification automation",
@@ -108,13 +106,13 @@ export default function BillingPage() {
     init();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const handleSubscribe = async (priceId, planId) => {
+  const handleSubscribe = async (planId) => {
     setCheckoutLoading(planId);
     try {
       const res = await fetch("/api/stripe/create-checkout", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ priceId }),
+        body: JSON.stringify({ planId }),
       });
 
       const data = await res.json();
@@ -346,7 +344,7 @@ export default function BillingPage() {
                     <Button
                       className="w-full"
                       variant={plan.popular ? "default" : "outline"}
-                      onClick={() => handleSubscribe(plan.priceId, plan.id)}
+                      onClick={() => handleSubscribe(plan.id)}
                       disabled={checkoutLoading === plan.id}
                     >
                       {checkoutLoading === plan.id && (

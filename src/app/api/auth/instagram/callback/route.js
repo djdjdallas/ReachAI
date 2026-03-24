@@ -1,22 +1,28 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import {
-  exchangeCodeForToken,
-  getLongLivedToken,
-  getInstagramProfile,
-} from "@/lib/instagram";
-import { encrypt } from "@/lib/encryption";
 
 export async function GET(request) {
+  const baseUrl = process.env.NEXT_PUBLIC_APP_URL;
+
   try {
     const { searchParams } = new URL(request.url);
-    const code = searchParams.get("code");
+    const accountId = searchParams.get("account_id");
     const error = searchParams.get("error");
+    const state = searchParams.get("state");
 
-    if (error || !code) {
-      console.error("Instagram OAuth error:", error);
+    if (error || !accountId) {
+      console.error("Unipile callback error:", error);
       return NextResponse.redirect(
-        `${process.env.NEXT_PUBLIC_APP_URL}/onboarding?step=1&error=oauth_denied`
+        `${baseUrl}/onboarding?step=1&error=oauth_denied`
+      );
+    }
+
+    // Verify CSRF state token
+    const storedState = request.cookies.get("oauth_state")?.value;
+    if (!state || !storedState || state !== storedState) {
+      console.error("OAuth state mismatch — possible CSRF attack");
+      return NextResponse.redirect(
+        `${baseUrl}/onboarding?step=1&error=invalid_state`
       );
     }
 
@@ -29,48 +35,36 @@ export async function GET(request) {
 
     if (authError || !user) {
       return NextResponse.redirect(
-        `${process.env.NEXT_PUBLIC_APP_URL}/login?error=unauthorized`
+        `${baseUrl}/login?error=unauthorized`
       );
     }
 
-    // Exchange code for short-lived token
-    const tokenData = await exchangeCodeForToken(code);
-    const shortLivedToken = tokenData.access_token;
-
-    // Exchange for long-lived token
-    const longLivedData = await getLongLivedToken(shortLivedToken);
-    const longLivedToken = longLivedData.access_token;
-
-    // Get Instagram profile
-    const profile = await getInstagramProfile(longLivedToken);
-
-    // Encrypt the long-lived token
-    const encryptedToken = encrypt(longLivedToken);
-
-    // Save to user's record in Supabase
+    // Save the Unipile account ID to the user's record
     const { error: updateError } = await supabase
       .from("users")
       .update({
-        instagram_token: encryptedToken,
-        instagram_user_id: profile.id,
-        instagram_page_id: profile.instagram_business_account?.id || profile.id,
+        unipile_account_id: accountId,
       })
       .eq("id", user.id);
 
     if (updateError) {
-      console.error("Failed to save Instagram credentials:", updateError);
+      console.error("Failed to save Unipile account ID:", updateError);
       return NextResponse.redirect(
-        `${process.env.NEXT_PUBLIC_APP_URL}/onboarding?step=1&error=save_failed`
+        `${baseUrl}/onboarding?step=1&error=save_failed`
       );
     }
 
-    return NextResponse.redirect(
-      `${process.env.NEXT_PUBLIC_APP_URL}/onboarding?step=2`
+    // Clear the state cookie
+    const response = NextResponse.redirect(
+      `${baseUrl}/onboarding?step=2`
     );
+    response.cookies.set("oauth_state", "", { maxAge: 0, path: "/" });
+
+    return response;
   } catch (error) {
-    console.error("Instagram callback error:", error);
+    console.error("Unipile callback error:", error);
     return NextResponse.redirect(
-      `${process.env.NEXT_PUBLIC_APP_URL}/onboarding?step=1&error=callback_failed`
+      `${baseUrl}/onboarding?step=1&error=callback_failed`
     );
   }
 }

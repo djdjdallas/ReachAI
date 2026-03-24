@@ -13,6 +13,11 @@ export async function updateSession(request) {
           return request.cookies.getAll();
         },
         setAll(cookiesToSet) {
+          // Track which cookie names are being set by Supabase
+          const newCookieNames = new Set(
+            cookiesToSet.map(({ name }) => name)
+          );
+
           cookiesToSet.forEach(({ name, value }) =>
             request.cookies.set(name, value)
           );
@@ -20,6 +25,24 @@ export async function updateSession(request) {
           cookiesToSet.forEach(({ name, value, options }) =>
             supabaseResponse.cookies.set(name, value, options)
           );
+
+          // Clean up stale chunked auth cookies that Supabase no longer needs.
+          // Supabase SSR chunks large tokens into cookies like
+          // sb-<ref>-auth-token.0, .1, .2, etc.
+          // When the token shrinks, old higher-numbered chunks linger and
+          // inflate the Cookie header, eventually triggering HTTP 431.
+          const allCookies = request.cookies.getAll();
+          for (const cookie of allCookies) {
+            if (
+              cookie.name.includes("-auth-token.") &&
+              !newCookieNames.has(cookie.name)
+            ) {
+              supabaseResponse.cookies.set(cookie.name, "", {
+                maxAge: 0,
+                path: "/",
+              });
+            }
+          }
         },
       },
     }
@@ -32,7 +55,13 @@ export async function updateSession(request) {
   const { pathname } = request.nextUrl;
 
   // Public routes
-  if (pathname === "/" || pathname.startsWith("/api/webhooks")) {
+  if (
+    pathname === "/" ||
+    pathname.startsWith("/api/webhooks") ||
+    pathname.startsWith("/api/cron") ||
+    pathname.startsWith("/compare") ||
+    pathname.startsWith("/blog")
+  ) {
     return supabaseResponse;
   }
 
