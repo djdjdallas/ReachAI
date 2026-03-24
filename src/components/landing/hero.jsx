@@ -86,7 +86,7 @@ export default function Hero() {
           ref={subtitleRef}
           className="text-lg md:text-2xl text-stone-500 max-w-3xl mx-auto mb-12 leading-relaxed font-medium"
         >
-          ReachAI is the first human-like AI sales agent that qualifies leads
+          Clinchd is the first human-like AI sales agent that qualifies leads
           and books calls in your Instagram DMs—while you sleep.
         </p>
 

@@ -14,7 +14,7 @@ const geistMono = localFont({
 });
 
 export const metadata = {
-  title: "ReachAI - AI Sales Agent for Instagram DMs",
+  title: "Clinchd - AI Sales Agent for Instagram DMs",
   description:
     "Automatically qualify leads and book sales calls via Instagram DMs with AI-powered conversations.",
 };

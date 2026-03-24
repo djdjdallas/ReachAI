@@ -287,7 +287,7 @@ export default function OnboardingPage() {
           <div className="w-9 h-9 bg-[#ff7e67] rounded-xl flex items-center justify-center shadow-lg shadow-[#ff7e67]/20">
             <Zap className="h-5 w-5 text-white" />
           </div>
-          <span className="text-2xl font-extrabold tracking-tight">ReachAI</span>
+          <span className="text-2xl font-extrabold tracking-tight">Clinchd</span>
         </div>
 
         {/* Step indicators */}
@@ -342,7 +342,7 @@ export default function OnboardingPage() {
               </div>
               <CardTitle className="text-xl">Connect Your Instagram</CardTitle>
               <CardDescription>
-                Link your Instagram Business or Creator account so ReachAI can
+                Link your Instagram Business or Creator account so Clinchd can
                 respond to DMs on your behalf.
               </CardDescription>
             </CardHeader>
@@ -358,7 +358,7 @@ export default function OnboardingPage() {
                     account through our authentication partner.
                   </li>
                   <li>
-                    ReachAI reads new DMs and sends replies as your account to
+                    Clinchd reads new DMs and sends replies as your account to
                     qualify leads automatically.
                   </li>
                   <li>

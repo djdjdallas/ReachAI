@@ -7,12 +7,12 @@ const faqs = [
   {
     question: "Is this against Instagram's rules?",
     answer:
-      "No. ReachAI uses the official Meta Graph API and only responds to inbound messages. We never send unsolicited spam.",
+      "No. Clinchd uses the official Meta Graph API and only responds to inbound messages. We never send unsolicited spam.",
   },
   {
     question: "Will it sound like a robot?",
     answer:
-      "Not at all. You provide the tone and script. ReachAI is trained to match your specific brand voice perfectly.",
+      "Not at all. You provide the tone and script. Clinchd is trained to match your specific brand voice perfectly.",
   },
   {
     question: "What happens when I hit my 500 DM limit?",
@@ -27,7 +27,7 @@ const faqs = [
   {
     question: "How is this different from a chatbot?",
     answer:
-      "ReachAI uses your actual sales script, handles real objections, and knows when to drop your booking link — a chatbot just answers simple FAQs with pre-set buttons.",
+      "Clinchd uses your actual sales script, handles real objections, and knows when to drop your booking link — a chatbot just answers simple FAQs with pre-set buttons.",
   },
 ];
 

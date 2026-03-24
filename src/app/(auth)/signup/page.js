@@ -62,11 +62,11 @@ export default function SignupPage() {
             <div className="w-9 h-9 bg-[#ff7e67] rounded-xl flex items-center justify-center shadow-lg shadow-[#ff7e67]/20">
               <Zap className="h-5 w-5 text-white" />
             </div>
-            <span className="text-2xl font-extrabold tracking-tight">ReachAI</span>
+            <span className="text-2xl font-extrabold tracking-tight">Clinchd</span>
           </div>
           <CardTitle className="text-xl">Create your account</CardTitle>
           <CardDescription>
-            Get started with ReachAI today
+            Get started with Clinchd today
           </CardDescription>
         </CardHeader>
         <CardContent>

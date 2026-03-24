@@ -3,7 +3,7 @@ import { TrendingUp, Star } from "lucide-react";
 const testimonials = [
   {
     quote:
-      "I was manually responding to 80+ DMs a day. ReachAI handles all of it now. I woke up to 3 booked calls on my first morning.",
+      "I was manually responding to 80+ DMs a day. Clinchd handles all of it now. I woke up to 3 booked calls on my first morning.",
     name: "Sarah Jenkins",
     role: "Sales Coach, 12k followers",
     avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Sarah",

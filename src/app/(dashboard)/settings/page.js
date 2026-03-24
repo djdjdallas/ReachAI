@@ -151,20 +151,12 @@ export default function SettingsPage() {
   const handleDisconnectInstagram = async () => {
     setDisconnecting(true);
     try {
-      await supabase
-        .from("users")
-        .update({
-          instagram_token: null,
-          instagram_user_id: null,
-          instagram_page_id: null,
-        })
-        .eq("id", authUser.id);
+      // Call backend to disconnect from Unipile + clear DB
+      await fetch("/api/auth/instagram/disconnect", { method: "POST" });
 
       setProfile((prev) => ({
         ...prev,
-        instagram_token: null,
-        instagram_user_id: null,
-        instagram_page_id: null,
+        unipile_account_id: null,
       }));
     } catch (err) {
       console.error("Error disconnecting Instagram:", err);
@@ -181,7 +173,7 @@ export default function SettingsPage() {
     );
   }
 
-  const isInstagramConnected = !!profile?.instagram_token;
+  const isInstagramConnected = !!profile?.unipile_account_id;
 
   return (
     <div className="space-y-6 p-6 max-w-3xl">
@@ -264,9 +256,9 @@ export default function SettingsPage() {
                 <Badge variant="muted">Not Connected</Badge>
               )}
             </div>
-            {profile?.instagram_user_id && (
+            {profile?.unipile_account_id && (
               <span className="text-xs text-muted-foreground">
-                ID: {profile.instagram_user_id}
+                Account: {profile.unipile_account_id}
               </span>
             )}
           </div>
@@ -403,7 +395,7 @@ export default function SettingsPage() {
                   <DialogDescription>
                     This action cannot be undone. To delete your account and all
                     associated data, please contact our support team at{" "}
-                    <strong>support@reachai.com</strong>. We will process your
+                    <strong>support@clinchd.com</strong>. We will process your
                     request within 24 hours.
                   </DialogDescription>
                 </DialogHeader>
@@ -418,7 +410,7 @@ export default function SettingsPage() {
                     variant="destructive"
                     onClick={() => {
                       window.location.href =
-                        "mailto:support@reachai.com?subject=Account%20Deletion%20Request";
+                        "mailto:support@clinchd.com?subject=Account%20Deletion%20Request";
                     }}
                   >
                     Contact Support

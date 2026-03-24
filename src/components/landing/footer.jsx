@@ -12,7 +12,7 @@ export default function Footer() {
                 <Zap className="w-5 h-5 text-white" />
               </div>
               <span className="text-xl font-extrabold tracking-tight text-stone-900">
-                ReachAI
+                Clinchd
               </span>
             </div>
             <p className="text-stone-400 text-lg font-medium max-w-xs leading-relaxed">
@@ -72,7 +72,7 @@ export default function Footer() {
         </div>
         <div className="pt-12 border-t border-stone-100 flex flex-col md:flex-row justify-between items-center gap-8">
           <p className="text-stone-300 text-[13px] font-bold">
-            &copy; {new Date().getFullYear()} REACHAI AUTOMATION INC.
+            &copy; {new Date().getFullYear()} CLINCHD INC.
           </p>
           <div className="flex items-center gap-8 text-stone-300">
             <a href="#" className="hover:text-[#ff7e67] text-xl transition-colors">

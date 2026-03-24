@@ -11,13 +11,13 @@ export function getStripe() {
 
 export const PLANS = {
   base: {
-    name: "ReachAI Base",
+    name: "Clinchd Base",
     price: 9700, // $97.00
     priceId: process.env.STRIPE_BASE_PRICE_ID,
     dmLimit: 500,
   },
   unlimited: {
-    name: "ReachAI Unlimited",
+    name: "Clinchd Unlimited",
     price: 19700, // $197.00
     priceId: process.env.STRIPE_UNLIMITED_PRICE_ID,
     dmLimit: Infinity,

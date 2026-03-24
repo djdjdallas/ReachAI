@@ -12,7 +12,7 @@ const steps = [
     icon: FileEdit,
     title: "Step 2 — Script",
     description:
-      "Tell ReachAI what you sell, who your ideal customer is, and how to handle objections. Takes 5 minutes.",
+      "Tell Clinchd what you sell, who your ideal customer is, and how to handle objections. Takes 5 minutes.",
     highlight: false,
   },
   {
@@ -26,7 +26,7 @@ const steps = [
     icon: CalendarCheck,
     title: "Step 4 — Book",
     description:
-      "When a lead is hot, ReachAI drops your Calendly link at exactly the right moment. You show up to pre-qualified calls.",
+      "When a lead is hot, Clinchd drops your Calendly link at exactly the right moment. You show up to pre-qualified calls.",
     highlight: true,
   },
 ];
