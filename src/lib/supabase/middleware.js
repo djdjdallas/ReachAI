@@ -58,7 +58,6 @@ export async function updateSession(request) {
   if (
     pathname === "/" ||
     pathname.startsWith("/api/webhooks") ||
-    pathname.startsWith("/api/cron") ||
     pathname.startsWith("/compare") ||
     pathname.startsWith("/blog")
   ) {

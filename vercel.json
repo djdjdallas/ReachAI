@@ -1,8 +1,1 @@
-{
-  "crons": [
-    {
-      "path": "/api/cron/reset-dm-counts",
-      "schedule": "0 0 1 * *"
-    }
-  ]
-}
+{}
