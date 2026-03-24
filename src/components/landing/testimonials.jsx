@@ -3,23 +3,23 @@ import { TrendingUp, Star } from "lucide-react";
 const testimonials = [
   {
     quote:
-      "I was manually responding to 80+ DMs a day. Clinchd handles all of it now. I woke up to 3 booked calls on my first morning.",
+      "I was spending 2 hours a day in DMs qualifying leads. Clinchd does it all now. I woke up to 3 booked discovery calls on my first morning.",
     name: "Sarah Jenkins",
-    role: "Sales Coach, 12k followers",
+    role: "Business Coach, 12k followers",
     avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Sarah",
   },
   {
     quote:
-      "I was skeptical an AI could handle my objections. It handles them better than I do. 20 minutes setup, money back in 4 days.",
+      "I was paying a setter $3K/month and half the leads were falling through the cracks. Clinchd handles objections better than they did. ROI in 4 days.",
     name: "Marcus Thorne",
-    role: "Agency Owner, 25k followers",
+    role: "High-Ticket Coach, 25k followers",
     avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Oliver",
   },
   {
     quote:
-      "The human-like delay is the game changer. People think they're talking to my assistant. Highest ROI tool I've ever bought.",
+      "The human-like delay is the game changer. People think they're talking to my assistant, not a bot. Replaced my $4K setter on day one.",
     name: "Emma Rivera",
-    role: "Business Coach, 8k followers",
+    role: "Course Creator, 8k followers",
     avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Emma",
   },
 ];
@@ -31,17 +31,17 @@ export default function Testimonials() {
         <div className="flex flex-col items-center mb-16 reveal-up">
           <div className="inline-flex items-center gap-3 px-6 py-2 rounded-full bg-stone-900 text-white text-sm font-bold mb-4 shadow-xl">
             <TrendingUp className="w-4 h-4 text-[#ff7e67]" />
-            847 calls booked this month
+            847 discovery calls booked this month
           </div>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-16">
           <div className="lg:col-span-1 reveal-up">
             <h2 className="text-4xl font-black mb-8 leading-tight text-stone-900">
-              Loved by the world&apos;s best closers.
+              Coaches are replacing their setters with Clinchd.
             </h2>
             <p className="text-stone-500 text-lg font-medium mb-8">
-              Real results from real operators. 4.9/5 from 800+ reviews.
+              Real results from coaches selling high-ticket offers. 4.9/5 from 800+ reviews.
             </p>
             <div className="flex items-center gap-1.5 text-[#ff7e67] mb-2">
               {[...Array(5)].map((_, i) => (
@@ -49,7 +49,7 @@ export default function Testimonials() {
               ))}
             </div>
             <p className="text-sm font-extrabold text-stone-400 uppercase tracking-widest">
-              Market Leader
+              #1 AI Setter for Coaches
             </p>
           </div>
 

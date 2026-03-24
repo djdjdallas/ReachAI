@@ -14,9 +14,9 @@ const geistMono = localFont({
 });
 
 export const metadata = {
-  title: "Clinchd - AI Sales Agent for Instagram DMs",
+  title: "Clinchd - The AI Setter for Coaches | Book Discovery Calls on Autopilot",
   description:
-    "Automatically qualify leads and book sales calls via Instagram DMs with AI-powered conversations.",
+    "Clinchd is the AI setter that qualifies leads, handles objections, and books discovery calls in your Instagram DMs — replacing your $5K/mo setter for just $97.",
 };
 
 export default function RootLayout({ children }) {

@@ -38,7 +38,6 @@ export default function Hero() {
           "-=0.3"
         );
 
-      // Floating chat bubble
       if (floatingBubbleRef.current) {
         gsap.to(floatingBubbleRef.current, {
           y: -10,
@@ -58,51 +57,59 @@ export default function Hero() {
       ref={sectionRef}
       className="relative pt-24 pb-20 md:pt-40 md:pb-32 overflow-hidden bg-white"
     >
-      {/* Background glow */}
       <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[1000px] h-[600px] bg-gradient-to-b from-[#fff5f2] to-transparent rounded-full blur-3xl -z-10 opacity-60" />
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center relative">
-        {/* Badge */}
         <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-[#fff5f2] text-[#ff7e67] text-[13px] font-bold tracking-tight mb-8 shadow-sm border border-[#ff7e67]/10">
           <Sparkles className="w-4 h-4" />
-          The #1 AI Agent for Instagram
+          The AI Setter Built for Coaches
         </div>
 
-        {/* Headline */}
         <h1
           ref={headlineRef}
           className="text-5xl md:text-7xl lg:text-8xl font-black tracking-tight text-stone-900 max-w-6xl mx-auto mb-10 leading-[1.05]"
         >
-          Your Instagram DMs Are Full of{" "}
+          Book More Discovery Calls{" "}
           <span className="text-[#ff7e67] relative inline-block">
-            Money
+            While You Sleep.
             <span className="absolute bottom-1 left-0 w-full h-3 bg-[#ff7e67]/10 -z-10" />
-          </span>{" "}
-          You&apos;re Leaving Behind.
+          </span>
         </h1>
 
-        {/* Subtitle */}
         <p
           ref={subtitleRef}
           className="text-lg md:text-2xl text-stone-500 max-w-3xl mx-auto mb-12 leading-relaxed font-medium"
         >
-          Clinchd is the first human-like AI sales agent that qualifies leads
-          and books calls in your Instagram DMs—while you sleep.
+          Clinchd is an AI setter that qualifies every DM, handles objections,
+          and drops your Calendly link at the right moment — so you wake up to
+          booked calls, not missed leads.
         </p>
 
-        {/* CTA */}
         <div ref={ctaRef} className="flex flex-col items-center gap-5">
-          <Link
-            href="/signup"
-            className="w-full sm:w-auto px-10 py-5 bg-[#ff7e67] text-white rounded-full text-xl font-bold hover:scale-105 active:scale-95 transition-all shadow-2xl shadow-[#ff7e67]/30 flex items-center justify-center gap-3 group"
-          >
-            Start Your 7-Day Free Trial
-            <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
-          </Link>
+          <div className="flex flex-col sm:flex-row items-center gap-4">
+            <Link
+              href="/signup"
+              className="w-full sm:w-auto px-10 py-5 bg-[#ff7e67] text-white rounded-full text-xl font-bold hover:scale-105 active:scale-95 transition-all shadow-2xl shadow-[#ff7e67]/30 flex items-center justify-center gap-3 group"
+            >
+              Start Free Trial
+              <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
+            </Link>
+            <a
+              href="#how-it-works"
+              className="w-full sm:w-auto px-10 py-5 bg-white text-stone-900 rounded-full text-xl font-bold border-2 border-stone-200 hover:border-stone-900 transition-all flex items-center justify-center"
+            >
+              See How It Works
+            </a>
+          </div>
           <p className="text-sm text-stone-400 font-medium">
             No credit card required &middot; $97/mo after &middot; Cancel
             anytime
           </p>
+          <div className="flex items-center gap-2 mt-2 px-5 py-2.5 bg-stone-50 rounded-2xl border border-stone-100">
+            <span className="text-sm font-bold text-stone-600">
+              Used by 500+ coaches and course creators
+            </span>
+          </div>
         </div>
 
         {/* DM Mockup */}
@@ -144,7 +151,7 @@ export default function Hero() {
                 <div className="flex-1 space-y-6">
                   <div className="flex justify-end">
                     <div className="bg-stone-900 text-white px-5 py-3 rounded-3xl rounded-tr-none max-w-xs text-sm font-medium shadow-lg">
-                      How much for your coaching?
+                      Hey! I saw your post about your coaching program. How much is it?
                     </div>
                   </div>
                   <div
@@ -155,13 +162,13 @@ export default function Hero() {
                       AI
                     </div>
                     <div className="bg-white border border-stone-100 px-5 py-3 rounded-3xl rounded-tl-none max-w-sm text-sm font-medium text-stone-600 soft-shadow">
-                      Hey Sarah! Prices vary based on your goals. Are you
-                      currently at $10k/mo or just starting out?
+                      Hey Sarah! Great question. Our program is tailored to where
+                      you&apos;re at. Are you currently doing $10k/mo or just starting out?
                     </div>
                   </div>
                   <div className="flex justify-end">
                     <div className="bg-stone-900 text-white px-5 py-3 rounded-3xl rounded-tr-none max-w-xs text-sm font-medium shadow-lg">
-                      Doing around $15k, looking to scale.
+                      Around $15k, looking to scale to $50k.
                     </div>
                   </div>
                   <div className="flex justify-start items-end gap-3">
@@ -169,7 +176,7 @@ export default function Hero() {
                       AI
                     </div>
                     <div className="bg-white border border-stone-100 px-5 py-3 rounded-3xl rounded-tl-none max-w-sm text-sm font-medium text-stone-600 soft-shadow">
-                      Perfect. You&apos;re a great fit. Let&apos;s hop on a
+                      That&apos;s exactly who we help. Let&apos;s hop on a 15-min
                       strategy call:{" "}
                       <span className="text-[#ff7e67] underline">
                         cal.com/book
@@ -181,10 +188,10 @@ export default function Hero() {
                   <CheckCircle className="w-6 h-6 text-emerald-600" />
                   <div>
                     <p className="text-xs font-bold text-emerald-800 uppercase tracking-widest">
-                      Status: Qualified
+                      Lead Qualified — Call Booked
                     </p>
                     <p className="text-[11px] text-emerald-600 font-medium">
-                      Booking link delivered automatically.
+                      Discovery call link delivered automatically at 2:47 AM.
                     </p>
                   </div>
                 </div>

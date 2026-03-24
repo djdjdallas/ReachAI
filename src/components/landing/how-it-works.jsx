@@ -5,14 +5,14 @@ const steps = [
     icon: Link2,
     title: "Step 1 — Connect",
     description:
-      "Link your Instagram Business account in one click via the official Meta Graph API. No passwords shared.",
+      "Link your Instagram Business account in one click. No passwords shared, fully secured through the official Meta API.",
     highlight: false,
   },
   {
     icon: FileEdit,
     title: "Step 2 — Script",
     description:
-      "Tell Clinchd what you sell, who your ideal customer is, and how to handle objections. Takes 5 minutes.",
+      "Tell Clinchd about your coaching offer, your ideal client, and how you handle objections. Takes 5 minutes.",
     highlight: false,
   },
   {
@@ -26,7 +26,7 @@ const steps = [
     icon: CalendarCheck,
     title: "Step 4 — Book",
     description:
-      "When a lead is hot, Clinchd drops your Calendly link at exactly the right moment. You show up to pre-qualified calls.",
+      "When a lead is qualified, Clinchd drops your Calendly link at exactly the right moment. You show up to pre-qualified discovery calls.",
     highlight: true,
   },
 ];
@@ -37,13 +37,13 @@ export default function HowItWorks() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="max-w-3xl mb-24 reveal-up">
           <div className="inline-flex items-center px-4 py-1 rounded-full bg-stone-100 text-stone-500 text-[11px] font-bold uppercase tracking-widest mb-6">
-            Process
+            How It Works
           </div>
           <h2 className="text-4xl md:text-6xl font-black mb-8 leading-tight text-stone-900">
-            From Instagram DM to booked call in under 10 minutes.
+            From DM to discovery call in under 10 minutes.
           </h2>
           <p className="text-stone-500 text-xl font-medium">
-            A seamless 4-step workflow designed to save you 20+ hours a week.
+            A 4-step workflow that replaces your setter and saves you 20+ hours a week.
           </p>
         </div>
 

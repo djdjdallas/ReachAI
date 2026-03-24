@@ -4,12 +4,12 @@ import { Check, CheckCircle, ShieldCheck } from "lucide-react";
 const basePlan = {
   name: "Base",
   price: "$97",
-  description: "Ideal for emerging coaches and boutique agencies.",
+  description: "For coaches ready to stop losing leads in their DMs.",
   features: [
     "500 DMs / month",
-    "Basic AI automation",
+    "AI setter replies in your voice",
     "Lead qualification",
-    "Auto-book calls",
+    "Auto-book discovery calls",
     "Email support",
   ],
 };
@@ -17,13 +17,13 @@ const basePlan = {
 const unlimitedPlan = {
   name: "Unlimited",
   price: "$197",
-  description: "For high-volume outreach and rapid scale.",
+  description: "For high-volume coaches scaling past $50K/mo.",
   features: [
     "Unlimited DMs / month",
     "Everything in Base",
-    "Advanced Analytics",
-    "Priority Support",
-    "Custom Personality",
+    "Advanced analytics",
+    "Priority support",
+    "Custom AI personality tuning",
   ],
 };
 
@@ -33,10 +33,10 @@ export default function Pricing() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="text-center mb-24 reveal-up">
           <h2 className="text-4xl md:text-6xl font-black mb-6 tracking-tight text-stone-900">
-            Simple, performance pricing.
+            A $5K setter or $97/mo.
           </h2>
           <p className="text-stone-500 text-xl font-medium">
-            Choose the plan that fits your growth.
+            Same result. Fraction of the cost. Choose the plan that fits your coaching business.
           </p>
         </div>
 

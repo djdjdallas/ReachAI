@@ -10,7 +10,7 @@ export default function FinalCta() {
           <div className="absolute -bottom-24 -left-24 w-96 h-96 bg-[#ff7e67]/5 blur-[120px] rounded-full" />
 
           <h2 className="text-4xl md:text-6xl font-black mb-12 max-w-3xl mx-auto leading-[1.1] tracking-tight text-stone-900 relative">
-            Stop ghosting your best leads.{" "}
+            Stop losing leads at 2 AM.{" "}
             <span className="text-[#ff7e67]">Start booking.</span>
           </h2>
           <div className="flex flex-col items-center gap-6 relative">
@@ -23,10 +23,10 @@ export default function FinalCta() {
             </Link>
             <div className="flex flex-col gap-2">
               <p className="text-stone-500 font-bold uppercase tracking-widest text-xs">
-                7-day trial &middot; Setup in minutes
+                7-day trial &middot; Setup in 5 minutes
               </p>
               <p className="text-stone-400 font-medium text-xs italic">
-                Setup takes 5 minutes. First reply sent today.
+                Your AI setter starts qualifying leads today.
               </p>
             </div>
           </div>

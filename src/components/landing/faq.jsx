@@ -5,29 +5,44 @@ import { ChevronDown } from "lucide-react";
 
 const faqs = [
   {
-    question: "Is this against Instagram's rules?",
+    question: "Is this compliant with Instagram's API?",
     answer:
-      "No. Clinchd uses the official Meta Graph API and only responds to inbound messages. We never send unsolicited spam.",
+      "Yes. Clinchd uses the official Meta Graph API and only responds to inbound messages. We never send unsolicited spam or cold outreach. We follow all of Instagram's platform policies.",
   },
   {
-    question: "Will it sound like a robot?",
+    question: "Will my followers know it's AI?",
     answer:
-      "Not at all. You provide the tone and script. Clinchd is trained to match your specific brand voice perfectly.",
+      "In our testing, over 95% of leads don't realize they're talking to AI. You provide your tone and sales script. Clinchd matches your specific coaching voice — with human-like delays so conversations feel natural.",
   },
   {
-    question: "What happens when I hit my 500 DM limit?",
+    question: "How is this different from ManyChat?",
     answer:
-      "Upgrade to Unlimited or wait for next month's reset. You'll receive a notification when you're at 80% and 100% of your limit.",
+      "ManyChat uses rigid decision-tree flows and charges per contact. Clinchd is an AI-native setter that understands context, handles objections dynamically, and qualifies leads like a real sales rep — for a flat $97/mo. No flows to build, no per-contact fees.",
   },
   {
-    question: "Can I use this with multiple Instagram accounts?",
+    question: "What if someone asks something my AI isn't trained on?",
     answer:
-      "One account per subscription currently. We are developing an agency plan for managing multiple accounts from a single dashboard.",
+      "Clinchd gracefully handles unknown topics by steering the conversation back to qualification, or it flags the lead for human takeover. You can jump into any conversation with one click and pick up exactly where the AI left off.",
   },
   {
-    question: "How is this different from a chatbot?",
+    question: "Do I need a business Instagram account?",
     answer:
-      "Clinchd uses your actual sales script, handles real objections, and knows when to drop your booking link — a chatbot just answers simple FAQs with pre-set buttons.",
+      "Yes, you'll need an Instagram Business or Creator account connected to a Facebook Page. This is required by Meta's API. If you're currently on a personal account, switching takes about 2 minutes in your Instagram settings.",
+  },
+  {
+    question: "How long does setup take?",
+    answer:
+      "Most coaches are fully set up in under 30 minutes. Connect your Instagram, describe your offer and ideal client, review the AI's conversation script, and flip the switch. No flow builders, no coding.",
+  },
+  {
+    question: "Can I cancel anytime?",
+    answer:
+      "Absolutely. No contracts, no commitments. Cancel with one click from your dashboard. You'll keep access through the end of your billing period. We also offer a 7-day free trial so you can test everything risk-free.",
+  },
+  {
+    question: "What if I have a VA already — can they use this too?",
+    answer:
+      "Yes. Your VA can access the Clinchd dashboard to monitor conversations, take over chats, and review lead quality. Many coaches use Clinchd as their AI first responder and have their VA handle warm handoffs for complex conversations.",
   },
 ];
 
@@ -42,7 +57,7 @@ export default function Faq() {
             Common Questions
           </h2>
           <p className="text-stone-500 font-medium">
-            Everything you need to know about your new AI agent.
+            Everything you need to know about your AI setter.
           </p>
         </div>
 

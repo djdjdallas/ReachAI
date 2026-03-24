@@ -10,44 +10,44 @@ import {
 const features = [
   {
     icon: MessageCircle,
-    title: "AI Replies",
+    title: "AI Setter Replies",
     description:
-      "Responds instantly in your unique brand voice, 24/7 with deep semantic understanding.",
+      "Responds to every DM in your voice, 24/7 — qualifying leads while you coach, sleep, or live your life.",
     bgClass: "bg-[#fff5f2]",
   },
   {
     icon: UserCheck,
-    title: "Qualification",
+    title: "Lead Qualification",
     description:
-      "Filters out time-wasters so you only talk to real buyers ready to pull the trigger.",
+      "Asks the right questions to filter tire-kickers from high-ticket buyers ready to book a discovery call.",
     bgClass: "bg-orange-50",
   },
   {
     icon: ShieldAlert,
-    title: "Objections",
+    title: "Objection Handling",
     description:
-      "Trained on your script to squash doubts on the spot using proven sales psychology.",
+      "Trained on your exact sales script to handle \"I can't afford it\" and \"I need to think about it\" on the spot.",
     bgClass: "bg-rose-50",
   },
   {
     icon: CalendarPlus,
-    title: "Auto-Book",
+    title: "Auto-Book Calls",
     description:
-      "Drops booking links at the peak of buyer interest, syncing directly with Calendly.",
+      "Drops your Calendly or Cal.com link at the perfect moment — when buyer interest peaks, not a second too early.",
     bgClass: "bg-amber-50",
   },
   {
     icon: LayoutDashboard,
-    title: "Dashboard",
+    title: "Live Dashboard",
     description:
-      "Watch every thread in real time and take over manually with a single click.",
+      "Watch every conversation in real time. See who's qualifying, who booked, and jump in manually with one click.",
     bgClass: "bg-stone-50",
   },
   {
     icon: PenTool,
     title: "Script Builder",
     description:
-      "AI helps generate your personality from scratch using successful outreach templates.",
+      "AI generates your coaching-specific conversation flow from scratch. Tweak the tone until it sounds like you.",
     bgClass: "bg-blue-50",
   },
 ];
@@ -58,10 +58,10 @@ export default function Features() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="text-center max-w-2xl mx-auto mb-20 reveal-up">
           <h2 className="text-4xl md:text-5xl font-black mb-6 tracking-tight text-stone-900">
-            Built for Closers Who Don&apos;t Have Time to Type
+            Your AI Setter That Never Misses a Lead
           </h2>
           <p className="text-stone-500 text-lg font-medium">
-            Powerful tools for serious sales automation.
+            Everything a $5K/mo setter does — at a fraction of the cost.
           </p>
         </div>
 
