@@ -283,9 +283,11 @@ export default function OnboardingPage() {
     <div className="min-h-screen bg-background px-4 py-8">
       <div className="mx-auto max-w-2xl">
         {/* Logo */}
-        <div className="flex items-center justify-center gap-2 mb-8">
-          <Zap className="h-7 w-7 text-primary" />
-          <span className="text-2xl font-bold">ReachAI</span>
+        <div className="flex items-center justify-center gap-2.5 mb-8">
+          <div className="w-9 h-9 bg-[#ff7e67] rounded-xl flex items-center justify-center shadow-lg shadow-[#ff7e67]/20">
+            <Zap className="h-5 w-5 text-white" />
+          </div>
+          <span className="text-2xl font-extrabold tracking-tight">ReachAI</span>
         </div>
 
         {/* Step indicators */}
@@ -335,7 +337,7 @@ export default function OnboardingPage() {
         {step === 1 && (
           <Card className="mt-6">
             <CardHeader className="text-center">
-              <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-gradient-to-br from-purple-500 to-pink-500 mb-3">
+              <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-[#ff7e67] mb-3">
                 <Instagram className="h-7 w-7 text-white" />
               </div>
               <CardTitle className="text-xl">Connect Your Instagram</CardTitle>
@@ -352,8 +354,8 @@ export default function OnboardingPage() {
                 </h4>
                 <ul className="text-sm text-muted-foreground space-y-2 ml-6 list-disc">
                   <li>
-                    We connect through the official Instagram Graph API via your
-                    Facebook Business account.
+                    Click the button below to securely connect your Instagram
+                    account through our authentication partner.
                   </li>
                   <li>
                     ReachAI reads new DMs and sends replies as your account to
@@ -369,10 +371,10 @@ export default function OnboardingPage() {
                 <p className="text-sm text-yellow-600 dark:text-yellow-400 flex items-start gap-2">
                   <ShieldCheck className="h-4 w-4 mt-0.5 shrink-0" />
                   <span>
-                    ReachAI complies with Instagram&apos;s Platform Policy and
-                    Automation Rules. We only respond to messages initiated by
-                    users and never send unsolicited outreach. Your account
-                    credentials are securely encrypted and never shared.
+                    Your Instagram credentials are handled securely by our
+                    authentication partner and never touch our servers. We only
+                    respond to messages initiated by users and never send
+                    unsolicited outreach.
                   </span>
                 </p>
               </div>
@@ -665,7 +667,7 @@ export default function OnboardingPage() {
                     <Instagram className="h-4 w-4" />
                     Instagram Connected
                   </span>
-                  {profile?.instagram_token ? (
+                  {profile?.unipile_account_id ? (
                     <Badge variant="success">Connected</Badge>
                   ) : (
                     <Badge variant="warning">Not Connected</Badge>

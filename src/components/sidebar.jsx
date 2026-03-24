@@ -46,9 +46,11 @@ export default function Sidebar() {
   return (
     <aside className="fixed inset-y-0 left-0 z-50 w-64 flex flex-col bg-sidebar text-sidebar-foreground">
       {/* Logo */}
-      <div className="flex items-center gap-2 px-6 py-5 border-b border-white/10">
-        <Zap className="h-6 w-6 text-primary" />
-        <span className="text-lg font-bold">ReachAI</span>
+      <div className="flex items-center gap-2.5 px-6 py-5 border-b border-white/10">
+        <div className="w-8 h-8 bg-[#ff7e67] rounded-xl flex items-center justify-center shadow-lg shadow-[#ff7e67]/20">
+          <Zap className="h-4 w-4 text-white" />
+        </div>
+        <span className="text-lg font-extrabold tracking-tight">ReachAI</span>
       </div>
 
       {/* Navigation */}
@@ -59,10 +61,10 @@ export default function Sidebar() {
             <Link
               key={href}
               href={href}
-              className={`flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors ${
+              className={`flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors ${
                 isActive
-                  ? "bg-white/10 text-white"
-                  : "text-sidebar-foreground/70 hover:bg-white/5 hover:text-white"
+                  ? "bg-[#ff7e67]/15 text-[#ff7e67]"
+                  : "text-sidebar-foreground/60 hover:bg-white/5 hover:text-sidebar-foreground"
               }`}
             >
               <Icon className="h-4 w-4" />
@@ -75,13 +77,13 @@ export default function Sidebar() {
       {/* User section */}
       <div className="border-t border-white/10 px-4 py-4 space-y-3">
         {userEmail && (
-          <p className="text-xs text-sidebar-foreground/60 truncate">
+          <p className="text-xs text-sidebar-foreground/50 truncate">
             {userEmail}
           </p>
         )}
         <Button
           variant="ghost"
-          className="w-full justify-start gap-2 text-sidebar-foreground/70 hover:text-white hover:bg-white/5"
+          className="w-full justify-start gap-2 text-sidebar-foreground/60 hover:text-sidebar-foreground hover:bg-white/5"
           onClick={handleSignOut}
         >
           <LogOut className="h-4 w-4" />

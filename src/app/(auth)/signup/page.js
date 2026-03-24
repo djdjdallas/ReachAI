@@ -56,11 +56,13 @@ export default function SignupPage() {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-background px-4">
-      <Card className="w-full max-w-md">
+      <Card className="w-full max-w-md border-border/50">
         <CardHeader className="text-center">
-          <div className="flex items-center justify-center gap-2 mb-2">
-            <Zap className="h-6 w-6 text-primary" />
-            <span className="text-2xl font-bold">ReachAI</span>
+          <div className="flex items-center justify-center gap-2.5 mb-2">
+            <div className="w-9 h-9 bg-[#ff7e67] rounded-xl flex items-center justify-center shadow-lg shadow-[#ff7e67]/20">
+              <Zap className="h-5 w-5 text-white" />
+            </div>
+            <span className="text-2xl font-extrabold tracking-tight">ReachAI</span>
           </div>
           <CardTitle className="text-xl">Create your account</CardTitle>
           <CardDescription>
@@ -69,7 +71,7 @@ export default function SignupPage() {
         </CardHeader>
         <CardContent>
           {success ? (
-            <div className="text-sm text-center text-green-400 bg-green-400/10 border border-green-400/20 rounded-md p-4">
+            <div className="text-sm text-center text-emerald-400 bg-emerald-400/10 border border-emerald-400/20 rounded-md p-4">
               Check your email for a confirmation link.
             </div>
           ) : (
@@ -128,7 +130,7 @@ export default function SignupPage() {
             Already have an account?{" "}
             <Link
               href="/login"
-              className="text-primary underline-offset-4 hover:underline"
+              className="text-[#ff7e67] underline-offset-4 hover:underline font-medium"
             >
               Sign in
             </Link>
