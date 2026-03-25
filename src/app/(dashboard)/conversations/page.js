@@ -333,13 +333,13 @@ function ConversationsPage() {
 
   if (loading) {
     return (
-      <div className="flex h-[calc(100vh-4rem)] overflow-hidden -m-4 md:-m-8">
-        <div className="w-96 border-r flex flex-col bg-background p-4 space-y-4">
+      <div className="flex h-screen overflow-hidden">
+        <div className="w-[380px] border-r border-white/[0.06] flex flex-col p-4 space-y-4">
           <Skeleton className="h-8 w-48" />
           <Skeleton className="h-10 w-full" />
           {[...Array(5)].map((_, i) => (
             <div key={i} className="flex items-center gap-3">
-              <Skeleton className="h-9 w-9 rounded-full" />
+              <Skeleton className="h-10 w-10 rounded-full" />
               <div className="flex-1 space-y-2">
                 <Skeleton className="h-4 w-32" />
                 <Skeleton className="h-3 w-48" />
@@ -355,30 +355,30 @@ function ConversationsPage() {
   }
 
   return (
-    <div className="flex h-[calc(100vh-4rem)] overflow-hidden -m-4 md:-m-8">
+    <div className="flex h-screen overflow-hidden">
       {/* Left Panel: Conversation List */}
-      <div className="w-full md:w-96 border-r flex flex-col bg-background">
-        <div className="p-4 border-b space-y-3">
-          <h2 className="font-semibold text-lg">Conversations</h2>
+      <div className="w-full md:w-[380px] border-r border-white/[0.06] flex flex-col">
+        <div className="px-5 pt-5 pb-4 space-y-4">
+          <h2 className="font-semibold text-xl tracking-tight">Conversations</h2>
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
               placeholder="Search conversations..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-9"
+              className="pl-9 bg-white/[0.04] border-white/[0.08] focus-visible:border-white/20 h-9"
             />
           </div>
           {/* Status filter tabs */}
-          <div className="flex gap-1 overflow-x-auto pb-1">
+          <div className="flex gap-1.5 overflow-x-auto pb-0.5 scrollbar-none">
             {STATUS_FILTERS.map((filter) => (
               <button
                 key={filter.value}
                 onClick={() => setStatusFilter(filter.value)}
-                className={`px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-colors ${
+                className={`px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-all ${
                   statusFilter === filter.value
-                    ? "bg-primary text-primary-foreground"
-                    : "bg-muted text-muted-foreground hover:bg-muted/80"
+                    ? "bg-[#ff7e67] text-white shadow-sm shadow-[#ff7e67]/25"
+                    : "bg-white/[0.06] text-muted-foreground hover:bg-white/[0.1] hover:text-foreground"
                 }`}
               >
                 {filter.label}
@@ -387,29 +387,43 @@ function ConversationsPage() {
           </div>
         </div>
 
+        <Separator className="bg-white/[0.06]" />
+
         <ScrollArea className="flex-1">
           {filteredConversations.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
-              <MessageSquare className="h-8 w-8 mb-2" />
-              <p className="text-sm">
+            <div className="flex flex-col items-center justify-center py-16 text-muted-foreground">
+              <div className="w-12 h-12 rounded-full bg-white/[0.04] flex items-center justify-center mb-3">
+                <MessageSquare className="h-5 w-5" />
+              </div>
+              <p className="text-sm font-medium">
                 {searchQuery || statusFilter !== "all"
                   ? "No conversations found"
                   : "No conversations yet"}
               </p>
+              <p className="text-xs text-muted-foreground/60 mt-1">
+                {searchQuery || statusFilter !== "all"
+                  ? "Try adjusting your filters"
+                  : "Conversations will appear here"}
+              </p>
             </div>
           ) : (
-            filteredConversations.map((convo, index) => (
-              <div key={convo.id}>
-                {index > 0 && <Separator />}
+            <div className="py-1">
+              {filteredConversations.map((convo) => (
                 <button
+                  key={convo.id}
                   onClick={() => handleSelectConversation(convo)}
-                  className={`w-full text-left px-4 py-3 hover:bg-muted/50 transition-colors ${
-                    selectedConvo?.id === convo.id ? "bg-muted" : ""
+                  className={`w-full text-left px-4 py-3 transition-colors relative ${
+                    selectedConvo?.id === convo.id
+                      ? "bg-white/[0.06]"
+                      : "hover:bg-white/[0.03]"
                   }`}
                 >
-                  <div className="flex items-center gap-3">
-                    <Avatar className="h-9 w-9 shrink-0">
-                      <AvatarFallback className="text-xs">
+                  {selectedConvo?.id === convo.id && (
+                    <div className="absolute left-0 top-2 bottom-2 w-[3px] rounded-r-full bg-[#ff7e67]" />
+                  )}
+                  <div className="flex items-start gap-3">
+                    <Avatar className="h-10 w-10 shrink-0 mt-0.5">
+                      <AvatarFallback className="text-xs bg-white/[0.08] text-foreground/80">
                         {getInitials(convo.sender_name)}
                       </AvatarFallback>
                     </Avatar>
@@ -418,35 +432,35 @@ function ConversationsPage() {
                         <span className="font-medium text-sm truncate">
                           {convo.sender_name || "Unknown"}
                         </span>
-                        <span className="text-xs text-muted-foreground whitespace-nowrap shrink-0">
+                        <span className="text-[11px] text-muted-foreground/60 whitespace-nowrap shrink-0">
                           {timeAgo(convo.updated_at)}
                         </span>
                       </div>
                       <div className="flex items-center gap-2 mt-1">
                         <StatusBadge status={convo.status} />
                       </div>
-                      <p className="text-xs text-muted-foreground truncate mt-1">
+                      <p className="text-xs text-muted-foreground/70 truncate mt-1.5 leading-relaxed">
                         {convo.last_message
-                          ? convo.last_message.length > 50
-                            ? convo.last_message.slice(0, 50) + "..."
+                          ? convo.last_message.length > 60
+                            ? convo.last_message.slice(0, 60) + "..."
                             : convo.last_message
                           : "No messages yet"}
                       </p>
                     </div>
                   </div>
                 </button>
-              </div>
-            ))
+              ))}
+            </div>
           )}
         </ScrollArea>
       </div>
 
       {/* Right Panel: Message Thread */}
-      <div className={`flex-1 flex flex-col bg-background ${selectedConvo ? "" : "hidden md:flex"}`}>
+      <div className={`flex-1 flex flex-col ${selectedConvo ? "" : "hidden md:flex"}`}>
         {selectedConvo ? (
           <>
             {/* Conversation Header */}
-            <div className="flex items-center justify-between px-6 py-4 border-b">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-white/[0.06]">
               <div className="flex items-center gap-3">
                 <Button
                   variant="ghost"
@@ -457,15 +471,15 @@ function ConversationsPage() {
                   &larr;
                 </Button>
                 <Avatar className="h-10 w-10">
-                  <AvatarFallback>
+                  <AvatarFallback className="bg-white/[0.08] text-foreground/80">
                     {getInitials(selectedConvo.sender_name)}
                   </AvatarFallback>
                 </Avatar>
                 <div>
-                  <h3 className="font-semibold">
+                  <h3 className="font-semibold text-[15px]">
                     {selectedConvo.sender_name || "Unknown"}
                   </h3>
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 mt-0.5">
                     <Select
                       value={selectedConvo.status || "qualifying"}
                       onValueChange={handleStatusChange}
@@ -482,7 +496,8 @@ function ConversationsPage() {
                       </SelectContent>
                     </Select>
                     {selectedConvo.ai_paused && (
-                      <span className="text-xs text-muted-foreground">
+                      <span className="text-xs text-amber-400/80 flex items-center gap-1">
+                        <Bot className="h-3 w-3" />
                         AI paused
                       </span>
                     )}
@@ -495,7 +510,7 @@ function ConversationsPage() {
                     variant="outline"
                     size="sm"
                     onClick={() => handleStatusChange("booked")}
-                    className="gap-1.5"
+                    className="gap-1.5 border-white/[0.1] hover:bg-white/[0.06]"
                   >
                     <CheckCircle className="h-3.5 w-3.5" />
                     Mark Booked
@@ -506,7 +521,7 @@ function ConversationsPage() {
                     variant="outline"
                     size="sm"
                     onClick={handleResumeAi}
-                    className="gap-1.5"
+                    className="gap-1.5 border-white/[0.1] hover:bg-white/[0.06]"
                   >
                     <Bot className="h-3.5 w-3.5" />
                     Resume AI
@@ -516,7 +531,7 @@ function ConversationsPage() {
             </div>
 
             {/* Messages Area */}
-            <ScrollArea className="flex-1 p-6">
+            <ScrollArea className="flex-1 px-6 py-4">
               {messagesLoading ? (
                 <div className="space-y-4">
                   {[...Array(4)].map((_, i) => (
@@ -531,12 +546,17 @@ function ConversationsPage() {
                   ))}
                 </div>
               ) : messages.length === 0 ? (
-                <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
-                  <MessageSquare className="h-8 w-8 mb-2" />
-                  <p className="text-sm">No messages in this conversation</p>
+                <div className="flex flex-col items-center justify-center py-16 text-muted-foreground">
+                  <div className="w-12 h-12 rounded-full bg-white/[0.04] flex items-center justify-center mb-3">
+                    <MessageSquare className="h-5 w-5" />
+                  </div>
+                  <p className="text-sm font-medium">No messages yet</p>
+                  <p className="text-xs text-muted-foreground/60 mt-1">
+                    Messages will appear here
+                  </p>
                 </div>
               ) : (
-                <div className="space-y-4">
+                <div className="space-y-3">
                   {messages.map((msg) => {
                     const isOutbound = msg.role === "assistant";
                     return (
@@ -550,32 +570,32 @@ function ConversationsPage() {
                           <div
                             className={`rounded-2xl px-4 py-2.5 ${
                               isOutbound
-                                ? "bg-primary text-primary-foreground"
-                                : "bg-muted"
+                                ? "bg-[#ff7e67] text-white rounded-br-md"
+                                : "bg-white/[0.06] rounded-bl-md"
                             }`}
                           >
-                            <p className="text-sm whitespace-pre-wrap">
+                            <p className="text-sm whitespace-pre-wrap leading-relaxed">
                               {msg.content}
                             </p>
                           </div>
                           <div
-                            className={`flex items-center gap-1.5 mt-1 ${
+                            className={`flex items-center gap-1.5 mt-1 px-1 ${
                               isOutbound ? "justify-end" : "justify-start"
                             }`}
                           >
                             {isOutbound && (
-                              <span className="text-[10px] font-medium text-muted-foreground flex items-center gap-0.5">
+                              <span className="text-[10px] font-medium text-muted-foreground/60 flex items-center gap-0.5">
                                 <Bot className="h-2.5 w-2.5" />
                                 AI
                               </span>
                             )}
                             {msg.role === "user" && (
-                              <span className="text-[10px] font-medium text-muted-foreground flex items-center gap-0.5">
+                              <span className="text-[10px] font-medium text-muted-foreground/60 flex items-center gap-0.5">
                                 <User className="h-2.5 w-2.5" />
                                 Lead
                               </span>
                             )}
-                            <span className="text-[10px] text-muted-foreground">
+                            <span className="text-[10px] text-muted-foreground/40">
                               {timeAgo(msg.created_at)}
                             </span>
                           </div>
@@ -589,7 +609,7 @@ function ConversationsPage() {
             </ScrollArea>
 
             {/* Message Input */}
-            <div className="border-t p-4">
+            <div className="border-t border-white/[0.06] p-4">
               <form
                 onSubmit={handleSendMessage}
                 className="flex items-center gap-2"
@@ -599,12 +619,13 @@ function ConversationsPage() {
                   value={newMessage}
                   onChange={(e) => setNewMessage(e.target.value)}
                   disabled={sending}
-                  className="flex-1"
+                  className="flex-1 bg-white/[0.04] border-white/[0.08] focus-visible:border-white/20"
                 />
                 <Button
                   type="submit"
                   size="icon"
                   disabled={!newMessage.trim() || sending}
+                  className="bg-[#ff7e67] hover:bg-[#ff6b52] text-white shrink-0"
                 >
                   {sending ? (
                     <Loader2 className="h-4 w-4 animate-spin" />
@@ -617,11 +638,13 @@ function ConversationsPage() {
           </>
         ) : (
           <div className="flex-1 flex flex-col items-center justify-center text-muted-foreground">
-            <MessageSquare className="h-12 w-12 mb-4" />
-            <h3 className="text-lg font-medium mb-1">
+            <div className="w-16 h-16 rounded-2xl bg-white/[0.04] flex items-center justify-center mb-5">
+              <MessageSquare className="h-7 w-7 text-muted-foreground/50" />
+            </div>
+            <h3 className="text-lg font-medium mb-1.5 text-foreground/80">
               No conversation selected
             </h3>
-            <p className="text-sm">
+            <p className="text-sm text-muted-foreground/60">
               Choose a conversation from the list to view messages
             </p>
           </div>
