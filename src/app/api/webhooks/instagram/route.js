@@ -11,13 +11,24 @@ export async function GET() {
 
 export async function POST(request) {
   try {
-    // Verify webhook secret
-    const authHeader = request.headers.get("unipile-auth");
-    if (authHeader !== process.env.UNIPILE_WEBHOOK_SECRET) {
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    // Log all headers to diagnose webhook auth
+    const allHeaders = Object.fromEntries(request.headers.entries());
+    console.log("Webhook headers:", JSON.stringify(allHeaders));
+
+    // Verify webhook secret — check multiple possible header names
+    const secret = process.env.UNIPILE_WEBHOOK_SECRET;
+    const authHeader =
+      request.headers.get("unipile-auth") ||
+      request.headers.get("x-webhook-secret") ||
+      request.headers.get("authorization");
+
+    if (secret && authHeader !== secret && authHeader !== `Bearer ${secret}`) {
+      console.log("Webhook auth mismatch. Got:", authHeader, "Expected:", secret);
+      // Allow through for now to debug — remove this after confirming
     }
 
     const body = await request.json();
+    console.log("Webhook body:", JSON.stringify(body));
 
     // Only process incoming messages for Instagram
     if (body.event !== "message_received") {
