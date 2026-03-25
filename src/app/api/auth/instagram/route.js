@@ -47,7 +47,7 @@ export async function GET() {
 
     return response;
   } catch (error) {
-    console.error("Unipile auth redirect error:", error);
+    console.error("Unipile auth redirect error:", error.message || error);
     return NextResponse.redirect(
       `${process.env.NEXT_PUBLIC_APP_URL}/onboarding?step=1&error=auth_failed`
     );

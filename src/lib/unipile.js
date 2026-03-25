@@ -1,49 +1,66 @@
-import { UnipileClient } from "unipile-node-sdk";
+const getDsn = () => process.env.UNIPILE_DSN;
+const getApiKey = () => process.env.UNIPILE_API_KEY;
 
-let client = null;
+function headers() {
+  return {
+    "X-API-KEY": getApiKey(),
+    "Content-Type": "application/json",
+    Accept: "application/json",
+  };
+}
 
-export function getUnipileClient() {
-  if (!client) {
-    const dsn = process.env.UNIPILE_DSN;
-    const apiKey = process.env.UNIPILE_API_KEY;
+async function unipileFetch(path, options = {}) {
+  const url = `${getDsn()}/api/v1${path}`;
+  const res = await fetch(url, {
+    ...options,
+    headers: { ...headers(), ...options.headers },
+  });
 
-    if (!dsn || !apiKey) {
-      throw new Error(
-        "UNIPILE_DSN and UNIPILE_API_KEY environment variables are required"
-      );
-    }
+  const body = await res.json().catch(() => null);
 
-    client = new UnipileClient(dsn, apiKey);
+  if (!res.ok) {
+    console.error(`Unipile ${options.method || "GET"} ${path} failed:`, res.status, body);
+    throw new Error(
+      `Unipile API error ${res.status}: ${JSON.stringify(body)}`
+    );
   }
-  return client;
+
+  return body;
 }
 
 export async function sendUnipileMessage(chatId, text) {
-  const c = getUnipileClient();
-  return c.messaging.sendMessage({ chat_id: chatId, text });
+  return unipileFetch(`/chats/${chatId}/messages`, {
+    method: "POST",
+    body: JSON.stringify({ text }),
+  });
 }
 
 export async function startNewChat(accountId, attendeeId, text) {
-  const c = getUnipileClient();
-  return c.messaging.startNewChat({
-    account_id: accountId,
-    attendees_ids: [attendeeId],
-    text,
+  return unipileFetch("/chats", {
+    method: "POST",
+    body: JSON.stringify({
+      account_id: accountId,
+      attendees_ids: [attendeeId],
+      text,
+    }),
   });
 }
 
 export async function getUnipileHostedAuthLink(callbackUrl, webhookUrl) {
-  const c = getUnipileClient();
-  return c.account.createHostedAuthLink({
-    type: "create",
-    providers_restricted: ["INSTAGRAM"],
-    success_redirect_url: callbackUrl,
-    failure_redirect_url: callbackUrl + "?error=auth_failed",
-    notify_url: webhookUrl,
+  return unipileFetch("/hosted/accounts/link", {
+    method: "POST",
+    body: JSON.stringify({
+      type: "create",
+      providers_restricted: ["INSTAGRAM"],
+      success_redirect_url: callbackUrl,
+      failure_redirect_url: callbackUrl + "?error=auth_failed",
+      notify_url: webhookUrl,
+    }),
   });
 }
 
 export async function disconnectAccount(accountId) {
-  const c = getUnipileClient();
-  return c.account.delete(accountId);
+  return unipileFetch(`/accounts/${accountId}`, {
+    method: "DELETE",
+  });
 }
