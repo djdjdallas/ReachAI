@@ -22,6 +22,11 @@ export async function POST(request) {
       return NextResponse.json({ status: "ignored" }, { status: 200 });
     }
 
+    // Ignore messages sent BY the connected account (our own outbound messages)
+    if (body.is_sender === true) {
+      return NextResponse.json({ status: "ignored_own_message" }, { status: 200 });
+    }
+
     const accountId = body.account_id;
     const chatId = body.chat_id;
     const messageText = body.message;
