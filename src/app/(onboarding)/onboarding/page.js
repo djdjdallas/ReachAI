@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useState, useEffect, Suspense } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import {
   Zap,
@@ -45,11 +45,23 @@ const STEPS = [
   { number: 4, title: "Go Live", icon: Rocket },
 ];
 
-export default function OnboardingPage() {
+export default function OnboardingPageWrapper() {
+  return (
+    <Suspense fallback={<div className="min-h-screen flex items-center justify-center bg-background"><Loader2 className="h-8 w-8 animate-spin text-muted-foreground" /></div>}>
+      <OnboardingPage />
+    </Suspense>
+  );
+}
+
+function OnboardingPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const supabase = createClient();
 
-  const [step, setStep] = useState(1);
+  const [step, setStep] = useState(() => {
+    const urlStep = parseInt(searchParams.get("step"), 10);
+    return urlStep >= 1 && urlStep <= 4 ? urlStep : 1;
+  });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [generating, setGenerating] = useState(false);
@@ -122,6 +134,12 @@ export default function OnboardingPage() {
         }
         if (userProfile.calendly_url) {
           setCalendlyUrl(userProfile.calendly_url);
+        }
+
+        // Auto-advance: if Instagram is connected and user is on step 1, go to step 2
+        const urlStep = parseInt(searchParams.get("step"), 10);
+        if (userProfile.unipile_account_id && (!urlStep || urlStep <= 1)) {
+          setStep(2);
         }
       }
 
