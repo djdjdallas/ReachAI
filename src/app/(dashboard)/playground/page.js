@@ -56,12 +56,12 @@ function MessageBubble({ message }) {
       <div
         className={`w-7 h-7 rounded-full flex items-center justify-center shrink-0 mb-1 ${
           isUser
-            ? "bg-zinc-700"
-            : "bg-[#ff7e67]/20 border border-[#ff7e67]/30"
+            ? "bg-stone-200"
+            : "bg-[#ff7e67]/10 border border-[#ff7e67]/20"
         }`}
       >
         {isUser ? (
-          <User className="h-3.5 w-3.5 text-zinc-400" />
+          <User className="h-3.5 w-3.5 text-stone-500" />
         ) : (
           <Zap className="h-3 w-3 text-[#ff7e67]" />
         )}
@@ -75,8 +75,8 @@ function MessageBubble({ message }) {
         <div
           className={`px-3.5 py-2.5 rounded-2xl text-sm leading-relaxed ${
             isUser
-              ? "bg-zinc-700 text-zinc-100 rounded-br-sm"
-              : "bg-zinc-800 text-zinc-100 border border-zinc-700/50 rounded-bl-sm"
+              ? "bg-[#ff7e67] text-white rounded-br-sm"
+              : "bg-white text-stone-800 border border-stone-200 rounded-bl-sm shadow-sm"
           }`}
         >
           {message.content}
@@ -89,7 +89,7 @@ function MessageBubble({ message }) {
           )}
         </div>
 
-        <span className="text-[10px] text-zinc-600 px-1">
+        <span className="text-[10px] text-stone-400 px-1">
           {isUser ? "You (test lead)" : "AI Agent"} &middot;{" "}
           {formatTime(new Date(message.timestamp))}
         </span>
@@ -104,11 +104,11 @@ function TypingIndicator() {
       <div className="w-7 h-7 rounded-full bg-[#ff7e67]/20 border border-[#ff7e67]/30 flex items-center justify-center shrink-0">
         <Zap className="h-3 w-3 text-[#ff7e67]" />
       </div>
-      <div className="bg-zinc-800 border border-zinc-700/50 px-4 py-3 rounded-2xl rounded-bl-sm">
+      <div className="bg-white border border-stone-200 px-4 py-3 rounded-2xl rounded-bl-sm shadow-sm">
         <div className="flex items-center gap-1">
-          <div className="w-1.5 h-1.5 bg-zinc-500 rounded-full animate-bounce [animation-delay:-0.3s]" />
-          <div className="w-1.5 h-1.5 bg-zinc-500 rounded-full animate-bounce [animation-delay:-0.15s]" />
-          <div className="w-1.5 h-1.5 bg-zinc-500 rounded-full animate-bounce" />
+          <div className="w-1.5 h-1.5 bg-stone-400 rounded-full animate-bounce [animation-delay:-0.3s]" />
+          <div className="w-1.5 h-1.5 bg-stone-400 rounded-full animate-bounce [animation-delay:-0.15s]" />
+          <div className="w-1.5 h-1.5 bg-stone-400 rounded-full animate-bounce" />
         </div>
       </div>
     </div>
@@ -343,13 +343,13 @@ export default function PlaygroundPage() {
       </div>
 
       {/* Info banner */}
-      <div className="flex items-start gap-2.5 bg-blue-500/5 border border-blue-500/20 rounded-lg px-3.5 py-2.5 text-xs text-blue-400 shrink-0">
+      <div className="flex items-start gap-2.5 bg-blue-50 border border-blue-200 rounded-lg px-3.5 py-2.5 text-xs text-blue-700 shrink-0">
         <Info className="h-3.5 w-3.5 mt-0.5 shrink-0" />
         <span>
           This uses your exact saved script. Type messages as if you were a
           potential lead on Instagram.
           {!profile?.calendly_url && (
-            <span className="text-yellow-400 ml-1">
+            <span className="text-yellow-600 ml-1">
               No booking link set &mdash; add one in{" "}
               <Link
                 href="/script-builder"
@@ -366,7 +366,7 @@ export default function PlaygroundPage() {
       {/* Main chat area + script summary side by side on desktop */}
       <div className="flex gap-4 flex-1 min-h-0">
         {/* Chat window */}
-        <div className="flex flex-col flex-1 min-h-0 rounded-xl border border-border bg-zinc-900/50 overflow-hidden">
+        <div className="flex flex-col flex-1 min-h-0 rounded-xl border border-stone-200 bg-stone-50 overflow-hidden">
           {/* Messages area */}
           <ScrollArea className="flex-1 p-4">
             {messages.length === 0 ? (
@@ -389,7 +389,7 @@ export default function PlaygroundPage() {
                     <button
                       key={prompt}
                       onClick={() => sendMessage(prompt)}
-                      className="text-xs border border-border bg-zinc-800/50 hover:bg-zinc-800 rounded-full px-3 py-1.5 text-muted-foreground hover:text-foreground transition-colors"
+                      className="text-xs border border-stone-200 bg-white hover:bg-stone-100 rounded-full px-3 py-1.5 text-stone-600 hover:text-stone-900 transition-colors shadow-sm"
                     >
                       {prompt}
                     </button>
@@ -409,8 +409,8 @@ export default function PlaygroundPage() {
 
           {/* Error state */}
           {error && (
-            <div className="px-4 py-2 bg-red-500/10 border-t border-red-500/20">
-              <p className="text-xs text-red-400 flex items-center gap-1.5">
+            <div className="px-4 py-2 bg-red-50 border-t border-red-200">
+              <p className="text-xs text-red-600 flex items-center gap-1.5">
                 <AlertTriangle className="h-3 w-3" />
                 {error === "no_script"
                   ? "No script found. Please save your script in Script Builder first."
@@ -420,7 +420,7 @@ export default function PlaygroundPage() {
           )}
 
           {/* Input area */}
-          <div className="p-3 border-t border-border bg-zinc-900/80">
+          <div className="p-3 border-t border-stone-200 bg-white">
             <div className="flex items-center gap-2">
               <div className="flex-1 relative">
                 <Input
@@ -430,7 +430,7 @@ export default function PlaygroundPage() {
                   onKeyDown={handleKeyDown}
                   placeholder="Message as a test lead..."
                   disabled={isThinking}
-                  className="bg-zinc-800 border-zinc-700 pr-4 text-sm"
+                  className="bg-stone-50 border-stone-200 focus-visible:border-[#ff7e67] pr-4 text-sm"
                   autoFocus
                 />
               </div>
