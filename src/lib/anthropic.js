@@ -51,5 +51,8 @@ Common Objections: ${objections}`,
     ],
   });
 
-  return JSON.parse(response.content[0].text);
+  let text = response.content[0].text.trim();
+  // Strip markdown code fences if Claude wraps the JSON
+  text = text.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/,"");
+  return JSON.parse(text);
 }
