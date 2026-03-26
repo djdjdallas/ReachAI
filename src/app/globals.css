@@ -48,8 +48,8 @@
   --border: #e7e5e4;
   --input: #e7e5e4;
   --ring: #ff7e67;
-  --sidebar: #1c1917;
-  --sidebar-foreground: #fafaf9;
+  --sidebar: #ffffff;
+  --sidebar-foreground: #1c1917;
 }
 
 .dark {
@@ -79,7 +79,31 @@
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: var(--font-sans), system-ui, sans-serif;
+  font-family: 'Satoshi', var(--font-sans), system-ui, sans-serif;
+}
+
+h1, h2, h3, h4 {
+  font-family: 'Cabinet Grotesk', sans-serif;
+  letter-spacing: -0.02em;
+}
+
+.soft-shadow {
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.03);
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: #e7e5e4;
+  border-radius: 10px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #d6d3d1;
 }
 
 * {

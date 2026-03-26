@@ -314,7 +314,7 @@ export default function ScriptBuilderPage() {
   return (
     <div className="space-y-6 p-6">
       <div>
-        <h1 className="text-2xl font-bold">Script Builder</h1>
+        <h1 className="text-2xl font-bold">Sales Script</h1>
         <p className="text-muted-foreground mt-1">
           Create and customize the AI conversation script for your DMs.
         </p>

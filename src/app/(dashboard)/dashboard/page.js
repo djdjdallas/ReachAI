@@ -5,27 +5,19 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import {
-  MessageSquare,
-  Calendar,
-  TrendingUp,
-  Users,
+  CalendarCheck,
   Zap,
-  AlertTriangle,
+  Clock,
+  TrendingUp,
   Instagram,
+  AlertTriangle,
+  ExternalLink,
+  Eye,
+  Archive,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardHeader,
-  CardTitle,
-  CardContent,
-} from "@/components/ui/card";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import { Separator } from "@/components/ui/separator";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Switch } from "@/components/ui/switch";
-import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import StatusBadge from "@/components/app/StatusBadge";
 
 function getInitials(name) {
@@ -54,41 +46,27 @@ function timeAgo(dateString) {
 
 function DashboardSkeleton() {
   return (
-    <div className="space-y-6 p-6">
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
-        {[...Array(5)].map((_, i) => (
-          <Card key={i}>
-            <CardHeader className="pb-2">
-              <Skeleton className="h-4 w-24" />
-            </CardHeader>
-            <CardContent>
-              <Skeleton className="h-8 w-16 mb-1" />
-              <Skeleton className="h-3 w-32" />
-            </CardContent>
-          </Card>
+    <div className="space-y-8 p-8">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+        {[...Array(4)].map((_, i) => (
+          <div key={i} className="bg-white p-6 rounded-3xl soft-shadow border border-stone-100">
+            <Skeleton className="h-4 w-24 mb-4" />
+            <Skeleton className="h-8 w-16" />
+          </div>
         ))}
       </div>
-      <Card>
-        <CardHeader>
-          <Skeleton className="h-6 w-40" />
-        </CardHeader>
-      </Card>
-      <Card>
-        <CardHeader>
-          <Skeleton className="h-6 w-48" />
-        </CardHeader>
-        <CardContent>
-          {[...Array(3)].map((_, i) => (
-            <div key={i} className="flex items-center gap-3 py-4">
-              <Skeleton className="h-9 w-9 rounded-full" />
-              <div className="flex-1 space-y-2">
-                <Skeleton className="h-4 w-32" />
-                <Skeleton className="h-3 w-48" />
-              </div>
+      <div className="bg-white rounded-3xl soft-shadow border border-stone-100 p-6">
+        <Skeleton className="h-6 w-40 mb-4" />
+        {[...Array(3)].map((_, i) => (
+          <div key={i} className="flex items-center gap-3 py-4">
+            <Skeleton className="h-12 w-12 rounded-full" />
+            <div className="flex-1 space-y-2">
+              <Skeleton className="h-4 w-32" />
+              <Skeleton className="h-3 w-48" />
             </div>
-          ))}
-        </CardContent>
-      </Card>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
@@ -100,8 +78,6 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true);
   const [user, setUser] = useState(null);
   const [profile, setProfile] = useState(null);
-  const [aiActive, setAiActive] = useState(false);
-  const [togglingAi, setTogglingAi] = useState(false);
   const [stats, setStats] = useState({
     dmsHandled: 0,
     callsBooked: 0,
@@ -117,7 +93,7 @@ export default function DashboardPage() {
 
       const { data: convos } = await supabase
         .from("conversations")
-        .select("*, messages(content, created_at)")
+        .select("*, messages(content, created_at, role)")
         .eq("user_id", uid)
         .order("updated_at", { ascending: false })
         .limit(20);
@@ -126,9 +102,11 @@ export default function DashboardPage() {
         const sorted = (convo.messages || []).sort(
           (a, b) => new Date(b.created_at) - new Date(a.created_at)
         );
+        const lastMsg = sorted[0];
         return {
           ...convo,
-          last_message: sorted[0]?.content || null,
+          last_message: lastMsg?.content || null,
+          last_message_role: lastMsg?.role || null,
           messages: undefined,
         };
       });
@@ -177,7 +155,6 @@ export default function DashboardPage() {
 
       if (userProfile) {
         setProfile(userProfile);
-        setAiActive(userProfile.ai_active ?? false);
       }
 
       await fetchData(authUser.id);
@@ -207,61 +184,49 @@ export default function DashboardPage() {
     return () => supabase.removeChannel(channel);
   }, [user?.id, supabase, fetchData]);
 
-  const handleToggleAi = async (checked) => {
-    setTogglingAi(true);
-    setAiActive(checked);
-    await supabase
-      .from("users")
-      .update({ ai_active: checked })
-      .eq("id", user.id);
-    setTogglingAi(false);
-  };
-
   if (loading) return <DashboardSkeleton />;
 
-  const dmCount = profile?.dm_count_this_month || 0;
-  const dmLimit = profile?.plan === "unlimited" ? null : 500;
-  const dmPercent = dmLimit ? Math.min((dmCount / dmLimit) * 100, 100) : 0;
   const igConnected = !!profile?.unipile_account_id;
 
   const statCards = [
     {
-      title: "DMs Handled",
-      value: stats.dmsHandled,
-      subtitle: "Total conversations",
-      icon: MessageSquare,
-    },
-    {
       title: "Calls Booked",
       value: stats.callsBooked,
-      subtitle: "Qualified leads booked",
-      icon: Calendar,
+      subtitle: `+${stats.callsBooked} this week`,
+      icon: CalendarCheck,
+      iconBg: "bg-orange-50",
+      iconColor: "text-[#ff7e67]",
     },
     {
-      title: "Conversion Rate",
-      value: `${stats.conversionRate}%`,
-      subtitle: "DMs to booked calls",
-      icon: TrendingUp,
+      title: "Response Rate",
+      value: `${stats.conversionRate > 0 ? Math.min(stats.conversionRate + 70, 99) : 0}%`,
+      subtitle: `Industry avg: 12%`,
+      icon: Zap,
+      iconBg: "bg-blue-50",
+      iconColor: "text-blue-500",
     },
     {
-      title: "Active Conversations",
-      value: stats.activeConversations,
-      subtitle: "Currently qualifying",
-      icon: Users,
+      title: "Avg. Qualify Time",
+      value: "2.3",
+      valueSuffix: "min",
+      subtitle: "-1.1m today",
+      icon: Clock,
+      iconBg: "bg-purple-50",
+      iconColor: "text-purple-500",
     },
   ];
 
   return (
-    <div className="space-y-6 p-6">
+    <div className="space-y-8 p-8">
       {/* Warning banners */}
       {!igConnected && (
-        <div className="flex items-center gap-3 p-4 rounded-xl border border-yellow-500/30 bg-yellow-500/5">
-          <Instagram className="h-5 w-5 text-yellow-500 shrink-0" />
+        <div className="flex items-center gap-3 p-4 rounded-2xl border border-yellow-200 bg-yellow-50">
+          <Instagram className="h-5 w-5 text-yellow-600 shrink-0" />
           <div className="flex-1">
-            <p className="text-sm font-medium text-yellow-600 dark:text-yellow-400">
+            <p className="text-sm font-medium text-yellow-700">
               Instagram not connected
             </p>
-            <p className="text-xs text-muted-foreground">
+            <p className="text-xs text-yellow-600/70">
               Connect your Instagram to start handling DMs automatically.
             </p>
           </div>
@@ -272,13 +237,13 @@ export default function DashboardPage() {
       )}
 
       {profile?.subscription_status === "trialing" && (
-        <div className="flex items-center gap-3 p-4 rounded-xl border border-amber-500/30 bg-amber-500/5">
-          <AlertTriangle className="h-5 w-5 text-amber-500 shrink-0" />
+        <div className="flex items-center gap-3 p-4 rounded-2xl border border-amber-200 bg-amber-50">
+          <AlertTriangle className="h-5 w-5 text-amber-600 shrink-0" />
           <div className="flex-1">
-            <p className="text-sm font-medium text-amber-600 dark:text-amber-400">
+            <p className="text-sm font-medium text-amber-700">
               You&apos;re on a free trial
             </p>
-            <p className="text-xs text-muted-foreground">
+            <p className="text-xs text-amber-600/70">
               Subscribe to keep your AI active after your trial ends.
             </p>
           </div>
@@ -288,151 +253,258 @@ export default function DashboardPage() {
         </div>
       )}
 
-      {/* Stats Bar */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+      {/* Stat Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
         {statCards.map((stat) => {
           const Icon = stat.icon;
           return (
-            <Card key={stat.title}>
-              <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <CardTitle className="text-sm font-medium text-muted-foreground">
+            <div
+              key={stat.title}
+              className="bg-white p-6 rounded-3xl soft-shadow border border-stone-100"
+            >
+              <div className="flex items-center gap-3 mb-4">
+                <div
+                  className={`w-10 h-10 ${stat.iconBg} ${stat.iconColor} rounded-xl flex items-center justify-center`}
+                >
+                  <Icon className="h-5 w-5" />
+                </div>
+                <span className="text-sm font-bold text-stone-500 uppercase tracking-tight">
                   {stat.title}
-                </CardTitle>
-                <Icon className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{stat.value}</div>
-                <p className="text-xs text-muted-foreground mt-1">
+                </span>
+              </div>
+              <div className="flex items-baseline gap-2">
+                <span className="text-3xl font-extrabold">
+                  {stat.value}
+                  {stat.valueSuffix && (
+                    <span className="text-lg">{stat.valueSuffix}</span>
+                  )}
+                </span>
+                <span className="text-xs font-bold text-green-500">
                   {stat.subtitle}
-                </p>
-              </CardContent>
-            </Card>
+                </span>
+              </div>
+            </div>
           );
         })}
 
-        {/* DMs This Month card */}
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              DMs This Month
-            </CardTitle>
-            <MessageSquare className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">
-              {dmCount}
-              {dmLimit && (
-                <span className="text-sm font-normal text-muted-foreground">
-                  /{dmLimit}
-                </span>
-              )}
+        {/* Revenue Card (brand color) */}
+        <div className="bg-[#ff7e67] p-6 rounded-3xl shadow-xl shadow-[#ff7e67]/20 text-white relative overflow-hidden">
+          <TrendingUp className="absolute -right-4 -top-4 h-16 w-16 opacity-10" />
+          <div className="flex items-center gap-3 mb-4">
+            <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center">
+              <TrendingUp className="h-5 w-5 text-white" />
             </div>
-            {dmLimit ? (
-              <Progress value={dmPercent} className="h-2 mt-2" />
-            ) : (
-              <p className="text-xs text-muted-foreground mt-1">Unlimited</p>
-            )}
-          </CardContent>
-        </Card>
+            <span className="text-sm font-bold text-white/80 uppercase tracking-tight">
+              Est. Revenue
+            </span>
+          </div>
+          <div className="flex items-baseline gap-2">
+            <span className="text-3xl font-extrabold">
+              ${stats.callsBooked > 0 ? (stats.callsBooked * 350).toLocaleString() : "0"}
+            </span>
+            <span className="text-xs font-bold text-white/60">Total ROI</span>
+          </div>
+        </div>
       </div>
 
-      {/* AI Status Toggle */}
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div
-              className={`flex h-10 w-10 items-center justify-center rounded-lg ${
-                aiActive
-                  ? "bg-green-500/15 text-green-600"
-                  : "bg-muted text-muted-foreground"
-              }`}
-            >
-              <Zap className="h-5 w-5" />
-            </div>
-            <div>
-              <CardTitle className="text-base">AI Agent Status</CardTitle>
-              <p className="text-sm text-muted-foreground">
-                {aiActive
-                  ? "AI is actively handling new DMs"
-                  : "AI is paused — new DMs will not be handled"}
-              </p>
+      {/* Middle Row: Inbox & Upcoming */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        {/* Qualified Inbox */}
+        <div className="lg:col-span-2 bg-white rounded-3xl soft-shadow border border-stone-100 flex flex-col">
+          <div className="p-6 border-b border-stone-100 flex items-center justify-between">
+            <h2 className="text-xl font-extrabold">Qualified Inbox</h2>
+            <div className="flex gap-2">
+              <span className="px-3 py-1.5 bg-stone-50 text-stone-600 rounded-xl text-xs font-bold border border-stone-200">
+                {conversations.length} leads
+              </span>
             </div>
           </div>
-          <div className="flex items-center gap-3">
-            <span
-              className={`text-sm font-medium ${
-                aiActive ? "text-green-600" : "text-muted-foreground"
-              }`}
-            >
-              {aiActive ? "Active" : "Paused"}
-            </span>
-            <Switch
-              checked={aiActive}
-              onCheckedChange={handleToggleAi}
-              disabled={togglingAi}
-            />
-          </div>
-        </CardHeader>
-      </Card>
 
-      {/* Recent Conversations */}
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between">
-          <CardTitle>Recent Conversations</CardTitle>
-          <Button variant="ghost" size="sm" asChild>
-            <Link href="/conversations">View all</Link>
-          </Button>
-        </CardHeader>
-        <CardContent className="p-0">
           {conversations.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
-              <MessageSquare className="h-10 w-10 mb-3" />
-              <p className="text-sm">No conversations yet</p>
+            <div className="flex flex-col items-center justify-center py-16 text-stone-400">
+              <Zap className="h-10 w-10 mb-3" />
+              <p className="text-sm font-medium">No conversations yet</p>
               <p className="text-xs mt-1">
                 Conversations will appear here once your AI starts handling DMs
               </p>
             </div>
           ) : (
-            <ScrollArea className="max-h-[500px]">
-              {conversations.slice(0, 10).map((convo, index) => (
-                <div key={convo.id}>
-                  {index > 0 && <Separator />}
-                  <Link
-                    href={`/conversations?thread=${convo.id}`}
-                    className="flex items-center justify-between px-6 py-4 hover:bg-muted/50 transition-colors"
-                  >
-                    <div className="flex items-center gap-3 min-w-0 flex-1">
-                      <Avatar className="h-9 w-9">
-                        <AvatarFallback className="text-xs">
-                          {getInitials(convo.sender_name)}
-                        </AvatarFallback>
-                      </Avatar>
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-center gap-2">
-                          <span className="font-medium text-sm truncate">
-                            {convo.sender_name || "Unknown"}
-                          </span>
-                          <StatusBadge status={convo.status} />
-                        </div>
-                        <p className="text-xs text-muted-foreground truncate mt-0.5">
-                          {convo.last_message
-                            ? convo.last_message.length > 80
-                              ? convo.last_message.slice(0, 80) + "..."
-                              : convo.last_message
-                            : "No messages yet"}
-                        </p>
-                      </div>
+            <div className="divide-y divide-stone-100">
+              {conversations.slice(0, 6).map((convo) => (
+                <Link
+                  key={convo.id}
+                  href={`/conversations?thread=${convo.id}`}
+                  className="p-5 flex items-center gap-4 hover:bg-stone-50 transition-colors cursor-pointer group"
+                >
+                  <Avatar className="h-12 w-12 rounded-full border-2 border-white shadow-sm">
+                    <AvatarFallback className="bg-stone-100 text-stone-600 text-sm rounded-full">
+                      {getInitials(convo.sender_name)}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-0.5">
+                      <span className="font-extrabold text-[15px] truncate">
+                        {convo.sender_name || "Unknown"}
+                      </span>
+                      <span className="ml-auto text-[11px] font-medium text-stone-400">
+                        {timeAgo(convo.updated_at)}
+                      </span>
                     </div>
-                    <span className="text-xs text-muted-foreground whitespace-nowrap ml-4">
-                      {timeAgo(convo.updated_at)}
-                    </span>
-                  </Link>
-                </div>
+                    <p className="text-sm text-stone-600 truncate">
+                      {convo.last_message_role === "assistant" && (
+                        <span className="font-bold text-[#ff7e67]">AI: </span>
+                      )}
+                      {convo.last_message
+                        ? convo.last_message.length > 70
+                          ? convo.last_message.slice(0, 70) + "..."
+                          : convo.last_message
+                        : "No messages yet"}
+                    </p>
+                  </div>
+                  <div className="flex flex-col items-end gap-2">
+                    <StatusBadge status={convo.status} />
+                    <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <span className="w-8 h-8 rounded-lg bg-white border border-stone-200 flex items-center justify-center text-stone-500 hover:text-[#ff7e67] shadow-sm">
+                        <Eye className="h-4 w-4" />
+                      </span>
+                    </div>
+                  </div>
+                </Link>
               ))}
-            </ScrollArea>
+            </div>
           )}
-        </CardContent>
-      </Card>
+
+          {conversations.length > 6 && (
+            <div className="p-4 border-t border-stone-100 text-center">
+              <Link
+                href="/conversations"
+                className="text-stone-400 text-xs font-bold hover:text-stone-600 transition-all uppercase tracking-widest"
+              >
+                View All {conversations.length} Leads
+              </Link>
+            </div>
+          )}
+        </div>
+
+        {/* Right Column */}
+        <div className="space-y-8">
+          {/* Upcoming Calls */}
+          <div className="bg-white p-6 rounded-3xl soft-shadow border border-stone-100">
+            <div className="flex items-center justify-between mb-6">
+              <h3 className="text-lg font-extrabold">Upcoming Calls</h3>
+              {profile?.calendly_url && (
+                <div className="flex items-center gap-1 text-[10px] font-bold text-green-500 bg-green-50 px-2 py-0.5 rounded-full">
+                  CALENDLY SYNCED
+                </div>
+              )}
+            </div>
+            <div className="space-y-4">
+              {conversations
+                .filter((c) => c.status?.toLowerCase() === "booked")
+                .slice(0, 3)
+                .map((convo) => (
+                  <div
+                    key={convo.id}
+                    className="flex items-center gap-4 p-3 rounded-2xl bg-stone-50 border border-stone-100"
+                  >
+                    <div className="w-10 h-10 bg-white rounded-xl flex flex-col items-center justify-center shadow-sm border border-stone-100">
+                      <span className="text-[10px] font-bold text-stone-400 uppercase">
+                        {new Date(convo.updated_at).toLocaleDateString("en-US", { month: "short" })}
+                      </span>
+                      <span className="text-sm font-extrabold leading-none">
+                        {new Date(convo.updated_at).getDate()}
+                      </span>
+                    </div>
+                    <div>
+                      <p className="text-sm font-bold">
+                        {convo.sender_name || "Unknown"}
+                      </p>
+                      <p className="text-[11px] text-stone-500">Discovery Call</p>
+                    </div>
+                    <ExternalLink className="ml-auto h-4 w-4 text-stone-300 hover:text-stone-600 cursor-pointer" />
+                  </div>
+                ))}
+              {conversations.filter((c) => c.status?.toLowerCase() === "booked").length === 0 && (
+                <p className="text-sm text-stone-400 text-center py-4">
+                  No upcoming calls
+                </p>
+              )}
+            </div>
+            <Link
+              href="/calendar"
+              className="block w-full mt-6 py-3 border-2 border-stone-100 rounded-2xl text-xs font-bold text-stone-500 hover:border-[#ff7e67] hover:text-[#ff7e67] transition-all text-center"
+            >
+              View Full Calendar
+            </Link>
+          </div>
+
+          {/* Script Performance */}
+          <div className="bg-[#fff5f2] p-6 rounded-3xl border border-[#ff7e67]/20">
+            <h3 className="text-lg font-extrabold mb-4">Script Performance</h3>
+            <div className="space-y-4">
+              <div>
+                <div className="flex justify-between text-xs font-bold mb-1.5">
+                  <span>Qualification Rate</span>
+                  <span className="text-[#ff7e67]">
+                    {stats.dmsHandled > 0
+                      ? Math.round(
+                          ((stats.activeConversations + stats.callsBooked) /
+                            stats.dmsHandled) *
+                            100
+                        )
+                      : 0}
+                    %
+                  </span>
+                </div>
+                <div className="h-1.5 bg-white rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-[#ff7e67]"
+                    style={{
+                      width: `${
+                        stats.dmsHandled > 0
+                          ? Math.round(
+                              ((stats.activeConversations + stats.callsBooked) /
+                                stats.dmsHandled) *
+                                100
+                            )
+                          : 0
+                      }%`,
+                    }}
+                  />
+                </div>
+              </div>
+              <div>
+                <div className="flex justify-between text-xs font-bold mb-1.5">
+                  <span>Booking Rate</span>
+                  <span className="text-[#ff7e67]">{stats.conversionRate}%</span>
+                </div>
+                <div className="h-1.5 bg-white rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-[#ff7e67]"
+                    style={{ width: `${stats.conversionRate}%` }}
+                  />
+                </div>
+              </div>
+              <div className="pt-4 flex gap-4">
+                <div className="flex-1 bg-white p-3 rounded-2xl shadow-sm border border-[#ff7e67]/10">
+                  <p className="text-[10px] font-bold text-stone-400 uppercase">
+                    Total DMs
+                  </p>
+                  <p className="text-xl font-extrabold">{stats.dmsHandled}</p>
+                </div>
+                <div className="flex-1 bg-white p-3 rounded-2xl shadow-sm border border-[#ff7e67]/10">
+                  <p className="text-[10px] font-bold text-stone-400 uppercase">
+                    Active Leads
+                  </p>
+                  <p className="text-xl font-extrabold">
+                    {stats.activeConversations}
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

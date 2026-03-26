@@ -5,14 +5,14 @@ import { useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
 import {
   Zap,
-  LayoutDashboard,
-  MessageSquare,
-  FileText,
-  CreditCard,
+  Inbox,
+  Users,
+  Calendar,
+  BarChart3,
+  Cpu,
   Settings,
   LogOut,
   Menu,
-  Instagram,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -21,88 +21,91 @@ import {
   SheetContent,
   SheetTrigger,
 } from "@/components/ui/sheet";
+import AccountUsageWidget from "@/components/app/AccountUsageWidget";
 
-const navLinks = [
-  { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/conversations", label: "Conversations", icon: MessageSquare },
-  { href: "/script-builder", label: "Script Builder", icon: FileText },
-  { href: "/billing", label: "Billing", icon: CreditCard },
+const mainNavLinks = [
+  { href: "/dashboard", label: "Inbox", icon: Inbox, showBadge: true },
+  { href: "/conversations", label: "Leads", icon: Users },
+  { href: "/calendar", label: "Calendar", icon: Calendar },
+  { href: "/analytics", label: "Analytics", icon: BarChart3 },
+];
+
+const settingsNavLinks = [
+  { href: "/script-builder", label: "Sales Script", icon: Cpu },
   { href: "/settings", label: "Settings", icon: Settings },
 ];
 
-function SidebarContent({ pathname, userEmail, profile, onSignOut, onLinkClick }) {
-  const aiActive = profile?.ai_active;
-  const igConnected = !!profile?.unipile_account_id;
-
+function SidebarContent({ pathname, onSignOut, conversationCount, onLinkClick }) {
   return (
-    <div className="flex flex-col h-full bg-sidebar text-sidebar-foreground">
+    <div className="flex flex-col h-full bg-white">
       {/* Logo */}
-      <div className="flex items-center gap-2.5 px-6 py-5 border-b border-white/10">
-        <div className="w-8 h-8 bg-[#ff7e67] rounded-xl flex items-center justify-center shadow-lg shadow-[#ff7e67]/20">
+      <div className="h-20 flex items-center px-6 gap-2.5">
+        <div className="w-8 h-8 bg-[#ff7e67] rounded-lg flex items-center justify-center shadow-lg shadow-[#ff7e67]/20">
           <Zap className="h-4 w-4 text-white" />
         </div>
-        <span className="text-lg font-extrabold tracking-tight">Clinchd</span>
-      </div>
-
-      {/* Status indicators */}
-      <div className="px-4 py-3 space-y-2 border-b border-white/10">
-        <div className="flex items-center justify-between px-2">
-          <span className="text-xs font-medium text-sidebar-foreground/50">AI Status</span>
-          <div className="flex items-center gap-1.5">
-            <div className={`w-2 h-2 rounded-full ${aiActive ? "bg-green-500" : "bg-red-400"}`} />
-            <span className={`text-xs font-medium ${aiActive ? "text-green-400" : "text-red-400"}`}>
-              {aiActive ? "Active" : "Paused"}
-            </span>
-          </div>
-        </div>
-        <div className="flex items-center justify-between px-2">
-          <span className="text-xs font-medium text-sidebar-foreground/50">Instagram</span>
-          <div className="flex items-center gap-1.5">
-            <Instagram className="h-3 w-3 text-sidebar-foreground/50" />
-            <span className={`text-xs font-medium ${igConnected ? "text-green-400" : "text-red-400"}`}>
-              {igConnected ? "Connected" : "Not Connected"}
-            </span>
-          </div>
-        </div>
+        <span className="text-xl font-extrabold tracking-tight">Clinchd</span>
       </div>
 
       {/* Navigation */}
-      <nav className="flex-1 px-3 py-4 space-y-1">
-        {navLinks.map(({ href, label, icon: Icon }) => {
+      <nav className="flex-1 px-4 py-4 space-y-1 overflow-y-auto">
+        {mainNavLinks.map(({ href, label, icon: Icon, showBadge }) => {
           const isActive = pathname === href || pathname.startsWith(href + "/");
           return (
             <Link
               key={href}
               href={href}
               onClick={onLinkClick}
-              className={`flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors ${
+              className={`flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all ${
                 isActive
-                  ? "bg-[#ff7e67]/15 text-[#ff7e67]"
-                  : "text-sidebar-foreground/60 hover:bg-white/5 hover:text-sidebar-foreground"
+                  ? "bg-[#fff5f2] text-[#ff7e67] font-semibold"
+                  : "text-stone-500 hover:bg-stone-50 hover:text-stone-900 font-medium"
               }`}
             >
-              <Icon className="h-4 w-4" />
-              {label}
+              <Icon className="h-5 w-5" />
+              <span>{label}</span>
+              {showBadge && conversationCount > 0 && (
+                <span className="ml-auto bg-[#ff7e67] text-white text-[10px] px-2 py-0.5 rounded-full">
+                  {conversationCount}
+                </span>
+              )}
+            </Link>
+          );
+        })}
+
+        <div className="pt-4 pb-2 px-3 text-[11px] font-bold text-stone-400 uppercase tracking-wider">
+          Settings
+        </div>
+
+        {settingsNavLinks.map(({ href, label, icon: Icon }) => {
+          const isActive = pathname === href || pathname.startsWith(href + "/");
+          return (
+            <Link
+              key={href}
+              href={href}
+              onClick={onLinkClick}
+              className={`flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all ${
+                isActive
+                  ? "bg-[#fff5f2] text-[#ff7e67] font-semibold"
+                  : "text-stone-500 hover:bg-stone-50 hover:text-stone-900 font-medium"
+              }`}
+            >
+              <Icon className="h-5 w-5" />
+              <span>{label}</span>
             </Link>
           );
         })}
       </nav>
 
-      {/* User section */}
-      <div className="border-t border-white/10 px-4 py-4 space-y-3">
-        {userEmail && (
-          <p className="text-xs text-sidebar-foreground/50 truncate">
-            {userEmail}
-          </p>
-        )}
-        <Button
-          variant="ghost"
-          className="w-full justify-start gap-2 text-sidebar-foreground/60 hover:text-sidebar-foreground hover:bg-white/5"
+      {/* Bottom section */}
+      <div className="p-4 border-t border-stone-100 space-y-3">
+        <AccountUsageWidget />
+        <button
           onClick={onSignOut}
+          className="w-full flex items-center justify-center gap-2 px-3 py-2 text-stone-400 hover:text-stone-600 text-xs font-medium transition-colors"
         >
-          <LogOut className="h-4 w-4" />
+          <LogOut className="h-3.5 w-3.5" />
           Sign Out
-        </Button>
+        </button>
       </div>
     </div>
   );
@@ -111,22 +114,20 @@ function SidebarContent({ pathname, userEmail, profile, onSignOut, onLinkClick }
 export default function Sidebar() {
   const router = useRouter();
   const pathname = usePathname();
-  const [userEmail, setUserEmail] = useState(null);
-  const [profile, setProfile] = useState(null);
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [conversationCount, setConversationCount] = useState(0);
 
   useEffect(() => {
     const supabase = createClient();
     supabase.auth.getUser().then(({ data: { user } }) => {
       if (user) {
-        setUserEmail(user.email);
         supabase
-          .from("users")
-          .select("ai_active, unipile_account_id")
-          .eq("id", user.id)
-          .single()
-          .then(({ data }) => {
-            if (data) setProfile(data);
+          .from("conversations")
+          .select("id", { count: "exact", head: true })
+          .eq("user_id", user.id)
+          .in("status", ["qualifying", "interested"])
+          .then(({ count }) => {
+            if (count != null) setConversationCount(count);
           });
       }
     });
@@ -141,29 +142,27 @@ export default function Sidebar() {
   return (
     <>
       {/* Desktop sidebar */}
-      <aside className="fixed inset-y-0 left-0 z-50 w-64 hidden md:block">
+      <aside className="fixed inset-y-0 left-0 z-50 w-64 hidden md:block border-r border-stone-200">
         <SidebarContent
           pathname={pathname}
-          userEmail={userEmail}
-          profile={profile}
           onSignOut={handleSignOut}
+          conversationCount={conversationCount}
         />
       </aside>
 
       {/* Mobile hamburger + sheet */}
-      <div className="fixed top-0 left-0 right-0 z-50 md:hidden flex items-center h-14 px-4 bg-sidebar border-b border-white/10">
+      <div className="fixed top-0 left-0 right-0 z-50 md:hidden flex items-center h-14 px-4 bg-white border-b border-stone-200">
         <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
           <SheetTrigger asChild>
-            <Button variant="ghost" size="icon" className="text-sidebar-foreground">
+            <Button variant="ghost" size="icon" className="text-stone-900">
               <Menu className="h-5 w-5" />
             </Button>
           </SheetTrigger>
-          <SheetContent side="left" className="p-0 w-64 bg-sidebar border-r-0">
+          <SheetContent side="left" className="p-0 w-64 bg-white border-r border-stone-200">
             <SidebarContent
               pathname={pathname}
-              userEmail={userEmail}
-              profile={profile}
               onSignOut={handleSignOut}
+              conversationCount={conversationCount}
               onLinkClick={() => setMobileOpen(false)}
             />
           </SheetContent>
@@ -172,7 +171,7 @@ export default function Sidebar() {
           <div className="w-7 h-7 bg-[#ff7e67] rounded-lg flex items-center justify-center">
             <Zap className="h-3.5 w-3.5 text-white" />
           </div>
-          <span className="text-base font-extrabold text-sidebar-foreground">Clinchd</span>
+          <span className="text-base font-extrabold">Clinchd</span>
         </div>
       </div>
     </>
