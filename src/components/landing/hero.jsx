@@ -2,7 +2,7 @@
 
 import { useEffect, useRef } from "react";
 import Link from "next/link";
-import { Sparkles, ArrowRight, CheckCircle } from "lucide-react";
+import { Sparkles, ArrowRight } from "lucide-react";
 import gsap from "gsap";
 
 export default function Hero() {
@@ -11,7 +11,6 @@ export default function Hero() {
   const subtitleRef = useRef(null);
   const ctaRef = useRef(null);
   const mockupRef = useRef(null);
-  const floatingBubbleRef = useRef(null);
 
   useEffect(() => {
     const ctx = gsap.context(() => {
@@ -38,15 +37,6 @@ export default function Hero() {
           "-=0.3"
         );
 
-      if (floatingBubbleRef.current) {
-        gsap.to(floatingBubbleRef.current, {
-          y: -10,
-          repeat: -1,
-          yoyo: true,
-          duration: 1.5,
-          ease: "power1.inOut",
-        });
-      }
     }, sectionRef);
 
     return () => ctx.revert();
@@ -112,91 +102,19 @@ export default function Hero() {
           </div>
         </div>
 
-        {/* DM Mockup */}
+        {/* Hero Demo Video */}
         <div ref={mockupRef} className="mt-24 md:mt-32 relative max-w-5xl mx-auto">
           <div className="absolute -inset-10 bg-[#ff7e67]/5 blur-[120px] rounded-full -z-10" />
-          <div className="relative bg-white border border-stone-100 rounded-[2.5rem] p-4 soft-shadow overflow-hidden">
-            <div className="bg-stone-50 rounded-[2rem] border border-stone-100 overflow-hidden aspect-[16/10] flex">
-              {/* Sidebar */}
-              <div className="w-1/4 border-r border-stone-200/50 p-6 hidden md:block bg-white">
-                <div className="h-4 w-24 bg-stone-100 rounded-full mb-8" />
-                <div className="space-y-6">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-full bg-stone-100" />
-                    <div className="space-y-2">
-                      <div className="h-2.5 w-16 bg-stone-100 rounded-full" />
-                      <div className="h-2 w-20 bg-stone-50 rounded-full" />
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-3 p-3 bg-[#fff5f2] rounded-2xl border border-[#ff7e67]/10">
-                    <div className="w-10 h-10 rounded-full bg-[#ff7e67] flex items-center justify-center text-white font-bold text-xs shadow-md shadow-[#ff7e67]/20">
-                      AI
-                    </div>
-                    <div className="space-y-2">
-                      <div className="h-2.5 w-12 bg-[#ff7e67]/20 rounded-full" />
-                      <div className="h-2 w-24 bg-[#ff7e67]/10 rounded-full" />
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-3 opacity-40">
-                    <div className="w-10 h-10 rounded-full bg-stone-100" />
-                    <div className="space-y-2">
-                      <div className="h-2.5 w-20 bg-stone-100 rounded-full" />
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Chat Area */}
-              <div className="flex-1 bg-[#fafaf9] flex flex-col p-8">
-                <div className="flex-1 space-y-6">
-                  <div className="flex justify-end">
-                    <div className="bg-stone-900 text-white px-5 py-3 rounded-3xl rounded-tr-none max-w-xs text-sm font-medium shadow-lg">
-                      Hey! I saw your post about your coaching program. How much is it?
-                    </div>
-                  </div>
-                  <div
-                    ref={floatingBubbleRef}
-                    className="flex justify-start items-end gap-3"
-                  >
-                    <div className="w-8 h-8 rounded-full bg-[#ff7e67] flex items-center justify-center text-white font-bold text-[10px] flex-shrink-0 mb-1">
-                      AI
-                    </div>
-                    <div className="bg-white border border-stone-100 px-5 py-3 rounded-3xl rounded-tl-none max-w-sm text-sm font-medium text-stone-600 soft-shadow">
-                      Hey Sarah! Great question. Our program is tailored to where
-                      you&apos;re at. Are you currently doing $10k/mo or just starting out?
-                    </div>
-                  </div>
-                  <div className="flex justify-end">
-                    <div className="bg-stone-900 text-white px-5 py-3 rounded-3xl rounded-tr-none max-w-xs text-sm font-medium shadow-lg">
-                      Around $15k, looking to scale to $50k.
-                    </div>
-                  </div>
-                  <div className="flex justify-start items-end gap-3">
-                    <div className="w-8 h-8 rounded-full bg-[#ff7e67] flex items-center justify-center text-white font-bold text-[10px] flex-shrink-0 mb-1">
-                      AI
-                    </div>
-                    <div className="bg-white border border-stone-100 px-5 py-3 rounded-3xl rounded-tl-none max-w-sm text-sm font-medium text-stone-600 soft-shadow">
-                      That&apos;s exactly who we help. Let&apos;s hop on a 15-min
-                      strategy call:{" "}
-                      <span className="text-[#ff7e67] underline">
-                        cal.com/book
-                      </span>
-                    </div>
-                  </div>
-                </div>
-                <div className="mt-6 p-4 bg-emerald-50 border border-emerald-100 rounded-2xl flex items-center gap-4">
-                  <CheckCircle className="w-6 h-6 text-emerald-600" />
-                  <div>
-                    <p className="text-xs font-bold text-emerald-800 uppercase tracking-widest">
-                      Lead Qualified — Call Booked
-                    </p>
-                    <p className="text-[11px] text-emerald-600 font-medium">
-                      Discovery call link delivered automatically at 2:47 AM.
-                    </p>
-                  </div>
-                </div>
-              </div>
-            </div>
+          <div className="relative bg-white border border-stone-100 rounded-[2.5rem] p-3 md:p-4 soft-shadow overflow-hidden">
+            <video
+              autoPlay
+              loop
+              muted
+              playsInline
+              className="w-full rounded-[2rem] border border-stone-100"
+            >
+              <source src="/animations/01-hero-demo.mp4" type="video/mp4" />
+            </video>
           </div>
         </div>
       </div>

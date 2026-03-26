@@ -56,6 +56,24 @@ export default function Problem() {
             );
           })}
         </div>
+
+        {/* 24/7 Availability Video */}
+        <div className="mt-16 reveal-up">
+          <div className="bg-stone-50 border border-stone-100 rounded-[2rem] p-3 md:p-4 overflow-hidden">
+            <video
+              autoPlay
+              loop
+              muted
+              playsInline
+              className="w-full rounded-[1.5rem]"
+            >
+              <source
+                src="/animations/02-availability-24x7.mp4"
+                type="video/mp4"
+              />
+            </video>
+          </div>
+        </div>
       </div>
     </section>
   );

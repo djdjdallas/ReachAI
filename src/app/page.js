@@ -6,6 +6,7 @@ import TrustedBy from "@/components/landing/trusted-by";
 import HowItWorks from "@/components/landing/how-it-works";
 import Features from "@/components/landing/features";
 import ComparisonCallout from "@/components/landing/comparison-callout";
+import Integrations from "@/components/landing/integrations";
 import Testimonials from "@/components/landing/testimonials";
 import Pricing from "@/components/landing/pricing";
 import Faq from "@/components/landing/faq";
@@ -80,6 +81,7 @@ export default function HomePage() {
           <HowItWorks />
           <Features />
           <ComparisonCallout />
+          <Integrations />
           <Testimonials />
           <Pricing />
           <Faq />

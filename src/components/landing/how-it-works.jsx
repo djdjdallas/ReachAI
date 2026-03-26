@@ -1,33 +1,24 @@
-import { Link2, FileEdit, ToggleRight, CalendarCheck } from "lucide-react";
-
 const steps = [
   {
-    icon: Link2,
-    title: "Step 1 — Connect",
+    number: "01",
+    title: "Connect & Describe Your Offer",
     description:
-      "Link your Instagram Business account in one click. No passwords shared, fully secured through the official Meta API.",
-    highlight: false,
+      "Link your Instagram account in one click, then tell Clinchd about your coaching offer, ideal client, and how you handle objections. Takes 5 minutes.",
+    video: "/animations/04-smart-replies.mp4",
   },
   {
-    icon: FileEdit,
-    title: "Step 2 — Script",
+    number: "02",
+    title: "AI Qualifies Every DM",
     description:
-      "Tell Clinchd about your coaching offer, your ideal client, and how you handle objections. Takes 5 minutes.",
-    highlight: false,
+      "Every new message gets read, qualified, and replied to in your voice. Clinchd asks the right questions, handles objections, and filters tire-kickers from real buyers.",
+    video: "/animations/03-lead-qualification.mp4",
   },
   {
-    icon: ToggleRight,
-    title: "Step 3 — Activate",
+    number: "03",
+    title: "Discovery Calls Get Booked",
     description:
-      "Flip the switch. Every new DM gets read, qualified, and replied to in your voice — with a human-like delay so it never feels robotic.",
-    highlight: false,
-  },
-  {
-    icon: CalendarCheck,
-    title: "Step 4 — Book",
-    description:
-      "When a lead is qualified, Clinchd drops your Calendly link at exactly the right moment. You show up to pre-qualified discovery calls.",
-    highlight: true,
+      "When a lead is qualified and interested, Clinchd drops your Calendly link at exactly the right moment. You show up to pre-qualified calls ready to close.",
+    video: "/animations/05-calendar-booking.mp4",
   },
 ];
 
@@ -43,42 +34,48 @@ export default function HowItWorks() {
             From DM to discovery call in under 10 minutes.
           </h2>
           <p className="text-stone-500 text-xl font-medium">
-            A 4-step workflow that replaces your setter and saves you 20+ hours a week.
+            A 3-step workflow that replaces your setter and saves you 20+ hours a
+            week.
           </p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-12 md:gap-8 relative">
+        <div className="space-y-20 md:space-y-32">
           {steps.map((step, i) => {
-            const Icon = step.icon;
-            const isLast = i === steps.length - 1;
+            const isReversed = i % 2 !== 0;
             return (
-              <div key={step.title} className="relative group reveal-up">
-                {!isLast && (
-                  <div className="hidden md:block connector-line" />
-                )}
-                <div
-                  className={`w-16 h-16 rounded-[1.5rem] flex items-center justify-center text-2xl font-bold mb-8 group-hover:scale-110 transition-transform duration-300 relative z-10 ${
-                    step.highlight
-                      ? "bg-[#ff7e67] text-white shadow-xl shadow-[#ff7e67]/30"
-                      : "bg-white shadow-sm border border-stone-100"
-                  }`}
-                >
-                  <Icon
-                    className={`w-7 h-7 ${
-                      step.highlight ? "text-white" : "text-[#ff7e67]"
-                    }`}
-                  />
+              <div
+                key={step.number}
+                className={`flex flex-col ${
+                  isReversed ? "md:flex-row-reverse" : "md:flex-row"
+                } items-center gap-12 md:gap-16 reveal-up`}
+              >
+                {/* Text */}
+                <div className="flex-1 md:max-w-md">
+                  <div className="inline-flex items-center justify-center w-12 h-12 rounded-2xl bg-[#ff7e67] text-white text-lg font-black mb-6 shadow-lg shadow-[#ff7e67]/20">
+                    {step.number}
+                  </div>
+                  <h3 className="text-2xl md:text-3xl font-black text-stone-900 mb-4">
+                    {step.title}
+                  </h3>
+                  <p className="text-stone-500 text-base md:text-lg leading-relaxed font-medium">
+                    {step.description}
+                  </p>
                 </div>
-                <h3
-                  className={`text-xl font-black mb-4 ${
-                    step.highlight ? "text-[#ff7e67]" : "text-stone-900"
-                  }`}
-                >
-                  {step.title}
-                </h3>
-                <p className="text-stone-500 text-[15px] leading-relaxed font-medium">
-                  {step.description}
-                </p>
+
+                {/* Video */}
+                <div className="flex-1 w-full">
+                  <div className="bg-white border border-stone-100 rounded-[2rem] p-3 md:p-4 soft-shadow overflow-hidden">
+                    <video
+                      autoPlay
+                      loop
+                      muted
+                      playsInline
+                      className="w-full rounded-[1.5rem]"
+                    >
+                      <source src={step.video} type="video/mp4" />
+                    </video>
+                  </div>
+                </div>
               </div>
             );
           })}
