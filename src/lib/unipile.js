@@ -47,13 +47,18 @@ export async function startNewChat(accountId, attendeeId, text) {
 }
 
 export async function getUnipileHostedAuthLink(callbackUrl, webhookUrl) {
+  // expiresOn: link expires in 1 hour
+  const expiresOn = new Date(Date.now() + 60 * 60 * 1000).toISOString().replace(/(\.\d{3})\d*Z$/, "$1Z");
+
   return unipileFetch("/hosted/accounts/link", {
     method: "POST",
     body: JSON.stringify({
       type: "create",
-      providers_restricted: ["INSTAGRAM"],
+      api_url: getDsn(),
+      providers: ["INSTAGRAM"],
+      expiresOn,
       success_redirect_url: callbackUrl,
-      failure_redirect_url: callbackUrl + "?error=auth_failed",
+      failure_redirect_url: callbackUrl + "&error=auth_failed",
       notify_url: webhookUrl,
     }),
   });
