@@ -13,14 +13,21 @@ function getAnthropic() {
 
 export default getAnthropic;
 
+// Remove unpaired surrogates that break JSON serialization
+function sanitize(str) {
+  if (typeof str !== "string") return str;
+  // eslint-disable-next-line no-control-regex
+  return str.replace(/[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/g, "");
+}
+
 export async function generateReply(systemPrompt, messages) {
   const response = await getAnthropic().messages.create({
     model: "claude-sonnet-4-6",
     max_tokens: 500,
-    system: systemPrompt,
+    system: sanitize(systemPrompt),
     messages: messages.map((m) => ({
       role: m.role === "assistant" ? "assistant" : "user",
-      content: m.content,
+      content: sanitize(m.content),
     })),
   });
 
