@@ -156,30 +156,49 @@ export async function POST(request) {
       }
 
       // Build system prompt from user's script_config
-      const scriptConfig = user.script_config || {};
+      const sc = user.script_config || {};
+      const bookingLink = (user.calendly_url || "").trim();
+
+      // objection_handlers can be a string or an object — normalize to string
+      let objectionText = "";
+      if (typeof sc.objection_handlers === "string") {
+        objectionText = sc.objection_handlers;
+      } else if (typeof sc.objection_handlers === "object" && sc.objection_handlers) {
+        objectionText = Object.entries(sc.objection_handlers)
+          .map(([k, v]) => `${k}: ${v}`)
+          .join("\n");
+      }
+
       const systemPrompt = `You are a friendly and helpful Instagram DM assistant for a business. Your goal is to qualify leads, handle objections, and guide interested prospects to book a call.
 
 Business Details:
-- Offer: ${scriptConfig.offer || "Not specified"}
-- Target Customer: ${scriptConfig.target_customer || "Not specified"}
-- Booking Link: ${user.calendly_url || "Not provided"}
+- Offer: ${sc.offer || "Not specified"}
+- Target Customer: ${sc.targetCustomer || sc.target_customer || "Not specified"}
+- Booking Link: ${bookingLink || "Not provided"}
+
+Greeting: ${sc.greeting || ""}
+
+Qualifying Questions:
+${sc.qualifying_questions || "Ask about their situation, goals, and timeline."}
+
+Interest Response: ${sc.interest_response || ""}
 
 Objection Handlers:
-${
-  scriptConfig.objection_handlers
-    ? Object.entries(scriptConfig.objection_handlers)
-        .map(([objection, response]) => `- If they say "${objection}": ${response}`)
-        .join("\n")
-    : "Handle objections naturally and empathetically."
-}
+${objectionText || "Handle objections naturally and empathetically."}
+
+Booking Message: ${sc.booking_message || ""}
+
+Not a Fit Message: ${sc.not_a_fit_message || ""}
 
 Instructions:
 1. Qualify the lead by understanding their needs and if they match the target customer profile.
-2. Handle any objections they raise using the provided objection handlers.
-3. When the prospect seems interested and qualified, share the booking link: ${user.calendly_url || "{{BOOKING_LINK}}"}
-4. Keep messages conversational, concise, and friendly. Avoid sounding robotic or overly salesy.
-5. If they are not a good fit, politely let them know.
-6. Never reveal that you are an AI assistant.`;
+2. Ask qualifying questions naturally, one at a time — do NOT dump all questions at once.
+3. Handle any objections they raise using the provided objection handlers.
+4. When the prospect seems interested and qualified, share the booking link: ${bookingLink || "{{BOOKING_LINK}}"}
+5. Keep messages conversational, concise (2-4 sentences max), and friendly. No emojis overload.
+6. If they are not a good fit, politely let them know.
+7. Never reveal that you are an AI assistant.
+8. Replace {{BOOKING_LINK}} with: ${bookingLink}`;
 
       // Generate AI reply
       const aiReply = await generateReply(systemPrompt, messages);
