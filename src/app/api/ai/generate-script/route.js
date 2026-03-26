@@ -34,7 +34,7 @@ export async function POST(request) {
   } catch (error) {
     console.error("Generate script error:", error);
     return NextResponse.json(
-      { error: "Internal server error" },
+      { error: error.message || "Failed to generate script. Please try again." },
       { status: 500 }
     );
   }

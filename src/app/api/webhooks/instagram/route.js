@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import { generateReply } from "@/lib/anthropic";
+import { buildSystemPrompt } from "@/lib/prompts";
 import { sendUnipileMessage } from "@/lib/unipile";
 
 export async function GET() {
@@ -130,6 +131,18 @@ export async function POST(request) {
         return NextResponse.json({ status: "ok" }, { status: 200 });
       }
 
+      // Skip AI reply if user has no script configured
+      const sc = user.script_config || {};
+      if (!sc.greeting) {
+        console.log("No script configured for user:", user.id);
+        await supabase.from("messages").insert({
+          conversation_id: conversation.id,
+          role: "user",
+          content: messageText,
+        });
+        return NextResponse.json({ status: "ok" }, { status: 200 });
+      }
+
       // Save incoming message
       await supabase.from("messages").insert({
         conversation_id: conversation.id,
@@ -156,50 +169,7 @@ export async function POST(request) {
       }
 
       // Build system prompt from user's script_config
-      const sc = user.script_config || {};
-      const bookingLink = (user.calendly_url || "").trim();
-
-      // objection_handlers can be a string or an object — normalize to string
-      let objectionText = "";
-      if (typeof sc.objection_handlers === "string") {
-        objectionText = sc.objection_handlers;
-      } else if (typeof sc.objection_handlers === "object" && sc.objection_handlers) {
-        objectionText = Object.entries(sc.objection_handlers)
-          .map(([k, v]) => `${k}: ${v}`)
-          .join("\n");
-      }
-
-      const systemPrompt = `You handle Instagram DMs for a business. You qualify leads and book discovery calls.
-
-BUSINESS CONTEXT:
-Offer: ${sc.offer || "Not specified"}
-Target customer: ${sc.targetCustomer || sc.target_customer || "Not specified"}
-Booking link: ${bookingLink || "Not provided"}
-
-SCRIPT REFERENCE (use as guidance, not word-for-word):
-Greeting style: ${sc.greeting || "Be warm and casual."}
-Qualifying questions: ${sc.qualifying_questions || "Ask about their situation, goals, and timeline."}
-When they show interest: ${sc.interest_response || "Share more about the offer and suggest a call."}
-Objection responses: ${objectionText || "Handle naturally."}
-Booking message style: ${sc.booking_message || "Share the link casually."}
-Not a fit: ${sc.not_a_fit_message || "Be honest and kind."}
-
-HOW TO RESPOND — THIS IS CRITICAL:
-- You are texting on Instagram. Write like a real person, not a marketer.
-- NEVER use em dashes (—). Use commas, periods, or just start a new sentence.
-- NEVER use semicolons.
-- NEVER use bold or markdown formatting like **this** or *this*. Plain text only.
-- Keep it SHORT. 2-3 sentences max per message. Sometimes just 1 sentence.
-- Use casual language: "yeah", "honestly", "for sure", "gotcha", "nice".
-- Max 1 emoji per message. Often zero. Never use multiple emojis.
-- Don't start every message the same way. Vary your openers.
-- Ask ONE question at a time. Never stack multiple questions.
-- Don't over-explain. Be direct.
-- Sound like a chill, helpful person, not a sales script.
-- Avoid words like: "straightforward", "comprehensive", "leverage", "delve", "I totally get it", "absolutely".
-- Use contractions always: "you're", "it's", "that's", "don't".
-- Never say you're an AI. If asked directly, say you help manage messages.
-- Replace {{BOOKING_LINK}} with: ${bookingLink}`;
+      const systemPrompt = buildSystemPrompt(sc, user.calendly_url);
 
       // Generate AI reply
       const aiReply = await generateReply(systemPrompt, messages);
@@ -221,9 +191,16 @@ HOW TO RESPOND — THIS IS CRITICAL:
 
       const hasCalendlyLink =
         user.calendly_url && aiReply.includes(user.calendly_url);
-      const hasBookKeyword = /\b(book|schedule|appointment)\b/i.test(aiReply);
+      // Match booking-intent phrases, not just the word "book" in isolation
+      const hasBookKeyword =
+        /\b(book a call|schedule a call|book a slot|grab a spot|set up a time|appointment)\b/i.test(aiReply);
+      // "Booked" status requires the calendly link to have been shared (strong signal)
       const hasBookedKeyword =
-        /\b(confirmed|booked|see you|looking forward)\b/i.test(aiReply);
+        hasCalendlyLink &&
+        /\b(confirmed|booked|see you (on|soon|then)|looking forward to (the call|our call|chatting|speaking))\b/i.test(aiReply);
+      // Detect not-a-fit signals in the AI reply
+      const hasNotAFitKeyword =
+        /\b(not (the right|a good|a great) fit|not quite what|might not be (for you|the best))\b/i.test(aiReply);
 
       if (
         (hasCalendlyLink || hasBookKeyword) &&
@@ -236,6 +213,9 @@ HOW TO RESPOND — THIS IS CRITICAL:
         statusOrder.indexOf("booked") > currentIdx
       ) {
         newStatus = "booked";
+      }
+      if (hasNotAFitKeyword && conversation.status !== "booked") {
+        newStatus = "not_a_fit";
       }
 
       if (newStatus !== conversation.status) {

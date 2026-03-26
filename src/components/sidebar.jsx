@@ -9,6 +9,7 @@ import {
   Users,
   Calendar,
   BarChart3,
+  FlaskConical,
   Cpu,
   Settings,
   LogOut,
@@ -32,6 +33,7 @@ const mainNavLinks = [
 
 const settingsNavLinks = [
   { href: "/script-builder", label: "Sales Script", icon: Cpu },
+  { href: "/playground", label: "Playground", icon: FlaskConical },
   { href: "/settings", label: "Settings", icon: Settings },
 ];
 

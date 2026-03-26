@@ -10,6 +10,7 @@ const PAGE_TITLES = {
   "/dashboard": "Inbox",
   "/conversations": "Conversations",
   "/script-builder": "Sales Script",
+  "/playground": "Playground",
   "/billing": "Billing",
   "/settings": "Settings",
   "/calendar": "Calendar",

@@ -269,7 +269,11 @@ function OnboardingPage() {
     }
   };
 
+  const scriptReady = !!(profile?.script_config?.greeting);
+  const instagramConnected = !!(profile?.unipile_account_id);
+
   const handleGoLive = async (checked) => {
+    if (checked && !scriptReady) return;
     setActivating(true);
     setAiActive(checked);
 
@@ -739,12 +743,16 @@ function OnboardingPage() {
                   <p className="text-sm text-muted-foreground max-w-sm">
                     {aiActive
                       ? "Your AI agent is now live and will handle incoming DMs automatically."
+                      : !scriptReady
+                      ? "You need to configure your script before activating the AI agent. Go back and generate a script first."
+                      : !instagramConnected
+                      ? "Connect your Instagram account first so the AI can respond to DMs."
                       : "Toggle the switch to activate your AI sales agent. It will start responding to new DMs immediately."}
                   </p>
                   <Switch
                     checked={aiActive}
                     onCheckedChange={handleGoLive}
-                    disabled={activating}
+                    disabled={activating || (!aiActive && !scriptReady)}
                   />
                   <span
                     className={`text-sm font-medium ${

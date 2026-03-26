@@ -69,17 +69,17 @@ const SMART_REPLIES = [
   {
     type: "objection",
     label: "HANDLE OBJECTION",
-    text: "I totally get that concern! Many of our clients felt the same way initially. What specifically would help put your mind at ease?",
+    text: "Yeah that makes sense honestly. What's the main thing holding you back? Just want to make sure I can help.",
   },
   {
     type: "book",
     label: "BOOK CALL",
-    text: "I'd love to show you exactly how this works for your business. Want to grab a quick 15-min slot to chat?",
+    text: "Sounds like this could be a good fit for you. Want to hop on a quick call so I can walk you through everything?",
   },
   {
     type: "reengage",
     label: "RE-ENGAGE",
-    text: "Hey! Just checking back in — did you get a chance to think about what we discussed? Happy to answer any questions!",
+    text: "Hey! Just circling back. Did you get a chance to think things over? No rush, just didn't want you to miss out.",
   },
 ];
 

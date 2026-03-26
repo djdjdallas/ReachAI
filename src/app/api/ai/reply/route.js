@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import { generateReply } from "@/lib/anthropic";
+import { buildSystemPrompt } from "@/lib/prompts";
 import { sendUnipileMessage } from "@/lib/unipile";
 
 export async function POST(request) {
@@ -83,30 +84,10 @@ export async function POST(request) {
         );
       }
 
-      const scriptConfig = userProfile.script_config || {};
-      const systemPrompt = `You are a friendly and helpful Instagram DM assistant for a business. Your goal is to qualify leads, handle objections, and guide interested prospects to book a call.
-
-Business Details:
-- Offer: ${scriptConfig.offer || "Not specified"}
-- Target Customer: ${scriptConfig.target_customer || "Not specified"}
-- Booking Link: ${userProfile.calendly_url || "Not provided"}
-
-Objection Handlers:
-${
-  scriptConfig.objection_handlers
-    ? Object.entries(scriptConfig.objection_handlers)
-        .map(([objection, response]) => `- If they say "${objection}": ${response}`)
-        .join("\n")
-    : "Handle objections naturally and empathetically."
-}
-
-Instructions:
-1. Qualify the lead by understanding their needs and if they match the target customer profile.
-2. Handle any objections they raise using the provided objection handlers.
-3. When the prospect seems interested and qualified, share the booking link: ${userProfile.calendly_url || "{{BOOKING_LINK}}"}
-4. Keep messages conversational, concise, and friendly. Avoid sounding robotic or overly salesy.
-5. If they are not a good fit, politely let them know.
-6. Never reveal that you are an AI assistant.`;
+      const systemPrompt = buildSystemPrompt(
+        userProfile.script_config,
+        userProfile.calendly_url
+      );
 
       // Add the new user message to the history for AI context
       const allMessages = [
