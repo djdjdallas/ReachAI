@@ -88,12 +88,45 @@ export default async function BlogPost({ params }) {
       name: "Clinchd",
       url: "https://clinchd.io",
     },
-    mainEntityOfPage: `https://clinchd.io/blog/${slug}`,
+    mainEntityOfPage: {
+      "@type": "WebPage",
+      "@id": `https://clinchd.io/blog/${slug}`,
+    },
+    articleSection: frontmatter.category,
+    inLanguage: "en-US",
+    isAccessibleForFree: true,
+    keywords: `${frontmatter.title}, Instagram DM automation, coaches, ${frontmatter.category}`,
+  };
+
+  const breadcrumbSchema = {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    itemListElement: [
+      {
+        "@type": "ListItem",
+        position: 1,
+        name: "Home",
+        item: "https://clinchd.io",
+      },
+      {
+        "@type": "ListItem",
+        position: 2,
+        name: "Blog",
+        item: "https://clinchd.io/blog",
+      },
+      {
+        "@type": "ListItem",
+        position: 3,
+        name: frontmatter.title,
+        item: `https://clinchd.io/blog/${slug}`,
+      },
+    ],
   };
 
   return (
     <>
       <JsonLd data={articleSchema} />
+      <JsonLd data={breadcrumbSchema} />
 
       {/* Header */}
       <section className="pt-20 pb-8 md:pt-32 md:pb-12 bg-white">

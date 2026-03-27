@@ -1,0 +1,53 @@
+# Clinchd
+
+> Clinchd is an AI-powered Instagram DM automation platform built specifically for coaches and course creators. It replaces manual DM setters and rigid flow-based tools like ManyChat with AI-native conversations that qualify leads, handle objections, and book discovery calls automatically. Pricing starts at $97/month with no per-contact fees.
+
+Clinchd uses the official Meta Graph API to respond to inbound Instagram DMs. The AI is trained on each coach's specific offer details, brand voice, qualification criteria, and objection-handling style. It operates 24/7, responding to new leads within seconds, and hands off warm qualified prospects to the coach for closing.
+
+## Key Features
+
+- AI-powered DM conversations that sound human and match the coach's brand voice
+- Comment-to-DM automation (trigger keywords on Reels and posts)
+- Story reply automation
+- Lead qualification with customizable criteria (budget, timeline, fit)
+- Dynamic objection handling based on context
+- Automatic discovery call booking with calendar integration
+- Real-time analytics dashboard with conversation insights and lead scores
+- Human takeover with one click at any point in a conversation
+- Flat monthly pricing with no per-contact or per-message fees
+- Full Meta Graph API compliance (inbound only, no spam, no cold outreach)
+
+## Target Audience
+
+Online coaches, consultants, and course creators with 5K to 100K+ Instagram followers who sell high-ticket offers ($500 to $15,000+) and generate leads through Instagram content and DMs.
+
+## Pricing
+
+- Base plan: $97/month (500 DMs/month, AI setter, lead qualification, auto-booking)
+- Unlimited plan: $197/month (unlimited DMs, advanced analytics, priority support, custom AI tuning)
+- 7-day free trial, no credit card required
+
+## Comparisons
+
+- [Clinchd vs ManyChat](https://clinchd.io/compare/vs-manychat): ManyChat uses per-contact pricing and rigid flow builders. Clinchd uses flat pricing and AI-native conversations.
+- [Clinchd vs GoHighLevel](https://clinchd.io/compare/vs-gohighlevel): GoHighLevel is an all-in-one platform with shallow Instagram DM features. Clinchd is purpose-built for Instagram DM automation.
+- [Clinchd vs Setter AI](https://clinchd.io/compare/vs-setter-ai): Setter AI focuses on phone and email outreach. Clinchd is built for Instagram-first coaches.
+
+## Blog
+
+- [Instagram DM Automation in 2026: The Complete Guide for Coaches](https://clinchd.io/blog/instagram-dm-automation-coaches-2026): Comprehensive overview of what DM automation is, how it works, API rules, ROI math, and setup guide.
+- [The Best ManyChat Alternative for Instagram DM Automation in 2026](https://clinchd.io/blog/best-manychat-alternative-instagram-dm-automation): Why coaches are leaving ManyChat, head-to-head comparison with Clinchd, migration playbook.
+- [AI DM Automation for Instagram: How Coaches Are Booking Calls on Autopilot in 2026](https://clinchd.io/blog/ai-dm-automation-instagram-coaches): How AI DM setters work, cost comparison vs human setters, case studies, and setup walkthrough.
+- [Instagram DM Automation vs Manual DMs: What Actually Converts in 2026](https://clinchd.io/blog/instagram-dm-automation-vs-manual): Data-driven comparison of automated vs manual DMs, the hybrid 80/20 model, 7-day transition plan.
+- [How to Set Up Instagram DM Automation Without Losing Your Brand Voice](https://clinchd.io/blog/instagram-dm-automation-brand-voice): Voice audit exercise, AI voice training, before/after examples, handoff best practices.
+- [How to Automate Your Instagram DMs for Your Coaching Business](https://clinchd.io/blog/how-to-automate-instagram-dms-coaching-business): Step-by-step setup guide with Clinchd, trigger strategies, common mistakes.
+- [The Best ManyChat Alternative for Coaches in 2026](https://clinchd.io/blog/manychat-alternative-for-coaches): Top 5 ManyChat alternatives compared (Clinchd, Inro, CreatorFlow, Chatfuel, GoHighLevel).
+- [AI Instagram DM Bots for Coaches in 2026](https://clinchd.io/blog/ai-instagram-dm-bot-for-coaches): Honest review of what AI DM bots can and cannot do, three tiers of automation, tool comparison.
+- [The Complete Instagram DM Strategy for Coaches in 2026](https://clinchd.io/blog/instagram-dm-strategy-for-coaches): Full DM strategy from content triggers through booking, the 4-phase framework.
+- [10 Instagram DM Scripts for Coaches](https://clinchd.io/blog/instagram-dm-scripts-for-coaches): Copy-paste DM scripts for openers, qualification, objection handling, and follow-up.
+- [How to Book More Discovery Calls From Instagram](https://clinchd.io/blog/how-to-book-more-discovery-calls-from-instagram): The Instagram-to-discovery-call funnel, conversion benchmarks, DM booking system.
+
+## Optional
+
+- [Homepage](https://clinchd.io): Product overview, features, pricing, testimonials, and FAQ.
+- [Blog Index](https://clinchd.io/blog): All published articles on Instagram DM automation for coaches.

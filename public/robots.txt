@@ -2,6 +2,38 @@
 User-agent: *
 Allow: /
 
+# GPTBot
+User-agent: GPTBot
+Allow: /
+
+# ChatGPT-User
+User-agent: ChatGPT-User
+Allow: /
+
+# Google-Extended
+User-agent: Google-Extended
+Allow: /
+
+# Anthropic-AI
+User-agent: Anthropic-AI
+Allow: /
+
+# ClaudeBot
+User-agent: ClaudeBot
+Allow: /
+
+# PerplexityBot
+User-agent: PerplexityBot
+Allow: /
+
+# Bytespider
+User-agent: Bytespider
+Allow: /
+
+# CCBot
+User-agent: CCBot
+Allow: /
+
 # Host
 Host: https://clinchd.io
 
