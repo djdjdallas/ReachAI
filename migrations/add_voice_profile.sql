@@ -1,0 +1,1 @@
+ALTER TABLE users ADD COLUMN voice_profile JSONB DEFAULT NULL;

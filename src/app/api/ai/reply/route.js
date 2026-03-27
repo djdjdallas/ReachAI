@@ -86,7 +86,8 @@ export async function POST(request) {
 
       const systemPrompt = buildSystemPrompt(
         userProfile.script_config,
-        userProfile.calendly_url
+        userProfile.calendly_url,
+        { voiceProfile: userProfile.voice_profile }
       );
 
       // Add the new user message to the history for AI context

@@ -32,14 +32,62 @@ function normalizeObjectionHandlers(handlers) {
 }
 
 /**
+ * Builds a personalized writing rules section from the coach's voice profile.
+ * Falls back to generic rules when no voice profile exists.
+ *
+ * @param {object|null} voiceProfile - The user's voice_profile from Supabase
+ * @returns {string}
+ */
+function buildWritingRules(voiceProfile) {
+  if (voiceProfile?.status === "ready" && voiceProfile?.voice_summary) {
+    const traits = voiceProfile.voice_traits || {};
+    const catchphrases = Array.isArray(traits.catchphrases)
+      ? traits.catchphrases.join(", ")
+      : "none specified";
+
+    return `VOICE & WRITING STYLE — match this person's exact voice:
+${voiceProfile.voice_summary}
+
+Specific traits to replicate:
+- Tone: ${traits.tone || "casual and friendly"}
+- Formality: ${traits.formality || "casual"}
+- Sentence style: ${traits.sentence_length || "short and conversational"}
+- Emoji usage: ${traits.emoji_usage || "minimal"}
+- Punctuation: ${traits.punctuation_style || "casual"}
+- Vocabulary/slang: ${traits.vocabulary || "casual language"}
+- Catchphrases to use naturally: ${catchphrases}
+- Personality: ${traits.personality || "friendly and approachable"}
+
+IMPORTANT: Stay in this voice for EVERY message. The prospect should feel like they're talking to a real person with this exact personality. Do not slip into generic AI-speak.
+- NO markdown. No bold, no bullet points, no headers. Plain text only.
+- NO AI buzzwords: do not use "absolutely", "certainly", "great question", "of course", "I'd be happy to", "comprehensive", "leverage", "innovative", "tailored", "I understand your concern", "diving into", "journey".
+- 2-3 sentences per message MAX. Exception: if they asked a detailed question, up to 5 sentences.`;
+  }
+
+  // Default generic rules (backward compatible)
+  return `CRITICAL WRITING RULES — follow these exactly or the message will sound unnatural:
+
+- Write like a real person texting on Instagram. Short, casual, warm.
+- 2-3 sentences per message MAX. Exception: if they asked a detailed question (like pricing or program structure), give a complete answer — up to 5 sentences.
+- NO em dashes (\u2014). Use commas or short sentences instead.
+- NO semicolons.
+- NO markdown. No bold, no bullet points, no headers. Plain text only.
+- NO AI buzzwords: do not use "absolutely", "certainly", "great question", "of course", "I'd be happy to", "comprehensive", "leverage", "innovative", "tailored", "I understand your concern", "diving into", "journey".
+- DO use casual language: "yeah", "honestly", "for sure", "totally", "makes sense", "that's fair".
+- Vary your openers. Do not start every message with "Hey" or "That's".
+- Use contractions: "you're", "I'm", "that's", "it's", "don't".
+- 1 emoji max per message. Often 0 is better. Never use emoji to start a sentence.
+- Sound like a chill, knowledgeable person — not a sales script.`;
+}
+
+/**
  * Builds the core system prompt used for all live DM reply generation.
  *
- * @param {object} scriptConfig - The user's saved script_config from Supabase
- * @param {string} calendlyUrl  - The user's Calendly/Cal.com booking link
+ * @param {object} scriptConfig  - The user's saved script_config from Supabase
+ * @param {string} calendlyUrl   - The user's Calendly/Cal.com booking link
  * @param {object} options
- * @param {boolean} options.isPlayground - If true, adds simulation context so the
- *                                         model knows this is a test and can be
- *                                         slightly more transparent about what it's doing
+ * @param {boolean} options.isPlayground - If true, adds simulation context
+ * @param {object}  options.voiceProfile - The user's voice_profile from Supabase
  * @returns {string} The full system prompt string
  */
 export function buildSystemPrompt(scriptConfig = {}, calendlyUrl = "", options = {}) {
@@ -106,17 +154,5 @@ CORE INSTRUCTIONS:
 
 ---
 
-CRITICAL WRITING RULES — follow these exactly or the message will sound unnatural:
-
-- Write like a real person texting on Instagram. Short, casual, warm.
-- 2-3 sentences per message MAX. Exception: if they asked a detailed question (like pricing or program structure), give a complete answer — up to 5 sentences.
-- NO em dashes (\u2014). Use commas or short sentences instead.
-- NO semicolons.
-- NO markdown. No bold, no bullet points, no headers. Plain text only.
-- NO AI buzzwords: do not use "absolutely", "certainly", "great question", "of course", "I'd be happy to", "comprehensive", "leverage", "innovative", "tailored", "I understand your concern", "diving into", "journey".
-- DO use casual language: "yeah", "honestly", "for sure", "totally", "makes sense", "that's fair".
-- Vary your openers. Do not start every message with "Hey" or "That's".
-- Use contractions: "you're", "I'm", "that's", "it's", "don't".
-- 1 emoji max per message. Often 0 is better. Never use emoji to start a sentence.
-- Sound like a chill, knowledgeable person — not a sales script.`;
+${buildWritingRules(options.voiceProfile)}`;
 }

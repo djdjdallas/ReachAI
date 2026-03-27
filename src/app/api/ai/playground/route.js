@@ -48,7 +48,7 @@ export async function POST(request) {
 
     const { data: userProfile, error: profileError } = await getSupabaseAdmin()
       .from("users")
-      .select("script_config, calendly_url")
+      .select("script_config, calendly_url, voice_profile")
       .eq("id", user.id)
       .single();
 
@@ -74,6 +74,7 @@ export async function POST(request) {
 
     const systemPrompt = buildSystemPrompt(scriptConfig, calendlyUrl, {
       isPlayground: true,
+      voiceProfile: userProfile.voice_profile,
     });
 
     // Cap at 20 messages — same as production webhook

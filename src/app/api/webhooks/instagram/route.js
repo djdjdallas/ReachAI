@@ -168,8 +168,10 @@ export async function POST(request) {
         return NextResponse.json({ status: "ok" }, { status: 200 });
       }
 
-      // Build system prompt from user's script_config
-      const systemPrompt = buildSystemPrompt(sc, user.calendly_url);
+      // Build system prompt from user's script_config + voice profile
+      const systemPrompt = buildSystemPrompt(sc, user.calendly_url, {
+        voiceProfile: user.voice_profile,
+      });
 
       // Generate AI reply
       const aiReply = await generateReply(systemPrompt, messages);

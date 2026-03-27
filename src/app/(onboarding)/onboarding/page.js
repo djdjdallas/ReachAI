@@ -3,6 +3,7 @@
 import { useState, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import posthog from "posthog-js";
 import {
   Zap,
   Instagram,
@@ -20,6 +21,12 @@ import {
   HelpCircle,
   Target,
   ShoppingBag,
+  Mic,
+  Send,
+  ClipboardPaste,
+  MessageCircle,
+  Bot,
+  User,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -41,8 +48,9 @@ import { Separator } from "@/components/ui/separator";
 const STEPS = [
   { number: 1, title: "Connect Instagram", icon: Instagram },
   { number: 2, title: "Sales Script", icon: FileText },
-  { number: 3, title: "Preview Script", icon: Eye },
-  { number: 4, title: "Go Live", icon: Rocket },
+  { number: 3, title: "Your Voice", icon: Mic },
+  { number: 4, title: "Preview Script", icon: Eye },
+  { number: 5, title: "Go Live", icon: Rocket },
 ];
 
 export default function OnboardingPageWrapper() {
@@ -60,7 +68,7 @@ function OnboardingPage() {
 
   const [step, setStep] = useState(() => {
     const urlStep = parseInt(searchParams.get("step"), 10);
-    return urlStep >= 1 && urlStep <= 4 ? urlStep : 1;
+    return urlStep >= 1 && urlStep <= 5 ? urlStep : 1;
   });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -82,7 +90,17 @@ function OnboardingPage() {
   const [bookingMessage, setBookingMessage] = useState("");
   const [notAFitMessage, setNotAFitMessage] = useState("");
 
-  // Step 4
+  // Step 3 — Voice Profile
+  const [voiceProfile, setVoiceProfile] = useState(null);
+  const [voiceMode, setVoiceMode] = useState(null); // null | "paste" | "chat"
+  const [sampleText, setSampleText] = useState("");
+  const [analyzingVoice, setAnalyzingVoice] = useState(false);
+  const [voiceChatMessages, setVoiceChatMessages] = useState([]);
+  const [voiceChatInput, setVoiceChatInput] = useState("");
+  const [voiceChatLoading, setVoiceChatLoading] = useState(false);
+  const [finalizingVoice, setFinalizingVoice] = useState(false);
+
+  // Step 5
   const [aiActive, setAiActive] = useState(false);
   const [activating, setActivating] = useState(false);
 
@@ -134,6 +152,9 @@ function OnboardingPage() {
         }
         if (userProfile.calendly_url) {
           setCalendlyUrl(userProfile.calendly_url);
+        }
+        if (userProfile.voice_profile) {
+          setVoiceProfile(userProfile.voice_profile);
         }
 
         // Auto-advance: if Instagram is connected and user is on step 1, go to step 2
@@ -190,6 +211,7 @@ function OnboardingPage() {
       }));
 
       setStep(3);
+      posthog.capture("onboarding_step_completed", { step: 2 });
     } catch (err) {
       console.error("Error saving script config:", err);
     } finally {
@@ -261,11 +283,152 @@ function OnboardingPage() {
         .eq("id", user.id);
 
       setProfile((prev) => ({ ...prev, script_config: scriptConfig }));
-      setStep(4);
+      setStep(5);
+      posthog.capture("onboarding_step_completed", { step: 4 });
     } catch (err) {
       console.error("Error saving generated script:", err);
     } finally {
       setSaving(false);
+    }
+  };
+
+  // Voice handlers
+  const sampleMessageCount = sampleText
+    .split("\n")
+    .filter((m) => m.trim().length > 0).length;
+
+  const handleAnalyzeVoice = async () => {
+    const messages = sampleText
+      .split("\n")
+      .map((m) => m.trim())
+      .filter((m) => m.length > 0);
+
+    if (messages.length < 3) return;
+
+    setAnalyzingVoice(true);
+    try {
+      const res = await fetch("/api/ai/analyze-voice", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ sample_messages: messages }),
+      });
+
+      const data = await res.json();
+      if (data.voice_profile) {
+        setVoiceProfile(data.voice_profile);
+        setVoiceMode(null);
+        setSampleText("");
+        posthog.capture("voice_analyzed", { method: "paste", source: "onboarding" });
+      }
+    } catch (err) {
+      console.error("Error analyzing voice:", err);
+    } finally {
+      setAnalyzingVoice(false);
+    }
+  };
+
+  const handleStartVoiceChat = async () => {
+    setVoiceMode("chat");
+    setVoiceChatMessages([]);
+    setVoiceChatLoading(true);
+
+    try {
+      const res = await fetch("/api/ai/voice-chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          messages: [
+            {
+              role: "user",
+              content:
+                "Hey, I want to set up my voice profile. Ask me some questions so you can learn how I write.",
+            },
+          ],
+        }),
+      });
+
+      const data = await res.json();
+      if (data.reply) {
+        setVoiceChatMessages([{ role: "assistant", content: data.reply }]);
+      }
+    } catch (err) {
+      console.error("Error starting voice chat:", err);
+    } finally {
+      setVoiceChatLoading(false);
+    }
+  };
+
+  const handleSendVoiceChat = async () => {
+    if (!voiceChatInput.trim() || voiceChatLoading) return;
+
+    const newMessages = [
+      ...voiceChatMessages,
+      { role: "user", content: voiceChatInput.trim() },
+    ];
+    setVoiceChatMessages(newMessages);
+    setVoiceChatInput("");
+    setVoiceChatLoading(true);
+
+    try {
+      const res = await fetch("/api/ai/voice-chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          messages: [
+            {
+              role: "user",
+              content:
+                "Hey, I want to set up my voice profile. Ask me some questions so you can learn how I write.",
+            },
+            ...newMessages,
+          ],
+        }),
+      });
+
+      const data = await res.json();
+      if (data.reply) {
+        setVoiceChatMessages([
+          ...newMessages,
+          { role: "assistant", content: data.reply },
+        ]);
+      }
+    } catch (err) {
+      console.error("Error in voice chat:", err);
+    } finally {
+      setVoiceChatLoading(false);
+    }
+  };
+
+  const handleFinalizeVoiceChat = async () => {
+    setFinalizingVoice(true);
+    try {
+      const res = await fetch("/api/ai/voice-chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          messages: [
+            {
+              role: "user",
+              content:
+                "Hey, I want to set up my voice profile. Ask me some questions so you can learn how I write.",
+            },
+            ...voiceChatMessages,
+          ],
+          finalize: true,
+        }),
+      });
+
+      const data = await res.json();
+      if (data.voice_profile) {
+        setVoiceProfile(data.voice_profile);
+        setVoiceMode(null);
+        setVoiceChatMessages([]);
+        posthog.capture("voice_analyzed", { method: "chat", source: "onboarding" });
+      }
+    } catch (err) {
+      console.error("Error finalizing voice:", err);
+    } finally {
+      setFinalizingVoice(false);
     }
   };
 
@@ -285,6 +448,10 @@ function OnboardingPage() {
           onboarding_completed: true,
         })
         .eq("id", user.id);
+
+      if (checked) {
+        posthog.capture("ai_agent_activated");
+      }
     } catch (err) {
       console.error("Error going live:", err);
       setAiActive(!checked);
@@ -513,8 +680,247 @@ function OnboardingPage() {
           </Card>
         )}
 
-        {/* Step 3: Preview AI Script */}
+        {/* Step 3: Your Voice */}
         {step === 3 && (
+          <Card className="mt-6">
+            <CardHeader className="text-center">
+              <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-primary/10 mb-3">
+                <Mic className="h-7 w-7 text-primary" />
+              </div>
+              <CardTitle className="text-xl">Teach the AI Your Voice</CardTitle>
+              <CardDescription>
+                Help the AI sound exactly like you when replying to DMs. You can
+                paste sample messages or have a quick chat.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {voiceProfile?.status === "ready" && !voiceMode ? (
+                // Voice configured
+                <div className="space-y-4">
+                  <div className="rounded-lg border bg-muted/50 p-4 space-y-3">
+                    <div className="flex items-center gap-2 mb-2">
+                      <Check className="h-4 w-4 text-green-600" />
+                      <span className="text-sm font-medium text-green-600">
+                        Voice profile captured
+                      </span>
+                    </div>
+                    <p className="text-sm italic">
+                      &ldquo;{voiceProfile.voice_summary}&rdquo;
+                    </p>
+                    {voiceProfile.voice_traits?.catchphrases?.length > 0 && (
+                      <>
+                        <Separator />
+                        <div className="flex flex-wrap gap-1.5">
+                          {voiceProfile.voice_traits.catchphrases.map(
+                            (phrase, i) => (
+                              <span
+                                key={i}
+                                className="inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-medium"
+                              >
+                                {phrase}
+                              </span>
+                            )
+                          )}
+                        </div>
+                      </>
+                    )}
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setVoiceMode("paste")}
+                  >
+                    <Sparkles className="h-3.5 w-3.5" />
+                    Re-analyze with new samples
+                  </Button>
+                </div>
+              ) : voiceMode === "paste" ? (
+                // Paste flow
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <Label className="flex items-center gap-2">
+                      <ClipboardPaste className="h-3.5 w-3.5" />
+                      Paste your messages
+                    </Label>
+                    <Textarea
+                      value={sampleText}
+                      onChange={(e) => setSampleText(e.target.value)}
+                      rows={8}
+                      placeholder={`Paste real messages you've sent — DMs, texts, or social posts. One message per line.\n\nExample:\nhey! saw your post, that's fire. what made you start your agency?\nhonestly that's impressive for 6 months in. what's your biggest bottleneck rn?\nyeah I totally get that. we actually help with exactly that kind of thing`}
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      {sampleMessageCount} message{sampleMessageCount !== 1 ? "s" : ""} detected
+                      {sampleMessageCount < 3
+                        ? " (minimum 3 needed)"
+                        : sampleMessageCount < 5
+                        ? " (5+ recommended for best results)"
+                        : ""}
+                    </p>
+                  </div>
+                  <div className="flex gap-2">
+                    <Button
+                      onClick={handleAnalyzeVoice}
+                      disabled={analyzingVoice || sampleMessageCount < 3}
+                    >
+                      {analyzingVoice ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <Sparkles className="h-4 w-4" />
+                      )}
+                      {analyzingVoice ? "Analyzing..." : "Analyze My Voice"}
+                    </Button>
+                    <Button
+                      variant="outline"
+                      onClick={() => {
+                        setVoiceMode(null);
+                        setSampleText("");
+                      }}
+                    >
+                      Back
+                    </Button>
+                  </div>
+                </div>
+              ) : voiceMode === "chat" ? (
+                // Chat flow
+                <div className="space-y-4">
+                  <div className="rounded-lg border bg-background p-4 max-h-72 overflow-y-auto space-y-3">
+                    {voiceChatMessages.map((msg, i) => (
+                      <div
+                        key={i}
+                        className={`flex ${msg.role === "assistant" ? "justify-start" : "justify-end"} mb-2`}
+                      >
+                        <div
+                          className={`flex items-start gap-2 max-w-[80%] ${
+                            msg.role === "assistant" ? "flex-row" : "flex-row-reverse"
+                          }`}
+                        >
+                          <div
+                            className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full mt-0.5 ${
+                              msg.role === "assistant"
+                                ? "bg-primary/15 text-primary"
+                                : "bg-secondary text-secondary-foreground"
+                            }`}
+                          >
+                            {msg.role === "assistant" ? (
+                              <Bot className="h-3.5 w-3.5" />
+                            ) : (
+                              <User className="h-3.5 w-3.5" />
+                            )}
+                          </div>
+                          <div
+                            className={`rounded-2xl px-4 py-2.5 text-sm ${
+                              msg.role === "assistant"
+                                ? "bg-muted text-foreground rounded-tl-sm"
+                                : "bg-primary text-primary-foreground rounded-tr-sm"
+                            }`}
+                          >
+                            {msg.content}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                    {voiceChatLoading && (
+                      <div className="flex justify-start">
+                        <div className="bg-muted rounded-2xl px-4 py-2.5 rounded-tl-sm">
+                          <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                  <div className="flex gap-2">
+                    <Input
+                      value={voiceChatInput}
+                      onChange={(e) => setVoiceChatInput(e.target.value)}
+                      placeholder="Type naturally, like you'd message a client..."
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" && !e.shiftKey) {
+                          e.preventDefault();
+                          handleSendVoiceChat();
+                        }
+                      }}
+                      disabled={voiceChatLoading}
+                    />
+                    <Button
+                      size="icon"
+                      onClick={handleSendVoiceChat}
+                      disabled={voiceChatLoading || !voiceChatInput.trim()}
+                    >
+                      <Send className="h-4 w-4" />
+                    </Button>
+                  </div>
+                  <div className="flex gap-2">
+                    {voiceChatMessages.filter((m) => m.role === "user").length >=
+                      3 && (
+                      <Button
+                        onClick={handleFinalizeVoiceChat}
+                        disabled={finalizingVoice}
+                      >
+                        {finalizingVoice ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <Check className="h-4 w-4" />
+                        )}
+                        {finalizingVoice ? "Saving..." : "Finish & Save"}
+                      </Button>
+                    )}
+                    <Button
+                      variant="outline"
+                      onClick={() => {
+                        setVoiceMode(null);
+                        setVoiceChatMessages([]);
+                      }}
+                    >
+                      Back
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                // Empty state — choose method
+                <div className="flex flex-col sm:flex-row gap-3">
+                  <button
+                    onClick={() => setVoiceMode("paste")}
+                    className="flex-1 rounded-lg border-2 border-dashed p-6 text-center hover:border-primary/50 hover:bg-muted/50 transition-colors"
+                  >
+                    <ClipboardPaste className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
+                    <p className="text-sm font-medium">Paste Sample Messages</p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Paste 5+ real DMs, texts, or posts
+                    </p>
+                  </button>
+                  <button
+                    onClick={() => {
+                      setVoiceMode("chat");
+                      handleStartVoiceChat();
+                    }}
+                    className="flex-1 rounded-lg border-2 border-dashed p-6 text-center hover:border-primary/50 hover:bg-muted/50 transition-colors"
+                  >
+                    <MessageCircle className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
+                    <p className="text-sm font-medium">Chat with AI</p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Quick conversation to capture your style
+                    </p>
+                  </button>
+                </div>
+              )}
+            </CardContent>
+            <CardFooter className="flex justify-between">
+              <Button variant="outline" onClick={() => setStep(2)}>
+                <ArrowLeft className="h-4 w-4 mr-1" />
+                Back
+              </Button>
+              <Button onClick={() => {
+                setStep(4);
+                posthog.capture("onboarding_step_completed", { step: 3 });
+              }}>
+                {voiceProfile?.status === "ready" ? "Continue" : "Skip for now"}
+                <ArrowRight className="h-4 w-4 ml-1" />
+              </Button>
+            </CardFooter>
+          </Card>
+        )}
+
+        {/* Step 4: Preview AI Script */}
+        {step === 4 && (
           <Card className="mt-6">
             <CardHeader className="text-center">
               <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-primary/10 mb-3">
@@ -650,7 +1056,7 @@ function OnboardingPage() {
               )}
             </CardContent>
             <CardFooter className="flex justify-between">
-              <Button variant="outline" onClick={() => setStep(2)}>
+              <Button variant="outline" onClick={() => setStep(3)}>
                 <ArrowLeft className="h-4 w-4 mr-1" />
                 Back
               </Button>
@@ -666,8 +1072,8 @@ function OnboardingPage() {
           </Card>
         )}
 
-        {/* Step 4: Go Live */}
-        {step === 4 && (
+        {/* Step 5: Go Live */}
+        {step === 5 && (
           <Card className="mt-6">
             <CardHeader className="text-center">
               <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-primary/10 mb-3">
@@ -773,7 +1179,7 @@ function OnboardingPage() {
                 Go to Dashboard
                 <ArrowRight className="h-4 w-4 ml-1" />
               </Button>
-              <Button variant="outline" onClick={() => setStep(3)}>
+              <Button variant="outline" onClick={() => setStep(4)}>
                 <ArrowLeft className="h-4 w-4 mr-1" />
                 Back to Script
               </Button>

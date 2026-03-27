@@ -60,7 +60,108 @@ export async function generateReply(systemPrompt, messages) {
  * @param {string} objections     - Common objections and how to handle them
  * @returns {Promise<object>}     - Validated script config object
  */
-export async function generateScript(offer, targetCustomer, objections) {
+/**
+ * Analyzes sample messages to extract a coach's unique writing voice.
+ *
+ * @param {string[]} sampleMessages - 5-20 real messages/posts written by the coach
+ * @returns {Promise<{voice_summary: string, voice_traits: object}>}
+ */
+export async function analyzeVoice(sampleMessages) {
+  for (let attempt = 1; attempt <= 2; attempt++) {
+    try {
+      const response = await getAnthropic().messages.create({
+        model: "claude-sonnet-4-6",
+        max_tokens: 1500,
+        temperature: 0.3,
+        system: `You are a linguistics and communication style expert. Analyze the writing samples provided and extract the author's unique voice characteristics.
+
+CRITICAL: Return ONLY a valid JSON object. No markdown code fences. No preamble. No explanation.
+
+The JSON must have exactly these fields:
+- "voice_summary": string — A 2-3 sentence natural language description of how this person writes. Written as instructions for an AI to mimic (e.g., "Write in short, punchy sentences with high energy. Use slang like 'bro' and 'fire'. Rarely use periods, prefer exclamation marks.")
+- "voice_traits": object with these keys:
+  - "tone": string — overall emotional tone (e.g., "warm and encouraging", "direct and no-BS", "hype and energetic")
+  - "formality": string — formality level (e.g., "very casual", "professional but approachable")
+  - "sentence_length": string — typical sentence structure (e.g., "short and punchy, 3-8 words", "medium, conversational")
+  - "emoji_usage": string — emoji habits (e.g., "heavy, uses fire/rocket/100 frequently", "minimal, occasional smiley", "none")
+  - "punctuation_style": string — punctuation patterns (e.g., "lots of exclamation marks, skips periods", "proper punctuation", "ellipsis heavy")
+  - "vocabulary": string — notable words/slang they use (e.g., "uses 'bro', 'honestly', 'let's go', 'crush it'")
+  - "catchphrases": array of strings — recurring phrases (e.g., ["let's go", "that's fire", "no cap"])
+  - "personality": string — overall vibe (e.g., "hype-man energy, like a supportive friend who's also a coach")
+
+EXAMPLE OUTPUT:
+{
+  "voice_summary": "Write in short, high-energy sentences. Use casual slang like 'bro' and 'let's go'. Heavy on exclamation marks, light on periods. Drop in a fire emoji occasionally. Sound like an excited friend who genuinely wants to help.",
+  "voice_traits": {
+    "tone": "hype and encouraging",
+    "formality": "very casual, bro-talk",
+    "sentence_length": "short and punchy, 3-8 words typical",
+    "emoji_usage": "moderate, favors fire and 100 emoji",
+    "punctuation_style": "heavy exclamation marks, rarely uses periods",
+    "vocabulary": "uses 'bro', 'fire', 'crush it', 'let's go', 'no cap'",
+    "catchphrases": ["let's go", "that's fire", "you got this"],
+    "personality": "hype-man energy, supportive friend who's also a coach"
+  }
+}`,
+        messages: [
+          {
+            role: "user",
+            content: `Analyze the writing voice in these ${sampleMessages.length} messages:\n\n${sampleMessages.map((m, i) => `[${i + 1}] ${m}`).join("\n\n")}`,
+          },
+        ],
+      });
+
+      const raw = response.content[0].text.trim();
+      const parsed = extractAndParseJSON(raw);
+
+      // Validate required fields exist
+      if (!parsed.voice_summary || !parsed.voice_traits) {
+        throw new Error("Missing voice_summary or voice_traits in response");
+      }
+
+      return parsed;
+    } catch (err) {
+      if (attempt === 2) {
+        console.error("analyzeVoice failed after 2 attempts:", err.message);
+        throw new Error("Failed to analyze voice. Please try again.");
+      }
+      console.warn(`analyzeVoice attempt ${attempt} failed, retrying...`, err.message);
+    }
+  }
+}
+
+/**
+ * Generates a reply in the voice-chat interview flow.
+ * The AI acts as a friendly interviewer eliciting the coach's natural writing style.
+ *
+ * @param {Array} messages - Conversation history [{role, content}]
+ * @returns {Promise<string>}
+ */
+export async function generateVoiceChatReply(messages) {
+  const response = await getAnthropic().messages.create({
+    model: "claude-sonnet-4-6",
+    max_tokens: 300,
+    temperature: 0.7,
+    system: `You are a friendly voice coach helping a business owner capture their unique writing style. Your job is to ask them questions that make them respond naturally — the way they'd actually text a client or DM a lead.
+
+RULES:
+- Ask one question at a time
+- Keep your questions short and casual
+- Ask them to respond AS IF they were messaging a real person (not describing how they'd respond)
+- Mix up the scenarios: greeting a new lead, handling an objection, following up, celebrating a win with a client
+- After 4-5 exchanges, tell them you've got a great picture of their voice and they can click "Finish & Save"
+- Do NOT analyze their voice in the chat — just be conversational and elicit natural responses
+- Sound like a friendly person, not a corporate interviewer`,
+    messages: messages.map((m) => ({
+      role: m.role === "assistant" ? "assistant" : "user",
+      content: sanitize(m.content),
+    })),
+  });
+
+  return response.content[0].text;
+}
+
+export async function generateScript(offer, targetCustomer, objections, voiceProfile = null) {
   const prompt = `Create a DM sales script for:
 Offer: ${offer}
 Target Customer: ${targetCustomer}
@@ -84,7 +185,20 @@ The JSON must have exactly these 6 fields:
 - "objection_handlers": string — format as "objection: response" pairs, one per line
 - "booking_message": string — message with the booking link placeholder {{BOOKING_LINK}}
 - "not_a_fit_message": string — polite decline message
+${voiceProfile?.voice_summary ? `
+VOICE & WRITING STYLE — the script MUST sound like this specific person:
+${voiceProfile.voice_summary}
 
+Specific traits to replicate:
+- Tone: ${voiceProfile.voice_traits?.tone || "casual and friendly"}
+- Formality: ${voiceProfile.voice_traits?.formality || "casual"}
+- Sentence style: ${voiceProfile.voice_traits?.sentence_length || "short"}
+- Emoji usage: ${voiceProfile.voice_traits?.emoji_usage || "minimal"}
+- Punctuation: ${voiceProfile.voice_traits?.punctuation_style || "casual"}
+- Vocabulary/slang: ${voiceProfile.voice_traits?.vocabulary || "casual language"}
+- Catchphrases to use naturally: ${Array.isArray(voiceProfile.voice_traits?.catchphrases) ? voiceProfile.voice_traits.catchphrases.join(", ") : "none specified"}
+- Personality: ${voiceProfile.voice_traits?.personality || "friendly and approachable"}
+` : `
 WRITING RULES (apply to all fields):
 - Sound like a real person texting on Instagram, not a corporate sales bot
 - Use casual language: "yeah", "honestly", "for sure", "totally"
@@ -92,7 +206,7 @@ WRITING RULES (apply to all fields):
 - Keep messages short (2-3 sentences max per field except qualifying_questions)
 - NO em dashes, NO semicolons, NO markdown, NO AI buzzwords like "absolutely", "certainly", "comprehensive"
 - 1 emoji max, often 0 is better
-
+`}
 EXAMPLE OUTPUT (follow this format exactly):
 {
   "greeting": "hey! thanks for reaching out. what made you decide to message today?",

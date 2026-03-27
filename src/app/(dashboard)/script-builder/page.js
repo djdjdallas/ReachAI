@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import posthog from "posthog-js";
 import {
   Loader2,
   Sparkles,
@@ -16,6 +17,12 @@ import {
   ShoppingBag,
   Bot,
   User,
+  Mic,
+  Send,
+  Check,
+  Trash2,
+  ClipboardPaste,
+  MessageCircle,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -92,6 +99,16 @@ export default function ScriptBuilderPage() {
   const [bookingMessage, setBookingMessage] = useState("");
   const [notAFitMessage, setNotAFitMessage] = useState("");
 
+  // Voice profile
+  const [voiceProfile, setVoiceProfile] = useState(null);
+  const [voiceMode, setVoiceMode] = useState(null); // null | "paste" | "chat"
+  const [sampleText, setSampleText] = useState("");
+  const [analyzingVoice, setAnalyzingVoice] = useState(false);
+  const [voiceChatMessages, setVoiceChatMessages] = useState([]);
+  const [voiceChatInput, setVoiceChatInput] = useState("");
+  const [voiceChatLoading, setVoiceChatLoading] = useState(false);
+  const [finalizingVoice, setFinalizingVoice] = useState(false);
+
   // Preview conversation
   const [previewMessages, setPreviewMessages] = useState([]);
 
@@ -110,7 +127,7 @@ export default function ScriptBuilderPage() {
 
       const { data: profile } = await supabase
         .from("users")
-        .select("script_config, calendly_url")
+        .select("script_config, calendly_url, voice_profile")
         .eq("id", authUser.id)
         .single();
 
@@ -141,6 +158,9 @@ export default function ScriptBuilderPage() {
         if (profile.calendly_url) {
           setCalendlyUrl(profile.calendly_url);
         }
+        if (profile.voice_profile) {
+          setVoiceProfile(profile.voice_profile);
+        }
       }
 
       setLoading(false);
@@ -148,6 +168,158 @@ export default function ScriptBuilderPage() {
 
     init();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const handleAnalyzeVoice = async () => {
+    const messages = sampleText
+      .split("\n")
+      .map((m) => m.trim())
+      .filter((m) => m.length > 0);
+
+    if (messages.length < 3) return;
+
+    setAnalyzingVoice(true);
+    try {
+      const res = await fetch("/api/ai/analyze-voice", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ sample_messages: messages }),
+      });
+
+      const data = await res.json();
+      if (data.voice_profile) {
+        setVoiceProfile(data.voice_profile);
+        setVoiceMode(null);
+        setSampleText("");
+        posthog.capture("voice_analyzed", { method: "paste" });
+      }
+    } catch (err) {
+      console.error("Error analyzing voice:", err);
+    } finally {
+      setAnalyzingVoice(false);
+    }
+  };
+
+  const handleStartVoiceChat = async () => {
+    setVoiceMode("chat");
+    setVoiceChatMessages([]);
+    setVoiceChatLoading(true);
+
+    try {
+      const res = await fetch("/api/ai/voice-chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          messages: [
+            {
+              role: "user",
+              content:
+                "Hey, I want to set up my voice profile. Ask me some questions so you can learn how I write.",
+            },
+          ],
+        }),
+      });
+
+      const data = await res.json();
+      if (data.reply) {
+        setVoiceChatMessages([{ role: "assistant", content: data.reply }]);
+      }
+    } catch (err) {
+      console.error("Error starting voice chat:", err);
+    } finally {
+      setVoiceChatLoading(false);
+    }
+  };
+
+  const handleSendVoiceChat = async () => {
+    if (!voiceChatInput.trim() || voiceChatLoading) return;
+
+    const newMessages = [
+      ...voiceChatMessages,
+      { role: "user", content: voiceChatInput.trim() },
+    ];
+    setVoiceChatMessages(newMessages);
+    setVoiceChatInput("");
+    setVoiceChatLoading(true);
+
+    try {
+      const res = await fetch("/api/ai/voice-chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          messages: [
+            {
+              role: "user",
+              content:
+                "Hey, I want to set up my voice profile. Ask me some questions so you can learn how I write.",
+            },
+            ...newMessages,
+          ],
+        }),
+      });
+
+      const data = await res.json();
+      if (data.reply) {
+        setVoiceChatMessages([
+          ...newMessages,
+          { role: "assistant", content: data.reply },
+        ]);
+      }
+    } catch (err) {
+      console.error("Error in voice chat:", err);
+    } finally {
+      setVoiceChatLoading(false);
+    }
+  };
+
+  const handleFinalizeVoiceChat = async () => {
+    setFinalizingVoice(true);
+    try {
+      const res = await fetch("/api/ai/voice-chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          messages: [
+            {
+              role: "user",
+              content:
+                "Hey, I want to set up my voice profile. Ask me some questions so you can learn how I write.",
+            },
+            ...voiceChatMessages,
+          ],
+          finalize: true,
+        }),
+      });
+
+      const data = await res.json();
+      if (data.voice_profile) {
+        setVoiceProfile(data.voice_profile);
+        setVoiceMode(null);
+        setVoiceChatMessages([]);
+        posthog.capture("voice_analyzed", { method: "chat" });
+      }
+    } catch (err) {
+      console.error("Error finalizing voice:", err);
+    } finally {
+      setFinalizingVoice(false);
+    }
+  };
+
+  const handleRemoveVoice = async () => {
+    try {
+      await supabase
+        .from("users")
+        .update({ voice_profile: null })
+        .eq("id", user.id);
+      setVoiceProfile(null);
+      posthog.capture("voice_removed");
+    } catch (err) {
+      console.error("Error removing voice:", err);
+    }
+  };
+
+  const sampleMessageCount = sampleText
+    .split("\n")
+    .filter((m) => m.trim().length > 0).length;
 
   const buildPreviewConversation = () => {
     const messages = [];
@@ -250,6 +422,7 @@ export default function ScriptBuilderPage() {
         );
         setBookingMessage(script.booking_message || "");
         setNotAFitMessage(script.not_a_fit_message || "");
+        posthog.capture("script_generated");
       }
     } catch (err) {
       console.error("Error generating script:", err);
@@ -280,6 +453,8 @@ export default function ScriptBuilderPage() {
           calendly_url: calendlyUrl,
         })
         .eq("id", user.id);
+
+      posthog.capture("script_saved");
     } catch (err) {
       console.error("Error saving script:", err);
     } finally {
@@ -329,6 +504,247 @@ export default function ScriptBuilderPage() {
         {/* Edit Tab */}
         <TabsContent value="edit">
           <div className="space-y-6 mt-4">
+            {/* Your Voice Card */}
+            <Card>
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle className="text-lg flex items-center gap-2">
+                      <Mic className="h-5 w-5" />
+                      Your Voice
+                    </CardTitle>
+                    <CardDescription>
+                      {voiceProfile?.status === "ready"
+                        ? "Your voice profile is active. AI responses will match your writing style."
+                        : "Teach the AI to write exactly like you so DM replies sound authentic."}
+                    </CardDescription>
+                  </div>
+                  {voiceProfile?.status === "ready" && (
+                    <Badge variant="success">Active</Badge>
+                  )}
+                </div>
+              </CardHeader>
+              <CardContent>
+                {voiceProfile?.status === "ready" && !voiceMode ? (
+                  // Configured state — show voice summary
+                  <div className="space-y-4">
+                    <div className="rounded-lg border bg-muted/50 p-4 space-y-3">
+                      <p className="text-sm italic">
+                        &ldquo;{voiceProfile.voice_summary}&rdquo;
+                      </p>
+                      <Separator />
+                      <div className="grid grid-cols-2 gap-2 text-xs">
+                        {voiceProfile.voice_traits?.tone && (
+                          <div>
+                            <span className="font-medium">Tone:</span>{" "}
+                            {voiceProfile.voice_traits.tone}
+                          </div>
+                        )}
+                        {voiceProfile.voice_traits?.formality && (
+                          <div>
+                            <span className="font-medium">Formality:</span>{" "}
+                            {voiceProfile.voice_traits.formality}
+                          </div>
+                        )}
+                        {voiceProfile.voice_traits?.emoji_usage && (
+                          <div>
+                            <span className="font-medium">Emoji:</span>{" "}
+                            {voiceProfile.voice_traits.emoji_usage}
+                          </div>
+                        )}
+                        {voiceProfile.voice_traits?.personality && (
+                          <div>
+                            <span className="font-medium">Personality:</span>{" "}
+                            {voiceProfile.voice_traits.personality}
+                          </div>
+                        )}
+                      </div>
+                      {voiceProfile.voice_traits?.catchphrases?.length > 0 && (
+                        <div className="flex flex-wrap gap-1.5">
+                          {voiceProfile.voice_traits.catchphrases.map(
+                            (phrase, i) => (
+                              <Badge key={i} variant="secondary" className="text-xs">
+                                {phrase}
+                              </Badge>
+                            )
+                          )}
+                        </div>
+                      )}
+                    </div>
+                    <div className="flex gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setVoiceMode("paste")}
+                      >
+                        <RefreshCw className="h-3.5 w-3.5" />
+                        Re-analyze
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          setVoiceMode("chat");
+                          handleStartVoiceChat();
+                        }}
+                      >
+                        <MessageCircle className="h-3.5 w-3.5" />
+                        Refine with Chat
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={handleRemoveVoice}
+                        className="text-destructive hover:text-destructive"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                        Remove
+                      </Button>
+                    </div>
+                  </div>
+                ) : voiceMode === "paste" ? (
+                  // Paste flow
+                  <div className="space-y-4">
+                    <div className="space-y-2">
+                      <Label className="flex items-center gap-2">
+                        <ClipboardPaste className="h-3.5 w-3.5" />
+                        Paste your messages
+                      </Label>
+                      <Textarea
+                        value={sampleText}
+                        onChange={(e) => setSampleText(e.target.value)}
+                        rows={8}
+                        placeholder={`Paste real messages you've sent — DMs, texts, or social posts. One message per line.\n\nExample:\nhey! saw your post, that's fire. what made you start your agency?\nhonestly that's impressive for 6 months in. what's your biggest bottleneck rn?\nyeah I totally get that. we actually help with exactly that kind of thing\nfor sure, let me send you the link to book a quick call`}
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        {sampleMessageCount} message{sampleMessageCount !== 1 ? "s" : ""} detected
+                        {sampleMessageCount < 3
+                          ? " (minimum 3 needed)"
+                          : sampleMessageCount < 5
+                          ? " (5+ recommended for best results)"
+                          : ""}
+                      </p>
+                    </div>
+                    <div className="flex gap-2">
+                      <Button
+                        onClick={handleAnalyzeVoice}
+                        disabled={analyzingVoice || sampleMessageCount < 3}
+                      >
+                        {analyzingVoice ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <Sparkles className="h-4 w-4" />
+                        )}
+                        {analyzingVoice ? "Analyzing..." : "Analyze My Voice"}
+                      </Button>
+                      <Button
+                        variant="outline"
+                        onClick={() => {
+                          setVoiceMode(null);
+                          setSampleText("");
+                        }}
+                      >
+                        Cancel
+                      </Button>
+                    </div>
+                  </div>
+                ) : voiceMode === "chat" ? (
+                  // Chat flow
+                  <div className="space-y-4">
+                    <div className="rounded-lg border bg-background p-4 max-h-80 overflow-y-auto space-y-3">
+                      {voiceChatMessages.map((msg, i) => (
+                        <ChatBubble
+                          key={i}
+                          message={msg.content}
+                          isAi={msg.role === "assistant"}
+                        />
+                      ))}
+                      {voiceChatLoading && (
+                        <div className="flex justify-start">
+                          <div className="bg-muted rounded-2xl px-4 py-2.5 rounded-tl-sm">
+                            <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                    <div className="flex gap-2">
+                      <Input
+                        value={voiceChatInput}
+                        onChange={(e) => setVoiceChatInput(e.target.value)}
+                        placeholder="Type naturally, like you'd message a client..."
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter" && !e.shiftKey) {
+                            e.preventDefault();
+                            handleSendVoiceChat();
+                          }
+                        }}
+                        disabled={voiceChatLoading}
+                      />
+                      <Button
+                        size="icon"
+                        onClick={handleSendVoiceChat}
+                        disabled={voiceChatLoading || !voiceChatInput.trim()}
+                      >
+                        <Send className="h-4 w-4" />
+                      </Button>
+                    </div>
+                    <div className="flex gap-2">
+                      {voiceChatMessages.filter((m) => m.role === "user")
+                        .length >= 3 && (
+                        <Button
+                          onClick={handleFinalizeVoiceChat}
+                          disabled={finalizingVoice}
+                        >
+                          {finalizingVoice ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : (
+                            <Check className="h-4 w-4" />
+                          )}
+                          {finalizingVoice ? "Saving..." : "Finish & Save"}
+                        </Button>
+                      )}
+                      <Button
+                        variant="outline"
+                        onClick={() => {
+                          setVoiceMode(null);
+                          setVoiceChatMessages([]);
+                        }}
+                      >
+                        Cancel
+                      </Button>
+                    </div>
+                  </div>
+                ) : (
+                  // Empty state — choose method
+                  <div className="flex flex-col sm:flex-row gap-3">
+                    <button
+                      onClick={() => setVoiceMode("paste")}
+                      className="flex-1 rounded-lg border-2 border-dashed p-6 text-center hover:border-primary/50 hover:bg-muted/50 transition-colors"
+                    >
+                      <ClipboardPaste className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
+                      <p className="text-sm font-medium">Paste Sample Messages</p>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Paste 5+ real DMs, texts, or posts you&apos;ve written
+                      </p>
+                    </button>
+                    <button
+                      onClick={() => {
+                        setVoiceMode("chat");
+                        handleStartVoiceChat();
+                      }}
+                      className="flex-1 rounded-lg border-2 border-dashed p-6 text-center hover:border-primary/50 hover:bg-muted/50 transition-colors"
+                    >
+                      <MessageCircle className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
+                      <p className="text-sm font-medium">Chat with AI</p>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Have a quick conversation so the AI can learn your style
+                      </p>
+                    </button>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
             {/* Business Info Card */}
             <Card>
               <CardHeader>

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import { generateScript } from "@/lib/anthropic";
 
 export async function POST(request) {
@@ -24,10 +25,18 @@ export async function POST(request) {
       );
     }
 
+    // Fetch voice profile so generated scripts match the coach's voice
+    const { data: userProfile } = await getSupabaseAdmin()
+      .from("users")
+      .select("voice_profile")
+      .eq("id", user.id)
+      .single();
+
     const script = await generateScript(
       offer,
       targetCustomer,
-      objections || ""
+      objections || "",
+      userProfile?.voice_profile
     );
 
     return NextResponse.json({ script }, { status: 200 });
