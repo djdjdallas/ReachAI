@@ -59,7 +59,9 @@ export async function updateSession(request) {
     pathname === "/" ||
     pathname.startsWith("/api/webhooks") ||
     pathname.startsWith("/compare") ||
-    pathname.startsWith("/blog")
+    pathname.startsWith("/blog") ||
+    pathname === "/privacy" ||
+    pathname === "/terms"
   ) {
     return supabaseResponse;
   }
