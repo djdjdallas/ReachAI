@@ -1,6 +1,6 @@
 /** @type {import('next-sitemap').IConfig} */
 module.exports = {
-  siteUrl: "https://clinchd.io",
+  siteUrl: "https://www.clinchd.io",
   generateRobotsTxt: true,
   changefreq: "weekly",
   priority: 0.7,

@@ -11,7 +11,7 @@ export const metadata = {
     title: "Clinchd vs Setter AI: Best AI Appointment Setter for Instagram (2026)",
     description:
       "Setter AI automates phone and email outreach but doesn't support Instagram DMs. Clinchd is built for Instagram-first coaches.",
-    url: "https://clinchd.io/compare/vs-setter-ai",
+    url: "https://www.clinchd.io/compare/vs-setter-ai",
     siteName: "Clinchd",
     type: "article",
   },

@@ -9,7 +9,7 @@ export const metadata = {
     title: "Instagram DM Strategy for Coaches — Clinchd Blog",
     description:
       "Guides and strategies for coaches to automate Instagram DMs, book more discovery calls, and turn followers into clients.",
-    url: "https://clinchd.io/blog",
+    url: "https://www.clinchd.io/blog",
     siteName: "Clinchd",
     type: "website",
   },

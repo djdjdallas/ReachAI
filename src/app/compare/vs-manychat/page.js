@@ -11,7 +11,7 @@ export const metadata = {
     title: "Clinchd vs ManyChat: Best Instagram DM Tool for Coaches (2026)",
     description:
       "Comparing Clinchd vs ManyChat for coaches in 2026? See why coaches are switching.",
-    url: "https://clinchd.io/compare/vs-manychat",
+    url: "https://www.clinchd.io/compare/vs-manychat",
     siteName: "Clinchd",
     type: "article",
   },

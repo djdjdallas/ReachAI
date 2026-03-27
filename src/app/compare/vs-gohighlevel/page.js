@@ -11,7 +11,7 @@ export const metadata = {
     title: "Clinchd vs GoHighLevel: Instagram DM Automation for Coaches (2026)",
     description:
       "GoHighLevel has shallow Instagram DM features. Clinchd is built specifically for coach DM automation.",
-    url: "https://clinchd.io/compare/vs-gohighlevel",
+    url: "https://www.clinchd.io/compare/vs-gohighlevel",
     siteName: "Clinchd",
     type: "article",
   },

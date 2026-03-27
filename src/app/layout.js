@@ -21,20 +21,20 @@ export const metadata = {
   },
   description:
     "Clinchd is the AI setter that qualifies leads, handles objections, and books discovery calls in your Instagram DMs — replacing your $5K/mo setter for just $97.",
-  metadataBase: new URL("https://clinchd.io"),
+  metadataBase: new URL("https://www.clinchd.io"),
 };
 
 const websiteSchema = {
   "@context": "https://schema.org",
   "@type": "WebSite",
   name: "Clinchd",
-  url: "https://clinchd.io",
+  url: "https://www.clinchd.io",
   description:
     "AI-powered Instagram DM automation for coaches and course creators. Qualify leads, handle objections, and book discovery calls automatically.",
   publisher: {
     "@type": "Organization",
     name: "Clinchd",
-    url: "https://clinchd.io",
+    url: "https://www.clinchd.io",
   },
 };
 

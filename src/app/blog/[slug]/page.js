@@ -22,7 +22,7 @@ export async function generateMetadata({ params }) {
     openGraph: {
       title: post.frontmatter.title,
       description: post.frontmatter.description,
-      url: `https://clinchd.io/blog/${slug}`,
+      url: `https://www.clinchd.io/blog/${slug}`,
       siteName: "Clinchd",
       type: "article",
       publishedTime: post.frontmatter.date,
@@ -81,16 +81,16 @@ export default async function BlogPost({ params }) {
     author: {
       "@type": "Organization",
       name: "Clinchd",
-      url: "https://clinchd.io",
+      url: "https://www.clinchd.io",
     },
     publisher: {
       "@type": "Organization",
       name: "Clinchd",
-      url: "https://clinchd.io",
+      url: "https://www.clinchd.io",
     },
     mainEntityOfPage: {
       "@type": "WebPage",
-      "@id": `https://clinchd.io/blog/${slug}`,
+      "@id": `https://www.clinchd.io/blog/${slug}`,
     },
     articleSection: frontmatter.category,
     inLanguage: "en-US",
@@ -106,19 +106,19 @@ export default async function BlogPost({ params }) {
         "@type": "ListItem",
         position: 1,
         name: "Home",
-        item: "https://clinchd.io",
+        item: "https://www.clinchd.io",
       },
       {
         "@type": "ListItem",
         position: 2,
         name: "Blog",
-        item: "https://clinchd.io/blog",
+        item: "https://www.clinchd.io/blog",
       },
       {
         "@type": "ListItem",
         position: 3,
         name: frontmatter.title,
-        item: `https://clinchd.io/blog/${slug}`,
+        item: `https://www.clinchd.io/blog/${slug}`,
       },
     ],
   };

@@ -29,7 +29,7 @@ export const metadata = {
     title: "Clinchd — AI Instagram DM Automation for Coaches",
     description:
       "Clinchd qualifies your Instagram DM leads and books discovery calls automatically. Replace your setter for $97/month.",
-    url: "https://clinchd.io",
+    url: "https://www.clinchd.io",
     siteName: "Clinchd",
     type: "website",
   },
@@ -45,7 +45,7 @@ const organizationSchema = {
   "@context": "https://schema.org",
   "@type": "Organization",
   name: "Clinchd",
-  url: "https://clinchd.io",
+  url: "https://www.clinchd.io",
   description:
     "AI-powered Instagram DM automation for coaches and course creators.",
   foundingDate: "2026",
@@ -59,7 +59,7 @@ const softwareSchema = {
   applicationCategory: "BusinessApplication",
   applicationSubCategory: "Instagram DM Automation",
   operatingSystem: "Web",
-  url: "https://clinchd.io",
+  url: "https://www.clinchd.io",
   offers: [
     {
       "@type": "Offer",

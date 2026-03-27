@@ -35,7 +35,7 @@ User-agent: CCBot
 Allow: /
 
 # Host
-Host: https://clinchd.io
+Host: https://www.clinchd.io
 
 # Sitemaps
-Sitemap: https://clinchd.io/sitemap.xml
+Sitemap: https://www.clinchd.io/sitemap.xml
