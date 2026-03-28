@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import posthog from "posthog-js";
 import {
   Loader2,
   Save,
@@ -120,6 +121,8 @@ export default function SettingsPage() {
         .from("users")
         .update({ ai_active: checked })
         .eq("id", authUser.id);
+
+      posthog.capture("ai_agent_toggled", { active: checked });
     } catch (err) {
       console.error("Error toggling AI:", err);
       setAiActive(!checked);
@@ -154,6 +157,7 @@ export default function SettingsPage() {
       // Call backend to disconnect from Unipile + clear DB
       await fetch("/api/auth/instagram/disconnect", { method: "POST" });
 
+      posthog.capture("instagram_disconnected");
       setProfile((prev) => ({
         ...prev,
         unipile_account_id: null,

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getStripe, PLANS } from "@/lib/stripe";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
+import { getPostHogClient } from "@/lib/posthog-server";
 
 // Map a Stripe price ID to the plan key ("base" or "unlimited")
 function getPlanFromPriceId(priceId) {
@@ -60,6 +61,12 @@ export async function POST(request) {
               plan,
             })
             .eq("id", userId);
+
+          getPostHogClient().capture({
+            distinctId: userId,
+            event: "subscription_activated",
+            properties: { plan },
+          });
         }
         break;
       }
@@ -108,6 +115,12 @@ export async function POST(request) {
         const subscription = event.data.object;
         const customerId = subscription.customer;
 
+        const { data: canceledUser } = await supabase
+          .from("users")
+          .select("id")
+          .eq("stripe_customer_id", customerId)
+          .single();
+
         await supabase
           .from("users")
           .update({
@@ -115,6 +128,13 @@ export async function POST(request) {
             ai_active: false,
           })
           .eq("stripe_customer_id", customerId);
+
+        if (canceledUser) {
+          getPostHogClient().capture({
+            distinctId: canceledUser.id,
+            event: "subscription_canceled",
+          });
+        }
         break;
       }
 

@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import posthog from "posthog-js";
 import {
   Loader2,
   Check,
@@ -118,6 +119,7 @@ export default function BillingPage() {
       const data = await res.json();
 
       if (data.url) {
+        posthog.capture("checkout_started", { plan_id: planId });
         window.location.href = data.url;
       }
     } catch (err) {
@@ -138,6 +140,7 @@ export default function BillingPage() {
       const data = await res.json();
 
       if (data.url) {
+        posthog.capture("subscription_portal_opened");
         window.location.href = data.url;
       }
     } catch (err) {
