@@ -23,9 +23,9 @@ export default function Navbar() {
             <Image
               src="/logo.png"
               alt="Clinchd logo"
-              width={36}
-              height={36}
-              className="w-9 h-9"
+              width={44}
+              height={44}
+              className="w-11 h-11"
             />
             <span className="text-xl font-extrabold tracking-tight text-stone-900">Clinchd</span>
           </Link>
