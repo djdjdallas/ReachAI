@@ -43,6 +43,8 @@ export async function GET(request) {
     } else {
       // Primary path: Meta Facebook Login
       authUrl = getOAuthUrl(state);
+      console.log("Meta OAuth URL:", authUrl);
+      console.log("FACEBOOK_APP_ID env:", process.env.FACEBOOK_APP_ID ? "SET" : "MISSING");
     }
 
     const response = NextResponse.redirect(authUrl);
