@@ -4,6 +4,7 @@ import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import { generateReply } from "@/lib/anthropic";
 import { buildSystemPrompt } from "@/lib/prompts";
 import { sendUnipileMessage } from "@/lib/unipile";
+import { sendInstagramMessage } from "@/lib/instagram";
 
 export async function POST(request) {
   try {
@@ -56,9 +57,15 @@ export async function POST(request) {
       );
     }
 
-    if (!conversation.unipile_chat_id) {
+    // Determine connection type — Meta or Unipile
+    const isMetaUser = !!userProfile.meta_page_access_token;
+    const canSend = isMetaUser
+      ? !!conversation.instagram_sender_id
+      : !!conversation.unipile_chat_id;
+
+    if (!canSend) {
       return NextResponse.json(
-        { error: "Conversation has no Unipile chat ID" },
+        { error: "Conversation has no valid messaging channel" },
         { status: 400 }
       );
     }
@@ -117,8 +124,17 @@ export async function POST(request) {
       );
     }
 
-    // Send via Unipile
-    await sendUnipileMessage(conversation.unipile_chat_id, replyContent);
+    // Send via the appropriate channel
+    if (isMetaUser) {
+      await sendInstagramMessage(
+        userProfile.instagram_business_account_id,
+        conversation.instagram_sender_id,
+        replyContent,
+        userProfile.meta_page_access_token
+      );
+    } else {
+      await sendUnipileMessage(conversation.unipile_chat_id, replyContent);
+    }
 
     return NextResponse.json({ message: savedMessage }, { status: 200 });
   } catch (error) {
