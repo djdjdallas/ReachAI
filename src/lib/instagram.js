@@ -59,14 +59,14 @@ export async function exchangeCodeForToken(code) {
 
   const userId = shortData.user_id;
 
-  // Step 2: Exchange short-lived token for long-lived token via Graph API
+  // Step 2: Exchange short-lived token for long-lived token via Instagram Graph API
   const longParams = new URLSearchParams({
     grant_type: "ig_exchange_token",
     client_secret: process.env.INSTAGRAM_APP_SECRET,
     access_token: shortData.access_token,
   });
 
-  const longRes = await fetch(`${GRAPH_BASE}/access_token?${longParams}`);
+  const longRes = await fetch(`https://graph.instagram.com/access_token?${longParams}`);
   const longData = await longRes.json();
 
   if (longData.error) {
@@ -89,7 +89,7 @@ export async function refreshLongLivedToken(currentToken) {
     access_token: currentToken,
   });
 
-  const res = await fetch(`${GRAPH_BASE}/refresh_access_token?${params}`);
+  const res = await fetch(`https://graph.instagram.com/refresh_access_token?${params}`);
   const data = await res.json();
 
   if (data.error) {
