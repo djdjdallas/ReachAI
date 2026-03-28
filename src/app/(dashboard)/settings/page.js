@@ -161,6 +161,7 @@ export default function SettingsPage() {
       setProfile((prev) => ({
         ...prev,
         unipile_account_id: null,
+        instagram_business_account_id: null,
       }));
     } catch (err) {
       console.error("Error disconnecting Instagram:", err);
@@ -177,7 +178,7 @@ export default function SettingsPage() {
     );
   }
 
-  const isInstagramConnected = !!profile?.unipile_account_id;
+  const isInstagramConnected = !!(profile?.unipile_account_id || profile?.instagram_business_account_id);
 
   return (
     <div className="space-y-6 p-6 max-w-3xl">
@@ -260,9 +261,9 @@ export default function SettingsPage() {
                 <Badge variant="muted">Not Connected</Badge>
               )}
             </div>
-            {profile?.unipile_account_id && (
+            {(profile?.unipile_account_id || profile?.instagram_business_account_id) && (
               <span className="text-xs text-muted-foreground">
-                Account: {profile.unipile_account_id}
+                Account: {profile.instagram_business_account_id || profile.unipile_account_id}
               </span>
             )}
           </div>

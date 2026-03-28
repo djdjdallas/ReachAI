@@ -160,7 +160,7 @@ function OnboardingPage() {
 
         // Auto-advance: if Instagram is connected and user is on step 1, go to step 2
         const urlStep = parseInt(searchParams.get("step"), 10);
-        if (userProfile.unipile_account_id && (!urlStep || urlStep <= 1)) {
+        if ((userProfile.unipile_account_id || userProfile.instagram_business_account_id) && (!urlStep || urlStep <= 1)) {
           setStep(2);
         }
       }
@@ -434,7 +434,7 @@ function OnboardingPage() {
   };
 
   const scriptReady = !!(profile?.script_config?.greeting);
-  const instagramConnected = !!(profile?.unipile_account_id);
+  const instagramConnected = !!(profile?.unipile_account_id || profile?.instagram_business_account_id);
 
   const handleGoLive = async (checked) => {
     if (checked && !scriptReady) return;
@@ -1100,7 +1100,7 @@ function OnboardingPage() {
                     <Instagram className="h-4 w-4" />
                     Instagram Connected
                   </span>
-                  {profile?.unipile_account_id ? (
+                  {(profile?.unipile_account_id || profile?.instagram_business_account_id) ? (
                     <Badge variant="success">Connected</Badge>
                   ) : (
                     <Badge variant="warning">Not Connected</Badge>
