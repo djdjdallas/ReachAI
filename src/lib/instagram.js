@@ -184,10 +184,18 @@ export function verifyWebhookSignature(rawBody, signatureHeader) {
   const crypto = require("crypto");
   const expected = crypto
     .createHmac("sha256", process.env.FACEBOOK_APP_SECRET)
-    .update(rawBody)
+    .update(rawBody, "utf-8")
     .digest("hex");
 
-  return signatureHeader === `sha256=${expected}`;
+  const expectedFull = `sha256=${expected}`;
+
+  // Use constant-time comparison to prevent timing attacks
+  if (expectedFull.length !== signatureHeader.length) return false;
+
+  return crypto.timingSafeEqual(
+    Buffer.from(expectedFull),
+    Buffer.from(signatureHeader)
+  );
 }
 
 // ── Profile Helpers ─────────────────────────────────────────────────────
