@@ -2,7 +2,8 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { Zap, ChevronDown, Menu, X } from "lucide-react";
+import Image from "next/image";
+import { ChevronDown, Menu, X } from "lucide-react";
 
 const compareLinks = [
   { href: "/compare/vs-manychat", label: "vs ManyChat" },
@@ -19,9 +20,13 @@ export default function Navbar() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center h-20">
           <Link href="/" className="flex items-center gap-2.5">
-            <div className="w-9 h-9 bg-[#ff7e67] rounded-xl flex items-center justify-center shadow-lg shadow-[#ff7e67]/20">
-              <Zap className="w-5 h-5 text-white" />
-            </div>
+            <Image
+              src="/logo.png"
+              alt="Clinchd logo"
+              width={36}
+              height={36}
+              className="w-9 h-9"
+            />
             <span className="text-xl font-extrabold tracking-tight text-stone-900">Clinchd</span>
           </Link>
 

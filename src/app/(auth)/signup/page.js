@@ -3,7 +3,8 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Zap, Loader2 } from "lucide-react";
+import Image from "next/image";
+import { Loader2 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import posthog from "posthog-js";
 import { Button } from "@/components/ui/button";
@@ -72,9 +73,7 @@ export default function SignupPage() {
       <Card className="w-full max-w-md border-border/50">
         <CardHeader className="text-center">
           <div className="flex items-center justify-center gap-2.5 mb-2">
-            <div className="w-9 h-9 bg-[#ff7e67] rounded-xl flex items-center justify-center shadow-lg shadow-[#ff7e67]/20">
-              <Zap className="h-5 w-5 text-white" />
-            </div>
+            <Image src="/logo.png" alt="Clinchd logo" width={36} height={36} className="w-9 h-9" />
             <span className="text-2xl font-extrabold tracking-tight">Clinchd</span>
           </div>
           <CardTitle className="text-xl">Create your account</CardTitle>

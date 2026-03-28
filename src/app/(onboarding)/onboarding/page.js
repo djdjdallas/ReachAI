@@ -2,6 +2,7 @@
 
 import { useState, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import Image from "next/image";
 import { createClient } from "@/lib/supabase/client";
 import posthog from "posthog-js";
 import {
@@ -473,9 +474,7 @@ function OnboardingPage() {
       <div className="mx-auto max-w-2xl">
         {/* Logo */}
         <div className="flex items-center justify-center gap-2.5 mb-8">
-          <div className="w-9 h-9 bg-[#ff7e67] rounded-xl flex items-center justify-center shadow-lg shadow-[#ff7e67]/20">
-            <Zap className="h-5 w-5 text-white" />
-          </div>
+          <Image src="/logo.png" alt="Clinchd logo" width={36} height={36} className="w-9 h-9" />
           <span className="text-2xl font-extrabold tracking-tight">Clinchd</span>
         </div>
 
