@@ -569,8 +569,8 @@ function OnboardingPage() {
             </CardContent>
             <CardFooter className="flex flex-col gap-3">
               <Button asChild className="w-full" size="lg">
-                <a href="/api/auth/instagram">
-                  <Instagram className="h-4 w-4" />
+                <a href="/api/auth/instagram" className="inline-flex items-center justify-center gap-2">
+                  <Instagram className="h-4 w-4 shrink-0" />
                   Connect Instagram Account
                 </a>
               </Button>
