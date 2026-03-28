@@ -52,7 +52,15 @@ export async function updateSession(request) {
     data: { user },
   } = await supabase.auth.getUser();
 
-  const { pathname } = request.nextUrl;
+  const { pathname, searchParams } = request.nextUrl;
+
+  // If an auth code lands on the homepage, redirect to /callback so it gets exchanged.
+  // This happens when Supabase can't match the redirectTo URL (e.g. www vs non-www).
+  if (pathname === "/" && searchParams.get("code")) {
+    const url = request.nextUrl.clone();
+    url.pathname = "/callback";
+    return NextResponse.redirect(url);
+  }
 
   // Public routes
   if (
