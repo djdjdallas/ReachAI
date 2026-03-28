@@ -1,11 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
-import {
-  exchangeCodeForToken,
-  getUserPagesWithInstagram,
-  subscribePageToWebhooks,
-} from "@/lib/instagram";
+import { exchangeCodeForToken } from "@/lib/instagram";
 
 export async function GET(request) {
   const baseUrl = process.env.NEXT_PUBLIC_APP_URL;
@@ -59,47 +55,27 @@ export async function GET(request) {
       return response;
     }
 
-    // ── Meta OAuth path ────────────────────────────────────────────────
+    // ── Instagram Login OAuth path ───────────────────────────────────
     const code = searchParams.get("code");
 
     if (error || !code) {
-      console.error("Meta OAuth error:", error || "no code returned");
+      console.error("Instagram OAuth error:", error || "no code returned");
       return NextResponse.redirect(
         `${baseUrl}/onboarding?step=1&error=oauth_denied`
       );
     }
 
-    // Exchange code for long-lived user token
-    const { accessToken, expiresIn } = await exchangeCodeForToken(code);
+    // Exchange code for long-lived token + Instagram user ID
+    const { accessToken, expiresIn, userId } = await exchangeCodeForToken(code);
 
-    // Find pages with connected Instagram Business accounts
-    const pages = await getUserPagesWithInstagram(accessToken);
-    const pageWithIg = pages.find((p) => p.instagramAccountId);
-
-    if (!pageWithIg) {
-      console.error("No Instagram Business account found on any page");
-      return NextResponse.redirect(
-        `${baseUrl}/onboarding?step=1&error=no_instagram_account`
-      );
-    }
-
-    // Subscribe page to webhooks so we receive DM events
-    try {
-      await subscribePageToWebhooks(pageWithIg.pageId, pageWithIg.pageAccessToken);
-    } catch (err) {
-      console.error("Failed to subscribe page to webhooks:", err.message);
-      // Non-fatal — continue saving. Webhooks can be re-subscribed later.
-    }
-
-    // Save Meta connection details
+    // Save Instagram connection details
     const expiresAt = new Date(Date.now() + expiresIn * 1000).toISOString();
 
     await admin
       .from("users")
       .update({
-        meta_page_id: pageWithIg.pageId,
-        meta_page_access_token: pageWithIg.pageAccessToken,
-        instagram_business_account_id: pageWithIg.instagramAccountId,
+        instagram_business_account_id: userId,
+        meta_page_access_token: accessToken,
         meta_user_access_token: accessToken,
         meta_token_expires_at: expiresAt,
       })

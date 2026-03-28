@@ -12,86 +12,88 @@ const GRAPH_BASE = `https://graph.facebook.com/${GRAPH_API_VERSION}`;
 // ── OAuth ───────────────────────────────────────────────────────────────
 
 /**
- * Builds the Facebook OAuth dialog URL for Instagram permissions.
+ * Builds the Instagram Login OAuth URL.
+ * Uses Instagram Login (not Facebook Login) to match instagram_business_* permissions.
  *
  * @param {string} state - CSRF state token
  * @returns {string}
  */
 export function getOAuthUrl(state) {
-  const appId = process.env.FACEBOOK_APP_ID;
+  const appId = process.env.INSTAGRAM_APP_ID;
   const redirectUri = `${process.env.NEXT_PUBLIC_APP_URL}/api/auth/instagram/callback`;
   const scopes = [
     "instagram_business_basic",
     "instagram_business_manage_messages",
-    "instagram_manage_comments",
-    "pages_show_list",
-    "pages_read_engagement",
   ].join(",");
 
-  return `https://www.facebook.com/${GRAPH_API_VERSION}/dialog/oauth?client_id=${appId}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=${scopes}&state=${state}&response_type=code`;
+  return `https://www.instagram.com/oauth/authorize?client_id=${appId}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=${scopes}&response_type=code&state=${state}`;
 }
 
 /**
- * Exchanges an OAuth code for a short-lived token, then upgrades to long-lived (60 days).
+ * Exchanges an Instagram OAuth code for a short-lived token, then upgrades to long-lived (60 days).
  *
  * @param {string} code
- * @returns {Promise<{accessToken: string, expiresIn: number}>}
+ * @returns {Promise<{accessToken: string, expiresIn: number, userId: string}>}
  */
 export async function exchangeCodeForToken(code) {
   const redirectUri = `${process.env.NEXT_PUBLIC_APP_URL}/api/auth/instagram/callback`;
 
-  // Short-lived token
-  const shortParams = new URLSearchParams({
-    client_id: process.env.FACEBOOK_APP_ID,
-    client_secret: process.env.FACEBOOK_APP_SECRET,
-    redirect_uri: redirectUri,
-    code,
+  // Step 1: Exchange code for short-lived token via Instagram API
+  const shortRes = await fetch("https://api.instagram.com/oauth/access_token", {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({
+      client_id: process.env.INSTAGRAM_APP_ID,
+      client_secret: process.env.INSTAGRAM_APP_SECRET,
+      grant_type: "authorization_code",
+      redirect_uri: redirectUri,
+      code,
+    }),
   });
 
-  const shortRes = await fetch(`${GRAPH_BASE}/oauth/access_token?${shortParams}`);
   const shortData = await shortRes.json();
 
-  if (shortData.error) {
-    throw new Error(`Meta token exchange failed: ${shortData.error.message}`);
+  if (shortData.error_type || shortData.error_message) {
+    throw new Error(`Instagram token exchange failed: ${shortData.error_message || shortData.error_type}`);
   }
 
-  // Long-lived token
+  const userId = shortData.user_id;
+
+  // Step 2: Exchange short-lived token for long-lived token via Graph API
   const longParams = new URLSearchParams({
-    grant_type: "fb_exchange_token",
-    client_id: process.env.FACEBOOK_APP_ID,
-    client_secret: process.env.FACEBOOK_APP_SECRET,
-    fb_exchange_token: shortData.access_token,
+    grant_type: "ig_exchange_token",
+    client_secret: process.env.INSTAGRAM_APP_SECRET,
+    access_token: shortData.access_token,
   });
 
-  const longRes = await fetch(`${GRAPH_BASE}/oauth/access_token?${longParams}`);
+  const longRes = await fetch(`${GRAPH_BASE}/access_token?${longParams}`);
   const longData = await longRes.json();
 
   if (longData.error) {
-    throw new Error(`Meta long-lived token failed: ${longData.error.message}`);
+    throw new Error(`Instagram long-lived token failed: ${longData.error.message}`);
   }
 
   return {
     accessToken: longData.access_token,
     expiresIn: longData.expires_in || 5184000,
+    userId: String(userId),
   };
 }
 
 /**
- * Refreshes a long-lived user access token before it expires.
+ * Refreshes a long-lived Instagram user access token before it expires.
  */
 export async function refreshLongLivedToken(currentToken) {
   const params = new URLSearchParams({
-    grant_type: "fb_exchange_token",
-    client_id: process.env.FACEBOOK_APP_ID,
-    client_secret: process.env.FACEBOOK_APP_SECRET,
-    fb_exchange_token: currentToken,
+    grant_type: "ig_refresh_token",
+    access_token: currentToken,
   });
 
-  const res = await fetch(`${GRAPH_BASE}/oauth/access_token?${params}`);
+  const res = await fetch(`${GRAPH_BASE}/refresh_access_token?${params}`);
   const data = await res.json();
 
   if (data.error) {
-    throw new Error(`Meta token refresh failed: ${data.error.message}`);
+    throw new Error(`Instagram token refresh failed: ${data.error.message}`);
   }
 
   return {
