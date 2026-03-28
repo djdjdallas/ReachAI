@@ -18,7 +18,7 @@ const GRAPH_BASE = `https://graph.facebook.com/${GRAPH_API_VERSION}`;
  * @returns {string}
  */
 export function getOAuthUrl(state) {
-  const appId = process.env.META_APP_ID;
+  const appId = process.env.FACEBOOK_APP_ID;
   const redirectUri = `${process.env.NEXT_PUBLIC_APP_URL}/api/auth/instagram/callback`;
   const scopes = [
     "instagram_basic",
@@ -41,8 +41,8 @@ export async function exchangeCodeForToken(code) {
 
   // Short-lived token
   const shortParams = new URLSearchParams({
-    client_id: process.env.META_APP_ID,
-    client_secret: process.env.META_APP_SECRET,
+    client_id: process.env.FACEBOOK_APP_ID,
+    client_secret: process.env.FACEBOOK_APP_SECRET,
     redirect_uri: redirectUri,
     code,
   });
@@ -57,8 +57,8 @@ export async function exchangeCodeForToken(code) {
   // Long-lived token
   const longParams = new URLSearchParams({
     grant_type: "fb_exchange_token",
-    client_id: process.env.META_APP_ID,
-    client_secret: process.env.META_APP_SECRET,
+    client_id: process.env.FACEBOOK_APP_ID,
+    client_secret: process.env.FACEBOOK_APP_SECRET,
     fb_exchange_token: shortData.access_token,
   });
 
@@ -81,8 +81,8 @@ export async function exchangeCodeForToken(code) {
 export async function refreshLongLivedToken(currentToken) {
   const params = new URLSearchParams({
     grant_type: "fb_exchange_token",
-    client_id: process.env.META_APP_ID,
-    client_secret: process.env.META_APP_SECRET,
+    client_id: process.env.FACEBOOK_APP_ID,
+    client_secret: process.env.FACEBOOK_APP_SECRET,
     fb_exchange_token: currentToken,
   });
 
@@ -180,7 +180,7 @@ export function verifyWebhookSignature(rawBody, signatureHeader) {
 
   const crypto = require("crypto");
   const expected = crypto
-    .createHmac("sha256", process.env.META_APP_SECRET)
+    .createHmac("sha256", process.env.FACEBOOK_APP_SECRET)
     .update(rawBody)
     .digest("hex");
 

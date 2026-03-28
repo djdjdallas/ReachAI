@@ -14,7 +14,7 @@ export async function GET(request) {
   const challenge = searchParams.get("hub.challenge");
 
   // Meta webhook verification handshake
-  if (mode === "subscribe" && token === process.env.META_WEBHOOK_VERIFY_TOKEN) {
+  if (mode === "subscribe" && token === process.env.INSTAGRAM_WEBHOOK_VERIFY_TOKEN) {
     return new Response(challenge, { status: 200 });
   }
 
@@ -51,7 +51,7 @@ export async function POST(request) {
 async function handleMetaWebhook(body, rawBody, request) {
   // Verify signature
   const signature = request.headers.get("x-hub-signature-256");
-  if (process.env.META_APP_SECRET && !verifyWebhookSignature(rawBody, signature)) {
+  if (process.env.FACEBOOK_APP_SECRET && !verifyWebhookSignature(rawBody, signature)) {
     console.error("Meta webhook signature verification failed");
     return NextResponse.json({ status: "ok" }, { status: 200 });
   }
