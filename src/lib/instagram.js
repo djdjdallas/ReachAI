@@ -21,8 +21,11 @@ export function getOAuthUrl(state) {
   const appId = process.env.FACEBOOK_APP_ID;
   const redirectUri = `${process.env.NEXT_PUBLIC_APP_URL}/api/auth/instagram/callback`;
   const scopes = [
+    "instagram_business_basic",
+    "instagram_business_manage_messages",
+    "instagram_manage_comments",
     "pages_show_list",
-    "pages_messaging",
+    "pages_read_engagement",
     "pages_manage_metadata",
   ].join(",");
 
