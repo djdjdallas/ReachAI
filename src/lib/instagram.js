@@ -26,7 +26,6 @@ export function getOAuthUrl(state) {
     "instagram_manage_comments",
     "pages_show_list",
     "pages_read_engagement",
-    "pages_manage_metadata",
   ].join(",");
 
   return `https://www.facebook.com/${GRAPH_API_VERSION}/dialog/oauth?client_id=${appId}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=${scopes}&state=${state}&response_type=code`;
