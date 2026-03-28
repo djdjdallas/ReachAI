@@ -14,14 +14,13 @@ export async function POST() {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // Fetch the user's Unipile account ID
     const { data: profile } = await supabase
       .from("users")
-      .select("unipile_account_id")
+      .select("unipile_account_id, instagram_business_account_id")
       .eq("id", user.id)
       .single();
 
-    // Disconnect from Unipile if we have an account ID
+    // Disconnect from Unipile if legacy connection
     if (profile?.unipile_account_id) {
       try {
         await disconnectAccount(profile.unipile_account_id);
@@ -30,10 +29,17 @@ export async function POST() {
       }
     }
 
-    // Clear the account ID from our DB regardless
+    // Clear all connection fields
     await supabase
       .from("users")
-      .update({ unipile_account_id: null })
+      .update({
+        unipile_account_id: null,
+        instagram_business_account_id: null,
+        meta_page_id: null,
+        meta_page_access_token: null,
+        meta_user_access_token: null,
+        meta_token_expires_at: null,
+      })
       .eq("id", user.id);
 
     return NextResponse.json({ status: "disconnected" }, { status: 200 });

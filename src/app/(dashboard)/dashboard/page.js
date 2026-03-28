@@ -186,7 +186,7 @@ export default function DashboardPage() {
 
   if (loading) return <DashboardSkeleton />;
 
-  const igConnected = !!profile?.unipile_account_id;
+  const igConnected = !!(profile?.unipile_account_id || profile?.instagram_business_account_id);
 
   const statCards = [
     {
