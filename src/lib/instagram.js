@@ -21,10 +21,9 @@ export function getOAuthUrl(state) {
   const appId = process.env.FACEBOOK_APP_ID;
   const redirectUri = `${process.env.NEXT_PUBLIC_APP_URL}/api/auth/instagram/callback`;
   const scopes = [
-    "instagram_basic",
-    "instagram_manage_messages",
     "pages_show_list",
     "pages_messaging",
+    "pages_manage_metadata",
   ].join(",");
 
   return `https://www.facebook.com/${GRAPH_API_VERSION}/dialog/oauth?client_id=${appId}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=${scopes}&state=${state}&response_type=code`;
