@@ -65,6 +65,7 @@ export async function updateSession(request) {
   // Public routes
   if (
     pathname === "/" ||
+    pathname === "/callback" ||
     pathname.startsWith("/api/webhooks") ||
     pathname.startsWith("/compare") ||
     pathname.startsWith("/blog") ||
