@@ -153,13 +153,17 @@ export async function subscribePageToWebhooks(pageId, pageAccessToken) {
  * @param {string} pageAccessToken - The Page Access Token
  */
 export async function sendInstagramMessage(igAccountId, recipientId, text, pageAccessToken) {
-  const res = await fetch(`${GRAPH_BASE}/${igAccountId}/messages`, {
+  const url = `https://graph.instagram.com/${GRAPH_API_VERSION}/${igAccountId}/messages`;
+  console.log("Sending IG message to:", url, "recipient:", recipientId);
+  const res = await fetch(url, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: {
+      "Content-Type": "application/json",
+      "Authorization": `Bearer ${pageAccessToken}`,
+    },
     body: JSON.stringify({
       recipient: { id: recipientId },
       message: { text },
-      access_token: pageAccessToken,
     }),
   });
 
