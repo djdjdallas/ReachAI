@@ -68,13 +68,29 @@ export async function GET(request) {
     // Exchange code for long-lived token + Instagram user ID
     const { accessToken, expiresIn, userId } = await exchangeCodeForToken(code);
 
+    // Fetch the Instagram Business Account ID (IGBA ID) which is what
+    // Meta uses in webhook payloads — different from the OAuth user ID
+    let igbaId = userId;
+    try {
+      const meRes = await fetch(
+        `https://graph.instagram.com/v21.0/me?fields=id,username&access_token=${accessToken}`
+      );
+      const meData = await meRes.json();
+      if (meData.id) {
+        igbaId = meData.id;
+        console.log("IGBA ID:", igbaId, "Username:", meData.username);
+      }
+    } catch (err) {
+      console.error("Failed to fetch IGBA ID, using OAuth user ID:", err.message);
+    }
+
     // Save Instagram connection details
     const expiresAt = new Date(Date.now() + expiresIn * 1000).toISOString();
 
     await admin
       .from("users")
       .update({
-        instagram_business_account_id: userId,
+        instagram_business_account_id: igbaId,
         meta_page_access_token: accessToken,
         meta_user_access_token: accessToken,
         meta_token_expires_at: expiresAt,
