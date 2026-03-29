@@ -327,24 +327,29 @@ async function processIncomingMessage({
     await sendUnipileMessage(unipileChatId, aiReply);
   }
 
-  // Status detection
+  // Status detection — check both AI reply and lead's message
   const statusOrder = ["qualifying", "interested", "booked"];
   const currentIdx = statusOrder.indexOf(conversation.status);
   let newStatus = conversation.status;
 
+  // Detect from AI reply
   const hasCalendlyLink = user.calendly_url && aiReply.includes(user.calendly_url);
   const hasBookKeyword =
     /\b(book a call|schedule a call|book a slot|grab a spot|set up a time|appointment)\b/i.test(aiReply);
-  const hasBookedKeyword =
+  const hasBookedFromAi =
     hasCalendlyLink &&
     /\b(confirmed|booked|see you (on|soon|then)|looking forward to (the call|our call|chatting|speaking))\b/i.test(aiReply);
   const hasNotAFitKeyword =
     /\b(not (the right|a good|a great) fit|not quite what|might not be (for you|the best))\b/i.test(aiReply);
 
+  // Detect from lead's message — if they say they booked, mark as booked
+  const leadBookedKeyword =
+    /\b(i booked|just booked|booked a (slot|time|call|spot)|i('ve| have) (booked|scheduled)|signed up|registered|see you (on|at)|looking forward to (the|our) (call|chat|meeting))\b/i.test(messageText);
+
   if ((hasCalendlyLink || hasBookKeyword) && statusOrder.indexOf("interested") > currentIdx) {
     newStatus = "interested";
   }
-  if (hasBookedKeyword && statusOrder.indexOf("booked") > currentIdx) {
+  if ((hasBookedFromAi || leadBookedKeyword) && statusOrder.indexOf("booked") > currentIdx) {
     newStatus = "booked";
   }
   if (hasNotAFitKeyword && conversation.status !== "booked") {
