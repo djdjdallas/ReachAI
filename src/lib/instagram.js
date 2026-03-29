@@ -209,12 +209,16 @@ export function verifyWebhookSignature(rawBody, signatureHeader) {
  */
 export async function getParticipantProfile(userId, accessToken) {
   try {
-    const res = await fetch(
-      `${GRAPH_BASE}/${userId}?fields=name,profile_pic&access_token=${accessToken}`
-    );
-    if (!res.ok) return null;
-    return res.json();
-  } catch {
+    const url = `https://graph.instagram.com/${GRAPH_API_VERSION}/${userId}?fields=name,username,profile_pic&access_token=${accessToken}`;
+    const res = await fetch(url);
+    const data = await res.json();
+    if (data.error) {
+      console.error("Failed to fetch participant profile:", data.error.message);
+      return null;
+    }
+    return data;
+  } catch (err) {
+    console.error("getParticipantProfile error:", err.message);
     return null;
   }
 }

@@ -31,6 +31,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
 import StatusBadge from "@/components/app/StatusBadge";
 
 function getInitials(name) {
@@ -106,6 +107,7 @@ function ConversationsPage() {
 
   const [loading, setLoading] = useState(true);
   const [user, setUser] = useState(null);
+  const [profile, setProfile] = useState(null);
   const [conversations, setConversations] = useState([]);
   const [selectedConvo, setSelectedConvo] = useState(null);
   const [messages, setMessages] = useState([]);
@@ -173,6 +175,13 @@ function ConversationsPage() {
       }
 
       setUser(authUser);
+
+      const { data: userProfile } = await supabase
+        .from("users")
+        .select("ai_active")
+        .eq("id", authUser.id)
+        .single();
+      if (userProfile) setProfile(userProfile);
 
       const { data: convos } = await supabase
         .from("conversations")
@@ -368,6 +377,18 @@ function ConversationsPage() {
     }
   };
 
+  const handleToggleAi = async (checked) => {
+    try {
+      await supabase
+        .from("users")
+        .update({ ai_active: checked })
+        .eq("id", user.id);
+      setProfile((prev) => ({ ...prev, ai_active: checked }));
+    } catch (err) {
+      console.error("Failed to toggle AI:", err);
+    }
+  };
+
   const filteredConversations = conversations.filter((convo) => {
     const matchesSearch =
       !searchQuery.trim() ||
@@ -409,7 +430,18 @@ function ConversationsPage() {
       {/* Left Panel: Conversation List */}
       <div className="w-full md:w-[380px] border-r border-stone-200 flex flex-col bg-white">
         <div className="px-5 pt-5 pb-4 space-y-4">
-          <h2 className="font-semibold text-xl tracking-tight">Conversations</h2>
+          <div className="flex items-center justify-between">
+            <h2 className="font-semibold text-xl tracking-tight">Conversations</h2>
+            <div className="flex items-center gap-2">
+              <span className={`text-xs font-medium ${profile?.ai_active ? "text-green-600" : "text-stone-400"}`}>
+                {profile?.ai_active ? "AI Active" : "AI Paused"}
+              </span>
+              <Switch
+                checked={profile?.ai_active || false}
+                onCheckedChange={handleToggleAi}
+              />
+            </div>
+          </div>
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-stone-400" />
             <Input

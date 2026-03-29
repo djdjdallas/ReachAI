@@ -92,7 +92,8 @@ async function handleMetaWebhook(body, rawBody, request) {
         let senderName = null;
         if (ownerUser?.meta_page_access_token) {
           const profile = await getParticipantProfile(senderId, ownerUser.meta_page_access_token);
-          senderName = profile?.name || null;
+          senderName = profile?.name || profile?.username || null;
+          console.log("Sender profile:", JSON.stringify(profile));
         }
 
         await processIncomingMessage({
