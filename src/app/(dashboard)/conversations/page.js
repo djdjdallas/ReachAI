@@ -17,6 +17,7 @@ import {
   Smile,
   Paperclip,
   Sparkles,
+  Trash2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -335,6 +336,38 @@ function ConversationsPage() {
     }
   };
 
+  const [deleting, setDeleting] = useState(false);
+
+  const handleDeleteConversation = async () => {
+    if (!selectedConvo || deleting) return;
+    if (!window.confirm("Delete this conversation? This cannot be undone.")) return;
+
+    setDeleting(true);
+    try {
+      // Delete messages first (foreign key constraint)
+      await supabase
+        .from("messages")
+        .delete()
+        .eq("conversation_id", selectedConvo.id);
+
+      // Delete the conversation
+      await supabase
+        .from("conversations")
+        .delete()
+        .eq("id", selectedConvo.id);
+
+      // Update local state
+      setConversations((prev) => prev.filter((c) => c.id !== selectedConvo.id));
+      setSelectedConvo(null);
+      setMessages([]);
+      router.replace("/conversations", { scroll: false });
+    } catch (err) {
+      console.error("Failed to delete conversation:", err);
+    } finally {
+      setDeleting(false);
+    }
+  };
+
   const filteredConversations = conversations.filter((convo) => {
     const matchesSearch =
       !searchQuery.trim() ||
@@ -542,6 +575,19 @@ function ConversationsPage() {
                     <SelectItem value="manual">Human Takeover</SelectItem>
                   </SelectContent>
                 </Select>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={handleDeleteConversation}
+                  disabled={deleting}
+                  className="text-stone-400 hover:text-red-500 hover:bg-red-50"
+                >
+                  {deleting ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    <Trash2 className="h-3.5 w-3.5" />
+                  )}
+                </Button>
               </div>
             </div>
 
