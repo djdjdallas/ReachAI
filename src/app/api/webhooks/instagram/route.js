@@ -217,6 +217,9 @@ async function processIncomingMessage({
     if (connectionType === "unipile") {
       insertData.instagram_thread_id = unipileChatId;
       insertData.unipile_chat_id = unipileChatId;
+    } else {
+      // Meta conversations use sender ID as thread identifier
+      insertData.instagram_thread_id = senderId;
     }
 
     const { data: newConv, error: createError } = await supabase
