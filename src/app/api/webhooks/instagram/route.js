@@ -59,6 +59,8 @@ async function handleMetaWebhook(body, rawBody, request) {
     console.warn("Processing webhook despite signature mismatch (dev mode)");
   }
 
+  console.log("Meta webhook payload:", JSON.stringify(body));
+
   const entries = body.entry || [];
 
   for (const entry of entries) {
