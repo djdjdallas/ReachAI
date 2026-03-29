@@ -3,7 +3,7 @@ import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import { generateReply } from "@/lib/anthropic";
 import { buildSystemPrompt } from "@/lib/prompts";
 import { sendUnipileMessage } from "@/lib/unipile";
-import { sendInstagramMessage, verifyWebhookSignature } from "@/lib/instagram";
+import { sendInstagramMessage, verifyWebhookSignature, getParticipantProfile } from "@/lib/instagram";
 
 // ── GET: Meta webhook verification ──────────────────────────────────────
 
@@ -80,12 +80,27 @@ async function handleMetaWebhook(body, rawBody, request) {
       if (!igAccountId || !senderId || !messageText) continue;
 
       try {
+        // Fetch sender's name from Instagram API
+        // We need the user's access token — look up user first
+        const supabaseForName = getSupabaseAdmin();
+        const { data: ownerUser } = await supabaseForName
+          .from("users")
+          .select("meta_page_access_token")
+          .eq("instagram_business_account_id", igAccountId)
+          .single();
+
+        let senderName = null;
+        if (ownerUser?.meta_page_access_token) {
+          const profile = await getParticipantProfile(senderId, ownerUser.meta_page_access_token);
+          senderName = profile?.name || null;
+        }
+
         await processIncomingMessage({
           lookupField: "instagram_business_account_id",
           lookupValue: igAccountId,
           senderId,
           messageText,
-          senderName: null, // Meta doesn't include name in webhook; could fetch separately
+          senderName,
           connectionType: "meta",
         });
       } catch (err) {
