@@ -131,6 +131,50 @@ EXAMPLE OUTPUT:
 }
 
 /**
+ * Summarizes a DM conversation and classifies the lead temperature.
+ *
+ * @param {Array} messages - Array of { role, content } objects
+ * @returns {Promise<{summary: string, temperature: string}>}
+ */
+export async function summarizeConversation(messages) {
+  const response = await getAnthropic().messages.create({
+    model: "claude-sonnet-4-6",
+    max_tokens: 300,
+    temperature: 0.3,
+    system: `You are a sales conversation analyst. Analyze the DM conversation and return a JSON object with exactly these fields:
+
+- "summary": A 1-2 sentence summary of where the conversation stands. Be specific about what was discussed and what the prospect's situation is.
+- "temperature": One of "hot", "warm", or "cold":
+  - "hot": Prospect is highly interested, asked about next steps, pricing, or booking. Ready to convert.
+  - "warm": Prospect is engaged and asking questions but hasn't committed yet. Shows interest but has objections or needs more info.
+  - "cold": Prospect is unresponsive, not a fit, showed little interest, or the conversation fizzled out.
+
+CRITICAL: Return ONLY a valid JSON object. No markdown. No explanation. Just the raw JSON.
+
+Example: {"summary": "Prospect runs a fitness coaching business doing $8k/month and is interested in scaling. Asked about pricing but concerned about the investment.", "temperature": "warm"}`,
+    messages: [
+      {
+        role: "user",
+        content: `Analyze this DM conversation:\n\n${messages.map((m) => `${m.role === "assistant" ? "AI" : "Lead"}: ${m.content}`).join("\n")}`,
+      },
+    ],
+  });
+
+  const raw = response.content[0].text.trim();
+  try {
+    const stripped = raw.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/i, "").trim();
+    const match = stripped.match(/\{[\s\S]*\}/);
+    const parsed = JSON.parse(match ? match[0] : stripped);
+    return {
+      summary: parsed.summary || "No summary available.",
+      temperature: ["hot", "warm", "cold"].includes(parsed.temperature) ? parsed.temperature : "warm",
+    };
+  } catch {
+    return { summary: raw.slice(0, 200), temperature: "warm" };
+  }
+}
+
+/**
  * Generates a reply in the voice-chat interview flow.
  * The AI acts as a friendly interviewer eliciting the coach's natural writing style.
  *

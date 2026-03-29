@@ -116,6 +116,7 @@ function ConversationsPage() {
   const [sending, setSending] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [summarizing, setSummarizing] = useState(false);
 
   const scrollToBottom = useCallback(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -389,6 +390,43 @@ function ConversationsPage() {
     }
   };
 
+  const handleSummarize = async () => {
+    if (!selectedConvo || summarizing) return;
+    setSummarizing(true);
+    try {
+      const res = await fetch("/api/ai/summarize", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ conversationId: selectedConvo.id }),
+      });
+      const data = await res.json();
+      if (data.summary) {
+        setSelectedConvo((prev) => ({
+          ...prev,
+          ai_summary: data.summary,
+          lead_temperature: data.temperature,
+        }));
+        setConversations((prev) =>
+          prev.map((c) =>
+            c.id === selectedConvo.id
+              ? { ...c, ai_summary: data.summary, lead_temperature: data.temperature }
+              : c
+          )
+        );
+      }
+    } catch (err) {
+      console.error("Failed to summarize:", err);
+    } finally {
+      setSummarizing(false);
+    }
+  };
+
+  const tempColors = {
+    hot: { bg: "bg-red-50", text: "text-red-600", border: "border-red-200", label: "HOT LEAD" },
+    warm: { bg: "bg-amber-50", text: "text-amber-600", border: "border-amber-200", label: "WARM LEAD" },
+    cold: { bg: "bg-blue-50", text: "text-blue-600", border: "border-blue-200", label: "COLD LEAD" },
+  };
+
   const filteredConversations = conversations.filter((convo) => {
     const matchesSearch =
       !searchQuery.trim() ||
@@ -520,6 +558,11 @@ function ConversationsPage() {
                       </div>
                       <div className="flex items-center gap-2 mt-1">
                         <StatusBadge status={convo.status} />
+                        {convo.lead_temperature && tempColors[convo.lead_temperature] && (
+                          <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold uppercase ${tempColors[convo.lead_temperature].bg} ${tempColors[convo.lead_temperature].text}`}>
+                            {tempColors[convo.lead_temperature].label}
+                          </span>
+                        )}
                       </div>
                       <p className="text-xs text-stone-500 truncate mt-1.5 leading-relaxed">
                         {convo.last_message
@@ -621,6 +664,48 @@ function ConversationsPage() {
                   )}
                 </Button>
               </div>
+            </div>
+
+            {/* Summary Panel */}
+            <div className="px-6 py-3 border-b border-stone-100 flex items-center gap-3">
+              {selectedConvo.lead_temperature && tempColors[selectedConvo.lead_temperature] ? (
+                <div className={`flex-1 flex items-start gap-3 p-3 rounded-xl ${tempColors[selectedConvo.lead_temperature].bg} border ${tempColors[selectedConvo.lead_temperature].border}`}>
+                  <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase shrink-0 ${tempColors[selectedConvo.lead_temperature].text} bg-white/80`}>
+                    {tempColors[selectedConvo.lead_temperature].label}
+                  </span>
+                  <p className="text-xs text-stone-600 leading-relaxed">
+                    {selectedConvo.ai_summary}
+                  </p>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={handleSummarize}
+                    disabled={summarizing}
+                    className="shrink-0 text-stone-400 hover:text-stone-600"
+                  >
+                    {summarizing ? (
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    ) : (
+                      <Sparkles className="h-3.5 w-3.5" />
+                    )}
+                  </Button>
+                </div>
+              ) : (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleSummarize}
+                  disabled={summarizing || messages.length === 0}
+                  className="gap-1.5"
+                >
+                  {summarizing ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    <Sparkles className="h-3.5 w-3.5" />
+                  )}
+                  {summarizing ? "Analyzing..." : "Generate Summary"}
+                </Button>
+              )}
             </div>
 
             {/* Messages Area */}
