@@ -81,7 +81,10 @@ export default function DashboardPage() {
   const [stats, setStats] = useState({
     dmsHandled: 0,
     callsBooked: 0,
+    callsBookedThisWeek: 0,
     conversionRate: 0,
+    responseRate: 0,
+    avgQualifyMinutes: 0,
     activeConversations: 0,
   });
   const [conversations, setConversations] = useState([]);
@@ -119,15 +122,56 @@ export default function DashboardPage() {
       const active = convList.filter((c) =>
         ["qualifying", "interested"].includes(c.status?.toLowerCase())
       ).length;
-      const rate =
+      const bookingRate =
         totalConversations > 0
           ? Math.round((booked / totalConversations) * 100)
           : 0;
 
+      // Calls booked this week
+      const weekAgo = new Date();
+      weekAgo.setDate(weekAgo.getDate() - 7);
+      const bookedThisWeek = convList.filter(
+        (c) =>
+          c.status?.toLowerCase() === "booked" &&
+          new Date(c.updated_at) >= weekAgo
+      ).length;
+
+      // Response rate: conversations that have at least one AI reply
+      const { count: respondedCount } = await supabase
+        .from("messages")
+        .select("conversation_id", { count: "exact", head: true })
+        .eq("role", "assistant")
+        .in(
+          "conversation_id",
+          convList.map((c) => c.id)
+        );
+      const responseRate =
+        totalConversations > 0
+          ? Math.round(((respondedCount || 0) / totalConversations) * 100)
+          : 0;
+
+      // Avg qualify time: average minutes from created_at to updated_at
+      // for conversations that progressed past "qualifying"
+      const qualifiedConvos = convList.filter((c) =>
+        ["interested", "booked"].includes(c.status?.toLowerCase())
+      );
+      let avgQualifyMinutes = 0;
+      if (qualifiedConvos.length > 0) {
+        const totalMinutes = qualifiedConvos.reduce((sum, c) => {
+          const created = new Date(c.created_at);
+          const updated = new Date(c.updated_at);
+          return sum + (updated - created) / 60000;
+          }, 0);
+        avgQualifyMinutes = Math.round((totalMinutes / qualifiedConvos.length) * 10) / 10;
+      }
+
       setStats({
         dmsHandled: totalConversations,
         callsBooked: booked,
-        conversionRate: rate,
+        callsBookedThisWeek: bookedThisWeek,
+        conversionRate: bookingRate,
+        responseRate: Math.min(responseRate, 100),
+        avgQualifyMinutes,
         activeConversations: active,
       });
     },
@@ -192,24 +236,26 @@ export default function DashboardPage() {
     {
       title: "Calls Booked",
       value: stats.callsBooked,
-      subtitle: `+${stats.callsBooked} this week`,
+      subtitle: `+${stats.callsBookedThisWeek} this week`,
       icon: CalendarCheck,
       iconBg: "bg-orange-50",
       iconColor: "text-[#ff7e67]",
     },
     {
       title: "Response Rate",
-      value: `${stats.conversionRate > 0 ? Math.min(stats.conversionRate + 70, 99) : 0}%`,
-      subtitle: `Industry avg: 12%`,
+      value: `${stats.responseRate}%`,
+      subtitle: `${stats.dmsHandled} conversations`,
       icon: Zap,
       iconBg: "bg-blue-50",
       iconColor: "text-blue-500",
     },
     {
       title: "Avg. Qualify Time",
-      value: "2.3",
-      valueSuffix: "min",
-      subtitle: "-1.1m today",
+      value: stats.avgQualifyMinutes > 0 ? String(stats.avgQualifyMinutes) : "—",
+      valueSuffix: stats.avgQualifyMinutes > 0 ? "min" : "",
+      subtitle: stats.avgQualifyMinutes > 0
+        ? `${stats.activeConversations} active leads`
+        : "No qualified leads yet",
       icon: Clock,
       iconBg: "bg-purple-50",
       iconColor: "text-purple-500",
@@ -295,14 +341,16 @@ export default function DashboardPage() {
               <TrendingUp className="h-5 w-5 text-white" />
             </div>
             <span className="text-sm font-bold text-white/80 uppercase tracking-tight">
-              Est. Revenue
+              Booking Rate
             </span>
           </div>
           <div className="flex items-baseline gap-2">
             <span className="text-3xl font-extrabold">
-              ${stats.callsBooked > 0 ? (stats.callsBooked * 350).toLocaleString() : "0"}
+              {stats.conversionRate}%
             </span>
-            <span className="text-xs font-bold text-white/60">Total ROI</span>
+            <span className="text-xs font-bold text-white/60">
+              {stats.callsBooked} booked / {stats.dmsHandled} total
+            </span>
           </div>
         </div>
       </div>
