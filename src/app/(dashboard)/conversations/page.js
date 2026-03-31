@@ -651,17 +651,18 @@ function ConversationsPage() {
                   </SelectContent>
                 </Select>
                 <Button
-                  variant="ghost"
+                  variant="outline"
                   size="sm"
                   onClick={handleDeleteConversation}
                   disabled={deleting}
-                  className="text-stone-400 hover:text-red-500 hover:bg-red-50"
+                  className="gap-1.5 text-red-500 border-red-200 hover:bg-red-50 hover:text-red-600"
                 >
                   {deleting ? (
                     <Loader2 className="h-3.5 w-3.5 animate-spin" />
                   ) : (
                     <Trash2 className="h-3.5 w-3.5" />
                   )}
+                  Delete
                 </Button>
               </div>
             </div>
