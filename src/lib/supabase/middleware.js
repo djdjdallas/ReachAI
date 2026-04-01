@@ -92,5 +92,45 @@ export async function updateSession(request) {
     return NextResponse.redirect(url);
   }
 
+  // Onboarding guard — redirect to onboarding if not completed
+  // Skip for onboarding routes themselves and API routes
+  const isDashboardRoute =
+    pathname.startsWith("/dashboard") ||
+    pathname.startsWith("/conversations") ||
+    pathname.startsWith("/analytics") ||
+    pathname.startsWith("/billing") ||
+    pathname.startsWith("/settings") ||
+    pathname.startsWith("/script-builder") ||
+    pathname.startsWith("/playground") ||
+    pathname.startsWith("/calendar");
+
+  if (isDashboardRoute) {
+    const onboardingCookie = request.cookies.get("onboarding_completed")?.value;
+
+    if (onboardingCookie !== "true") {
+      // Cookie missing — check database once
+      const { data: profile } = await supabase
+        .from("users")
+        .select("onboarding_completed")
+        .eq("id", user.id)
+        .single();
+
+      if (profile?.onboarding_completed) {
+        // Set cookie for future requests (avoids repeated DB queries)
+        supabaseResponse.cookies.set("onboarding_completed", "true", {
+          httpOnly: true,
+          secure: process.env.NODE_ENV === "production",
+          sameSite: "lax",
+          maxAge: 60 * 60 * 24 * 365,
+          path: "/",
+        });
+      } else {
+        const url = request.nextUrl.clone();
+        url.pathname = "/onboarding";
+        return NextResponse.redirect(url);
+      }
+    }
+  }
+
   return supabaseResponse;
 }

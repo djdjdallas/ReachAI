@@ -3,8 +3,8 @@ import { createClient } from "@/lib/supabase/server";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import { generateReply } from "@/lib/anthropic";
 import { buildSystemPrompt } from "@/lib/prompts";
-import { sendUnipileMessage } from "@/lib/unipile";
 import { sendInstagramMessage } from "@/lib/instagram";
+import { decryptToken } from "@/lib/token-utils";
 
 export async function POST(request) {
   try {
@@ -57,13 +57,8 @@ export async function POST(request) {
       );
     }
 
-    // Determine connection type — Meta or Unipile
-    const isMetaUser = !!userProfile.meta_page_access_token;
-    const canSend = isMetaUser
-      ? !!conversation.instagram_sender_id
-      : !!conversation.unipile_chat_id;
-
-    if (!canSend) {
+    // Verify we have a valid messaging channel
+    if (!conversation.instagram_sender_id || !userProfile.meta_page_access_token) {
       return NextResponse.json(
         { error: "Conversation has no valid messaging channel" },
         { status: 400 }
@@ -124,17 +119,21 @@ export async function POST(request) {
       );
     }
 
-    // Send via the appropriate channel
-    if (isMetaUser) {
-      await sendInstagramMessage(
-        userProfile.instagram_business_account_id,
-        conversation.instagram_sender_id,
-        replyContent,
-        userProfile.meta_page_access_token
-      );
-    } else {
-      await sendUnipileMessage(conversation.unipile_chat_id, replyContent);
+    // Pause AI on manual reply so the bot doesn't also reply next message
+    if (manual) {
+      await getSupabaseAdmin()
+        .from("conversations")
+        .update({ ai_paused: true })
+        .eq("id", conversationId);
     }
+
+    // Send via Meta Instagram API
+    await sendInstagramMessage(
+      userProfile.instagram_business_account_id,
+      conversation.instagram_sender_id,
+      replyContent,
+      decryptToken(userProfile.meta_page_access_token)
+    );
 
     return NextResponse.json({ message: savedMessage }, { status: 200 });
   } catch (error) {

@@ -154,7 +154,6 @@ export async function subscribePageToWebhooks(pageId, pageAccessToken) {
  */
 export async function sendInstagramMessage(igAccountId, recipientId, text, pageAccessToken) {
   const url = `https://graph.instagram.com/${GRAPH_API_VERSION}/${igAccountId}/messages`;
-  console.log("Sending IG message to:", url, "recipient:", recipientId);
   const res = await fetch(url, {
     method: "POST",
     headers: {

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import { exchangeCodeForToken } from "@/lib/instagram";
+import { encryptToken } from "@/lib/token-utils";
 
 export async function GET(request) {
   const baseUrl = process.env.NEXT_PUBLIC_APP_URL;
@@ -78,7 +79,6 @@ export async function GET(request) {
       const meData = await meRes.json();
       if (meData.id) {
         igbaId = meData.id;
-        console.log("IGBA ID:", igbaId, "Username:", meData.username);
       }
     } catch (err) {
       console.error("Failed to fetch IGBA ID, using OAuth user ID:", err.message);
@@ -91,8 +91,8 @@ export async function GET(request) {
       .from("users")
       .update({
         instagram_business_account_id: igbaId,
-        meta_page_access_token: accessToken,
-        meta_user_access_token: accessToken,
+        meta_page_access_token: encryptToken(accessToken),
+        meta_user_access_token: encryptToken(accessToken),
         meta_token_expires_at: expiresAt,
       })
       .eq("id", user.id);

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import { refreshLongLivedToken } from "@/lib/instagram";
+import { encryptToken, decryptToken } from "@/lib/token-utils";
 
 /**
  * GET /api/cron/refresh-tokens
@@ -41,7 +42,7 @@ export async function GET(request) {
   for (const user of users || []) {
     try {
       const { accessToken, expiresIn } = await refreshLongLivedToken(
-        user.meta_user_access_token
+        decryptToken(user.meta_user_access_token)
       );
 
       const expiresAt = new Date(Date.now() + expiresIn * 1000).toISOString();
@@ -49,7 +50,8 @@ export async function GET(request) {
       await supabase
         .from("users")
         .update({
-          meta_user_access_token: accessToken,
+          meta_user_access_token: encryptToken(accessToken),
+          meta_page_access_token: encryptToken(accessToken),
           meta_token_expires_at: expiresAt,
         })
         .eq("id", user.id);

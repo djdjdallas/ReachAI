@@ -59,7 +59,9 @@ export async function getUnipileHostedAuthLink(callbackUrl, webhookUrl) {
       expiresOn,
       success_redirect_url: callbackUrl,
       failure_redirect_url: callbackUrl + "&error=auth_failed",
-      notify_url: webhookUrl,
+      notify_url: process.env.UNIPILE_WEBHOOK_SECRET
+        ? `${webhookUrl}?secret=${process.env.UNIPILE_WEBHOOK_SECRET}`
+        : webhookUrl,
     }),
   });
 }

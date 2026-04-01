@@ -450,6 +450,9 @@ function OnboardingPage() {
         })
         .eq("id", user.id);
 
+      // Set cookie so middleware knows onboarding is done
+      document.cookie = "onboarding_completed=true; path=/; max-age=31536000; samesite=lax";
+
       if (checked) {
         posthog.capture("ai_agent_activated");
       }
@@ -574,12 +577,6 @@ function OnboardingPage() {
                   Connect Instagram Account
                 </a>
               </Button>
-              <a
-                href="/api/auth/instagram?method=unipile"
-                className="text-xs text-muted-foreground hover:text-foreground transition-colors"
-              >
-                Having trouble? Try alternative connection method
-              </a>
               <Button
                 variant="ghost"
                 className="w-full"

@@ -2,8 +2,8 @@ import { NextResponse } from "next/server";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import { generateReply } from "@/lib/anthropic";
 import { buildSystemPrompt } from "@/lib/prompts";
-import { sendUnipileMessage } from "@/lib/unipile";
 import { sendInstagramMessage, verifyWebhookSignature, getParticipantProfile } from "@/lib/instagram";
+import { decryptToken } from "@/lib/token-utils";
 
 // ── GET: Meta webhook verification ──────────────────────────────────────
 
@@ -18,25 +18,19 @@ export async function GET(request) {
     return new Response(challenge, { status: 200 });
   }
 
-  // Fallback health check (also used by Unipile)
+  // Health check
   return NextResponse.json({ status: "ok" }, { status: 200 });
 }
 
-// ── POST: Handle incoming messages (Meta or Unipile) ────────────────────
+// ── POST: Handle incoming Instagram messages via Meta Graph API ─────────
 
 export async function POST(request) {
   try {
     const rawBody = await request.text();
     const body = JSON.parse(rawBody);
 
-    // Detect whether this is a Meta or Unipile webhook based on payload shape
     if (body.object === "instagram") {
       return handleMetaWebhook(body, rawBody, request);
-    }
-
-    // Unipile webhook (legacy)
-    if (body.event === "message_received") {
-      return handleUnipileWebhook(body);
     }
 
     return NextResponse.json({ status: "ignored" }, { status: 200 });
@@ -51,15 +45,12 @@ export async function POST(request) {
 async function handleMetaWebhook(body, rawBody, request) {
   // Verify signature
   const signature = request.headers.get("x-hub-signature-256");
-  if (process.env.FACEBOOK_APP_SECRET && !verifyWebhookSignature(rawBody, signature)) {
+  if (!process.env.FACEBOOK_APP_SECRET) {
+    console.warn("FACEBOOK_APP_SECRET not set — skipping signature verification");
+  } else if (!verifyWebhookSignature(rawBody, signature)) {
     console.error("Meta webhook signature verification failed");
-    console.error("Received signature:", signature);
-    console.error("Raw body length:", rawBody.length);
-    // Process anyway during development — remove this fallthrough once verified
-    console.warn("Processing webhook despite signature mismatch (dev mode)");
+    return NextResponse.json({ error: "Invalid signature" }, { status: 403 });
   }
-
-  console.log("Meta webhook payload:", JSON.stringify(body));
 
   const entries = body.entry || [];
 
@@ -91,9 +82,9 @@ async function handleMetaWebhook(body, rawBody, request) {
 
         let senderName = null;
         if (ownerUser?.meta_page_access_token) {
-          const profile = await getParticipantProfile(senderId, ownerUser.meta_page_access_token);
+          const pageToken = decryptToken(ownerUser.meta_page_access_token);
+          const profile = await getParticipantProfile(senderId, pageToken);
           senderName = profile?.name || profile?.username || null;
-          console.log("Sender profile:", JSON.stringify(profile));
         }
 
         await processIncomingMessage({
@@ -102,7 +93,7 @@ async function handleMetaWebhook(body, rawBody, request) {
           senderId,
           messageText,
           senderName,
-          connectionType: "meta",
+          providerMessageId: event.message?.mid || null,
         });
       } catch (err) {
         console.error("Error processing Meta message:", err);
@@ -113,42 +104,25 @@ async function handleMetaWebhook(body, rawBody, request) {
   return NextResponse.json({ status: "ok" }, { status: 200 });
 }
 
-// ── Unipile webhook (legacy fallback) ───────────────────────────────────
+// ── Helpers ─────────────────────────────────────────────────────────────
 
-async function handleUnipileWebhook(body) {
-  if (body.account_type !== "INSTAGRAM") {
-    return NextResponse.json({ status: "ignored" }, { status: 200 });
+async function insertMessageIfNew(supabase, { conversation_id, role, content, provider_message_id }) {
+  if (provider_message_id) {
+    const { data: existing } = await supabase
+      .from("messages")
+      .select("id")
+      .eq("provider_message_id", provider_message_id)
+      .maybeSingle();
+    if (existing) return { duplicate: true };
   }
-
-  if (body.is_sender === true) {
-    return NextResponse.json({ status: "ignored_own_message" }, { status: 200 });
-  }
-
-  const accountId = body.account_id;
-  const chatId = body.chat_id;
-  const messageText = body.message;
-  const senderName = body.sender?.attendee_name || null;
-  const senderId = body.sender?.attendee_provider_id || body.sender?.attendee_id || null;
-
-  if (!messageText || !accountId) {
-    return NextResponse.json({ status: "ok" }, { status: 200 });
-  }
-
-  try {
-    await processIncomingMessage({
-      lookupField: "unipile_account_id",
-      lookupValue: accountId,
-      senderId,
-      messageText,
-      senderName,
-      connectionType: "unipile",
-      unipileChatId: chatId,
-    });
-  } catch (err) {
-    console.error("Error processing Unipile message:", err);
-  }
-
-  return NextResponse.json({ status: "ok" }, { status: 200 });
+  const { data, error } = await supabase
+    .from("messages")
+    .insert({ conversation_id, role, content, provider_message_id })
+    .select()
+    .single();
+  // Handle unique constraint violation (race condition fallback)
+  if (error?.code === "23505") return { duplicate: true };
+  return { data, error, duplicate: false };
 }
 
 // ── Shared message processing logic ─────────────────────────────────────
@@ -159,8 +133,7 @@ async function processIncomingMessage({
   senderId,
   messageText,
   senderName,
-  connectionType,
-  unipileChatId,
+  providerMessageId,
 }) {
   const supabase = getSupabaseAdmin();
 
@@ -183,6 +156,19 @@ async function processIncomingMessage({
     return;
   }
 
+  // Fix #1: Check trial expiry
+  if (user.subscription_status === "trialing") {
+    const trialEnd = user.trial_ends_at ? new Date(user.trial_ends_at) : null;
+    if (trialEnd && new Date() > trialEnd) {
+      await supabase
+        .from("users")
+        .update({ subscription_status: "expired", ai_active: false })
+        .eq("id", user.id);
+      console.log("Trial expired for user:", user.id);
+      return;
+    }
+  }
+
   // Lazy-reset monthly DM count
   const now = new Date();
   const resetAt = user.dm_count_reset_at ? new Date(user.dm_count_reset_at) : null;
@@ -198,49 +184,28 @@ async function processIncomingMessage({
     user.dm_count_this_month = 0;
   }
 
-  // Find or create conversation
-  // For Meta: match by instagram_sender_id + user_id
-  // For Unipile: match by unipile_chat_id
+  // Find or create conversation by instagram_sender_id
   let conversation;
 
-  if (connectionType === "meta") {
-    const { data: conv } = await supabase
-      .from("conversations")
-      .select("*")
-      .eq("user_id", user.id)
-      .eq("instagram_sender_id", senderId)
-      .single();
-    conversation = conv;
-  } else {
-    const { data: conv } = await supabase
-      .from("conversations")
-      .select("*")
-      .eq("user_id", user.id)
-      .eq("unipile_chat_id", unipileChatId)
-      .single();
-    conversation = conv;
-  }
+  const { data: conv } = await supabase
+    .from("conversations")
+    .select("*")
+    .eq("user_id", user.id)
+    .eq("instagram_sender_id", senderId)
+    .single();
+  conversation = conv;
 
   if (!conversation) {
-    const insertData = {
-      user_id: user.id,
-      instagram_sender_id: senderId,
-      status: "qualifying",
-      ai_paused: false,
-      sender_name: senderName,
-    };
-
-    if (connectionType === "unipile") {
-      insertData.instagram_thread_id = unipileChatId;
-      insertData.unipile_chat_id = unipileChatId;
-    } else {
-      // Meta conversations use sender ID as thread identifier
-      insertData.instagram_thread_id = senderId;
-    }
-
     const { data: newConv, error: createError } = await supabase
       .from("conversations")
-      .insert(insertData)
+      .insert({
+        user_id: user.id,
+        instagram_sender_id: senderId,
+        instagram_thread_id: senderId,
+        status: "qualifying",
+        ai_paused: false,
+        sender_name: senderName,
+      })
       .select()
       .single();
 
@@ -253,38 +218,52 @@ async function processIncomingMessage({
 
   // If AI is paused, save message but skip reply
   if (conversation.ai_paused) {
-    await supabase.from("messages").insert({
+    await insertMessageIfNew(supabase, {
       conversation_id: conversation.id,
       role: "user",
       content: messageText,
+      provider_message_id: providerMessageId,
     });
-    return;
-  }
-
-  // Check DM limit
-  const dmLimit = user.plan === "unlimited" ? Infinity : 500;
-  if (user.dm_count_this_month >= dmLimit) {
-    console.log("DM limit reached for user:", user.id);
     return;
   }
 
   // Skip if no script configured
   const sc = user.script_config || {};
   if (!sc.greeting) {
-    await supabase.from("messages").insert({
+    await insertMessageIfNew(supabase, {
       conversation_id: conversation.id,
       role: "user",
       content: messageText,
+      provider_message_id: providerMessageId,
     });
     return;
   }
 
-  // Save incoming message
-  await supabase.from("messages").insert({
+  // Atomic DM limit check — increment first, then verify
+  const dmLimit = user.plan === "unlimited" ? Infinity : 500;
+  if (dmLimit !== Infinity) {
+    const { data: newCount, error: rpcError } = await supabase.rpc("increment_dm_count", { uid: user.id });
+    if (rpcError) {
+      console.error("Failed to increment DM count:", rpcError);
+      return;
+    }
+    if (newCount > dmLimit) {
+      console.log("DM limit reached for user:", user.id);
+      return;
+    }
+  }
+
+  // Save incoming message (with deduplication)
+  const insertResult = await insertMessageIfNew(supabase, {
     conversation_id: conversation.id,
     role: "user",
     content: messageText,
+    provider_message_id: providerMessageId,
   });
+  if (insertResult.duplicate) {
+    console.log("Duplicate message skipped:", providerMessageId);
+    return;
+  }
 
   // Natural delay
   await new Promise((r) => setTimeout(r, 1000 + Math.random() * 2000));
@@ -315,17 +294,13 @@ async function processIncomingMessage({
     content: aiReply,
   });
 
-  // Send reply via the appropriate channel
-  if (connectionType === "meta") {
-    await sendInstagramMessage(
-      user.instagram_business_account_id,
-      senderId,
-      aiReply,
-      user.meta_page_access_token
-    );
-  } else {
-    await sendUnipileMessage(unipileChatId, aiReply);
-  }
+  // Send reply via Meta Instagram API
+  await sendInstagramMessage(
+    user.instagram_business_account_id,
+    senderId,
+    aiReply,
+    decryptToken(user.meta_page_access_token)
+  );
 
   // Status detection — check both AI reply and lead's message
   const statusOrder = ["qualifying", "interested", "booked"];
@@ -359,10 +334,4 @@ async function processIncomingMessage({
   if (newStatus !== conversation.status) {
     await supabase.from("conversations").update({ status: newStatus }).eq("id", conversation.id);
   }
-
-  // Increment DM count
-  await supabase
-    .from("users")
-    .update({ dm_count_this_month: (user.dm_count_this_month || 0) + 1 })
-    .eq("id", user.id);
 }
