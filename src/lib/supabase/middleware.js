@@ -69,6 +69,7 @@ export async function updateSession(request) {
     pathname.startsWith("/api/webhooks") ||
     pathname.startsWith("/compare") ||
     pathname.startsWith("/blog") ||
+    pathname.startsWith("/for") ||
     pathname === "/privacy" ||
     pathname === "/terms"
   ) {

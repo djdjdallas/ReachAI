@@ -3,10 +3,26 @@
 import { useState, useEffect } from "react";
 import BlogCard from "@/components/BlogCard";
 
-const categories = ["All", "Automation", "Scripts & Templates", "Strategy", "Tools & Reviews"];
+const categories = ["All", "AI & Automation", "Automation", "Scripts & Templates", "Strategy", "Tools & Reviews"];
 
 // Static post data — avoids needing server-side fs reads in client component
 const allPosts = [
+  {
+    slug: "best-manychat-alternative-for-coaches-2026",
+    title: "7 Best ManyChat Alternatives for Coaches in 2026 (Ranked & Reviewed)",
+    description: "ManyChat was built for e-commerce, not coaching. Here are the 7 best ManyChat alternatives for coaches who sell high-ticket offers, ranked by AI quality, pricing, and booking rate.",
+    date: "2026-04-03",
+    category: "Tools & Reviews",
+    readTime: "12 min read",
+  },
+  {
+    slug: "what-is-an-ai-dm-setter",
+    title: "What Is an AI DM Setter? How Coaches Are Replacing $3K/Month Setters in 2026",
+    description: "An AI DM setter is software that qualifies your Instagram leads, handles objections, and books discovery calls automatically, 24/7. Here is how it works and why coaches are switching.",
+    date: "2026-04-03",
+    category: "AI & Automation",
+    readTime: "10 min read",
+  },
   {
     slug: "instagram-dm-strategy-for-coaches",
     title: "The Complete Instagram DM Strategy for Coaches in 2026",

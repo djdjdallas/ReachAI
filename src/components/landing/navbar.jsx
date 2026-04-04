@@ -7,13 +7,21 @@ import { ChevronDown, Menu, X } from "lucide-react";
 
 const compareLinks = [
   { href: "/compare/vs-manychat", label: "vs ManyChat" },
+  { href: "/compare/vs-setsmart", label: "vs SetSmart" },
   { href: "/compare/vs-gohighlevel", label: "vs GoHighLevel" },
   { href: "/compare/vs-setter-ai", label: "vs Setter AI" },
+];
+
+const nicheLinks = [
+  { href: "/for/fitness-coaches", label: "Fitness Coaches" },
+  { href: "/for/business-coaches", label: "Business Coaches" },
+  { href: "/for/life-coaches", label: "Life Coaches" },
 ];
 
 export default function Navbar() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [compareOpen, setCompareOpen] = useState(false);
+  const [nicheOpen, setNicheOpen] = useState(false);
 
   return (
     <nav className="sticky top-0 z-50 bg-white/70 backdrop-blur-xl border-b border-stone-100">
@@ -48,6 +56,33 @@ export default function Navbar() {
                 <div className="absolute top-full left-1/2 -translate-x-1/2 pt-2">
                   <div className="bg-white rounded-2xl border border-stone-100 shadow-xl p-2 min-w-[200px]">
                     {compareLinks.map((link) => (
+                      <Link
+                        key={link.href}
+                        href={link.href}
+                        className="block px-4 py-2.5 text-sm font-semibold text-stone-600 hover:text-[#ff7e67] hover:bg-[#fff5f2] rounded-xl transition-colors"
+                      >
+                        {link.label}
+                      </Link>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* For Coaches dropdown */}
+            <div
+              className="relative"
+              onMouseEnter={() => setNicheOpen(true)}
+              onMouseLeave={() => setNicheOpen(false)}
+            >
+              <button className="flex items-center gap-1 hover:text-[#ff7e67] transition-colors">
+                For Coaches
+                <ChevronDown className={`w-4 h-4 transition-transform ${nicheOpen ? "rotate-180" : ""}`} />
+              </button>
+              {nicheOpen && (
+                <div className="absolute top-full left-1/2 -translate-x-1/2 pt-2">
+                  <div className="bg-white rounded-2xl border border-stone-100 shadow-xl p-2 min-w-[200px]">
+                    {nicheLinks.map((link) => (
                       <Link
                         key={link.href}
                         href={link.href}
@@ -98,6 +133,17 @@ export default function Navbar() {
           <a href="/#pricing" onClick={() => setMobileOpen(false)} className="block px-4 py-3 text-sm font-semibold text-stone-700 hover:text-[#ff7e67] hover:bg-[#fff5f2] rounded-xl transition-colors">Pricing</a>
           <div className="px-4 py-2 text-xs font-bold uppercase tracking-widest text-stone-400">Compare</div>
           {compareLinks.map((link) => (
+            <Link
+              key={link.href}
+              href={link.href}
+              onClick={() => setMobileOpen(false)}
+              className="block px-6 py-2.5 text-sm font-semibold text-stone-600 hover:text-[#ff7e67] hover:bg-[#fff5f2] rounded-xl transition-colors"
+            >
+              {link.label}
+            </Link>
+          ))}
+          <div className="px-4 py-2 text-xs font-bold uppercase tracking-widest text-stone-400">For Coaches</div>
+          {nicheLinks.map((link) => (
             <Link
               key={link.href}
               href={link.href}
