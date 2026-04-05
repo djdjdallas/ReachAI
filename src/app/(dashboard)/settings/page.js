@@ -13,6 +13,11 @@ import {
   Bot,
   AlertTriangle,
   Clock,
+  Calendar,
+  ChevronDown,
+  ChevronUp,
+  Copy,
+  Link2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -60,6 +65,12 @@ export default function SettingsPage() {
   // Instagram
   const [disconnecting, setDisconnecting] = useState(false);
 
+  // Calendar integrations
+  const [calendlyGuideOpen, setCalendlyGuideOpen] = useState(false);
+  const [gcalConnected, setGcalConnected] = useState(false);
+  const [disconnectingGcal, setDisconnectingGcal] = useState(false);
+  const [copied, setCopied] = useState(false);
+
   // Delete dialog
   const [deleteOpen, setDeleteOpen] = useState(false);
 
@@ -87,6 +98,7 @@ export default function SettingsPage() {
         setFullName(userProfile.full_name || "");
         setAiActive(userProfile.ai_active || false);
         setResponseDelay(userProfile.response_delay || 2);
+        setGcalConnected(!!userProfile.google_calendar_refresh_token);
       }
 
       setLoading(false);
@@ -284,6 +296,159 @@ export default function SettingsPage() {
                 disabled={disconnecting}
               >
                 {disconnecting && (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                )}
+                Disconnect
+              </Button>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Calendly Webhook Integration */}
+      <Card>
+        <CardHeader>
+          <button
+            onClick={() => setCalendlyGuideOpen(!calendlyGuideOpen)}
+            className="w-full flex items-center justify-between"
+          >
+            <div className="text-left">
+              <CardTitle className="text-lg flex items-center gap-2">
+                <Link2 className="h-5 w-5" />
+                Calendly Webhook Integration
+              </CardTitle>
+              <CardDescription>
+                Automatically sync bookings when leads schedule via Calendly.
+              </CardDescription>
+            </div>
+            {calendlyGuideOpen ? (
+              <ChevronUp className="h-5 w-5 text-muted-foreground" />
+            ) : (
+              <ChevronDown className="h-5 w-5 text-muted-foreground" />
+            )}
+          </button>
+        </CardHeader>
+        {calendlyGuideOpen && (
+          <CardContent className="space-y-4">
+            <div className="bg-muted/50 p-4 rounded-lg space-y-3">
+              <p className="text-sm font-medium">
+                Follow these steps to connect Calendly webhooks:
+              </p>
+              <ol className="text-sm text-muted-foreground space-y-3 list-decimal list-inside">
+                <li>
+                  Go to your{" "}
+                  <span className="font-medium text-foreground">
+                    Calendly dashboard → Integrations → Webhooks
+                  </span>
+                </li>
+                <li>
+                  Add a new webhook with this URL:
+                  <div className="mt-1 flex items-center gap-2">
+                    <code className="bg-background px-3 py-1.5 rounded border text-xs flex-1 break-all">
+                      https://clinchd.io/api/webhooks/calendly
+                    </code>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        navigator.clipboard.writeText(
+                          "https://clinchd.io/api/webhooks/calendly"
+                        );
+                        setCopied(true);
+                        setTimeout(() => setCopied(false), 2000);
+                      }}
+                    >
+                      {copied ? (
+                        <Check className="h-3.5 w-3.5" />
+                      ) : (
+                        <Copy className="h-3.5 w-3.5" />
+                      )}
+                    </Button>
+                  </div>
+                </li>
+                <li>
+                  Subscribe to these events:{" "}
+                  <code className="bg-background px-1.5 py-0.5 rounded border text-xs">
+                    invitee.created
+                  </code>{" "}
+                  and{" "}
+                  <code className="bg-background px-1.5 py-0.5 rounded border text-xs">
+                    invitee.canceled
+                  </code>
+                </li>
+                <li>
+                  Copy the{" "}
+                  <span className="font-medium text-foreground">
+                    signing secret
+                  </span>{" "}
+                  from Calendly and add it as the{" "}
+                  <code className="bg-background px-1.5 py-0.5 rounded border text-xs">
+                    CALENDLY_WEBHOOK_SECRET
+                  </code>{" "}
+                  environment variable in your deployment settings.
+                </li>
+              </ol>
+            </div>
+          </CardContent>
+        )}
+      </Card>
+
+      {/* Google Calendar */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-lg flex items-center gap-2">
+            <Calendar className="h-5 w-5" />
+            Google Calendar
+          </CardTitle>
+          <CardDescription>
+            View your Google Calendar events alongside Calendly bookings.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <span className="text-sm font-medium">Status:</span>
+              {gcalConnected ? (
+                <Badge variant="success">Connected</Badge>
+              ) : (
+                <Badge variant="muted">Not Connected</Badge>
+              )}
+            </div>
+          </div>
+          <div className="flex gap-2">
+            <Button
+              asChild
+              variant={gcalConnected ? "outline" : "default"}
+            >
+              <a href="/api/auth/google-calendar">
+                <Calendar className="h-4 w-4" />
+                {gcalConnected ? "Reconnect" : "Connect Google Calendar"}
+              </a>
+            </Button>
+            {gcalConnected && (
+              <Button
+                variant="destructive"
+                onClick={async () => {
+                  setDisconnectingGcal(true);
+                  try {
+                    await supabase
+                      .from("users")
+                      .update({
+                        google_calendar_access_token: null,
+                        google_calendar_refresh_token: null,
+                        google_calendar_token_expires_at: null,
+                      })
+                      .eq("id", authUser.id);
+                    setGcalConnected(false);
+                  } catch (err) {
+                    console.error("Error disconnecting Google Calendar:", err);
+                  } finally {
+                    setDisconnectingGcal(false);
+                  }
+                }}
+                disabled={disconnectingGcal}
+              >
+                {disconnectingGcal && (
                   <Loader2 className="h-4 w-4 animate-spin" />
                 )}
                 Disconnect

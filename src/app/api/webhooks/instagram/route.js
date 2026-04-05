@@ -285,7 +285,14 @@ async function processIncomingMessage({
   const systemPrompt = buildSystemPrompt(sc, user.calendly_url, {
     voiceProfile: user.voice_profile,
   });
-  const aiReply = await generateReply(systemPrompt, messages);
+
+  let aiReply;
+  try {
+    aiReply = await generateReply(systemPrompt, messages);
+  } catch (err) {
+    console.error("generateReply failed for conversation:", conversation.id, err.message);
+    return;
+  }
 
   // Save AI reply
   await supabase.from("messages").insert({
@@ -295,12 +302,17 @@ async function processIncomingMessage({
   });
 
   // Send reply via Meta Instagram API
-  await sendInstagramMessage(
-    user.instagram_business_account_id,
-    senderId,
-    aiReply,
-    decryptToken(user.meta_page_access_token)
-  );
+  try {
+    await sendInstagramMessage(
+      user.instagram_business_account_id,
+      senderId,
+      aiReply,
+      decryptToken(user.meta_page_access_token)
+    );
+  } catch (err) {
+    console.error("sendInstagramMessage failed for conversation:", conversation.id, err.message);
+    // Reply is saved to DB but wasn't delivered — continue to status detection
+  }
 
   // Status detection — check both AI reply and lead's message
   const statusOrder = ["qualifying", "interested", "booked"];
@@ -332,6 +344,7 @@ async function processIncomingMessage({
   }
 
   if (newStatus !== conversation.status) {
+    console.log(`Status change: ${conversation.id} ${conversation.status} → ${newStatus}`);
     await supabase.from("conversations").update({ status: newStatus }).eq("id", conversation.id);
   }
 }

@@ -37,7 +37,7 @@ const faqs = [
   },
   {
     q: "Does Clinchd integrate with GoHighLevel?",
-    a: "Clinchd books calls directly into your calendar (Calendly, Cal.com, or Google Calendar). If you use GHL's built-in calendar, you can connect it via the calendar link. For CRM syncing, you can use webhook integrations to push qualified leads from Clinchd into your GHL pipeline.",
+    a: "Clinchd integrates with Calendly, Cal.com, and Google Calendar — bookings sync automatically when a lead books. If you use GHL's built-in calendar, you can connect it via the calendar link. For CRM syncing, you can use webhook integrations to push qualified leads from Clinchd into your GHL pipeline.",
   },
   {
     q: "Is GoHighLevel's Conversation AI as good as Clinchd?",
