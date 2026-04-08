@@ -2,7 +2,6 @@
 
 import {
   Zap,
-  Facebook,
   Instagram,
   ShieldCheck,
   ShieldOff,
@@ -36,12 +35,12 @@ export default function Step1Connect({ instagramConnected, onSkip }) {
             <div className="bg-white rounded-[2.5rem] p-10 soft-shadow border border-stone-100 space-y-8">
               <div className="space-y-6">
                 <div className="flex items-start gap-5">
-                  <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center flex-shrink-0">
-                    <Facebook className="w-5 h-5" />
+                  <div className="w-10 h-10 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center flex-shrink-0">
+                    <Instagram className="w-5 h-5" />
                   </div>
                   <div>
                     <h4 className="font-bold text-stone-900">
-                      1. Log in to Facebook
+                      1. Log in to Instagram
                     </h4>
                     <p className="text-sm text-stone-500">
                       Connect via the secure Meta portal.
@@ -193,12 +192,12 @@ export default function Step1Connect({ instagramConnected, onSkip }) {
               <div className="pt-4 space-y-4">
                 <div className="flex items-center gap-3">
                   <div className="flex -space-x-3">
-                    <div className="w-8 h-8 rounded-full border-2 border-white bg-stone-200" />
-                    <div className="w-8 h-8 rounded-full border-2 border-white bg-stone-300" />
-                    <div className="w-8 h-8 rounded-full border-2 border-white bg-stone-200" />
+                    <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=A" alt="" className="w-8 h-8 rounded-full border-2 border-white bg-stone-100" />
+                    <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=B" alt="" className="w-8 h-8 rounded-full border-2 border-white bg-stone-100" />
+                    <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=C" alt="" className="w-8 h-8 rounded-full border-2 border-white bg-stone-100" />
                   </div>
                   <span className="text-xs font-bold text-stone-500">
-                    Trusted by 5,000+ creators
+                    Trusted by 100+ creators
                   </span>
                 </div>
 
