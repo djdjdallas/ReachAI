@@ -97,7 +97,7 @@ export default function Hero() {
           </p>
           <div className="flex items-center gap-2 mt-2 px-5 py-2.5 bg-stone-50 rounded-2xl border border-stone-100">
             <span className="text-sm font-bold text-stone-600">
-              Used by 500+ coaches and course creators
+              Used by 100+ coaches and course creators
             </span>
           </div>
         </div>
