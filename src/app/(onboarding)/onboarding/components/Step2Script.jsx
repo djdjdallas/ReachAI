@@ -177,7 +177,7 @@ export default function Step2Script({
                 <div className="flex gap-3 justify-end ml-auto max-w-[85%]">
                   <div className="bg-[#ff7e67] px-5 py-4 rounded-2xl rounded-br-none text-xs leading-relaxed">
                     <span className="font-bold block mb-1 opacity-80 uppercase tracking-tighter text-[10px]">
-                      CLINCHD
+                      Clinchd
                     </span>
                     {objections
                       ? objections.slice(0, 150) + (objections.length > 150 ? "..." : "")
