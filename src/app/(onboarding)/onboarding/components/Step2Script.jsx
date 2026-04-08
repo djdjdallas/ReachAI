@@ -170,14 +170,14 @@ export default function Step2Script({
               <div className="flex gap-3 max-w-[80%]">
                 <div className="w-8 h-8 rounded-full bg-white/20 flex-shrink-0" />
                 <div className="bg-white/10 p-4 rounded-2xl rounded-tl-none text-xs leading-relaxed">
-                  Hey! Saw your post. How does ReachAI handle objection handling?
+                  Hey! Saw your post. How does Clinchd handle objection handling?
                 </div>
               </div>
               <div className="flex flex-col items-end gap-1.5">
                 <div className="flex gap-3 justify-end ml-auto max-w-[85%]">
                   <div className="bg-[#ff7e67] px-5 py-4 rounded-2xl rounded-br-none text-xs leading-relaxed">
                     <span className="font-bold block mb-1 opacity-80 uppercase tracking-tighter text-[10px]">
-                      REACH AI
+                      CLINCHD
                     </span>
                     {objections
                       ? objections.slice(0, 150) + (objections.length > 150 ? "..." : "")
@@ -234,7 +234,7 @@ export default function Step2Script({
                   icon: Briefcase,
                   title: "Consultants / Agencies",
                   preview:
-                    '"Expertise is scalable. ReachAI helps consultants pre-qualify inbound interests..."',
+                    '"Expertise is scalable. Clinchd helps consultants pre-qualify inbound interests..."',
                 },
               ].map(({ icon: Icon, title, preview }) => (
                 <div
@@ -291,7 +291,7 @@ export default function Step2Script({
                 <span className="text-[#ff7e67] font-bold">[name]</span> and{" "}
                 <span className="text-[#ff7e67] font-bold">[niche]</span>{" "}
                 increases response rates by up to{" "}
-                <span className="font-bold text-stone-900">42%</span>. ReachAI
+                <span className="font-bold text-stone-900">42%</span>. Clinchd
                 fills these in automatically.
               </p>
             </div>

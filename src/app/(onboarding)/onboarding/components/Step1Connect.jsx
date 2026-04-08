@@ -26,7 +26,7 @@ export default function Step1Connect({ instagramConnected, onSkip }) {
                 <span className="text-[#ff7e67]">Instagram</span> Account
               </h1>
               <p className="text-xl text-stone-500 font-medium leading-relaxed">
-                ReachAI uses the official Meta Graph API to securely handle your
+                Clinchd uses the official Meta Graph API to securely handle your
                 DMs. Setup takes less than 60 seconds and no passwords are
                 shared.
               </p>
@@ -57,7 +57,7 @@ export default function Step1Connect({ instagramConnected, onSkip }) {
                       2. Select Business Profile
                     </h4>
                     <p className="text-sm text-stone-500">
-                      Choose the handle you want ReachAI to manage.
+                      Choose the handle you want Clinchd to manage.
                     </p>
                   </div>
                 </div>
@@ -71,7 +71,7 @@ export default function Step1Connect({ instagramConnected, onSkip }) {
                       3. Grant DM Permissions
                     </h4>
                     <p className="text-sm text-stone-500">
-                      Allow ReachAI to read and reply to messages.
+                      Allow Clinchd to read and reply to messages.
                     </p>
                   </div>
                 </div>
@@ -101,7 +101,7 @@ export default function Step1Connect({ instagramConnected, onSkip }) {
               <div className="grid md:grid-cols-2 gap-6">
                 <div className="space-y-3">
                   <p className="text-xs font-bold text-green-600 uppercase tracking-tight">
-                    ReachAI Can:
+                    Clinchd Can:
                   </p>
                   <ul className="space-y-2">
                     <li className="flex items-center gap-2 text-sm text-stone-600 font-medium">
@@ -120,7 +120,7 @@ export default function Step1Connect({ instagramConnected, onSkip }) {
                 </div>
                 <div className="space-y-3">
                   <p className="text-xs font-bold text-red-500 uppercase tracking-tight">
-                    ReachAI Cannot:
+                    Clinchd Cannot:
                   </p>
                   <ul className="space-y-2">
                     <li className="flex items-center gap-2 text-sm text-stone-600 font-medium">
@@ -172,7 +172,7 @@ export default function Step1Connect({ instagramConnected, onSkip }) {
                 <div>
                   <p className="text-sm font-bold">No Passwords Stored</p>
                   <p className="text-xs text-stone-500 font-medium">
-                    ReachAI never sees your login data
+                    Clinchd never sees your login data
                   </p>
                 </div>
               </div>

@@ -85,7 +85,7 @@ export default function Step3Voice({
           <div className="mb-10">
             <h1 className="text-4xl font-black mb-2">Your Voice</h1>
             <p className="text-stone-500 text-lg font-medium">
-              How should ReachAI talk to your leads? Set your tone, personality,
+              How should Clinchd talk to your leads? Set your tone, personality,
               and response style.
             </p>
           </div>
@@ -397,7 +397,7 @@ export default function Step3Voice({
                 <div className="flex items-center gap-2 mt-4 text-[#ff7e67]">
                   <Info className="w-4 h-4" />
                   <span className="text-[11px] font-bold uppercase tracking-widest">
-                    This helps ReachAI match your authentic voice
+                    This helps Clinchd match your authentic voice
                   </span>
                 </div>
               </div>
@@ -451,7 +451,7 @@ export default function Step3Voice({
                         </div>
                         <div className="flex items-start gap-3 justify-end">
                           <div className="bg-[#ff7e67] p-4 rounded-2xl rounded-tr-none text-xs text-white max-w-[85%] leading-relaxed">
-                            It&apos;s super simple. ReachAI monitors your DMs
+                            It&apos;s super simple. Clinchd monitors your DMs
                             24/7, qualifies leads based on your script, and
                             drops your Calendly link when they&apos;re ready to
                             talk!{traits.emojis ? " \ud83d\ude80" : ""}

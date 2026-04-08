@@ -12,7 +12,7 @@ export default function OnboardingHeader({ currentStep }) {
           <div className="w-8 h-8 bg-[#ff7e67] rounded-lg flex items-center justify-center shadow-lg shadow-[#ff7e67]/20">
             <Zap className="w-4 h-4 text-white" />
           </div>
-          <span className="text-xl font-extrabold tracking-tight">ReachAI</span>
+          <span className="text-xl font-extrabold tracking-tight">Clinchd</span>
         </div>
 
         <div className="flex items-center gap-4">

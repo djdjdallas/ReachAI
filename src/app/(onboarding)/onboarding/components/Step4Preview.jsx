@@ -54,7 +54,7 @@ export default function Step4Preview({
             <span className="text-[#ff7e67]">in Action</span>
           </h1>
           <p className="text-xl text-stone-500 font-medium">
-            See how ReachAI will respond to real prospects using the data
+            See how Clinchd will respond to real prospects using the data
             you&apos;ve provided.
           </p>
         </header>

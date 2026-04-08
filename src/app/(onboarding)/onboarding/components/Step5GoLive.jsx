@@ -31,7 +31,7 @@ export default function Step5GoLive({
             <Zap className="w-4 h-4 text-white" />
           </div>
           <span className="text-xl font-extrabold tracking-tight">
-            ReachAI
+            Clinchd
           </span>
         </div>
 
@@ -75,7 +75,7 @@ export default function Step5GoLive({
           </h1>
           <p className="text-stone-500 text-xl font-medium max-w-2xl mx-auto">
             Link your script and voice profiles to activation. Once live,
-            ReachAI will monitor your DMs 24/7 to book qualified calls.
+            Clinchd will monitor your DMs 24/7 to book qualified calls.
           </p>
 
           {/* Activation Toggle */}
@@ -145,7 +145,7 @@ export default function Step5GoLive({
             {
               icon: Monitor,
               title: "DMs Monitored",
-              desc: "ReachAI scans every incoming Instagram DM in real-time, even while you sleep or work on your business.",
+              desc: "Clinchd scans every incoming Instagram DM in real-time, even while you sleep or work on your business.",
               color: "bg-blue-50 text-blue-500",
             },
             {
@@ -188,7 +188,7 @@ export default function Step5GoLive({
                 You stay in full control
               </h2>
               <p className="text-stone-400 text-lg leading-relaxed">
-                We built ReachAI to be your assistant, not your replacement. You
+                We built Clinchd to be your assistant, not your replacement. You
                 can jump in, pause, or tweak the AI at any time.
               </p>
             </div>
@@ -280,7 +280,7 @@ export default function Step5GoLive({
 
       <footer className="w-full py-10 border-t border-stone-100 text-center">
         <p className="text-stone-400 text-xs font-bold uppercase tracking-widest">
-          &copy; 2024 ReachAI &bull; Secure connection via Meta Graph API
+          &copy; 2024 Clinchd &bull; Secure connection via Meta Graph API
         </p>
       </footer>
     </div>
