@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
@@ -24,6 +24,13 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [deletedNotice, setDeletedNotice] = useState(false);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("deleted") === "true") setDeletedNotice(true);
+  }, []);
 
   const handleGoogleLogin = async () => {
     const supabase = createClient();
@@ -76,6 +83,11 @@ export default function LoginPage() {
           </CardDescription>
         </CardHeader>
         <CardContent>
+          {deletedNotice && (
+            <div className="mb-4 text-sm text-foreground bg-muted border border-border rounded-md p-3">
+              Your account has been deleted.
+            </div>
+          )}
           <Button
             type="button"
             variant="outline"

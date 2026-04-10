@@ -67,6 +67,30 @@ export default function SettingsPage() {
 
   // Delete dialog
   const [deleteOpen, setDeleteOpen] = useState(false);
+  const [deleteConfirmText, setDeleteConfirmText] = useState("");
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState(null);
+
+  const handleDeleteAccount = async () => {
+    setDeleteError(null);
+    setDeleting(true);
+    try {
+      const res = await fetch("/api/user/delete", { method: "DELETE" });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setDeleteError(data?.error || "Failed to delete account");
+        setDeleting(false);
+        return;
+      }
+      posthog.capture("account_deleted");
+      posthog.reset();
+      await supabase.auth.signOut();
+      window.location.href = "/login?deleted=true";
+    } catch (err) {
+      setDeleteError("An unexpected error occurred. Please try again.");
+      setDeleting(false);
+    }
+  };
 
   useEffect(() => {
     async function init() {
@@ -461,7 +485,16 @@ export default function SettingsPage() {
                 action cannot be undone.
               </p>
             </div>
-            <Dialog open={deleteOpen} onOpenChange={setDeleteOpen}>
+            <Dialog
+              open={deleteOpen}
+              onOpenChange={(open) => {
+                setDeleteOpen(open);
+                if (!open) {
+                  setDeleteConfirmText("");
+                  setDeleteError(null);
+                }
+              }}
+            >
               <DialogTrigger asChild>
                 <Button variant="destructive" size="sm">
                   Delete Account
@@ -471,27 +504,42 @@ export default function SettingsPage() {
                 <DialogHeader>
                   <DialogTitle>Delete Account</DialogTitle>
                   <DialogDescription>
-                    This action cannot be undone. To delete your account and all
-                    associated data, please contact our support team at{" "}
-                    <strong>support@clinchd.com</strong>. We will process your
-                    request within 24 hours.
+                    This will permanently delete your account, all conversations,
+                    messages, bookings, and cancel your subscription. This action
+                    cannot be undone.
                   </DialogDescription>
                 </DialogHeader>
+                <div className="space-y-2 mt-2">
+                  <Label htmlFor="delete-confirm">
+                    Type <strong>DELETE</strong> to confirm
+                  </Label>
+                  <Input
+                    id="delete-confirm"
+                    value={deleteConfirmText}
+                    onChange={(e) => setDeleteConfirmText(e.target.value)}
+                    placeholder="DELETE"
+                    disabled={deleting}
+                    autoComplete="off"
+                  />
+                  {deleteError && (
+                    <p className="text-sm text-destructive">{deleteError}</p>
+                  )}
+                </div>
                 <div className="flex justify-end gap-2 mt-4">
                   <Button
                     variant="outline"
                     onClick={() => setDeleteOpen(false)}
+                    disabled={deleting}
                   >
                     Cancel
                   </Button>
                   <Button
                     variant="destructive"
-                    onClick={() => {
-                      window.location.href =
-                        "mailto:support@clinchd.com?subject=Account%20Deletion%20Request";
-                    }}
+                    onClick={handleDeleteAccount}
+                    disabled={deleteConfirmText !== "DELETE" || deleting}
                   >
-                    Contact Support
+                    {deleting && <Loader2 className="h-4 w-4 animate-spin" />}
+                    {deleting ? "Deleting..." : "Delete Account"}
                   </Button>
                 </div>
               </DialogContent>
