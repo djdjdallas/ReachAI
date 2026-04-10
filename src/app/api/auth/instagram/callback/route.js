@@ -57,23 +57,52 @@ export async function GET(request) {
 
     // Exchange code for long-lived token + Instagram user ID
     const { accessToken, expiresIn, userId } = await exchangeCodeForToken(code);
+    console.log(
+      "[ig-callback] exchangeCodeForToken returned userId (IGSID):",
+      userId
+    );
 
-    // Fetch the Instagram Business Account ID (IGBA ID) which is what
-    // Meta uses in webhook payloads — different from the OAuth user ID
-    let igbaId = userId;
+    // Fetch the Instagram Business Account ID (IGBA ID) — the 17841… format
+    // that Meta Dashboard shows and that the webhook fires with.
+    //
+    // IMPORTANT: /me?fields=id returns the Instagram-Scoped User ID (the short
+    // 269… format, per-app). The actual IGBA ID lives in the `user_id` field
+    // when you request it explicitly. We query both so the logs make the
+    // difference obvious if Meta ever changes this again.
+    let igbaId = null;
+    var igUsername = null;
     try {
       const meRes = await fetch(
-        `https://graph.instagram.com/v21.0/me?fields=id,username&access_token=${accessToken}`
+        `https://graph.instagram.com/v21.0/me?fields=id,user_id,username&access_token=${accessToken}`
       );
       const meData = await meRes.json();
-      if (meData.id) {
+      console.log("[ig-callback] /me response:", meData);
+
+      if (meData.user_id) {
+        igbaId = meData.user_id;
+      } else if (meData.id) {
+        // Fallback only — this will be the IGSID not the IGBA, so webhook
+        // matches will fail. Log loudly so we notice.
+        console.warn(
+          "[ig-callback] /me did not return user_id — falling back to id which is the IGSID, NOT the IGBA. Webhook matching will likely fail."
+        );
         igbaId = meData.id;
       }
-      // Save username for display on settings page
-      var igUsername = meData.username || null;
+      igUsername = meData.username || null;
     } catch (err) {
-      console.error("Failed to fetch IGBA ID, using OAuth user ID:", err.message);
+      console.error("[ig-callback] Failed to fetch /me:", err?.message);
     }
+
+    if (!igbaId) {
+      console.error(
+        "[ig-callback] No IGBA ID resolved from /me. Aborting token save and redirecting with error."
+      );
+      return NextResponse.redirect(
+        `${baseUrl}/onboarding?step=1&error=no_igba_id`
+      );
+    }
+
+    console.log("[ig-callback] resolved IGBA ID to save:", igbaId);
 
     // Save Instagram connection details
     const expiresAt = new Date(Date.now() + expiresIn * 1000).toISOString();
