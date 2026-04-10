@@ -48,7 +48,18 @@ async function handleMetaWebhook(body, rawBody, request) {
   if (!process.env.FACEBOOK_APP_SECRET) {
     console.warn("FACEBOOK_APP_SECRET not set — skipping signature verification");
   } else if (!verifyWebhookSignature(rawBody, signature)) {
-    console.error("Meta webhook signature verification failed");
+    // DEBUG: temporary logging to diagnose signature mismatch
+    const crypto = await import("crypto");
+    const secret = process.env.FACEBOOK_APP_SECRET;
+    const computed = "sha256=" + crypto.createHmac("sha256", secret).update(rawBody, "utf-8").digest("hex");
+    console.error("Signature mismatch debug:", {
+      secretLength: secret.length,
+      secretFirst4: secret.slice(0, 4),
+      receivedSig: signature,
+      computedSig: computed,
+      bodyLength: rawBody.length,
+      bodyFirst80: rawBody.slice(0, 80),
+    });
     return NextResponse.json({ error: "Invalid signature" }, { status: 403 });
   }
 
