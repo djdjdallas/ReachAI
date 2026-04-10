@@ -18,6 +18,7 @@ import {
   Paperclip,
   Sparkles,
   Trash2,
+  AlertCircle,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -60,6 +61,7 @@ function timeAgo(dateString) {
 
 const STATUS_FILTERS = [
   { value: "all", label: "All" },
+  { value: "needs_review", label: "Needs Review" },
   { value: "qualifying", label: "Qualifying" },
   { value: "interested", label: "Interested" },
   { value: "booked", label: "Booked" },
@@ -321,13 +323,21 @@ function ConversationsPage() {
     if (!selectedConvo) return;
     await supabase
       .from("conversations")
-      .update({ ai_paused: false, status: "qualifying" })
+      .update({ ai_paused: false, ai_pause_reason: null, status: "qualifying" })
       .eq("id", selectedConvo.id);
     setSelectedConvo((prev) => ({
       ...prev,
       ai_paused: false,
+      ai_pause_reason: null,
       status: "qualifying",
     }));
+    setConversations((prev) =>
+      prev.map((c) =>
+        c.id === selectedConvo.id
+          ? { ...c, ai_paused: false, ai_pause_reason: null, status: "qualifying" }
+          : c
+      )
+    );
   };
 
   const handleStatusChange = async (newStatus) => {
@@ -433,9 +443,15 @@ function ConversationsPage() {
       convo.sender_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
       convo.last_message?.toLowerCase().includes(searchQuery.toLowerCase());
 
-    const matchesStatus =
-      statusFilter === "all" ||
-      convo.status?.toLowerCase() === statusFilter;
+    let matchesStatus;
+    if (statusFilter === "all") {
+      matchesStatus = true;
+    } else if (statusFilter === "needs_review") {
+      matchesStatus =
+        convo.ai_paused === true && convo.ai_pause_reason === "complex_objection";
+    } else {
+      matchesStatus = convo.status?.toLowerCase() === statusFilter;
+    }
 
     return matchesSearch && matchesStatus;
   });
@@ -558,6 +574,12 @@ function ConversationsPage() {
                       </div>
                       <div className="flex items-center gap-2 mt-1">
                         <StatusBadge status={convo.status} />
+                        {convo.ai_paused &&
+                          convo.ai_pause_reason === "complex_objection" && (
+                            <span className="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase bg-red-50 text-red-600 border border-red-200">
+                              Needs Review
+                            </span>
+                          )}
                         {convo.lead_temperature && tempColors[convo.lead_temperature] && (
                           <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold uppercase ${tempColors[convo.lead_temperature].bg} ${tempColors[convo.lead_temperature].text}`}>
                             {tempColors[convo.lead_temperature].label}
@@ -666,6 +688,21 @@ function ConversationsPage() {
                 </Button>
               </div>
             </div>
+
+            {/* Complex-objection (human-in-loop) banner */}
+            {selectedConvo.ai_paused &&
+              selectedConvo.ai_pause_reason === "complex_objection" && (
+                <div className="px-6 py-3 border-b border-stone-100 bg-red-50">
+                  <div className="flex items-start gap-3">
+                    <AlertCircle className="w-4 h-4 text-red-600 mt-0.5 shrink-0" />
+                    <p className="text-xs text-red-700 leading-relaxed">
+                      <span className="font-bold">AI paused:</span> complex
+                      objection detected. Review the conversation and respond
+                      manually, then click Resume AI when ready.
+                    </p>
+                  </div>
+                </div>
+              )}
 
             {/* Summary Panel */}
             <div className="px-6 py-3 border-b border-stone-100 flex items-center gap-3">

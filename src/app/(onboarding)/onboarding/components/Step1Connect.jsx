@@ -224,10 +224,13 @@ export default function Step1Connect({ instagramConnected, onSkip }) {
               <h4 className="text-[11px] font-black text-stone-400 uppercase tracking-widest mb-4">
                 Need Help?
               </h4>
-              <button className="text-sm font-bold text-stone-500 hover:text-[#ff7e67] transition-colors flex items-center gap-2 mx-auto">
+              <a
+                href="mailto:support@clinchd.com?subject=Help%20with%20Instagram%20connection"
+                className="text-sm font-bold text-stone-500 hover:text-[#ff7e67] transition-colors flex items-center gap-2 mx-auto"
+              >
                 <MessageSquareText className="w-4 h-4" />
                 Chat with a human
-              </button>
+              </a>
             </div>
           </div>
         </div>

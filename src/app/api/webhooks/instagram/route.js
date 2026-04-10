@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
-import { generateReply } from "@/lib/anthropic";
+import { generateReply, classifyIncomingMessage } from "@/lib/anthropic";
 import { buildSystemPrompt } from "@/lib/prompts";
 import { sendInstagramMessage, verifyWebhookSignature, getParticipantProfile } from "@/lib/instagram";
 import { decryptToken } from "@/lib/token-utils";
@@ -124,7 +124,10 @@ async function insertMessageIfNew(supabase, { conversation_id, role, content, pr
       .select("id")
       .eq("provider_message_id", provider_message_id)
       .maybeSingle();
-    if (existing) return { duplicate: true };
+    if (existing) {
+      console.log("[webhook] duplicate message skipped:", provider_message_id);
+      return { duplicate: true };
+    }
   }
   const { data, error } = await supabase
     .from("messages")
@@ -132,7 +135,23 @@ async function insertMessageIfNew(supabase, { conversation_id, role, content, pr
     .select()
     .single();
   // Handle unique constraint violation (race condition fallback)
-  if (error?.code === "23505") return { duplicate: true };
+  if (error?.code === "23505") {
+    console.log("[webhook] duplicate message (unique violation):", provider_message_id);
+    return { duplicate: true };
+  }
+  if (error) {
+    console.error("[webhook] message insert FAILED:", { conversation_id, role, error });
+  } else {
+    console.log("[webhook] message inserted:", { id: data?.id, conversation_id, role });
+  }
+  // Bump the conversation's updated_at so the inbox reorders/realtime fires
+  const { error: bumpError } = await supabase
+    .from("conversations")
+    .update({ last_message_at: new Date().toISOString() })
+    .eq("id", conversation_id);
+  if (bumpError) {
+    console.error("[webhook] conversation bump FAILED:", bumpError);
+  }
   return { data, error, duplicate: false };
 }
 
@@ -156,14 +175,19 @@ async function processIncomingMessage({
     .single();
 
   if (userError || !user) {
-    console.error(`No user found for ${lookupField}:`, lookupValue);
+    console.error(`[webhook] No user found for ${lookupField}:`, lookupValue, userError);
     return;
   }
 
-  if (!user.ai_active) return;
+  console.log("[webhook] processing message for user:", user.id, "sender:", senderId);
+
+  if (!user.ai_active) {
+    console.log("[webhook] AI inactive — dropping message for user:", user.id);
+    return;
+  }
 
   if (!["active", "trialing"].includes(user.subscription_status)) {
-    console.log("Inactive subscription for user:", user.id);
+    console.log("[webhook] Inactive subscription for user:", user.id, "status:", user.subscription_status);
     return;
   }
 
@@ -203,7 +227,7 @@ async function processIncomingMessage({
     .select("*")
     .eq("user_id", user.id)
     .eq("instagram_sender_id", senderId)
-    .single();
+    .maybeSingle();
   conversation = conv;
 
   if (!conversation) {
@@ -221,10 +245,13 @@ async function processIncomingMessage({
       .single();
 
     if (createError) {
-      console.error("Failed to create conversation:", createError);
+      console.error("[webhook] Failed to create conversation:", createError);
       return;
     }
+    console.log("[webhook] conversation created:", newConv?.id, "for user:", user.id);
     conversation = newConv;
+  } else {
+    console.log("[webhook] existing conversation found:", conversation.id);
   }
 
   // If AI is paused, save message but skip reply
@@ -292,6 +319,41 @@ async function processIncomingMessage({
     return;
   }
 
+  // Human-in-loop: when enabled, classify the incoming message. If the
+  // classifier flags it as a complex/novel objection, pause the AI and mark
+  // the conversation so the dashboard surfaces it. Fail-open on any error —
+  // we prefer a pass-through reply over a blocked conversation.
+  if (sc.human_in_loop) {
+    try {
+      const classification = await classifyIncomingMessage(
+        messageText,
+        messages,
+        sc
+      );
+      if (classification.needs_human) {
+        await supabase
+          .from("conversations")
+          .update({
+            ai_paused: true,
+            ai_pause_reason: "complex_objection",
+            last_message_at: new Date().toISOString(),
+          })
+          .eq("id", conversation.id);
+        console.log(
+          "[webhook] human-in-loop pause:",
+          conversation.id,
+          classification.reason
+        );
+        return;
+      }
+    } catch (err) {
+      console.warn(
+        "[webhook] classifier failed, falling through to normal reply:",
+        err?.message
+      );
+    }
+  }
+
   // Build prompt and generate reply
   const systemPrompt = buildSystemPrompt(sc, user.calendly_url, {
     voiceProfile: user.voice_profile,
@@ -306,11 +368,24 @@ async function processIncomingMessage({
   }
 
   // Save AI reply
-  await supabase.from("messages").insert({
-    conversation_id: conversation.id,
-    role: "assistant",
-    content: aiReply,
-  });
+  const { data: aiMsg, error: aiInsertError } = await supabase
+    .from("messages")
+    .insert({
+      conversation_id: conversation.id,
+      role: "assistant",
+      content: aiReply,
+    })
+    .select()
+    .single();
+  if (aiInsertError) {
+    console.error("[webhook] AI reply insert FAILED:", aiInsertError);
+  } else {
+    console.log("[webhook] AI reply inserted:", aiMsg?.id);
+  }
+  await supabase
+    .from("conversations")
+    .update({ last_message_at: new Date().toISOString() })
+    .eq("id", conversation.id);
 
   // Send reply via Meta Instagram API
   try {

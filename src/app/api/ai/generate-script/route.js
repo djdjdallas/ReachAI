@@ -25,18 +25,27 @@ export async function POST(request) {
       );
     }
 
-    // Fetch voice profile so generated scripts match the coach's voice
+    // Fetch voice profile + script_config settings so generated scripts match
+    // the coach's voice and persisted preferences (tone, traits, length).
     const { data: userProfile } = await getSupabaseAdmin()
       .from("users")
-      .select("voice_profile")
+      .select("voice_profile, script_config")
       .eq("id", user.id)
       .single();
+
+    const sc = userProfile?.script_config || {};
+    const settings = {
+      tone: sc.tone,
+      traits: sc.traits,
+      response_length: sc.response_length,
+    };
 
     const script = await generateScript(
       offer,
       targetCustomer,
       objections || "",
-      userProfile?.voice_profile
+      userProfile?.voice_profile,
+      settings
     );
 
     return NextResponse.json({ script }, { status: 200 });

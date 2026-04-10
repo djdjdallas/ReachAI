@@ -205,11 +205,48 @@ RULES:
   return response.content[0].text;
 }
 
-export async function generateScript(offer, targetCustomer, objections, voiceProfile = null) {
+export async function generateScript(
+  offer,
+  targetCustomer,
+  objections,
+  voiceProfile = null,
+  settings = null
+) {
   const prompt = `Create a DM sales script for:
 Offer: ${offer}
 Target Customer: ${targetCustomer}
 Common Objections: ${objections || "Not provided — generate sensible defaults based on the offer."}`;
+
+  // Optional user preferences block — appended to the system prompt when provided.
+  const toneMap = {
+    professional: "polished and structured, avoid slang",
+    friendly: "warm and conversational, like texting a friend",
+    direct: "goal-oriented and assertive, get to the ask fast",
+    supportive: "empathetic and patient, acknowledge concerns before redirecting",
+  };
+  const lengthMap = {
+    short: "1-2 sentences per message",
+    medium: "2-4 sentences per message",
+    long: "up to 4-6 sentences per message when warranted",
+  };
+  let settingsBlock = "";
+  if (settings) {
+    const lines = [];
+    if (settings.tone && toneMap[settings.tone]) {
+      lines.push(`- Tone: ${toneMap[settings.tone]}`);
+    }
+    const t = settings.traits || {};
+    if (t.emojis === false) lines.push("- Do NOT use emojis anywhere in the script.");
+    if (t.questions === true) lines.push("- End appropriate messages with a natural follow-up question.");
+    if (t.humor === true) lines.push("- Light humor is welcome where it fits.");
+    if (t.stories === true) lines.push("- Brief 1-sentence anecdotes are welcome where they fit.");
+    if (settings.response_length && lengthMap[settings.response_length]) {
+      lines.push(`- Length: ${lengthMap[settings.response_length]}`);
+    }
+    if (lines.length > 0) {
+      settingsBlock = `\nUSER PREFERENCES — respect these alongside the writing rules:\n${lines.join("\n")}\n`;
+    }
+  }
 
   // Attempt generation with one automatic retry on parse failure
   for (let attempt = 1; attempt <= 2; attempt++) {
@@ -242,7 +279,7 @@ Specific traits to replicate:
 - Vocabulary/slang: ${voiceProfile.voice_traits?.vocabulary || "casual language"}
 - Catchphrases to use naturally: ${Array.isArray(voiceProfile.voice_traits?.catchphrases) ? voiceProfile.voice_traits.catchphrases.join(", ") : "none specified"}
 - Personality: ${voiceProfile.voice_traits?.personality || "friendly and approachable"}
-` : `
+${settingsBlock}` : `
 WRITING RULES (apply to all fields):
 - Sound like a real person texting on Instagram, not a corporate sales bot
 - Use casual language: "yeah", "honestly", "for sure", "totally"
@@ -250,7 +287,7 @@ WRITING RULES (apply to all fields):
 - Keep messages short (2-3 sentences max per field except qualifying_questions)
 - NO em dashes, NO semicolons, NO markdown, NO AI buzzwords like "absolutely", "certainly", "comprehensive"
 - 1 emoji max, often 0 is better
-`}
+${settingsBlock}`}
 EXAMPLE OUTPUT (follow this format exactly):
 {
   "greeting": "hey! thanks for reaching out. what made you decide to message today?",
@@ -274,6 +311,76 @@ EXAMPLE OUTPUT (follow this format exactly):
       console.warn(`generateScript attempt ${attempt} failed, retrying...`, err.message);
     }
   }
+}
+
+/**
+ * Classifies an incoming Instagram DM as simple (AI can handle) or complex/uncertain
+ * (a human should review before replying). Used by the human-in-loop feature.
+ *
+ * Fail-open by design: callers should treat any thrown error as "not complex".
+ *
+ * @param {string} incomingMessage - The user-facing text that just arrived
+ * @param {Array}  recentMessages  - Last ~10 messages of the conversation [{role, content}]
+ * @param {object} scriptConfig    - The coach's script_config (offer, target customer, etc.)
+ * @returns {Promise<{needs_human: boolean, reason: string}>}
+ */
+export async function classifyIncomingMessage(incomingMessage, recentMessages = [], scriptConfig = {}) {
+  const offer = scriptConfig.offer || "Not specified";
+  const targetCustomer =
+    scriptConfig.targetCustomer || scriptConfig.target_customer || "Not specified";
+
+  const historyBlock = recentMessages
+    .slice(-8)
+    .map((m) => `${m.role === "assistant" ? "AI" : "Lead"}: ${m.content}`)
+    .join("\n");
+
+  const response = await getAnthropic().messages.create({
+    model: "claude-sonnet-4-6",
+    max_tokens: 150,
+    temperature: 0.2,
+    system: `You are a triage classifier for a sales DM automation. Decide whether an incoming DM should be answered by the AI or escalated to the human business owner.
+
+Return ONLY a valid JSON object. No markdown. No explanation. Format:
+{"needs_human": boolean, "reason": "short 1-sentence explanation"}
+
+Escalate (needs_human: true) when the incoming message is ANY of:
+- A multi-part question with 3+ distinct asks in one message
+- A high-stakes situation (legal, medical, refund dispute, financial distress, crisis)
+- An unusual or novel objection the standard script clearly can't address
+- Explicit request to speak to a human, owner, or real person
+- Accusations or hostile messages
+- Off-topic or confusing messages where the intent is unclear
+
+Do NOT escalate (needs_human: false) for:
+- Standard questions about pricing, program details, results, timing
+- Common objections like "too expensive", "need to think", "not right now"
+- Qualifying questions being answered
+- Simple greetings or interest expressions
+- Booking confirmations
+
+Be conservative: when in doubt, do NOT escalate — false-escalations are worse than false-pass-throughs.`,
+    messages: [
+      {
+        role: "user",
+        content: `BUSINESS: ${offer}
+TARGET CUSTOMER: ${targetCustomer}
+
+RECENT CONVERSATION:
+${historyBlock || "(no prior messages)"}
+
+NEW INCOMING MESSAGE: ${incomingMessage}
+
+Classify this message.`,
+      },
+    ],
+  });
+
+  const raw = response.content[0].text.trim();
+  const parsed = extractAndParseJSON(raw);
+  return {
+    needs_human: parsed.needs_human === true,
+    reason: typeof parsed.reason === "string" ? parsed.reason : "",
+  };
 }
 
 /**

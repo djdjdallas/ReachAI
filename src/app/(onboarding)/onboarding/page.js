@@ -70,6 +70,21 @@ function OnboardingPage() {
   const [aiActive, setAiActive] = useState(false);
   const [activating, setActivating] = useState(false);
 
+  // AI/API errors surfaced to the user
+  const [aiError, setAiError] = useState(null);
+  const dismissError = () => setAiError(null);
+
+  // Persisted user preferences (Step 3 + Step 4 controls)
+  const [tone, setTone] = useState("professional");
+  const [traits, setTraits] = useState({
+    emojis: true,
+    questions: true,
+    stories: false,
+    humor: false,
+  });
+  const [responseLength, setResponseLength] = useState("medium");
+  const [humanInLoop, setHumanInLoop] = useState(true);
+
   useEffect(() => {
     async function init() {
       const {
@@ -115,6 +130,16 @@ function OnboardingPage() {
           );
           setBookingMessage(config.booking_message || "");
           setNotAFitMessage(config.not_a_fit_message || "");
+
+          // Persisted user preferences
+          if (config.tone) setTone(config.tone);
+          if (config.traits && typeof config.traits === "object") {
+            setTraits((prev) => ({ ...prev, ...config.traits }));
+          }
+          if (config.response_length) setResponseLength(config.response_length);
+          if (typeof config.human_in_loop === "boolean") {
+            setHumanInLoop(config.human_in_loop);
+          }
         }
         if (userProfile.calendly_url) {
           setCalendlyUrl(userProfile.calendly_url);
@@ -142,13 +167,18 @@ function OnboardingPage() {
 
   // --- Handlers ---
 
+  const handleApplyPreset = ({ offer: o, targetCustomer: t, objections: obj }) => {
+    setAiError(null);
+    setOffer(o);
+    setTargetCustomer(t);
+    setObjections(obj);
+  };
+
   const handleSaveScriptConfig = async () => {
+    setAiError(null);
     setSaving(true);
     try {
       const scriptConfig = {
-        offer,
-        targetCustomer,
-        objections,
         ...(profile?.script_config || {}),
         ...(greeting && { greeting }),
         ...(qualifyingQuestions && {
@@ -160,18 +190,23 @@ function OnboardingPage() {
         ...(notAFitMessage && { not_a_fit_message: notAFitMessage }),
       };
 
-      // Always overwrite core fields
+      // Always overwrite core + preference fields
       scriptConfig.offer = offer;
       scriptConfig.targetCustomer = targetCustomer;
       scriptConfig.objections = objections;
+      scriptConfig.tone = tone;
+      scriptConfig.traits = traits;
+      scriptConfig.response_length = responseLength;
+      scriptConfig.human_in_loop = humanInLoop;
 
-      await supabase
+      const { error: dbErr } = await supabase
         .from("users")
         .update({
           script_config: scriptConfig,
           calendly_url: calendlyUrl,
         })
         .eq("id", user.id);
+      if (dbErr) throw dbErr;
 
       setProfile((prev) => ({
         ...prev,
@@ -183,12 +218,14 @@ function OnboardingPage() {
       posthog.capture("onboarding_step_completed", { step: 2 });
     } catch (err) {
       console.error("Error saving script config:", err);
+      setAiError(err?.message || "Failed to save. Please try again.");
     } finally {
       setSaving(false);
     }
   };
 
   const handleGenerateScript = async () => {
+    setAiError(null);
     setGenerating(true);
     try {
       const res = await fetch("/api/ai/generate-script", {
@@ -201,7 +238,11 @@ function OnboardingPage() {
         }),
       });
 
-      const data = await res.json();
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setAiError(data?.error || "Failed to generate script.");
+        return;
+      }
 
       if (data.script) {
         const script = data.script;
@@ -225,12 +266,14 @@ function OnboardingPage() {
       }
     } catch (err) {
       console.error("Error generating script:", err);
+      setAiError(err?.message || "An unexpected error occurred.");
     } finally {
       setGenerating(false);
     }
   };
 
   const handleSaveGeneratedScript = async () => {
+    setAiError(null);
     setSaving(true);
     try {
       const scriptConfig = {
@@ -244,18 +287,24 @@ function OnboardingPage() {
         objection_handlers: objectionHandlers,
         booking_message: bookingMessage,
         not_a_fit_message: notAFitMessage,
+        tone,
+        traits,
+        response_length: responseLength,
+        human_in_loop: humanInLoop,
       };
 
-      await supabase
+      const { error: dbErr } = await supabase
         .from("users")
         .update({ script_config: scriptConfig })
         .eq("id", user.id);
+      if (dbErr) throw dbErr;
 
       setProfile((prev) => ({ ...prev, script_config: scriptConfig }));
       setStep(5);
       posthog.capture("onboarding_step_completed", { step: 4 });
     } catch (err) {
       console.error("Error saving generated script:", err);
+      setAiError(err?.message || "Failed to save script.");
     } finally {
       setSaving(false);
     }
@@ -274,6 +323,7 @@ function OnboardingPage() {
 
     if (messages.length < 3) return;
 
+    setAiError(null);
     setAnalyzingVoice(true);
     try {
       const res = await fetch("/api/ai/analyze-voice", {
@@ -282,7 +332,11 @@ function OnboardingPage() {
         body: JSON.stringify({ sample_messages: messages }),
       });
 
-      const data = await res.json();
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setAiError(data?.error || "Failed to analyze voice.");
+        return;
+      }
       if (data.voice_profile) {
         setVoiceProfile(data.voice_profile);
         setVoiceMode(null);
@@ -294,12 +348,14 @@ function OnboardingPage() {
       }
     } catch (err) {
       console.error("Error analyzing voice:", err);
+      setAiError(err?.message || "An unexpected error occurred.");
     } finally {
       setAnalyzingVoice(false);
     }
   };
 
   const handleStartVoiceChat = async () => {
+    setAiError(null);
     setVoiceMode("chat");
     setVoiceChatMessages([]);
     setVoiceChatLoading(true);
@@ -319,12 +375,17 @@ function OnboardingPage() {
         }),
       });
 
-      const data = await res.json();
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setAiError(data?.error || "Failed to start voice chat.");
+        return;
+      }
       if (data.reply) {
         setVoiceChatMessages([{ role: "assistant", content: data.reply }]);
       }
     } catch (err) {
       console.error("Error starting voice chat:", err);
+      setAiError(err?.message || "An unexpected error occurred.");
     } finally {
       setVoiceChatLoading(false);
     }
@@ -332,6 +393,8 @@ function OnboardingPage() {
 
   const handleSendVoiceChat = async () => {
     if (!voiceChatInput.trim() || voiceChatLoading) return;
+
+    setAiError(null);
 
     const newMessages = [
       ...voiceChatMessages,
@@ -357,7 +420,11 @@ function OnboardingPage() {
         }),
       });
 
-      const data = await res.json();
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setAiError(data?.error || "Failed to get reply.");
+        return;
+      }
       if (data.reply) {
         setVoiceChatMessages([
           ...newMessages,
@@ -366,12 +433,14 @@ function OnboardingPage() {
       }
     } catch (err) {
       console.error("Error in voice chat:", err);
+      setAiError(err?.message || "An unexpected error occurred.");
     } finally {
       setVoiceChatLoading(false);
     }
   };
 
   const handleFinalizeVoiceChat = async () => {
+    setAiError(null);
     setFinalizingVoice(true);
     try {
       const res = await fetch("/api/ai/voice-chat", {
@@ -390,7 +459,11 @@ function OnboardingPage() {
         }),
       });
 
-      const data = await res.json();
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setAiError(data?.error || "Failed to finalize voice profile.");
+        return;
+      }
       if (data.voice_profile) {
         setVoiceProfile(data.voice_profile);
         setVoiceMode(null);
@@ -402,6 +475,7 @@ function OnboardingPage() {
       }
     } catch (err) {
       console.error("Error finalizing voice:", err);
+      setAiError(err?.message || "An unexpected error occurred.");
     } finally {
       setFinalizingVoice(false);
     }
@@ -414,17 +488,19 @@ function OnboardingPage() {
 
   const handleGoLive = async (checked) => {
     if (checked && !scriptReady) return;
+    setAiError(null);
     setActivating(true);
     setAiActive(checked);
 
     try {
-      await supabase
+      const { error: dbErr } = await supabase
         .from("users")
         .update({
           ai_active: checked,
           onboarding_completed: true,
         })
         .eq("id", user.id);
+      if (dbErr) throw dbErr;
 
       // Set cookie so middleware knows onboarding is done
       document.cookie =
@@ -436,6 +512,7 @@ function OnboardingPage() {
     } catch (err) {
       console.error("Error going live:", err);
       setAiActive(!checked);
+      setAiError(err?.message || "Failed to update AI status.");
     } finally {
       setActivating(false);
     }
@@ -475,6 +552,9 @@ function OnboardingPage() {
           generating={generating}
           onSave={handleSaveScriptConfig}
           onGenerate={handleGenerateScript}
+          onApplyPreset={handleApplyPreset}
+          aiError={aiError}
+          onDismissError={dismissError}
           onBack={() => setStep(1)}
         />
       )}
@@ -497,6 +577,14 @@ function OnboardingPage() {
           onSendVoiceChat={handleSendVoiceChat}
           onFinalizeVoiceChat={handleFinalizeVoiceChat}
           sampleMessageCount={sampleMessageCount}
+          tone={tone}
+          setTone={setTone}
+          traits={traits}
+          setTraits={setTraits}
+          responseLength={responseLength}
+          setResponseLength={setResponseLength}
+          aiError={aiError}
+          onDismissError={dismissError}
           onBack={() => setStep(2)}
           onNext={() => {
             setStep(4);
@@ -520,10 +608,14 @@ function OnboardingPage() {
           setBookingMessage={setBookingMessage}
           notAFitMessage={notAFitMessage}
           setNotAFitMessage={setNotAFitMessage}
+          humanInLoop={humanInLoop}
+          setHumanInLoop={setHumanInLoop}
           generating={generating}
           saving={saving}
           onGenerate={handleGenerateScript}
           onSave={handleSaveGeneratedScript}
+          aiError={aiError}
+          onDismissError={dismissError}
           onBack={() => setStep(3)}
         />
       )}

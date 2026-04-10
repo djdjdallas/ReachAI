@@ -280,7 +280,7 @@ export default function Step5GoLive({
 
       <footer className="w-full py-10 border-t border-stone-100 text-center">
         <p className="text-stone-400 text-xs font-bold uppercase tracking-widest">
-          &copy; 2024 Clinchd &bull; Secure connection via Meta Graph API
+          &copy; {new Date().getFullYear()} Clinchd &bull; Secure connection via Meta Graph API
         </p>
       </footer>
     </div>

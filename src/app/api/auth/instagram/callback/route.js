@@ -89,6 +89,35 @@ export async function GET(request) {
       })
       .eq("id", user.id);
 
+    // Subscribe this IG business account to our webhook so Meta starts
+    // firing incoming DM events. Non-blocking: log failures and continue to
+    // the redirect — the user can reconnect / re-subscribe later if needed.
+    try {
+      const subRes = await fetch(
+        `https://graph.instagram.com/v21.0/${igbaId}/subscribed_apps`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/x-www-form-urlencoded" },
+          body: new URLSearchParams({
+            subscribed_fields: "messages,messaging_postbacks",
+            access_token: accessToken,
+          }),
+        }
+      );
+      const subData = await subRes.json().catch(() => ({}));
+      if (!subRes.ok || subData?.error) {
+        console.error(
+          "[ig-callback] subscribe_apps failed:",
+          subRes.status,
+          subData
+        );
+      } else {
+        console.log("[ig-callback] subscribe_apps ok:", igbaId, subData);
+      }
+    } catch (subErr) {
+      console.error("[ig-callback] subscribe_apps threw:", subErr?.message);
+    }
+
     const response = NextResponse.redirect(successRedirect);
     response.cookies.set("oauth_state", "", { maxAge: 0, path: "/" });
     return response;

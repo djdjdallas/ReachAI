@@ -32,6 +32,63 @@ function normalizeObjectionHandlers(handlers) {
 }
 
 /**
+ * Builds an optional user-preferences block from script_config settings
+ * (tone, traits, response_length). These augment or override the generic
+ * writing rules without clashing with a persisted voice profile.
+ *
+ * @param {object} scriptConfig
+ * @returns {string} — empty string if no settings are present
+ */
+function buildSettingsRules(scriptConfig = {}) {
+  const lines = [];
+
+  const toneMap = {
+    professional: "Be polished and structured. Avoid slang.",
+    friendly: "Be warm and conversational, like texting a friend.",
+    direct:
+      "Be goal-oriented and assertive. Move toward the booking ask without small talk.",
+    supportive:
+      "Be empathetic and patient. Acknowledge the prospect's concerns before redirecting.",
+  };
+  if (scriptConfig.tone && toneMap[scriptConfig.tone]) {
+    lines.push(`- Tone: ${toneMap[scriptConfig.tone]}`);
+  }
+
+  const traits = scriptConfig.traits || {};
+  if (traits.emojis === false) {
+    lines.push("- Do not use emojis.");
+  }
+  if (traits.questions === true) {
+    lines.push(
+      "- End replies with a natural follow-up question when it fits the flow."
+    );
+  }
+  if (traits.stories === true) {
+    lines.push(
+      "- You may share brief 1-sentence relevant anecdotes when they feel natural."
+    );
+  }
+  if (traits.humor === true) {
+    lines.push(
+      "- Light humor is welcome if the prospect's tone supports it."
+    );
+  }
+
+  const lengthMap = {
+    short: "Keep replies tight: 1-2 sentences per message.",
+    medium: "Aim for 2-4 sentences per message.",
+    long: "Up to 4-6 sentences per message when the topic warrants it.",
+  };
+  if (scriptConfig.response_length && lengthMap[scriptConfig.response_length]) {
+    lines.push(`- Length: ${lengthMap[scriptConfig.response_length]}`);
+  }
+
+  if (lines.length === 0) return "";
+
+  return `\n\nUSER PREFERENCES (follow these on top of the rules above):\n${lines.join("\n")}`;
+}
+
+/**
  * Builds a personalized writing rules section from the coach's voice profile.
  * Falls back to generic rules when no voice profile exists.
  *
@@ -154,5 +211,5 @@ CORE INSTRUCTIONS:
 
 ---
 
-${buildWritingRules(options.voiceProfile)}`;
+${buildWritingRules(options.voiceProfile)}${buildSettingsRules(sc)}`;
 }

@@ -1,6 +1,5 @@
 "use client";
 
-import { useState } from "react";
 import {
   Mic2,
   Sparkles,
@@ -17,6 +16,8 @@ import {
   Send,
   Bot,
   User,
+  AlertCircle,
+  X,
 } from "lucide-react";
 
 export default function Step3Voice({
@@ -36,17 +37,18 @@ export default function Step3Voice({
   onSendVoiceChat,
   onFinalizeVoiceChat,
   sampleMessageCount,
+  tone,
+  setTone,
+  traits,
+  setTraits,
+  responseLength,
+  setResponseLength,
+  aiError,
+  onDismissError,
   onBack,
   onNext,
 }) {
-  const [selectedTone, setSelectedTone] = useState("professional");
-  const [traits, setTraits] = useState({
-    emojis: true,
-    questions: true,
-    stories: false,
-    humor: false,
-  });
-  const [responseLength, setResponseLength] = useState("medium");
+  const selectedTone = tone;
 
   const tones = [
     {
@@ -90,6 +92,20 @@ export default function Step3Voice({
             </p>
           </div>
 
+          {aiError && (
+            <div className="mb-8 flex items-start gap-3 rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+              <AlertCircle className="w-5 h-5 shrink-0 mt-0.5" />
+              <div className="flex-1">{aiError}</div>
+              <button
+                type="button"
+                onClick={onDismissError}
+                className="shrink-0 p-1 rounded-md hover:bg-red-100"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+          )}
+
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-10">
             {/* Left Column: Configuration */}
             <div className="lg:col-span-7 space-y-8">
@@ -114,7 +130,7 @@ export default function Step3Voice({
                         name="tone"
                         value={tone.id}
                         checked={selectedTone === tone.id}
-                        onChange={() => setSelectedTone(tone.id)}
+                        onChange={() => setTone(tone.id)}
                         className="hidden"
                       />
                       <p className="font-bold text-sm mb-1">{tone.title}</p>

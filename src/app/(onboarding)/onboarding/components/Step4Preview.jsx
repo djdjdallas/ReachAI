@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import {
   Zap,
   Edit3,
@@ -17,6 +17,8 @@ import {
   Rocket,
   Loader2,
   Sparkles,
+  PenTool,
+  X,
 } from "lucide-react";
 
 export default function Step4Preview({
@@ -33,14 +35,18 @@ export default function Step4Preview({
   setBookingMessage,
   notAFitMessage,
   setNotAFitMessage,
+  humanInLoop,
+  setHumanInLoop,
   generating,
   saving,
   onGenerate,
   onSave,
+  aiError,
+  onDismissError,
   onBack,
 }) {
   const [activeScenario, setActiveScenario] = useState("objection");
-  const [humanInLoop, setHumanInLoop] = useState(true);
+  const editorRef = useRef(null);
 
   const scriptConfig = profile?.script_config || {};
 
@@ -58,6 +64,20 @@ export default function Step4Preview({
             you&apos;ve provided.
           </p>
         </header>
+
+        {aiError && (
+          <div className="mb-8 flex items-start gap-3 rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+            <AlertCircle className="w-5 h-5 shrink-0 mt-0.5" />
+            <div className="flex-1">{aiError}</div>
+            <button
+              type="button"
+              onClick={onDismissError}
+              className="shrink-0 p-1 rounded-md hover:bg-red-100"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        )}
 
         {/* Generate button if no script yet */}
         {!greeting && (
@@ -84,7 +104,12 @@ export default function Step4Preview({
               <div className="flex items-center justify-between mb-8">
                 <h2 className="text-xl font-bold">Script Summary</h2>
                 <button
-                  onClick={onBack}
+                  onClick={() =>
+                    editorRef.current?.scrollIntoView({
+                      behavior: "smooth",
+                      block: "start",
+                    })
+                  }
                   className="text-xs font-black text-[#ff7e67] uppercase tracking-widest hover:underline"
                 >
                   Edit Full Script
@@ -225,6 +250,100 @@ export default function Step4Preview({
                 ))}
               </div>
             </div>
+
+            {/* Inline Editor: the 6 script fields */}
+            <div
+              ref={editorRef}
+              className="bg-white p-8 rounded-[2.5rem] soft-shadow border border-stone-100 scroll-mt-24"
+            >
+              <h3 className="text-xl font-bold mb-2 flex items-center gap-2">
+                <PenTool className="w-5 h-5 text-[#ff7e67]" />
+                Edit Your Script
+              </h3>
+              <p className="text-xs text-stone-400 font-medium mb-6">
+                Fine-tune the AI-generated script before going live.
+              </p>
+
+              <div className="space-y-5">
+                <div>
+                  <label className="text-[11px] font-black text-stone-400 uppercase tracking-widest px-1 block mb-2">
+                    Opening Message
+                  </label>
+                  <textarea
+                    rows={3}
+                    value={greeting}
+                    onChange={(e) => setGreeting(e.target.value)}
+                    placeholder="Your first reply when someone messages you..."
+                    className="w-full px-4 py-3 bg-stone-50 border border-stone-100 rounded-2xl text-sm font-medium focus:outline-none focus:ring-4 focus:ring-[#ff7e67]/10 focus:border-[#ff7e67] transition-all resize-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-[11px] font-black text-stone-400 uppercase tracking-widest px-1 block mb-2">
+                    Qualifying Questions (one per line)
+                  </label>
+                  <textarea
+                    rows={4}
+                    value={qualifyingQuestions}
+                    onChange={(e) => setQualifyingQuestions(e.target.value)}
+                    placeholder={"What's your current situation?\nWhat's your main goal?\nWhat have you tried before?"}
+                    className="w-full px-4 py-3 bg-stone-50 border border-stone-100 rounded-2xl text-sm font-medium focus:outline-none focus:ring-4 focus:ring-[#ff7e67]/10 focus:border-[#ff7e67] transition-all resize-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-[11px] font-black text-stone-400 uppercase tracking-widest px-1 block mb-2">
+                    When They Show Interest
+                  </label>
+                  <textarea
+                    rows={3}
+                    value={interestResponse}
+                    onChange={(e) => setInterestResponse(e.target.value)}
+                    placeholder="Your response when a lead says they're interested..."
+                    className="w-full px-4 py-3 bg-stone-50 border border-stone-100 rounded-2xl text-sm font-medium focus:outline-none focus:ring-4 focus:ring-[#ff7e67]/10 focus:border-[#ff7e67] transition-all resize-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-[11px] font-black text-stone-400 uppercase tracking-widest px-1 block mb-2">
+                    Objection Handlers (topic: response, one per line)
+                  </label>
+                  <textarea
+                    rows={5}
+                    value={objectionHandlers}
+                    onChange={(e) => setObjectionHandlers(e.target.value)}
+                    placeholder={"too expensive: the ROI covers the investment...\nnot the right time: when do you think you'd be ready?"}
+                    className="w-full px-4 py-3 bg-stone-50 border border-stone-100 rounded-2xl text-sm font-medium focus:outline-none focus:ring-4 focus:ring-[#ff7e67]/10 focus:border-[#ff7e67] transition-all resize-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-[11px] font-black text-stone-400 uppercase tracking-widest px-1 block mb-2">
+                    Booking Message
+                  </label>
+                  <textarea
+                    rows={3}
+                    value={bookingMessage}
+                    onChange={(e) => setBookingMessage(e.target.value)}
+                    placeholder="Use {{BOOKING_LINK}} as a placeholder for your Calendly URL..."
+                    className="w-full px-4 py-3 bg-stone-50 border border-stone-100 rounded-2xl text-sm font-medium focus:outline-none focus:ring-4 focus:ring-[#ff7e67]/10 focus:border-[#ff7e67] transition-all resize-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-[11px] font-black text-stone-400 uppercase tracking-widest px-1 block mb-2">
+                    Not-A-Fit Message
+                  </label>
+                  <textarea
+                    rows={3}
+                    value={notAFitMessage}
+                    onChange={(e) => setNotAFitMessage(e.target.value)}
+                    placeholder="Polite decline when a prospect isn't a match..."
+                    className="w-full px-4 py-3 bg-stone-50 border border-stone-100 rounded-2xl text-sm font-medium focus:outline-none focus:ring-4 focus:ring-[#ff7e67]/10 focus:border-[#ff7e67] transition-all resize-none"
+                  />
+                </div>
+              </div>
+            </div>
           </div>
 
           {/* Right Column: Live Preview Chat */}
@@ -235,14 +354,9 @@ export default function Step4Preview({
                 <div className="flex items-center gap-3">
                   <div className="w-10 h-10 rounded-full border border-stone-100 bg-stone-100" />
                   <div>
-                    <div className="flex items-center gap-2">
-                      <p className="text-sm font-black">Jordan Storey</p>
-                      <span className="px-2 py-0.5 bg-green-50 text-green-600 rounded-md text-[9px] font-black uppercase">
-                        92% Match
-                      </span>
-                    </div>
+                    <p className="text-sm font-black">Sample Lead</p>
                     <p className="text-[10px] text-stone-400 font-bold uppercase tracking-wider">
-                      E-commerce Owner &bull; 64.2k followers
+                      Preview
                     </p>
                   </div>
                 </div>
@@ -280,7 +394,7 @@ export default function Step4Preview({
                     <div className="bg-[#ff7e67] px-5 py-3 text-sm font-medium leading-relaxed shadow-lg shadow-[#ff7e67]/20 text-white rounded-2xl rounded-br-none">
                       <div className="flex items-center gap-2 mb-1 justify-end">
                         <span className="bg-white/20 text-[9px] font-black px-1.5 py-0.5 rounded uppercase tracking-widest">
-                          AI Reach Agent
+                          Clinchd Agent
                         </span>
                       </div>
                       {greeting ||
@@ -326,7 +440,7 @@ export default function Step4Preview({
                         <div className="bg-[#ff7e67] px-5 py-3 text-sm font-medium leading-relaxed shadow-lg shadow-[#ff7e67]/20 text-white rounded-2xl rounded-br-none">
                           <div className="flex items-center gap-2 mb-1 justify-end">
                             <span className="bg-white/20 text-[9px] font-black px-1.5 py-0.5 rounded uppercase tracking-widest">
-                              AI Reach Agent
+                              Clinchd Agent
                             </span>
                           </div>
                           {objectionHandlers
