@@ -186,7 +186,7 @@ export function verifyWebhookSignature(rawBody, signatureHeader) {
 
   const crypto = require("crypto");
   const expected = crypto
-    .createHmac("sha256", process.env.FACEBOOK_APP_SECRET)
+    .createHmac("sha256", process.env.INSTAGRAM_APP_SECRET)
     .update(rawBody, "utf-8")
     .digest("hex");
 

@@ -45,12 +45,12 @@ export async function POST(request) {
 async function handleMetaWebhook(body, rawBody, request) {
   // Verify signature
   const signature = request.headers.get("x-hub-signature-256");
-  if (!process.env.FACEBOOK_APP_SECRET) {
-    console.warn("FACEBOOK_APP_SECRET not set — skipping signature verification");
+  if (!process.env.INSTAGRAM_APP_SECRET) {
+    console.warn("INSTAGRAM_APP_SECRET not set — skipping signature verification");
   } else if (!verifyWebhookSignature(rawBody, signature)) {
     // DEBUG: temporary logging to diagnose signature mismatch
     const crypto = await import("crypto");
-    const secret = process.env.FACEBOOK_APP_SECRET;
+    const secret = process.env.INSTAGRAM_APP_SECRET;
     const computed = "sha256=" + crypto.createHmac("sha256", secret).update(rawBody, "utf-8").digest("hex");
     console.error("Signature mismatch debug:", {
       secretLength: secret.length,
