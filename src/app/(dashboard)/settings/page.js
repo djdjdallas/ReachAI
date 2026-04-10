@@ -267,9 +267,11 @@ export default function SettingsPage() {
                 <Badge variant="muted">Not Connected</Badge>
               )}
             </div>
-            {(profile?.unipile_account_id || profile?.instagram_business_account_id) && (
+            {isInstagramConnected && (
               <span className="text-xs text-muted-foreground">
-                Account: {profile.instagram_business_account_id || profile.unipile_account_id}
+                {profile?.instagram_username
+                  ? `@${profile.instagram_username}`
+                  : `Account: ${profile?.instagram_business_account_id || profile?.unipile_account_id}`}
               </span>
             )}
           </div>
