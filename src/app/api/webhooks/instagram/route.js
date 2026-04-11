@@ -181,11 +181,6 @@ async function processIncomingMessage({
 
   console.log("[webhook] processing message for user:", user.id, "sender:", senderId);
 
-  if (!user.ai_active) {
-    console.log("[webhook] AI inactive — dropping message for user:", user.id);
-    return;
-  }
-
   if (!["active", "trialing"].includes(user.subscription_status)) {
     console.log("[webhook] Inactive subscription for user:", user.id, "status:", user.subscription_status);
     return;
@@ -254,8 +249,9 @@ async function processIncomingMessage({
     console.log("[webhook] existing conversation found:", conversation.id);
   }
 
-  // If AI is paused, save message but skip reply
-  if (conversation.ai_paused) {
+  // Manual takeover: AI globally off or this conversation paused — still log
+  // the inbound message so the dashboard stays in sync, but don't auto-reply.
+  if (!user.ai_active || conversation.ai_paused) {
     await insertMessageIfNew(supabase, {
       conversation_id: conversation.id,
       role: "user",
