@@ -16,6 +16,7 @@ import {
   Calendar,
   CalendarClock,
   ExternalLink,
+  DollarSign,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -73,6 +74,12 @@ export default function SettingsPage() {
   const [calendlySaved, setCalendlySaved] = useState(false);
   const [calendlyError, setCalendlyError] = useState(null);
 
+  // Revenue / deal value
+  const [avgDealValue, setAvgDealValue] = useState("");
+  const [savingDealValue, setSavingDealValue] = useState(false);
+  const [dealValueSaved, setDealValueSaved] = useState(false);
+  const [dealValueError, setDealValueError] = useState(null);
+
   // Delete dialog
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [deleteConfirmText, setDeleteConfirmText] = useState("");
@@ -126,6 +133,11 @@ export default function SettingsPage() {
         setResponseDelay(userProfile.response_delay || 2);
         setGcalConnected(!!userProfile.google_calendar_refresh_token);
         setCalendlyUrl(userProfile.calendly_url || "");
+        setAvgDealValue(
+          userProfile.avg_deal_value != null
+            ? String(userProfile.avg_deal_value)
+            : ""
+        );
       }
 
       setLoading(false);
@@ -187,6 +199,44 @@ export default function SettingsPage() {
       console.error("Error saving AI settings:", err);
     } finally {
       setSavingAi(false);
+    }
+  };
+
+  const handleSaveDealValue = async () => {
+    setDealValueError(null);
+    const trimmed = avgDealValue.trim();
+    let parsedValue = null;
+
+    if (trimmed) {
+      const num = Number(trimmed);
+      if (Number.isNaN(num) || num < 0) {
+        setDealValueError("Please enter a valid non-negative number.");
+        return;
+      }
+      if (num > 10_000_000) {
+        setDealValueError("Value is too large.");
+        return;
+      }
+      parsedValue = num;
+    }
+
+    setSavingDealValue(true);
+    try {
+      const { error } = await supabase
+        .from("users")
+        .update({ avg_deal_value: parsedValue })
+        .eq("id", authUser.id);
+
+      if (error) throw error;
+
+      setProfile((prev) => ({ ...prev, avg_deal_value: parsedValue }));
+      setDealValueSaved(true);
+      setTimeout(() => setDealValueSaved(false), 2000);
+    } catch (err) {
+      console.error("Error saving deal value:", err);
+      setDealValueError("Failed to save. Please try again.");
+    } finally {
+      setSavingDealValue(false);
     }
   };
 
@@ -428,6 +478,55 @@ export default function SettingsPage() {
               <Save className="h-4 w-4" />
             )}
             {calendlySaved ? "Saved!" : "Save Calendly Link"}
+          </Button>
+        </CardFooter>
+      </Card>
+
+      {/* Revenue tracking */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-lg flex items-center gap-2">
+            <DollarSign className="h-5 w-5" />
+            Revenue Tracking
+          </CardTitle>
+          <CardDescription>
+            Set your average deal value so the Analytics page can show real
+            revenue from booked calls.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="space-y-2">
+            <Label htmlFor="avgDealValue">Average Deal Value (USD)</Label>
+            <Input
+              id="avgDealValue"
+              type="number"
+              min={0}
+              step="0.01"
+              value={avgDealValue}
+              onChange={(e) => setAvgDealValue(e.target.value)}
+              placeholder="e.g. 500"
+              className="w-48"
+            />
+            {dealValueError ? (
+              <p className="text-xs text-destructive">{dealValueError}</p>
+            ) : (
+              <p className="text-xs text-muted-foreground">
+                Revenue on the Analytics page = booked calls × this value.
+                Leave blank to hide revenue KPIs.
+              </p>
+            )}
+          </div>
+        </CardContent>
+        <CardFooter>
+          <Button onClick={handleSaveDealValue} disabled={savingDealValue}>
+            {savingDealValue ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : dealValueSaved ? (
+              <Check className="h-4 w-4" />
+            ) : (
+              <Save className="h-4 w-4" />
+            )}
+            {dealValueSaved ? "Saved!" : "Save Deal Value"}
           </Button>
         </CardFooter>
       </Card>
