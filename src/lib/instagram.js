@@ -36,7 +36,18 @@ export function getOAuthUrl(state) {
  * @returns {Promise<{accessToken: string, expiresIn: number, userId: string}>}
  */
 export async function exchangeCodeForToken(code) {
+  if (!process.env.INSTAGRAM_APP_SECRET) {
+    throw new Error("INSTAGRAM_APP_SECRET is not set in the environment");
+  }
+  if (!process.env.INSTAGRAM_APP_ID) {
+    throw new Error("INSTAGRAM_APP_ID is not set in the environment");
+  }
+
   const redirectUri = `${process.env.NEXT_PUBLIC_APP_URL}/api/auth/instagram/callback`;
+  const mask = (s) =>
+    typeof s === "string" && s.length > 8
+      ? `${s.slice(0, 4)}…${s.slice(-4)}`
+      : "***";
 
   // Step 1: Exchange code for short-lived token via Instagram API
   const shortRes = await fetch("https://api.instagram.com/oauth/access_token", {
@@ -49,25 +60,68 @@ export async function exchangeCodeForToken(code) {
       redirect_uri: redirectUri,
       code,
     }),
+    cache: "no-store",
   });
 
   const shortData = await shortRes.json();
+  console.log("[ig-oauth] short-lived response:", {
+    status: shortRes.status,
+    ok: shortRes.ok,
+    // Don't log the token itself, but log the shape + mask
+    shape: Array.isArray(shortData?.data) ? "data-array" : "flat",
+    keys: Object.keys(shortData || {}),
+  });
 
-  if (shortData.error_type || shortData.error_message) {
-    throw new Error(`Instagram token exchange failed: ${shortData.error_message || shortData.error_type}`);
+  if (shortData.error_type || shortData.error_message || shortData.error) {
+    throw new Error(
+      `Instagram token exchange failed: ${
+        shortData.error_message ||
+        shortData.error?.message ||
+        shortData.error_type
+      }`
+    );
   }
 
-  const userId = shortData.user_id;
+  // Meta wraps the Instagram Login short-lived response in a `data` array in
+  // some rollouts; handle both the flat and wrapped shapes.
+  const shortPayload = shortData?.data?.[0] || shortData;
+  const shortAccessToken = shortPayload.access_token;
+  const userId = shortPayload.user_id;
+
+  if (!shortAccessToken) {
+    console.error(
+      "[ig-oauth] short-lived exchange returned no access_token. Raw:",
+      shortData
+    );
+    throw new Error("Instagram token exchange returned no access_token");
+  }
 
   // Step 2: Exchange short-lived token for long-lived token via Instagram Graph API
   const longParams = new URLSearchParams({
     grant_type: "ig_exchange_token",
     client_secret: process.env.INSTAGRAM_APP_SECRET,
-    access_token: shortData.access_token,
+    access_token: shortAccessToken,
   });
 
-  const longRes = await fetch(`https://graph.instagram.com/access_token?${longParams}`);
+  console.log("[ig-oauth] long-lived exchange:", {
+    url: "https://graph.instagram.com/access_token",
+    method: "GET",
+    grant_type: "ig_exchange_token",
+    client_secret: mask(process.env.INSTAGRAM_APP_SECRET),
+    access_token: mask(shortAccessToken),
+  });
+
+  const longRes = await fetch(
+    `https://graph.instagram.com/access_token?${longParams}`,
+    { method: "GET", cache: "no-store" }
+  );
   const longData = await longRes.json();
+
+  console.log("[ig-oauth] long-lived response:", {
+    status: longRes.status,
+    ok: longRes.ok,
+    body: longData,
+  });
 
   if (longData.error) {
     throw new Error(`Instagram long-lived token failed: ${longData.error.message}`);
