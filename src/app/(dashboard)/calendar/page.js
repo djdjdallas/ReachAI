@@ -12,7 +12,6 @@ import {
   ExternalLink,
   Loader2,
   Calendar,
-  Info,
 } from "lucide-react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 
@@ -193,7 +192,6 @@ export default function CalendarPage() {
   const upcomingEvents = confirmedEvents.filter((e) => new Date(e.start) >= today);
   const pastEvents = confirmedEvents.filter((e) => new Date(e.start) < today);
 
-  const isEmpty = events.length === 0;
   const hasCalendlyUrl = !!profile?.calendly_url;
 
   if (loading) {
@@ -238,22 +236,6 @@ export default function CalendarPage() {
             </button>
           </div>
         </div>
-
-        {/* Empty state helper */}
-        {isEmpty && hasCalendlyUrl && (
-          <div className="mb-6 p-4 rounded-2xl border border-blue-100 bg-blue-50/50 flex items-start gap-3">
-            <Info className="h-5 w-5 text-blue-500 mt-0.5 shrink-0" />
-            <div>
-              <p className="text-sm font-medium text-blue-900">
-                Bookings will appear here automatically once someone schedules via your Calendly link.
-              </p>
-              <p className="text-xs text-blue-700 mt-1">
-                Make sure you&apos;ve added Clinchd as a webhook in your Calendly dashboard.
-                Go to Settings &rarr; Calendly Webhook Integration for setup instructions.
-              </p>
-            </div>
-          </div>
-        )}
 
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
           {/* Calendar Grid */}

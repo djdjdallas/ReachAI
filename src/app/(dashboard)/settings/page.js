@@ -14,6 +14,8 @@ import {
   AlertTriangle,
   Clock,
   Calendar,
+  CalendarClock,
+  ExternalLink,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -64,6 +66,12 @@ export default function SettingsPage() {
   // Calendar integrations
   const [gcalConnected, setGcalConnected] = useState(false);
   const [disconnectingGcal, setDisconnectingGcal] = useState(false);
+
+  // Calendly
+  const [calendlyUrl, setCalendlyUrl] = useState("");
+  const [savingCalendly, setSavingCalendly] = useState(false);
+  const [calendlySaved, setCalendlySaved] = useState(false);
+  const [calendlyError, setCalendlyError] = useState(null);
 
   // Delete dialog
   const [deleteOpen, setDeleteOpen] = useState(false);
@@ -117,6 +125,7 @@ export default function SettingsPage() {
         setAiActive(userProfile.ai_active || false);
         setResponseDelay(userProfile.response_delay || 2);
         setGcalConnected(!!userProfile.google_calendar_refresh_token);
+        setCalendlyUrl(userProfile.calendly_url || "");
       }
 
       setLoading(false);
@@ -178,6 +187,44 @@ export default function SettingsPage() {
       console.error("Error saving AI settings:", err);
     } finally {
       setSavingAi(false);
+    }
+  };
+
+  const handleSaveCalendly = async () => {
+    setCalendlyError(null);
+    const trimmed = calendlyUrl.trim();
+
+    if (trimmed) {
+      try {
+        const parsed = new URL(trimmed);
+        if (!parsed.hostname.endsWith("calendly.com")) {
+          setCalendlyError("URL must be a calendly.com link.");
+          return;
+        }
+      } catch {
+        setCalendlyError("Please enter a valid URL.");
+        return;
+      }
+    }
+
+    setSavingCalendly(true);
+    try {
+      const { error } = await supabase
+        .from("users")
+        .update({ calendly_url: trimmed || null })
+        .eq("id", authUser.id);
+
+      if (error) throw error;
+
+      setCalendlyUrl(trimmed);
+      setProfile((prev) => ({ ...prev, calendly_url: trimmed || null }));
+      setCalendlySaved(true);
+      setTimeout(() => setCalendlySaved(false), 2000);
+    } catch (err) {
+      console.error("Error saving Calendly URL:", err);
+      setCalendlyError("Failed to save. Please try again.");
+    } finally {
+      setSavingCalendly(false);
     }
   };
 
@@ -323,6 +370,66 @@ export default function SettingsPage() {
             )}
           </div>
         </CardContent>
+      </Card>
+
+      {/* Calendly */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-lg flex items-center gap-2">
+            <CalendarClock className="h-5 w-5" />
+            Calendly
+          </CardTitle>
+          <CardDescription>
+            Your Calendly booking link. The AI will share this in DMs when a
+            prospect is ready to book a call.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="space-y-2">
+            <Label htmlFor="calendlyUrl">Booking Link</Label>
+            <Input
+              id="calendlyUrl"
+              type="url"
+              value={calendlyUrl}
+              onChange={(e) => setCalendlyUrl(e.target.value)}
+              placeholder="https://calendly.com/your-handle/30min"
+            />
+            {calendlyError ? (
+              <p className="text-xs text-destructive">{calendlyError}</p>
+            ) : (
+              <p className="text-xs text-muted-foreground">
+                Paste the full URL of the event type you want prospects to book
+                (e.g. <code>https://calendly.com/your-handle/30min</code>).
+              </p>
+            )}
+          </div>
+
+          {calendlyUrl.trim() && !calendlyError && (
+            <div className="flex items-center gap-2">
+              <Badge variant="success">Link set</Badge>
+              <a
+                href={calendlyUrl.trim()}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-xs text-muted-foreground hover:text-foreground inline-flex items-center gap-1"
+              >
+                Preview <ExternalLink className="h-3 w-3" />
+              </a>
+            </div>
+          )}
+        </CardContent>
+        <CardFooter>
+          <Button onClick={handleSaveCalendly} disabled={savingCalendly}>
+            {savingCalendly ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : calendlySaved ? (
+              <Check className="h-4 w-4" />
+            ) : (
+              <Save className="h-4 w-4" />
+            )}
+            {calendlySaved ? "Saved!" : "Save Calendly Link"}
+          </Button>
+        </CardFooter>
       </Card>
 
       {/* Google Calendar */}
