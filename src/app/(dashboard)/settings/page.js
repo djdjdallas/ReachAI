@@ -17,6 +17,8 @@ import {
   CalendarClock,
   ExternalLink,
   DollarSign,
+  Bell,
+  MessageSquare,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -32,6 +34,7 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Separator } from "@/components/ui/separator";
+import { Switch } from "@/components/ui/switch";
 import {
   Dialog,
   DialogContent,
@@ -79,6 +82,16 @@ export default function SettingsPage() {
   const [savingDealValue, setSavingDealValue] = useState(false);
   const [dealValueSaved, setDealValueSaved] = useState(false);
   const [dealValueError, setDealValueError] = useState(null);
+
+  // Notifications
+  const [phoneNumber, setPhoneNumber] = useState("");
+  const [savingPhone, setSavingPhone] = useState(false);
+  const [phoneSaved, setPhoneSaved] = useState(false);
+  const [phoneError, setPhoneError] = useState(null);
+  const [notifyHotLeadsEmail, setNotifyHotLeadsEmail] = useState(true);
+  const [notifyBookingsEmail, setNotifyBookingsEmail] = useState(true);
+  const [notifyHotLeadsSms, setNotifyHotLeadsSms] = useState(false);
+  const [notifyBookingsSms, setNotifyBookingsSms] = useState(false);
 
   // Delete dialog
   const [deleteOpen, setDeleteOpen] = useState(false);
@@ -138,6 +151,11 @@ export default function SettingsPage() {
             ? String(userProfile.avg_deal_value)
             : ""
         );
+        setPhoneNumber(userProfile.phone_number || "");
+        setNotifyHotLeadsEmail(userProfile.notify_hot_leads_email ?? true);
+        setNotifyBookingsEmail(userProfile.notify_bookings_email ?? true);
+        setNotifyHotLeadsSms(userProfile.notify_hot_leads_sms ?? false);
+        setNotifyBookingsSms(userProfile.notify_bookings_sms ?? false);
       }
 
       setLoading(false);
@@ -276,6 +294,72 @@ export default function SettingsPage() {
       setCalendlyError("Failed to save. Please try again.");
     } finally {
       setSavingCalendly(false);
+    }
+  };
+
+  const handleSavePhone = async () => {
+    setPhoneError(null);
+    const trimmed = phoneNumber.trim().replace(/[^\d+]/g, "");
+
+    if (trimmed && !/^\+[1-9]\d{6,14}$/.test(trimmed)) {
+      setPhoneError(
+        "Enter a valid phone number with country code (e.g. +15551234567)."
+      );
+      return;
+    }
+
+    setSavingPhone(true);
+    try {
+      const { error } = await supabase
+        .from("users")
+        .update({ phone_number: trimmed || null })
+        .eq("id", authUser.id);
+
+      if (error) throw error;
+
+      setPhoneNumber(trimmed);
+      setPhoneSaved(true);
+      setTimeout(() => setPhoneSaved(false), 2000);
+
+      // If phone was cleared, turn off SMS toggles
+      if (!trimmed) {
+        setNotifyHotLeadsSms(false);
+        setNotifyBookingsSms(false);
+        await supabase
+          .from("users")
+          .update({ notify_hot_leads_sms: false, notify_bookings_sms: false })
+          .eq("id", authUser.id);
+      }
+    } catch (err) {
+      console.error("Error saving phone:", err);
+      setPhoneError("Failed to save. Please try again.");
+    } finally {
+      setSavingPhone(false);
+    }
+  };
+
+  const handleToggleNotification = async (field, value) => {
+    // Optimistic update
+    const setters = {
+      notify_hot_leads_email: setNotifyHotLeadsEmail,
+      notify_bookings_email: setNotifyBookingsEmail,
+      notify_hot_leads_sms: setNotifyHotLeadsSms,
+      notify_bookings_sms: setNotifyBookingsSms,
+    };
+    const setter = setters[field];
+    if (!setter) return;
+
+    setter(value);
+    try {
+      const { error } = await supabase
+        .from("users")
+        .update({ [field]: value })
+        .eq("id", authUser.id);
+
+      if (error) throw error;
+    } catch (err) {
+      console.error("Error saving notification pref:", err);
+      setter(!value); // revert
     }
   };
 
@@ -594,6 +678,138 @@ export default function SettingsPage() {
               </Button>
             )}
           </div>
+        </CardContent>
+      </Card>
+
+      {/* Email Notifications */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-lg flex items-center gap-2">
+            <Bell className="h-5 w-5" />
+            Email Notifications
+          </CardTitle>
+          <CardDescription>
+            Get notified by email when your AI flags important lead activity.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium">Hot Lead Alerts</p>
+              <p className="text-xs text-muted-foreground">
+                Get emailed when the AI flags a highly interested lead.
+              </p>
+            </div>
+            <Switch
+              checked={notifyHotLeadsEmail}
+              onCheckedChange={(v) =>
+                handleToggleNotification("notify_hot_leads_email", v)
+              }
+            />
+          </div>
+          <Separator />
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium">Booking Confirmation</p>
+              <p className="text-xs text-muted-foreground">
+                Get emailed when a discovery call gets booked.
+              </p>
+            </div>
+            <Switch
+              checked={notifyBookingsEmail}
+              onCheckedChange={(v) =>
+                handleToggleNotification("notify_bookings_email", v)
+              }
+            />
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* SMS Notifications */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-lg flex items-center gap-2">
+            <MessageSquare className="h-5 w-5" />
+            SMS Notifications
+          </CardTitle>
+          <CardDescription>
+            Get text message alerts for urgent lead activity.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="space-y-2">
+            <Label htmlFor="phoneNumber">Phone Number</Label>
+            <div className="flex gap-2">
+              <Input
+                id="phoneNumber"
+                type="tel"
+                value={phoneNumber}
+                onChange={(e) => setPhoneNumber(e.target.value)}
+                placeholder="+1 (555) 000-0000"
+                className="w-56"
+              />
+              <Button
+                onClick={handleSavePhone}
+                disabled={savingPhone}
+                variant="outline"
+                size="sm"
+              >
+                {savingPhone ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : phoneSaved ? (
+                  <Check className="h-4 w-4" />
+                ) : (
+                  <Save className="h-4 w-4" />
+                )}
+                {phoneSaved ? "Saved!" : "Save"}
+              </Button>
+            </div>
+            {phoneError ? (
+              <p className="text-xs text-destructive">{phoneError}</p>
+            ) : (
+              <p className="text-xs text-muted-foreground">
+                Include country code (e.g. +15551234567). Required for SMS
+                alerts.
+              </p>
+            )}
+          </div>
+          <Separator />
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium">Hot Lead SMS</p>
+              <p className="text-xs text-muted-foreground">
+                Text me when a lead becomes interested.
+              </p>
+            </div>
+            <Switch
+              checked={notifyHotLeadsSms}
+              onCheckedChange={(v) =>
+                handleToggleNotification("notify_hot_leads_sms", v)
+              }
+              disabled={!phoneNumber.trim()}
+            />
+          </div>
+          <Separator />
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium">Booking SMS</p>
+              <p className="text-xs text-muted-foreground">
+                Text me when a lead books a discovery call.
+              </p>
+            </div>
+            <Switch
+              checked={notifyBookingsSms}
+              onCheckedChange={(v) =>
+                handleToggleNotification("notify_bookings_sms", v)
+              }
+              disabled={!phoneNumber.trim()}
+            />
+          </div>
+          {!phoneNumber.trim() && (
+            <p className="text-xs text-muted-foreground italic">
+              Add a phone number above to enable SMS alerts.
+            </p>
+          )}
         </CardContent>
       </Card>
 

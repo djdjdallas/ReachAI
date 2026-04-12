@@ -4,6 +4,7 @@ import { generateReply, classifyIncomingMessage } from "@/lib/anthropic";
 import { buildSystemPrompt } from "@/lib/prompts";
 import { sendInstagramMessage, verifyWebhookSignature, getParticipantProfile } from "@/lib/instagram";
 import { decryptToken } from "@/lib/token-utils";
+import { sendHotLeadAlert, sendBookingAlert } from "@/lib/notifications";
 
 // ── GET: Meta webhook verification ──────────────────────────────────────
 
@@ -435,5 +436,13 @@ async function processIncomingMessage({
   if (newStatus !== conversation.status) {
     console.log(`Status change: ${conversation.id} ${conversation.status} → ${newStatus}`);
     await supabase.from("conversations").update({ status: newStatus }).eq("id", conversation.id);
+
+    // Fire-and-forget notification alerts
+    if (newStatus === "interested") {
+      sendHotLeadAlert(user, conversation).catch(console.error);
+    }
+    if (newStatus === "booked") {
+      sendBookingAlert(user, conversation).catch(console.error);
+    }
   }
 }

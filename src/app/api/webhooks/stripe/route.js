@@ -67,6 +67,15 @@ export async function POST(request) {
             event: "subscription_activated",
             properties: { plan },
           });
+
+          // Enroll new subscriber in drip campaign
+          fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/drip/enroll`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ userId }),
+          }).catch((err) =>
+            console.error("Drip enrollment failed:", err.message)
+          );
         }
         break;
       }
