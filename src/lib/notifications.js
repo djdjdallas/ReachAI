@@ -97,29 +97,63 @@ async function logEvent(supabase, userId, eventType, metadata = {}) {
 
 // --------------- branded email template ---------------
 
-function alertEmail({ heading, body, ctaText, ctaUrl }) {
+function alertEmail({ badge, heading, body, ctaText, ctaUrl }) {
+  const logoUrl = `${APP_URL}/logo.png`;
   return `<!DOCTYPE html>
 <html lang="en">
-<head><meta charset="utf-8" /><meta name="viewport" content="width=device-width,initial-scale=1.0" /></head>
-<body style="margin:0;padding:0;background-color:#f5f5f4;font-family:'Nunito',system-ui,-apple-system,sans-serif;">
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#f5f5f4;">
-<tr><td align="center" style="padding:40px 16px;">
-<table role="presentation" width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;background-color:#ffffff;border-radius:16px;overflow:hidden;">
-<tr><td style="background-color:#ff7e67;padding:32px 40px;">
-  <span style="font-size:24px;font-weight:700;color:#ffffff;letter-spacing:-0.5px;">Clinchd</span>
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1.0" />
+<style>@import url('https://api.fontshare.com/v2/css?f[]=cabinet-grotesk@700,800&f[]=satoshi@400,500,700&display=swap');</style>
+</head>
+<body style="margin:0;padding:0;background-color:#fafaf9;font-family:'Satoshi',system-ui,-apple-system,'Segoe UI',sans-serif;-webkit-font-smoothing:antialiased;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#fafaf9;">
+<tr><td align="center" style="padding:48px 16px 40px;">
+
+<!-- Card -->
+<table role="presentation" width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;background-color:#ffffff;border-radius:24px;overflow:hidden;border:1px solid #e7e5e4;">
+
+<!-- Header -->
+<tr><td style="padding:36px 40px 0;">
+  <table role="presentation" cellpadding="0" cellspacing="0"><tr>
+    <td style="vertical-align:middle;padding-right:10px;">
+      <img src="${logoUrl}" alt="Clinchd" width="36" height="36" style="display:block;border-radius:8px;" />
+    </td>
+    <td style="vertical-align:middle;">
+      <span style="font-family:'Cabinet Grotesk','Satoshi',system-ui,sans-serif;font-size:20px;font-weight:800;color:#1c1917;letter-spacing:-0.02em;">Clinchd</span>
+    </td>
+  </tr></table>
 </td></tr>
-<tr><td style="padding:40px;">
-  <h1 style="margin:0 0 16px;font-size:22px;color:#1a1a1a;">${heading}</h1>
-  <p style="margin:0 0 24px;font-size:16px;color:#44403c;line-height:1.6;">${body}</p>
-  <table role="presentation" cellpadding="0" cellspacing="0">
-  <tr><td style="background-color:#ff7e67;border-radius:8px;padding:14px 28px;">
-    <a href="${ctaUrl}" style="color:#ffffff;font-size:16px;font-weight:600;text-decoration:none;display:inline-block;">${ctaText}</a>
-  </td></tr>
-  </table>
+
+<!-- Body -->
+<tr><td style="padding:32px 40px 40px;">
+  <!-- Badge -->
+  <table role="presentation" cellpadding="0" cellspacing="0" style="margin-bottom:24px;"><tr>
+    <td style="background-color:#fff5f2;border:1px solid rgba(255,126,103,0.1);border-radius:999px;padding:6px 14px;">
+      <span style="font-size:13px;font-weight:700;color:#ff7e67;letter-spacing:-0.01em;">${badge}</span>
+    </td>
+  </tr></table>
+
+  <h1 style="margin:0 0 16px;font-family:'Cabinet Grotesk','Satoshi',system-ui,sans-serif;font-size:28px;font-weight:800;color:#1c1917;letter-spacing:-0.02em;line-height:1.15;">${heading}</h1>
+
+  <p style="margin:0 0 32px;font-size:16px;color:#78716c;line-height:1.7;font-weight:500;">${body}</p>
+
+  <!-- CTA Button -->
+  <table role="presentation" cellpadding="0" cellspacing="0"><tr>
+    <td style="background-color:#ff7e67;border-radius:999px;padding:16px 32px;box-shadow:0 8px 24px rgba(255,126,103,0.3);">
+      <a href="${ctaUrl}" style="color:#ffffff;font-family:'Satoshi',system-ui,sans-serif;font-size:16px;font-weight:700;text-decoration:none;display:inline-block;">${ctaText} &rarr;</a>
+    </td>
+  </tr></table>
 </td></tr>
-<tr><td style="padding:24px 40px;border-top:1px solid #e7e5e4;">
-  <p style="margin:0;font-size:12px;color:#a8a29e;">Clinchd &middot; Automated lead alerts</p>
+
+<!-- Footer -->
+<tr><td style="padding:24px 40px;background-color:#f5f5f4;border-top:1px solid #e7e5e4;">
+  <p style="margin:0;font-size:12px;color:#a8a29e;line-height:1.5;">
+    Clinchd &middot; AI DM automation for coaches<br/>
+    <a href="${APP_URL}/settings" style="color:#a8a29e;text-decoration:underline;">Notification settings</a>
+  </p>
 </td></tr>
+
 </table>
 </td></tr>
 </table>
@@ -148,10 +182,11 @@ export async function sendHotLeadAlert(user, conversation) {
     if (user.notify_hot_leads_email && user.email) {
       await sendEmail({
         to: user.email,
-        subject: `\uD83D\uDD25 Hot Lead Alert \u2014 ${senderName} is interested`,
+        subject: `Hot Lead Alert \u2014 ${senderName} is interested`,
         html: alertEmail({
-          heading: `\uD83D\uDD25 ${senderName} is a hot lead!`,
-          body: `Your AI has flagged <strong>${senderName}</strong> as highly interested on Instagram. They\u2019re warm right now \u2014 check the conversation and close the deal.`,
+          badge: "\uD83D\uDD25 Hot Lead",
+          heading: `${senderName} is interested`,
+          body: `Your AI has flagged <strong style="color:#1c1917;">${senderName}</strong> as highly interested on Instagram. They\u2019re warm right now \u2014 check the conversation and close the deal.`,
           ctaText: "View Conversation",
           ctaUrl: conversationUrl,
         }),
@@ -195,10 +230,11 @@ export async function sendBookingAlert(user, conversation) {
     if (user.notify_bookings_email && user.email) {
       await sendEmail({
         to: user.email,
-        subject: `\uD83D\uDCC5 Discovery Call Booked \u2014 ${senderName} just booked`,
+        subject: `Discovery Call Booked \u2014 ${senderName} just booked`,
         html: alertEmail({
-          heading: `\uD83D\uDCC5 ${senderName} booked a discovery call!`,
-          body: `Great news \u2014 <strong>${senderName}</strong> just booked a discovery call through your AI. Check your calendar for the details.`,
+          badge: "\uD83D\uDCC5 Call Booked",
+          heading: `${senderName} booked a discovery call`,
+          body: `Great news \u2014 <strong style="color:#1c1917;">${senderName}</strong> just booked a discovery call through your AI. Check your calendar for the details.`,
           ctaText: "View Calendar",
           ctaUrl: calendarUrl,
         }),
