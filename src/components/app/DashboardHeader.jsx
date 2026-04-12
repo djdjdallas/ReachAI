@@ -37,7 +37,7 @@ export default function DashboardHeader() {
       if (user) {
         supabase
           .from("users")
-          .select("full_name, ai_active")
+          .select("full_name, ai_mode")
           .eq("id", user.id)
           .single()
           .then(({ data }) => {
@@ -52,16 +52,22 @@ export default function DashboardHeader() {
     PAGE_TITLES[Object.keys(PAGE_TITLES).find((k) => pathname.startsWith(k))] ||
     "Dashboard";
 
-  const aiActive = profile?.ai_active;
+  const aiMode = profile?.ai_mode;
 
   return (
     <header className="h-16 bg-white border-b border-stone-200 px-6 flex items-center justify-between flex-shrink-0">
       <div className="flex items-center gap-4">
         <h1 className="text-2xl font-extrabold">{title}</h1>
-        {aiActive && (
+        {aiMode === "active" && (
           <div className="flex items-center gap-1.5 px-3 py-1 bg-green-50 text-green-600 rounded-full text-xs font-bold">
             <span className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse" />
             AI AGENT ACTIVE
+          </div>
+        )}
+        {aiMode === "handoff" && (
+          <div className="flex items-center gap-1.5 px-3 py-1 bg-amber-50 text-amber-600 rounded-full text-xs font-bold">
+            <span className="w-1.5 h-1.5 bg-amber-500 rounded-full" />
+            HANDOFF MODE
           </div>
         )}
       </div>

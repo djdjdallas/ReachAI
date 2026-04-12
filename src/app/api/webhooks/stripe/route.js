@@ -125,7 +125,7 @@ export async function POST(request) {
           .from("users")
           .update({
             subscription_status: "canceled",
-            ai_active: false,
+            ai_mode: "off",
           })
           .eq("stripe_customer_id", customerId);
 

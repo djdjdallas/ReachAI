@@ -496,7 +496,7 @@ function OnboardingPage() {
       const { error: dbErr } = await supabase
         .from("users")
         .update({
-          ai_active: checked,
+          ai_mode: checked ? "active" : "handoff",
           onboarding_completed: true,
         })
         .eq("id", user.id);

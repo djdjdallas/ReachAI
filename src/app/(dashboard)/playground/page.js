@@ -156,7 +156,7 @@ export default function PlaygroundPage() {
 
       const { data: userProfile } = await supabase
         .from("users")
-        .select("script_config, calendly_url, ai_active")
+        .select("script_config, calendly_url, ai_mode")
         .eq("id", authUser.id)
         .single();
 
@@ -525,12 +525,12 @@ export default function PlaygroundPage() {
               <div>
                 <p className="text-sm font-semibold">Happy with it?</p>
                 <p className="text-xs text-muted-foreground mt-0.5">
-                  {profile?.ai_active
+                  {profile?.ai_mode === "active"
                     ? "Your AI is already live on Instagram."
                     : "Activate your AI to start qualifying real leads."}
                 </p>
               </div>
-              {profile?.ai_active ? (
+              {profile?.ai_mode === "active" ? (
                 <Button variant="outline" size="sm" className="w-full" asChild>
                   <Link href="/dashboard">View Dashboard</Link>
                 </Button>

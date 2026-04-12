@@ -32,7 +32,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Switch } from "@/components/ui/switch";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import StatusBadge from "@/components/app/StatusBadge";
 
 function getInitials(name) {
@@ -181,7 +181,7 @@ function ConversationsPage() {
 
       const { data: userProfile } = await supabase
         .from("users")
-        .select("ai_active")
+        .select("ai_mode")
         .eq("id", authUser.id)
         .single();
       if (userProfile) setProfile(userProfile);
@@ -388,15 +388,15 @@ function ConversationsPage() {
     }
   };
 
-  const handleToggleAi = async (checked) => {
+  const handleSetAiMode = async (mode) => {
     try {
       await supabase
         .from("users")
-        .update({ ai_active: checked })
+        .update({ ai_mode: mode })
         .eq("id", user.id);
-      setProfile((prev) => ({ ...prev, ai_active: checked }));
+      setProfile((prev) => ({ ...prev, ai_mode: mode }));
     } catch (err) {
-      console.error("Failed to toggle AI:", err);
+      console.error("Failed to set AI mode:", err);
     }
   };
 
@@ -486,15 +486,19 @@ function ConversationsPage() {
         <div className="px-5 pt-5 pb-4 space-y-4">
           <div className="flex items-center justify-between">
             <h2 className="font-semibold text-xl tracking-tight">Conversations</h2>
-            <div className="flex items-center gap-2">
-              <span className={`text-xs font-medium ${profile?.ai_active ? "text-green-600" : "text-stone-400"}`}>
-                {profile?.ai_active ? "AI Active" : "AI Paused"}
-              </span>
-              <Switch
-                checked={profile?.ai_active || false}
-                onCheckedChange={handleToggleAi}
-              />
-            </div>
+            <Tabs value={profile?.ai_mode || "active"} onValueChange={handleSetAiMode}>
+              <TabsList className="h-8">
+                <TabsTrigger value="active" className="text-[11px] px-2.5">
+                  Active
+                </TabsTrigger>
+                <TabsTrigger value="handoff" className="text-[11px] px-2.5">
+                  Handoff
+                </TabsTrigger>
+                <TabsTrigger value="off" className="text-[11px] px-2.5">
+                  Off
+                </TabsTrigger>
+              </TabsList>
+            </Tabs>
           </div>
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-stone-400" />

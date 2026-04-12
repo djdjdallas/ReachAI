@@ -192,7 +192,7 @@ async function processIncomingMessage({
     if (trialEnd && new Date() > trialEnd) {
       await supabase
         .from("users")
-        .update({ subscription_status: "expired", ai_active: false })
+        .update({ subscription_status: "expired", ai_mode: "off" })
         .eq("id", user.id);
       console.log("Trial expired for user:", user.id);
       return;
@@ -249,9 +249,16 @@ async function processIncomingMessage({
     console.log("[webhook] existing conversation found:", conversation.id);
   }
 
-  // Manual takeover: AI globally off or this conversation paused — still log
-  // the inbound message so the dashboard stays in sync, but don't auto-reply.
-  if (!user.ai_active || conversation.ai_paused) {
+  // ── Global AI mode gate ─────────────────────────────────────────────
+  // 'off'     → complete silence: return without saving anything
+  // 'handoff' → save inbound message for dashboard, but skip AI reply
+  // 'active'  → full processing (may still be paused per-conversation)
+  if (user.ai_mode === "off") {
+    console.log("[webhook] ai_mode=off for user:", user.id, "— skipping entirely");
+    return;
+  }
+
+  if (user.ai_mode === "handoff" || conversation.ai_paused) {
     await insertMessageIfNew(supabase, {
       conversation_id: conversation.id,
       role: "user",

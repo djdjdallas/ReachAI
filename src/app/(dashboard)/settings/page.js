@@ -30,7 +30,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { Switch } from "@/components/ui/switch";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Separator } from "@/components/ui/separator";
 import {
   Dialog,
@@ -55,7 +55,7 @@ export default function SettingsPage() {
   const [profileSaved, setProfileSaved] = useState(false);
 
   // AI Settings
-  const [aiActive, setAiActive] = useState(false);
+  const [aiMode, setAiMode] = useState("active");
   const [togglingAi, setTogglingAi] = useState(false);
   const [responseDelay, setResponseDelay] = useState(2);
   const [savingAi, setSavingAi] = useState(false);
@@ -129,7 +129,7 @@ export default function SettingsPage() {
       if (userProfile) {
         setProfile(userProfile);
         setFullName(userProfile.full_name || "");
-        setAiActive(userProfile.ai_active || false);
+        setAiMode(userProfile.ai_mode || "active");
         setResponseDelay(userProfile.response_delay || 2);
         setGcalConnected(!!userProfile.google_calendar_refresh_token);
         setCalendlyUrl(userProfile.calendly_url || "");
@@ -163,20 +163,21 @@ export default function SettingsPage() {
     }
   };
 
-  const handleToggleAi = async (checked) => {
+  const handleSetAiMode = async (newMode) => {
     setTogglingAi(true);
-    setAiActive(checked);
+    const previousMode = aiMode;
+    setAiMode(newMode);
 
     try {
       await supabase
         .from("users")
-        .update({ ai_active: checked })
+        .update({ ai_mode: newMode })
         .eq("id", authUser.id);
 
-      posthog.capture("ai_agent_toggled", { active: checked });
+      posthog.capture("ai_agent_toggled", { mode: newMode, previous_mode: previousMode });
     } catch (err) {
-      console.error("Error toggling AI:", err);
-      setAiActive(!checked);
+      console.error("Error setting AI mode:", err);
+      setAiMode(previousMode);
     } finally {
       setTogglingAi(false);
     }
@@ -610,25 +611,20 @@ export default function SettingsPage() {
         <CardContent className="space-y-5">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium">AI Agent Active</p>
+              <p className="text-sm font-medium">AI Agent Mode</p>
               <p className="text-xs text-muted-foreground">
-                When enabled, the AI will automatically respond to new DMs.
+                {aiMode === "active" && "AI is responding to DMs automatically."}
+                {aiMode === "handoff" && "Messages are logged but AI won\u2019t reply. You can reply manually."}
+                {aiMode === "off" && "Complete silence. No messages logged, no replies sent."}
               </p>
             </div>
-            <div className="flex items-center gap-3">
-              <span
-                className={`text-sm font-medium ${
-                  aiActive ? "text-green-600" : "text-muted-foreground"
-                }`}
-              >
-                {aiActive ? "Active" : "Paused"}
-              </span>
-              <Switch
-                checked={aiActive}
-                onCheckedChange={handleToggleAi}
-                disabled={togglingAi}
-              />
-            </div>
+            <Tabs value={aiMode} onValueChange={handleSetAiMode}>
+              <TabsList>
+                <TabsTrigger value="active" disabled={togglingAi}>Active</TabsTrigger>
+                <TabsTrigger value="handoff" disabled={togglingAi}>Handoff</TabsTrigger>
+                <TabsTrigger value="off" disabled={togglingAi}>Off</TabsTrigger>
+              </TabsList>
+            </Tabs>
           </div>
 
           <Separator />
