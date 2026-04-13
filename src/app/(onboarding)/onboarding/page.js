@@ -83,6 +83,7 @@ function OnboardingPage() {
     humor: false,
   });
   const [responseLength, setResponseLength] = useState("medium");
+  const [scriptMode, setScriptMode] = useState("guided");
   const [humanInLoop, setHumanInLoop] = useState(true);
 
   // Warn before navigating away during an active voice chat interview
@@ -142,6 +143,7 @@ function OnboardingPage() {
           setNotAFitMessage(config.not_a_fit_message || "");
 
           // Persisted user preferences
+          if (config.script_mode) setScriptMode(config.script_mode);
           if (config.tone) setTone(config.tone);
           if (config.traits && typeof config.traits === "object") {
             setTraits((prev) => ({ ...prev, ...config.traits }));
@@ -210,6 +212,7 @@ function OnboardingPage() {
       scriptConfig.tone = tone;
       scriptConfig.traits = traits;
       scriptConfig.response_length = responseLength;
+      scriptConfig.script_mode = scriptMode;
       scriptConfig.human_in_loop = humanInLoop;
 
       const { error: dbErr } = await supabase
@@ -303,6 +306,7 @@ function OnboardingPage() {
         tone,
         traits,
         response_length: responseLength,
+        script_mode: scriptMode,
         human_in_loop: humanInLoop,
       };
 
@@ -651,6 +655,8 @@ function OnboardingPage() {
           setBookingMessage={setBookingMessage}
           notAFitMessage={notAFitMessage}
           setNotAFitMessage={setNotAFitMessage}
+          scriptMode={scriptMode}
+          setScriptMode={setScriptMode}
           humanInLoop={humanInLoop}
           setHumanInLoop={setHumanInLoop}
           generating={generating}

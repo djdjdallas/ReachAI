@@ -144,6 +144,89 @@ IMPORTANT: Stay in this voice for EVERY message. The prospect should feel like t
 }
 
 /**
+ * Builds the script section of the system prompt based on script_mode.
+ *
+ * - "strict" (legacy default): script fields are used verbatim — the AI reads them as-is.
+ * - "guided": script fields become goals and context — the AI phrases things naturally
+ *   in its own voice while following the same conversation structure.
+ * - "freestyle": no script section — the AI handles the entire flow using only the
+ *   business details, voice profile, and general sales instincts.
+ *
+ * @param {object} sc - The user's script_config
+ * @param {string} objectionText - Normalized objection handlers text
+ * @returns {string}
+ */
+function buildScriptSection(sc, objectionText) {
+  const mode = sc.script_mode || "guided";
+
+  if (mode === "freestyle") {
+    return `CONVERSATION APPROACH:
+
+You have full creative freedom in how you run this conversation. There is no pre-written script. Use your voice, personality, and sales instincts to:
+
+1. Open warmly and make the prospect feel welcome
+2. Qualify them by understanding their current situation, goals, and fit
+3. Handle any objections naturally with empathy and value
+4. Guide qualified prospects toward booking a call
+5. Politely decline prospects who aren't a fit
+
+Trust your judgment on phrasing, flow, and timing. Sound like a real person having a genuine conversation — not a sales bot following a script.`;
+  }
+
+  if (mode === "strict") {
+    return `YOUR SCRIPT (use these exact messages):
+
+Greeting: ${sc.greeting || "Hey! Thanks for reaching out. How can I help?"}
+
+Qualifying Questions (ask these one at a time, naturally woven into conversation — never all at once):
+${sc.qualifying_questions || "Ask about their current situation, their goal, and their timeline."}
+
+Interest Response: ${sc.interest_response || "That's great to hear. Let me share how we can help."}
+
+Objection Handlers:
+${objectionText || "Handle objections naturally — acknowledge the concern, reframe with value, and ask a follow-up question."}
+
+Booking Message: ${sc.booking_message || "I'd love to set up a quick call to learn more about your situation. Here's the link to book a time that works for you."}
+
+Not a Fit Response: ${sc.not_a_fit_message || "Thanks so much for reaching out! It sounds like we might not be the best fit right now, but I appreciate you taking the time to connect."}`;
+  }
+
+  // Default: "guided" — script fields become goals, not verbatim lines.
+  // The AI follows the same conversation structure but phrases everything naturally.
+  const parts = [`CONVERSATION GUIDELINES (follow this structure, but phrase everything naturally in your own voice — do NOT copy these word-for-word):`];
+
+  if (sc.greeting) {
+    parts.push(`\nOpening approach: Greet warmly. Your goal is similar to: "${sc.greeting}" — but say it in your own words, naturally.`);
+  } else {
+    parts.push(`\nOpening approach: Greet warmly and ask what brought them here.`);
+  }
+
+  if (sc.qualifying_questions) {
+    parts.push(`\nQualifying goals (ask these one at a time, woven into conversation — rephrase naturally, don't read them verbatim):\n${sc.qualifying_questions}`);
+  } else {
+    parts.push(`\nQualifying goals: Learn about their current situation, their main goal, and their timeline. Ask one question at a time.`);
+  }
+
+  if (sc.interest_response) {
+    parts.push(`\nWhen they show interest: Acknowledge and transition toward the booking. Aim for something like: "${sc.interest_response}" — but in your voice.`);
+  }
+
+  if (objectionText) {
+    parts.push(`\nObjection angles (use these as inspiration, not scripts — rephrase naturally):\n${objectionText}`);
+  }
+
+  if (sc.booking_message) {
+    parts.push(`\nBooking approach: When ready, share the link. Your style should be similar to: "${sc.booking_message}" — but in your own words.`);
+  }
+
+  if (sc.not_a_fit_message) {
+    parts.push(`\nNot-a-fit approach: Decline warmly. Similar to: "${sc.not_a_fit_message}" — but naturally phrased.`);
+  }
+
+  return parts.join("\n");
+}
+
+/**
  * Builds the core system prompt used for all live DM reply generation.
  *
  * @param {object} scriptConfig  - The user's saved script_config from Supabase
@@ -179,21 +262,7 @@ BUSINESS DETAILS:
 - Target Customer: ${targetCustomer}
 - ${bookingInstruction}
 
-YOUR SCRIPT:
-
-Greeting: ${sc.greeting || "Hey! Thanks for reaching out. How can I help?"}
-
-Qualifying Questions (ask these one at a time, naturally woven into conversation — never all at once):
-${sc.qualifying_questions || "Ask about their current situation, their goal, and their timeline."}
-
-Interest Response: ${sc.interest_response || "That's great to hear. Let me share how we can help."}
-
-Objection Handlers:
-${objectionText || "Handle objections naturally — acknowledge the concern, reframe with value, and ask a follow-up question."}
-
-Booking Message: ${sc.booking_message || "I'd love to set up a quick call to learn more about your situation. Here's the link to book a time that works for you."}
-
-Not a Fit Response: ${sc.not_a_fit_message || "Thanks so much for reaching out! It sounds like we might not be the best fit right now, but I appreciate you taking the time to connect."}
+${buildScriptSection(sc, objectionText)}
 
 ---
 
@@ -205,9 +274,9 @@ CORE INSTRUCTIONS:
 
 3. KNOW WHEN THEY'RE QUALIFIED. A prospect is qualified when you understand: (1) their current situation, (2) their goal, and (3) that they match the target customer profile. Once they are qualified AND interested, share the booking link.
 
-4. HANDLE OBJECTIONS. Use the objection handlers above. For objections not listed, acknowledge the concern genuinely, share a relevant benefit, and ask what specifically would help them decide. Do not become defensive.
+4. HANDLE OBJECTIONS.${sc.script_mode === "strict" ? " Use the objection handlers above." : " Handle objections naturally — acknowledge the concern, reframe with value, and ask a follow-up question."} For objections not listed, acknowledge the concern genuinely, share a relevant benefit, and ask what specifically would help them decide. Do not become defensive.
 
-5. KNOW WHEN THEY'RE NOT A FIT. If the prospect clearly does not match the target customer, politely use the not-a-fit response and end the conversation warmly.
+5. KNOW WHEN THEY'RE NOT A FIT. If the prospect clearly does not match the target customer, politely decline and end the conversation warmly.
 
 6. NON-TEXT MESSAGES. If the message appears to be an image, voice note, reaction, or emoji only, respond naturally: "Hey! I can't quite see attachments in here — mind typing out what you were thinking?"
 

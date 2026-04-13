@@ -19,6 +19,10 @@ import {
   Sparkles,
   PenTool,
   X,
+  Lock,
+  Compass,
+  Wand2,
+  Info,
 } from "lucide-react";
 
 export default function Step4Preview({
@@ -35,6 +39,8 @@ export default function Step4Preview({
   setBookingMessage,
   notAFitMessage,
   setNotAFitMessage,
+  scriptMode,
+  setScriptMode,
   humanInLoop,
   setHumanInLoop,
   generating,
@@ -265,7 +271,7 @@ export default function Step4Preview({
               </div>
             </div>
 
-            {/* Inline Editor: the 6 script fields */}
+            {/* Script Mode + Inline Editor */}
             <div
               ref={editorRef}
               className="bg-white p-8 rounded-[2.5rem] soft-shadow border border-stone-100 scroll-mt-24"
@@ -275,13 +281,64 @@ export default function Step4Preview({
                 Edit Your Script
               </h3>
               <p className="text-xs text-stone-400 font-medium mb-6">
-                Fine-tune the AI-generated script before going live.
+                {scriptMode === "strict"
+                  ? "The AI will use these exact messages word-for-word."
+                  : scriptMode === "guided"
+                  ? "The AI follows this structure but phrases things naturally in your voice."
+                  : "The AI handles conversations freely using your voice and business info."}
               </p>
 
+              {/* Script Mode Toggle */}
+              <div className="rounded-2xl border border-stone-100 bg-stone-50 p-5 mb-6 space-y-3">
+                <p className="text-[11px] font-black text-stone-400 uppercase tracking-widest">
+                  Script Mode
+                </p>
+                <div className="grid grid-cols-3 gap-2">
+                  {[
+                    { id: "strict", label: "Strict", icon: Lock, desc: "Exact script" },
+                    { id: "guided", label: "Guided", icon: Compass, desc: "Natural phrasing" },
+                    { id: "freestyle", label: "Freestyle", icon: Wand2, desc: "Full freedom" },
+                  ].map(({ id, label, icon: Icon, desc }) => (
+                    <button
+                      key={id}
+                      onClick={() => setScriptMode(id)}
+                      className={`flex flex-col items-center gap-1 rounded-xl border-2 p-3 transition-all ${
+                        scriptMode === id
+                          ? "border-[#ff7e67] bg-[#fff5f2]"
+                          : "border-transparent hover:border-stone-200"
+                      }`}
+                    >
+                      <Icon className={`h-4 w-4 ${scriptMode === id ? "text-[#ff7e67]" : "text-stone-400"}`} />
+                      <span className={`text-xs font-bold ${scriptMode === id ? "text-[#ff7e67]" : "text-stone-600"}`}>
+                        {label}
+                      </span>
+                      <span className="text-[10px] text-stone-400">{desc}</span>
+                    </button>
+                  ))}
+                </div>
+                <div className="flex items-start gap-2 rounded-xl bg-white border border-stone-100 p-3">
+                  <Info className="h-4 w-4 text-stone-400 shrink-0 mt-0.5" />
+                  <p className="text-[11px] text-stone-500 leading-relaxed">
+                    {scriptMode === "strict" && "The AI reads your script fields word-for-word. Best when you need full control over exact messaging."}
+                    {scriptMode === "guided" && "The AI follows your conversation flow but rephrases everything naturally in your voice. Produces the most authentic-sounding DMs."}
+                    {scriptMode === "freestyle" && "The AI uses only your offer, target customer, and voice profile. No script fields needed. Best with a strong voice profile."}
+                  </p>
+                </div>
+              </div>
+
+              {scriptMode === "freestyle" ? (
+                <div className="text-center py-8 text-stone-400">
+                  <Wand2 className="h-8 w-8 mx-auto mb-2" />
+                  <p className="text-sm font-bold text-stone-600">Freestyle mode active</p>
+                  <p className="text-xs mt-1">
+                    Script fields are not used. The AI handles conversations using your voice and business details.
+                  </p>
+                </div>
+              ) : (
               <div className="space-y-5">
                 <div>
                   <label className="text-[11px] font-black text-stone-400 uppercase tracking-widest px-1 block mb-2">
-                    Opening Message
+                    {scriptMode === "strict" ? "Opening Message" : "Opening Approach"}
                   </label>
                   <textarea
                     rows={3}
@@ -294,7 +351,7 @@ export default function Step4Preview({
 
                 <div>
                   <label className="text-[11px] font-black text-stone-400 uppercase tracking-widest px-1 block mb-2">
-                    Qualifying Questions (one per line)
+                    {scriptMode === "strict" ? "Qualifying Questions (one per line)" : "Qualifying Goals (one per line)"}
                   </label>
                   <textarea
                     rows={4}
@@ -357,6 +414,7 @@ export default function Step4Preview({
                   />
                 </div>
               </div>
+              )}
             </div>
           </div>
 

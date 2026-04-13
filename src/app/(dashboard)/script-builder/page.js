@@ -23,6 +23,10 @@ import {
   Trash2,
   ClipboardPaste,
   MessageCircle,
+  Lock,
+  Compass,
+  Wand2,
+  Info,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -91,6 +95,9 @@ export default function ScriptBuilderPage() {
   const [objections, setObjections] = useState("");
   const [calendlyUrl, setCalendlyUrl] = useState("");
 
+  // Script mode
+  const [scriptMode, setScriptMode] = useState("guided");
+
   // Generated script fields
   const [greeting, setGreeting] = useState("");
   const [qualifyingQuestions, setQualifyingQuestions] = useState("");
@@ -136,6 +143,7 @@ export default function ScriptBuilderPage() {
           const config = profile.script_config;
           setOffer(config.offer || "");
           setTargetCustomer(config.targetCustomer || "");
+          if (config.script_mode) setScriptMode(config.script_mode);
           setObjections(config.objections || "");
           setGreeting(config.greeting || "");
           setQualifyingQuestions(
@@ -444,6 +452,7 @@ export default function ScriptBuilderPage() {
         objection_handlers: objectionHandlers,
         booking_message: bookingMessage,
         not_a_fit_message: notAFitMessage,
+        script_mode: scriptMode,
       };
 
       await supabase
@@ -840,15 +849,111 @@ export default function ScriptBuilderPage() {
               <CardHeader>
                 <CardTitle className="text-lg">Conversation Script</CardTitle>
                 <CardDescription>
-                  Fine-tune each part of the AI conversation flow. These fields
-                  control exactly how the AI responds in DMs.
+                  {scriptMode === "strict"
+                    ? "The AI will use these exact messages word-for-word in DMs."
+                    : scriptMode === "guided"
+                    ? "The AI follows this structure but phrases everything naturally in your voice."
+                    : "The AI handles the entire conversation freely using your voice and business details."}
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-5">
+                {/* Script Mode Toggle */}
+                <div className="rounded-xl border bg-muted/30 p-4 space-y-3">
+                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                    Script Mode
+                  </p>
+                  <div className="grid grid-cols-3 gap-2">
+                    {[
+                      {
+                        id: "strict",
+                        label: "Strict",
+                        icon: Lock,
+                        desc: "AI reads your exact script",
+                      },
+                      {
+                        id: "guided",
+                        label: "Guided",
+                        icon: Compass,
+                        desc: "AI follows your structure, uses own words",
+                      },
+                      {
+                        id: "freestyle",
+                        label: "Freestyle",
+                        icon: Wand2,
+                        desc: "AI handles the full conversation",
+                      },
+                    ].map(({ id, label, icon: Icon, desc }) => (
+                      <button
+                        key={id}
+                        onClick={() => setScriptMode(id)}
+                        className={`flex flex-col items-center gap-1.5 rounded-lg border-2 p-3 text-center transition-all ${
+                          scriptMode === id
+                            ? "border-primary bg-primary/5"
+                            : "border-transparent hover:border-border"
+                        }`}
+                      >
+                        <Icon className={`h-4 w-4 ${scriptMode === id ? "text-primary" : "text-muted-foreground"}`} />
+                        <span className={`text-sm font-semibold ${scriptMode === id ? "text-primary" : ""}`}>
+                          {label}
+                        </span>
+                        <span className="text-[10px] text-muted-foreground leading-tight">
+                          {desc}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* Explainer for each mode */}
+                  <div className="flex items-start gap-2 rounded-lg bg-background border p-3">
+                    <Info className="h-4 w-4 text-muted-foreground shrink-0 mt-0.5" />
+                    <div className="text-xs text-muted-foreground leading-relaxed">
+                      {scriptMode === "strict" && (
+                        <>
+                          <span className="font-semibold text-foreground">Strict mode:</span>{" "}
+                          The AI uses your script fields exactly as written. Every greeting, question,
+                          and objection handler is delivered word-for-word. Best when you need full
+                          control over messaging or have compliance requirements.
+                        </>
+                      )}
+                      {scriptMode === "guided" && (
+                        <>
+                          <span className="font-semibold text-foreground">Guided mode:</span>{" "}
+                          The AI follows your conversation structure (qualify → handle objections → book)
+                          but rephrases everything naturally in your voice. Your script fields become
+                          guidelines, not verbatim lines. This produces the most natural-sounding conversations
+                          while keeping your sales flow intact.
+                        </>
+                      )}
+                      {scriptMode === "freestyle" && (
+                        <>
+                          <span className="font-semibold text-foreground">Freestyle mode:</span>{" "}
+                          The AI has full creative freedom. It only uses your offer, target customer,
+                          and booking link to guide the conversation. Script fields below are ignored.
+                          Best for users with a strong voice profile who trust the AI to sell naturally.
+                        </>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                {scriptMode === "freestyle" && (
+                  <div className="text-center py-6 text-muted-foreground">
+                    <Wand2 className="h-8 w-8 mx-auto mb-2" />
+                    <p className="text-sm font-medium">
+                      Script fields are disabled in Freestyle mode
+                    </p>
+                    <p className="text-xs mt-1">
+                      The AI uses your business info and voice profile to handle conversations naturally.
+                    </p>
+                  </div>
+                )}
+
+                {scriptMode !== "freestyle" && (
+                <>
                 <div className="space-y-2">
                   <Label htmlFor="greeting" className="flex items-center gap-2">
                     <MessageSquare className="h-3.5 w-3.5" />
-                    Greeting Message
+                    {scriptMode === "strict" ? "Greeting Message" : "Greeting Approach"}
                   </Label>
                   <Textarea
                     id="greeting"
@@ -865,7 +970,7 @@ export default function ScriptBuilderPage() {
                     className="flex items-center gap-2"
                   >
                     <HelpCircle className="h-3.5 w-3.5" />
-                    Qualifying Questions
+                    {scriptMode === "strict" ? "Qualifying Questions" : "Qualifying Goals"}
                   </Label>
                   <Textarea
                     id="qualifyingQuestions"
@@ -875,8 +980,9 @@ export default function ScriptBuilderPage() {
                     placeholder="One question per line..."
                   />
                   <p className="text-xs text-muted-foreground">
-                    One question per line. These are asked sequentially to
-                    qualify leads.
+                    {scriptMode === "strict"
+                      ? "One question per line. These are asked sequentially to qualify leads."
+                      : "One topic per line. The AI will ask about these naturally in its own words."}
                   </p>
                 </div>
 
@@ -947,6 +1053,8 @@ export default function ScriptBuilderPage() {
                     placeholder="Polite message when the lead isn't a good fit..."
                   />
                 </div>
+                </>
+                )}
               </CardContent>
               <CardFooter>
                 <Button onClick={handleSave} disabled={saving}>
