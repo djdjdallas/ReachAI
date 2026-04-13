@@ -13,6 +13,11 @@ import crypto from "crypto";
 export async function GET() {
   const baseUrl = process.env.NEXT_PUBLIC_APP_URL;
 
+  if (!process.env.GOOGLE_CLIENT_ID || !process.env.GOOGLE_CLIENT_SECRET) {
+    console.error("Google Calendar OAuth not configured: missing GOOGLE_CLIENT_ID or GOOGLE_CLIENT_SECRET");
+    return NextResponse.redirect(`${baseUrl}/settings?error=gcal_not_configured`);
+  }
+
   try {
     const supabase = await createClient();
     const {
