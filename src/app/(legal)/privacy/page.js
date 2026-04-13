@@ -8,7 +8,7 @@ export default function PrivacyPage() {
     <div className="min-h-screen bg-background px-4 py-16">
       <div className="mx-auto max-w-3xl prose prose-neutral dark:prose-invert">
         <h1>Privacy Policy</h1>
-        <p className="text-muted-foreground">Last updated: March 27, 2026</p>
+        <p className="text-muted-foreground">Last updated: April 12, 2026</p>
 
         <h2>1. Introduction</h2>
         <p>
@@ -31,6 +31,18 @@ export default function PrivacyPage() {
           of your Instagram messages beyond what is necessary to maintain conversation context
           for the AI agent.
         </p>
+        <h3>Google Calendar Data</h3>
+        <p>
+          When you connect your Google Calendar account, Clinchd requests
+          <strong> read-only </strong> access to your calendar events. This data is used
+          solely to display your scheduled calls and appointments within the Clinchd
+          dashboard. Google Calendar data is fetched on demand and is not stored on our
+          servers beyond the active session. We do not share, sell, or transfer your
+          Google Calendar data to any third party. You can disconnect your Google Calendar
+          at any time from the Settings page, which immediately revokes Clinchd&apos;s
+          access to your calendar data.
+        </p>
+
         <h3>Usage Data</h3>
         <p>
           We collect anonymized usage analytics (via PostHog) to improve the product. This
@@ -58,9 +70,9 @@ export default function PrivacyPage() {
         <p>We do not sell your personal data. We share information only with:</p>
         <ul>
           <li>
-            <strong>Service providers:</strong> Anthropic (AI processing), Stripe (payments),
-            Supabase (database hosting), Unipile (Instagram messaging integration), Vercel
-            (hosting), and PostHog (analytics).
+            <strong>Service providers:</strong> Anthropic (AI processing), Google (calendar
+            integration), Stripe (payments), Supabase (database hosting), Unipile
+            (Instagram messaging integration), Vercel (hosting), and PostHog (analytics).
           </li>
           <li>
             <strong>Legal requirements:</strong> When required by law, subpoena, or
@@ -88,7 +100,7 @@ export default function PrivacyPage() {
           <li>Access the personal data we hold about you</li>
           <li>Request correction of inaccurate data</li>
           <li>Request deletion of your data</li>
-          <li>Disconnect your Instagram account at any time</li>
+          <li>Disconnect your Instagram or Google Calendar accounts at any time</li>
           <li>Export your data</li>
         </ul>
 
