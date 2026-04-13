@@ -19,6 +19,7 @@ import {
   DollarSign,
   Bell,
   MessageSquare,
+  RefreshCw,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -70,6 +71,7 @@ export default function SettingsPage() {
   // Calendar integrations
   const [gcalConnected, setGcalConnected] = useState(false);
   const [disconnectingGcal, setDisconnectingGcal] = useState(false);
+  const [syncingGcal, setSyncingGcal] = useState(false);
 
   // Calendly
   const [calendlyUrl, setCalendlyUrl] = useState("");
@@ -648,6 +650,29 @@ export default function SettingsPage() {
                 {gcalConnected ? "Reconnect" : "Connect Google Calendar"}
               </a>
             </Button>
+            {gcalConnected && (
+              <Button
+                variant="outline"
+                onClick={async () => {
+                  setSyncingGcal(true);
+                  try {
+                    await fetch("/api/google-calendar/events");
+                  } catch (err) {
+                    console.error("Error syncing Google Calendar:", err);
+                  } finally {
+                    setSyncingGcal(false);
+                  }
+                }}
+                disabled={syncingGcal}
+              >
+                {syncingGcal ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <RefreshCw className="h-4 w-4" />
+                )}
+                Sync Now
+              </Button>
+            )}
             {gcalConnected && (
               <Button
                 variant="destructive"

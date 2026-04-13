@@ -14,6 +14,13 @@ import {
   Calendar,
 } from "lucide-react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
 
 function getInitials(name) {
   if (!name) return "?";
@@ -43,6 +50,19 @@ function getCalendarDays(year, month) {
     days.push({ day: d, currentMonth: false, date: new Date(year, month + 1, d) });
   }
 
+  return days;
+}
+
+function getWeekDays(date) {
+  const dayOfWeek = date.getDay();
+  const weekStart = new Date(date);
+  weekStart.setDate(date.getDate() - dayOfWeek);
+  const days = [];
+  for (let i = 0; i < 7; i++) {
+    const d = new Date(weekStart);
+    d.setDate(weekStart.getDate() + i);
+    days.push({ day: d.getDate(), currentMonth: d.getMonth() === date.getMonth(), date: d });
+  }
   return days;
 }
 
@@ -106,11 +126,14 @@ export default function CalendarPage() {
   const [gcalConnected, setGcalConnected] = useState(false);
   const [currentDate, setCurrentDate] = useState(new Date());
   const [viewMode, setViewMode] = useState("month");
+  const [selectedEvent, setSelectedEvent] = useState(null);
+  const [syncing, setSyncing] = useState(false);
 
   const year = currentDate.getFullYear();
   const month = currentDate.getMonth();
   const today = new Date();
   const calendarDays = getCalendarDays(year, month);
+  const weekDays = getWeekDays(currentDate);
   const monthName = currentDate.toLocaleDateString("en-US", { month: "long", year: "numeric" });
 
   useEffect(() => {
@@ -182,8 +205,26 @@ export default function CalendarPage() {
     setLoading(false);
   }
 
-  const prevMonth = () => setCurrentDate(new Date(year, month - 1, 1));
-  const nextMonth = () => setCurrentDate(new Date(year, month + 1, 1));
+  const prev = () => {
+    if (viewMode === "week") {
+      setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth(), currentDate.getDate() - 7));
+    } else {
+      setCurrentDate(new Date(year, month - 1, 1));
+    }
+  };
+  const next = () => {
+    if (viewMode === "week") {
+      setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth(), currentDate.getDate() + 7));
+    } else {
+      setCurrentDate(new Date(year, month + 1, 1));
+    }
+  };
+
+  const handleSync = async () => {
+    setSyncing(true);
+    await fetchData();
+    setSyncing(false);
+  };
 
   const getEventsForDay = (date) =>
     events.filter((e) => e.start && isSameDay(new Date(e.start), date));
@@ -208,7 +249,11 @@ export default function CalendarPage() {
         {/* Header */}
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
           <div>
-            <h2 className="text-3xl font-extrabold mb-1">{monthName}</h2>
+            <h2 className="text-3xl font-extrabold mb-1">
+              {viewMode === "week"
+                ? `${weekDays[0].date.toLocaleDateString("en-US", { month: "short", day: "numeric" })} – ${weekDays[6].date.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}`
+                : monthName}
+            </h2>
             <p className="text-stone-500 font-medium">
               You have {confirmedEvents.length} event{confirmedEvents.length !== 1 ? "s" : ""} this month.
             </p>
@@ -228,10 +273,10 @@ export default function CalendarPage() {
             </button>
           </div>
           <div className="flex items-center gap-3">
-            <button onClick={prevMonth} className="p-2.5 rounded-xl border border-stone-200 bg-white text-stone-600 hover:bg-stone-50 transition-all">
+            <button onClick={prev} className="p-2.5 rounded-xl border border-stone-200 bg-white text-stone-600 hover:bg-stone-50 transition-all">
               <ChevronLeft className="h-5 w-5" />
             </button>
-            <button onClick={nextMonth} className="p-2.5 rounded-xl border border-stone-200 bg-white text-stone-600 hover:bg-stone-50 transition-all">
+            <button onClick={next} className="p-2.5 rounded-xl border border-stone-200 bg-white text-stone-600 hover:bg-stone-50 transition-all">
               <ChevronRight className="h-5 w-5" />
             </button>
           </div>
@@ -249,42 +294,91 @@ export default function CalendarPage() {
               ))}
             </div>
             {/* Day cells */}
-            <div className="grid grid-cols-7 divide-x divide-y divide-stone-100">
-              {calendarDays.map((day, idx) => {
-                const dayEvents = getEventsForDay(day.date);
-                const isToday = isSameDay(day.date, today);
-                return (
-                  <div
-                    key={idx}
-                    className={`min-h-[100px] p-3 ${!day.currentMonth ? "bg-stone-50/50 text-stone-300" : "text-stone-900"} ${isToday ? "bg-[#fff5f2]/30" : ""}`}
-                  >
-                    <span className={`text-sm font-bold ${isToday ? "flex items-center justify-center w-7 h-7 bg-[#ff7e67] text-white rounded-full" : ""}`}>
-                      {day.day}
-                    </span>
-                    {dayEvents.length > 0 && (
-                      <div className="mt-2 space-y-1">
-                        {dayEvents.slice(0, 2).map((e) => {
-                          const colors = SOURCE_COLORS[e.source] || SOURCE_COLORS.manual;
-                          return (
-                            <div key={e.id} className={`${colors.bg} border ${colors.border} p-1.5 rounded-lg ${e.status === "canceled" ? "opacity-50 line-through" : ""}`}>
-                              <div className="flex items-center gap-1">
-                                <div className={`w-1.5 h-1.5 ${colors.dot} rounded-full shrink-0`} />
-                                <span className="text-[9px] truncate">
-                                  {formatTime(e.start)} - {e.name || e.title}
-                                </span>
+            {viewMode === "month" ? (
+              <div className="grid grid-cols-7 divide-x divide-y divide-stone-100">
+                {calendarDays.map((day, idx) => {
+                  const dayEvents = getEventsForDay(day.date);
+                  const isToday = isSameDay(day.date, today);
+                  return (
+                    <div
+                      key={idx}
+                      className={`min-h-[100px] p-3 ${!day.currentMonth ? "bg-stone-50/50 text-stone-300" : "text-stone-900"} ${isToday ? "bg-[#fff5f2]/30" : ""}`}
+                    >
+                      <span className={`text-sm font-bold ${isToday ? "flex items-center justify-center w-7 h-7 bg-[#ff7e67] text-white rounded-full" : ""}`}>
+                        {day.day}
+                      </span>
+                      {dayEvents.length > 0 && (
+                        <div className="mt-2 space-y-1">
+                          {dayEvents.slice(0, 2).map((e) => {
+                            const colors = SOURCE_COLORS[e.source] || SOURCE_COLORS.manual;
+                            return (
+                              <div
+                                key={e.id}
+                                className={`${colors.bg} border ${colors.border} p-1.5 rounded-lg cursor-pointer hover:opacity-80 transition-opacity ${e.status === "canceled" ? "opacity-50 line-through" : ""}`}
+                                onClick={() => setSelectedEvent(e)}
+                              >
+                                <div className="flex items-center gap-1">
+                                  <div className={`w-1.5 h-1.5 ${colors.dot} rounded-full shrink-0`} />
+                                  <span className="text-[9px] truncate">
+                                    {formatTime(e.start)} - {e.name || e.title}
+                                  </span>
+                                </div>
                               </div>
-                            </div>
-                          );
-                        })}
-                        {dayEvents.length > 2 && (
-                          <span className="text-[9px] text-stone-400 font-medium">+{dayEvents.length - 2} more</span>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
+                            );
+                          })}
+                          {dayEvents.length > 2 && (
+                            <button
+                              className="text-[9px] text-stone-400 font-medium hover:text-stone-600 transition-colors"
+                              onClick={() => setSelectedEvent(dayEvents[0])}
+                            >
+                              +{dayEvents.length - 2} more
+                            </button>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="grid grid-cols-7 divide-x divide-stone-100">
+                {weekDays.map((day, idx) => {
+                  const dayEvents = getEventsForDay(day.date);
+                  const isToday = isSameDay(day.date, today);
+                  return (
+                    <div
+                      key={idx}
+                      className={`min-h-[300px] p-3 ${!day.currentMonth ? "bg-stone-50/50 text-stone-300" : "text-stone-900"} ${isToday ? "bg-[#fff5f2]/30" : ""}`}
+                    >
+                      <span className={`text-sm font-bold ${isToday ? "flex items-center justify-center w-7 h-7 bg-[#ff7e67] text-white rounded-full" : ""}`}>
+                        {day.day}
+                      </span>
+                      {dayEvents.length > 0 && (
+                        <div className="mt-2 space-y-1">
+                          {dayEvents.map((e) => {
+                            const colors = SOURCE_COLORS[e.source] || SOURCE_COLORS.manual;
+                            return (
+                              <div
+                                key={e.id}
+                                className={`${colors.bg} border ${colors.border} p-1.5 rounded-lg cursor-pointer hover:opacity-80 transition-opacity ${e.status === "canceled" ? "opacity-50 line-through" : ""}`}
+                                onClick={() => setSelectedEvent(e)}
+                              >
+                                <div className="flex items-center gap-1">
+                                  <div className={`w-1.5 h-1.5 ${colors.dot} rounded-full shrink-0`} />
+                                  <span className="text-[9px] truncate">
+                                    {formatTime(e.start)} - {e.name || e.title}
+                                  </span>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
 
           {/* Right Panel */}
@@ -322,9 +416,19 @@ export default function CalendarPage() {
                     </p>
                   </div>
                   {gcalConnected ? (
-                    <span className="px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-tighter bg-green-50 text-green-600">
-                      Active
-                    </span>
+                    <div className="flex items-center gap-2">
+                      <span className="px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-tighter bg-green-50 text-green-600">
+                        Active
+                      </span>
+                      <button
+                        onClick={handleSync}
+                        disabled={syncing}
+                        className="p-1.5 rounded-lg text-stone-400 hover:text-stone-600 hover:bg-stone-100 transition-all disabled:opacity-50"
+                        title="Sync now"
+                      >
+                        <RefreshCw className={`h-3.5 w-3.5 ${syncing ? "animate-spin" : ""}`} />
+                      </button>
+                    </div>
                   ) : (
                     <a
                       href="/api/auth/google-calendar"
@@ -342,7 +446,7 @@ export default function CalendarPage() {
               <h3 className="text-lg font-extrabold mb-6">Upcoming</h3>
               <div className="space-y-4">
                 {upcomingEvents.slice(0, 4).map((evt) => (
-                  <div key={evt.id} className="p-4 rounded-2xl border border-stone-100 bg-[#fff5f2] relative group cursor-pointer hover:border-[#ff7e67]/30 transition-all">
+                  <div key={evt.id} className="p-4 rounded-2xl border border-stone-100 bg-[#fff5f2] relative group cursor-pointer hover:border-[#ff7e67]/30 transition-all" onClick={() => setSelectedEvent(evt)}>
                     <div className="flex items-center gap-3 mb-3">
                       <Avatar className="h-10 w-10 rounded-full bg-white ring-2 ring-white shadow-sm">
                         <AvatarFallback className="bg-stone-100 text-stone-600 text-xs">
@@ -393,6 +497,56 @@ export default function CalendarPage() {
             </div>
           </div>
         </div>
+
+        {/* Event Detail Modal */}
+        <Dialog open={!!selectedEvent} onOpenChange={(open) => { if (!open) setSelectedEvent(null); }}>
+          <DialogContent className="rounded-3xl border-stone-200 bg-white p-0 max-w-md">
+            <div className="p-6">
+              <DialogHeader>
+                <DialogTitle className="text-xl font-extrabold">
+                  {selectedEvent?.title || selectedEvent?.name || "Event"}
+                </DialogTitle>
+                <DialogDescription className="sr-only">Event details</DialogDescription>
+              </DialogHeader>
+
+              <div className="flex items-center gap-2 mt-3">
+                <SourceBadge source={selectedEvent?.source} />
+                <StatusBadge status={selectedEvent?.status} />
+              </div>
+
+              {selectedEvent?.name && selectedEvent?.name !== selectedEvent?.title && (
+                <div className="flex items-center gap-3 mt-5">
+                  <Avatar className="h-10 w-10 rounded-full bg-stone-100 ring-2 ring-white shadow-sm">
+                    <AvatarFallback className="bg-stone-100 text-stone-600 text-xs">
+                      {getInitials(selectedEvent.name)}
+                    </AvatarFallback>
+                  </Avatar>
+                  <span className="text-sm font-bold">{selectedEvent.name}</span>
+                </div>
+              )}
+
+              <div className="mt-5 space-y-3 text-sm text-stone-600">
+                <div className="flex items-center gap-2">
+                  <Calendar className="h-4 w-4 text-stone-400" />
+                  <span className="font-medium">{formatDate(selectedEvent?.start)}</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Clock className="h-4 w-4 text-stone-400" />
+                  <span className="font-medium">
+                    {formatTime(selectedEvent?.start)}
+                    {selectedEvent?.end && ` – ${formatTime(selectedEvent?.end)}`}
+                  </span>
+                </div>
+                {selectedEvent?.end && (
+                  <div className="flex items-center gap-2">
+                    <Hourglass className="h-4 w-4 text-stone-400" />
+                    <span className="font-medium">{formatDuration(selectedEvent?.start, selectedEvent?.end)}</span>
+                  </div>
+                )}
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
       </div>
     </div>
   );
