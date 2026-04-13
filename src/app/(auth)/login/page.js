@@ -35,6 +35,7 @@ export default function LoginPage() {
   }, []);
 
   const handleGoogleLogin = async () => {
+    posthog.capture("login_attempted", { method: "google" });
     const supabase = createClient();
     await supabase.auth.signInWithOAuth({
       provider: "google",
@@ -57,6 +58,7 @@ export default function LoginPage() {
       });
 
       if (error) {
+        posthog.capture("login_failed", { method: "email", error: error.message });
         setError(error.message);
         return;
       }
@@ -65,6 +67,7 @@ export default function LoginPage() {
       posthog.capture("user_logged_in", { method: "email" });
       router.push("/dashboard");
     } catch (err) {
+      posthog.capture("login_failed", { method: "email", error: "unexpected_error" });
       setError("An unexpected error occurred. Please try again.");
     } finally {
       setLoading(false);

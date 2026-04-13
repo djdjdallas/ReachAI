@@ -1,5 +1,9 @@
+"use client";
+
+import { useEffect, useRef } from "react";
 import Link from "next/link";
 import { Check, CheckCircle, ShieldCheck } from "lucide-react";
+import posthog from "posthog-js";
 
 const basePlan = {
   name: "Base",
@@ -28,8 +32,28 @@ const unlimitedPlan = {
 };
 
 export default function Pricing() {
+  const sectionRef = useRef(null);
+  const hasTracked = useRef(false);
+
+  useEffect(() => {
+    const el = sectionRef.current;
+    if (!el) return;
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting && !hasTracked.current) {
+          hasTracked.current = true;
+          posthog.capture("pricing_section_viewed");
+          observer.disconnect();
+        }
+      },
+      { threshold: 0.3 }
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
+
   return (
-    <section id="pricing" className="py-32 bg-white">
+    <section ref={sectionRef} id="pricing" className="py-32 bg-white">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="text-center mb-24 reveal-up">
           <h2 className="text-4xl md:text-6xl font-black mb-6 tracking-tight text-stone-900">
@@ -71,6 +95,7 @@ export default function Pricing() {
             <div className="text-center">
               <Link
                 href="/signup"
+                onClick={() => posthog.capture("pricing_cta_clicked", { plan: "base", price: "$97" })}
                 className="w-full block py-4 rounded-full border-2 border-stone-200 font-black hover:border-stone-900 transition-colors text-stone-900 mb-3"
               >
                 Start 7-Day Trial
@@ -109,6 +134,7 @@ export default function Pricing() {
             <div className="text-center">
               <Link
                 href="/signup"
+                onClick={() => posthog.capture("pricing_cta_clicked", { plan: "unlimited", price: "$197" })}
                 className="w-full block py-5 rounded-full bg-white text-[#ff7e67] font-black hover:scale-105 active:scale-95 transition-all shadow-xl mb-3"
               >
                 Get Unlimited Access

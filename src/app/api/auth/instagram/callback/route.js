@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import { exchangeCodeForToken } from "@/lib/instagram";
 import { encryptToken } from "@/lib/token-utils";
+import { getPostHogClient } from "@/lib/posthog-server";
 
 export async function GET(request) {
   const baseUrl = process.env.NEXT_PUBLIC_APP_URL;
@@ -16,6 +17,11 @@ export async function GET(request) {
     const storedState = request.cookies.get("oauth_state")?.value;
     if (!state || !storedState || state !== storedState) {
       console.error("OAuth state mismatch");
+      getPostHogClient().capture({
+        distinctId: "anonymous",
+        event: "instagram_connection_failed",
+        properties: { reason: "invalid_state" },
+      });
       return NextResponse.redirect(
         `${baseUrl}/onboarding?step=1&error=invalid_state`
       );
@@ -50,6 +56,11 @@ export async function GET(request) {
 
     if (error || !code) {
       console.error("Instagram OAuth error:", error || "no code returned");
+      getPostHogClient().capture({
+        distinctId: user.email || user.id,
+        event: "instagram_connection_failed",
+        properties: { reason: "oauth_denied" },
+      });
       return NextResponse.redirect(
         `${baseUrl}/onboarding?step=1&error=oauth_denied`
       );
@@ -97,6 +108,11 @@ export async function GET(request) {
       console.error(
         "[ig-callback] No IGBA ID resolved from /me. Aborting token save and redirecting with error."
       );
+      getPostHogClient().capture({
+        distinctId: user.email || user.id,
+        event: "instagram_connection_failed",
+        properties: { reason: "no_igba_id" },
+      });
       return NextResponse.redirect(
         `${baseUrl}/onboarding?step=1&error=no_igba_id`
       );
@@ -152,6 +168,11 @@ export async function GET(request) {
     return response;
   } catch (err) {
     console.error("Instagram callback error:", err);
+    getPostHogClient().capture({
+      distinctId: "anonymous",
+      event: "instagram_connection_failed",
+      properties: { reason: "callback_error" },
+    });
     return NextResponse.redirect(
       `${baseUrl}/onboarding?step=1&error=callback_failed`
     );

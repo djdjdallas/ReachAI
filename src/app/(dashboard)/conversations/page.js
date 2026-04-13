@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useRef, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import posthog from "posthog-js";
 import {
   MessageSquare,
   Send,
@@ -308,8 +309,16 @@ function ConversationsPage() {
       });
       if (!res.ok) throw new Error("Failed to send message");
       await fetchMessages(selectedConvo.id);
+      posthog.capture("manual_message_sent", {
+        conversation_id: selectedConvo.id,
+        message_length: messageText.length,
+      });
     } catch (error) {
       console.error("Failed to send message:", error);
+      posthog.capture("message_send_failed", {
+        conversation_id: selectedConvo.id,
+        error: error.message,
+      });
       setMessages((prev) =>
         prev.filter((m) => m.id !== optimisticMessage.id)
       );
@@ -338,6 +347,7 @@ function ConversationsPage() {
           : c
       )
     );
+    posthog.capture("ai_resumed", { conversation_id: selectedConvo.id });
   };
 
   const handleStatusChange = async (newStatus) => {
@@ -347,6 +357,12 @@ function ConversationsPage() {
       .update({ status: newStatus })
       .eq("id", selectedConvo.id);
     setSelectedConvo((prev) => ({ ...prev, status: newStatus }));
+    posthog.capture("lead_status_changed", {
+      conversation_id: selectedConvo.id,
+      from_status: selectedConvo.status,
+      to_status: newStatus,
+      source: "manual",
+    });
 
     if (newStatus === "booked") {
       await supabase.from("bookings").insert({
@@ -378,6 +394,7 @@ function ConversationsPage() {
 
       // Update local state
       setConversations((prev) => prev.filter((c) => c.id !== selectedConvo.id));
+      posthog.capture("conversation_deleted", { conversation_id: selectedConvo.id });
       setSelectedConvo(null);
       setMessages([]);
       router.replace("/conversations", { scroll: false });
@@ -423,6 +440,10 @@ function ConversationsPage() {
               : c
           )
         );
+        posthog.capture("conversation_summarized", {
+          conversation_id: selectedConvo.id,
+          lead_temperature: data.temperature,
+        });
       }
     } catch (err) {
       console.error("Failed to summarize:", err);
@@ -848,7 +869,13 @@ function ConversationsPage() {
                 {SMART_REPLIES.map((reply) => (
                   <button
                     key={reply.type}
-                    onClick={() => setNewMessage(reply.text)}
+                    onClick={() => {
+                      setNewMessage(reply.text);
+                      posthog.capture("smart_reply_used", {
+                        reply_type: reply.type,
+                        conversation_id: selectedConvo?.id,
+                      });
+                    }}
                     className="group p-3 bg-white border border-stone-200 rounded-xl text-left hover:border-[#ff7e67] hover:shadow-sm transition-all"
                   >
                     <div className="text-[10px] font-bold text-stone-400 mb-1 group-hover:text-[#ff7e67]">

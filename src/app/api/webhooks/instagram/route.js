@@ -5,6 +5,7 @@ import { buildSystemPrompt } from "@/lib/prompts";
 import { sendInstagramMessage, verifyWebhookSignature, getParticipantProfile } from "@/lib/instagram";
 import { decryptToken } from "@/lib/token-utils";
 import { sendHotLeadAlert, sendBookingAlert } from "@/lib/notifications";
+import { getPostHogClient } from "@/lib/posthog-server";
 
 // ── GET: Meta webhook verification ──────────────────────────────────────
 
@@ -245,6 +246,11 @@ async function processIncomingMessage({
       return;
     }
     console.log("[webhook] conversation created:", newConv?.id, "for user:", user.id);
+    getPostHogClient().capture({
+      distinctId: user.email || user.id,
+      event: "conversation_created",
+      properties: { conversation_id: newConv.id, sender_name: senderName },
+    });
     conversation = newConv;
   } else {
     console.log("[webhook] existing conversation found:", conversation.id);
@@ -307,6 +313,12 @@ async function processIncomingMessage({
     return;
   }
 
+  getPostHogClient().capture({
+    distinctId: user.email || user.id,
+    event: "message_received",
+    properties: { conversation_id: conversation.id, message_length: messageText.length },
+  });
+
   // Natural delay
   await new Promise((r) => setTimeout(r, 1000 + Math.random() * 2000));
 
@@ -348,6 +360,11 @@ async function processIncomingMessage({
           conversation.id,
           classification.reason
         );
+        getPostHogClient().capture({
+          distinctId: user.email || user.id,
+          event: "human_in_loop_triggered",
+          properties: { conversation_id: conversation.id, reason: classification.reason },
+        });
         return;
       }
     } catch (err) {
@@ -368,6 +385,11 @@ async function processIncomingMessage({
     aiReply = await generateReply(systemPrompt, messages);
   } catch (err) {
     console.error("generateReply failed for conversation:", conversation.id, err.message);
+    getPostHogClient().capture({
+      distinctId: user.email || user.id,
+      event: "ai_reply_failed",
+      properties: { conversation_id: conversation.id, error: err.message },
+    });
     return;
   }
 
@@ -399,8 +421,18 @@ async function processIncomingMessage({
       aiReply,
       decryptToken(user.meta_page_access_token)
     );
+    getPostHogClient().capture({
+      distinctId: user.email || user.id,
+      event: "ai_reply_sent",
+      properties: { conversation_id: conversation.id, reply_length: aiReply.length },
+    });
   } catch (err) {
     console.error("sendInstagramMessage failed for conversation:", conversation.id, err.message);
+    getPostHogClient().capture({
+      distinctId: user.email || user.id,
+      event: "message_delivery_failed",
+      properties: { conversation_id: conversation.id, error: err.message },
+    });
     // Reply is saved to DB but wasn't delivered — continue to status detection
   }
 
@@ -436,6 +468,16 @@ async function processIncomingMessage({
   if (newStatus !== conversation.status) {
     console.log(`Status change: ${conversation.id} ${conversation.status} → ${newStatus}`);
     await supabase.from("conversations").update({ status: newStatus }).eq("id", conversation.id);
+    getPostHogClient().capture({
+      distinctId: user.email || user.id,
+      event: "lead_status_changed",
+      properties: {
+        conversation_id: conversation.id,
+        from_status: conversation.status,
+        to_status: newStatus,
+        source: "ai_detection",
+      },
+    });
 
     // Fire-and-forget notification alerts
     if (newStatus === "interested") {

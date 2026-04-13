@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import { createCustomer } from "@/lib/stripe";
+import { getPostHogClient } from "@/lib/posthog-server";
 
 export async function GET(request) {
   const { searchParams, origin } = new URL(request.url);
@@ -33,6 +34,17 @@ export async function GET(request) {
             full_name: user.user_metadata?.full_name || "",
             subscription_status: "trialing",
             trial_ends_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+          });
+          getPostHogClient().capture({
+            distinctId: user.email,
+            event: "user_signed_up",
+            properties: { method: "google", email: user.email },
+          });
+        } else {
+          getPostHogClient().capture({
+            distinctId: user.email,
+            event: "user_logged_in",
+            properties: { method: "google" },
           });
         }
 

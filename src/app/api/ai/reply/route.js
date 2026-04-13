@@ -5,6 +5,7 @@ import { generateReply } from "@/lib/anthropic";
 import { buildSystemPrompt } from "@/lib/prompts";
 import { sendInstagramMessage } from "@/lib/instagram";
 import { decryptToken } from "@/lib/token-utils";
+import { getPostHogClient } from "@/lib/posthog-server";
 
 export async function POST(request) {
   try {
@@ -135,9 +136,20 @@ export async function POST(request) {
       decryptToken(userProfile.meta_page_access_token)
     );
 
+    getPostHogClient().capture({
+      distinctId: user.email || user.id,
+      event: "dashboard_reply_sent",
+      properties: { conversation_id: conversationId, message_length: replyContent.length, manual: !!manual },
+    });
+
     return NextResponse.json({ message: savedMessage }, { status: 200 });
   } catch (error) {
     console.error("AI reply error:", error);
+    getPostHogClient().capture({
+      distinctId: "unknown",
+      event: "dashboard_reply_failed",
+      properties: { endpoint: "/api/ai/reply", error: error.message },
+    });
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 }
