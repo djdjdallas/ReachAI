@@ -71,7 +71,7 @@ export async function analyzeVoice(sampleMessages) {
     try {
       const response = await getAnthropic().messages.create({
         model: "claude-sonnet-4-6",
-        max_tokens: 1500,
+        max_tokens: 2000,
         temperature: 0.3,
         system: `You are a linguistics and communication style expert. Analyze the writing samples provided and extract the author's unique voice characteristics.
 
@@ -88,6 +88,13 @@ The JSON must have exactly these fields:
   - "vocabulary": string — notable words/slang they use (e.g., "uses 'bro', 'honestly', 'let's go', 'crush it'")
   - "catchphrases": array of strings — recurring phrases (e.g., ["let's go", "that's fire", "no cap"])
   - "personality": string — overall vibe (e.g., "hype-man energy, like a supportive friend who's also a coach")
+- "preview_replies": array of exactly 2 objects — sample DM replies written in this person's voice, to show them what the AI will sound like. Each object has:
+  - "lead_message": string — a realistic incoming lead DM (e.g., "How much does this cost?")
+  - "reply": string — a reply written in the analyzed voice (1-3 sentences, matching all traits above)
+- "suggested_response_length": string — one of "short", "medium", or "long". Inferred from the average message length in the samples:
+  - "short" if most messages are 1-2 sentences
+  - "medium" if most messages are 2-4 sentences
+  - "long" if most messages are 4+ sentences
 
 EXAMPLE OUTPUT:
 {
@@ -101,7 +108,12 @@ EXAMPLE OUTPUT:
     "vocabulary": "uses 'bro', 'fire', 'crush it', 'let's go', 'no cap'",
     "catchphrases": ["let's go", "that's fire", "you got this"],
     "personality": "hype-man energy, supportive friend who's also a coach"
-  }
+  },
+  "preview_replies": [
+    {"lead_message": "How much does this cost?", "reply": "yo good question! it's super affordable honestly, let me break it down for you real quick"},
+    {"lead_message": "How does this work?", "reply": "bro it's so simple! basically I handle everything for you, you just show up and crush it"}
+  ],
+  "suggested_response_length": "short"
 }`,
         messages: [
           {
@@ -230,9 +242,11 @@ Common Objections: ${objections || "Not provided — generate sensible defaults 
     long: "up to 4-6 sentences per message when warranted",
   };
   let settingsBlock = "";
+  const hasVoiceProfile = voiceProfile?.voice_summary;
   if (settings) {
     const lines = [];
-    if (settings.tone && toneMap[settings.tone]) {
+    // Skip tone when a voice profile is active — it already defines tone
+    if (!hasVoiceProfile && settings.tone && toneMap[settings.tone]) {
       lines.push(`- Tone: ${toneMap[settings.tone]}`);
     }
     const t = settings.traits || {};

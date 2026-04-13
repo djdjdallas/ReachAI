@@ -41,12 +41,34 @@ export async function POST(request) {
       );
     }
 
+    // Fetch existing profile so we can store it for rollback
+    const { data: existingUser } = await getSupabaseAdmin()
+      .from("users")
+      .select("voice_profile")
+      .eq("id", user.id)
+      .single();
+
     const result = await analyzeVoice(cleaned);
 
+    const suggestedLength = ["short", "medium", "long"].includes(result.suggested_response_length)
+      ? result.suggested_response_length
+      : null;
+
+    // Snapshot the current profile (without its own previous_profile to avoid nesting)
+    const existing = existingUser?.voice_profile;
+    let previousProfile = null;
+    if (existing?.status === "ready") {
+      const { previous_profile: _, ...snapshot } = existing;
+      previousProfile = snapshot;
+    }
+
     const voiceProfile = {
-      sample_messages: cleaned,
       voice_summary: result.voice_summary,
       voice_traits: result.voice_traits,
+      preview_replies: result.preview_replies || [],
+      suggested_response_length: suggestedLength,
+      sample_count: cleaned.length,
+      previous_profile: previousProfile,
       status: "ready",
       updated_at: new Date().toISOString(),
     };

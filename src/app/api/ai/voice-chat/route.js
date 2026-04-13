@@ -31,29 +31,42 @@ export async function POST(request) {
         .map((m) => m.content)
         .filter((c) => c && c.trim().length > 0);
 
-      if (coachMessages.length < 2) {
+      if (coachMessages.length < 3) {
         return NextResponse.json(
-          { error: "Need at least a few responses to analyze your voice." },
+          { error: "Need at least 3 responses to analyze your voice." },
           { status: 400 }
         );
       }
 
-      // Merge with existing sample messages if there's an existing voice profile
-      const { data: userProfile } = await getSupabaseAdmin()
+      const samples = coachMessages.slice(0, 20);
+
+      // Fetch existing profile for rollback
+      const { data: existingUser } = await getSupabaseAdmin()
         .from("users")
         .select("voice_profile")
         .eq("id", user.id)
         .single();
 
-      const existingSamples = userProfile?.voice_profile?.sample_messages || [];
-      const allSamples = [...existingSamples, ...coachMessages].slice(0, 20);
+      const result = await analyzeVoice(samples);
 
-      const result = await analyzeVoice(allSamples);
+      const suggestedLength = ["short", "medium", "long"].includes(result.suggested_response_length)
+        ? result.suggested_response_length
+        : null;
+
+      const existing = existingUser?.voice_profile;
+      let previousProfile = null;
+      if (existing?.status === "ready") {
+        const { previous_profile: _, ...snapshot } = existing;
+        previousProfile = snapshot;
+      }
 
       const voiceProfile = {
-        sample_messages: allSamples,
         voice_summary: result.voice_summary,
         voice_traits: result.voice_traits,
+        preview_replies: result.preview_replies || [],
+        suggested_response_length: suggestedLength,
+        sample_count: samples.length,
+        previous_profile: previousProfile,
         status: "ready",
         updated_at: new Date().toISOString(),
       };

@@ -20,6 +20,8 @@ import {
   Bell,
   MessageSquare,
   RefreshCw,
+  Mic2,
+  Trash2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -95,6 +97,10 @@ export default function SettingsPage() {
   const [notifyHotLeadsSms, setNotifyHotLeadsSms] = useState(false);
   const [notifyBookingsSms, setNotifyBookingsSms] = useState(false);
 
+  // Voice profile
+  const [voiceProfile, setVoiceProfile] = useState(null);
+  const [clearingVoice, setClearingVoice] = useState(false);
+
   // Delete dialog
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [deleteConfirmText, setDeleteConfirmText] = useState("");
@@ -158,6 +164,9 @@ export default function SettingsPage() {
         setNotifyBookingsEmail(userProfile.notify_bookings_email ?? true);
         setNotifyHotLeadsSms(userProfile.notify_hot_leads_sms ?? false);
         setNotifyBookingsSms(userProfile.notify_bookings_sms ?? false);
+        if (userProfile.voice_profile) {
+          setVoiceProfile(userProfile.voice_profile);
+        }
       }
 
       setLoading(false);
@@ -362,6 +371,22 @@ export default function SettingsPage() {
     } catch (err) {
       console.error("Error saving notification pref:", err);
       setter(!value); // revert
+    }
+  };
+
+  const handleClearVoice = async () => {
+    setClearingVoice(true);
+    try {
+      await supabase
+        .from("users")
+        .update({ voice_profile: null })
+        .eq("id", authUser.id);
+      setVoiceProfile(null);
+      posthog.capture("voice_profile_cleared", { source: "settings" });
+    } catch (err) {
+      console.error("Error clearing voice profile:", err);
+    } finally {
+      setClearingVoice(false);
     }
   };
 
@@ -906,6 +931,92 @@ export default function SettingsPage() {
             {aiSaved ? "Saved!" : "Save AI Settings"}
           </Button>
         </CardFooter>
+      </Card>
+
+      {/* Voice Profile */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-lg flex items-center gap-2">
+            <Mic2 className="h-5 w-5" />
+            Voice Profile
+          </CardTitle>
+          <CardDescription>
+            Your AI voice profile controls how DM replies sound. Train or
+            re-train it in the Script Builder.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {voiceProfile?.status === "ready" ? (
+            <>
+              <div className="rounded-lg border bg-muted/50 p-4 space-y-3">
+                <p className="text-sm italic text-foreground">
+                  &ldquo;{voiceProfile.voice_summary}&rdquo;
+                </p>
+                <div className="grid grid-cols-2 gap-x-6 gap-y-2 text-xs">
+                  {voiceProfile.voice_traits?.tone && (
+                    <div>
+                      <span className="font-medium text-muted-foreground">Tone:</span>{" "}
+                      {voiceProfile.voice_traits.tone}
+                    </div>
+                  )}
+                  {voiceProfile.voice_traits?.formality && (
+                    <div>
+                      <span className="font-medium text-muted-foreground">Formality:</span>{" "}
+                      {voiceProfile.voice_traits.formality}
+                    </div>
+                  )}
+                  {voiceProfile.voice_traits?.emoji_usage && (
+                    <div>
+                      <span className="font-medium text-muted-foreground">Emojis:</span>{" "}
+                      {voiceProfile.voice_traits.emoji_usage}
+                    </div>
+                  )}
+                  {voiceProfile.voice_traits?.personality && (
+                    <div>
+                      <span className="font-medium text-muted-foreground">Personality:</span>{" "}
+                      {voiceProfile.voice_traits.personality}
+                    </div>
+                  )}
+                </div>
+              </div>
+              <div className="flex gap-2">
+                <Button asChild variant="outline" size="sm">
+                  <a href="/script-builder" className="flex items-center gap-2">
+                    <RefreshCw className="h-3.5 w-3.5" />
+                    Re-train Voice
+                  </a>
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={handleClearVoice}
+                  disabled={clearingVoice}
+                  className="text-muted-foreground"
+                >
+                  {clearingVoice ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    <Trash2 className="h-3.5 w-3.5" />
+                  )}
+                  Clear Profile
+                </Button>
+              </div>
+            </>
+          ) : (
+            <div className="text-center py-4">
+              <p className="text-sm text-muted-foreground mb-3">
+                No voice profile set up yet. The AI will use generic writing
+                rules for DM replies.
+              </p>
+              <Button asChild size="sm">
+                <a href="/script-builder" className="flex items-center gap-2">
+                  <Mic2 className="h-4 w-4" />
+                  Set Up Voice Profile
+                </a>
+              </Button>
+            </div>
+          )}
+        </CardContent>
       </Card>
 
       {/* Danger Zone */}

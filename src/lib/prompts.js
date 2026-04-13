@@ -39,19 +39,25 @@ function normalizeObjectionHandlers(handlers) {
  * @param {object} scriptConfig
  * @returns {string} — empty string if no settings are present
  */
-function buildSettingsRules(scriptConfig = {}) {
+function buildSettingsRules(scriptConfig = {}, voiceProfile = null) {
   const lines = [];
+  const hasVoiceProfile = voiceProfile?.status === "ready" && voiceProfile?.voice_summary;
 
-  const toneMap = {
-    professional: "Be polished and structured. Avoid slang.",
-    friendly: "Be warm and conversational, like texting a friend.",
-    direct:
-      "Be goal-oriented and assertive. Move toward the booking ask without small talk.",
-    supportive:
-      "Be empathetic and patient. Acknowledge the prospect's concerns before redirecting.",
-  };
-  if (scriptConfig.tone && toneMap[scriptConfig.tone]) {
-    lines.push(`- Tone: ${toneMap[scriptConfig.tone]}`);
+  // Skip tone when a voice profile is active — the analyzed voice already
+  // defines tone, formality, and personality. Adding a manual tone setting
+  // on top creates contradictory instructions for the LLM.
+  if (!hasVoiceProfile) {
+    const toneMap = {
+      professional: "Be polished and structured. Avoid slang.",
+      friendly: "Be warm and conversational, like texting a friend.",
+      direct:
+        "Be goal-oriented and assertive. Move toward the booking ask without small talk.",
+      supportive:
+        "Be empathetic and patient. Acknowledge the prospect's concerns before redirecting.",
+    };
+    if (scriptConfig.tone && toneMap[scriptConfig.tone]) {
+      lines.push(`- Tone: ${toneMap[scriptConfig.tone]}`);
+    }
   }
 
   const traits = scriptConfig.traits || {};
@@ -211,5 +217,5 @@ CORE INSTRUCTIONS:
 
 ---
 
-${buildWritingRules(options.voiceProfile)}${buildSettingsRules(sc)}`;
+${buildWritingRules(options.voiceProfile)}${buildSettingsRules(sc, options.voiceProfile)}`;
 }

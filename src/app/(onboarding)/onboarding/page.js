@@ -85,6 +85,16 @@ function OnboardingPage() {
   const [responseLength, setResponseLength] = useState("medium");
   const [humanInLoop, setHumanInLoop] = useState(true);
 
+  // Warn before navigating away during an active voice chat interview
+  useEffect(() => {
+    if (voiceMode !== "chat" || voiceChatMessages.length === 0) return;
+    const handler = (e) => {
+      e.preventDefault();
+    };
+    window.addEventListener("beforeunload", handler);
+    return () => window.removeEventListener("beforeunload", handler);
+  }, [voiceMode, voiceChatMessages.length]);
+
   useEffect(() => {
     async function init() {
       const {
@@ -146,6 +156,9 @@ function OnboardingPage() {
         }
         if (userProfile.voice_profile) {
           setVoiceProfile(userProfile.voice_profile);
+          if (userProfile.voice_profile.suggested_response_length) {
+            setResponseLength(userProfile.voice_profile.suggested_response_length);
+          }
         }
 
         // Auto-advance: if Instagram is connected and user is on step 1, go to step 2
@@ -341,6 +354,9 @@ function OnboardingPage() {
         setVoiceProfile(data.voice_profile);
         setVoiceMode(null);
         setSampleText("");
+        if (data.voice_profile.suggested_response_length) {
+          setResponseLength(data.voice_profile.suggested_response_length);
+        }
         posthog.capture("voice_analyzed", {
           method: "paste",
           source: "onboarding",
@@ -468,6 +484,9 @@ function OnboardingPage() {
         setVoiceProfile(data.voice_profile);
         setVoiceMode(null);
         setVoiceChatMessages([]);
+        if (data.voice_profile.suggested_response_length) {
+          setResponseLength(data.voice_profile.suggested_response_length);
+        }
         posthog.capture("voice_analyzed", {
           method: "chat",
           source: "onboarding",
@@ -478,6 +497,29 @@ function OnboardingPage() {
       setAiError(err?.message || "An unexpected error occurred.");
     } finally {
       setFinalizingVoice(false);
+    }
+  };
+
+  const handleRevertVoice = async () => {
+    const prev = voiceProfile?.previous_profile;
+    if (!prev) return;
+
+    setAiError(null);
+    try {
+      const { error: dbErr } = await supabase
+        .from("users")
+        .update({ voice_profile: { ...prev, previous_profile: null } })
+        .eq("id", user.id);
+      if (dbErr) throw dbErr;
+
+      setVoiceProfile({ ...prev, previous_profile: null });
+      if (prev.suggested_response_length) {
+        setResponseLength(prev.suggested_response_length);
+      }
+      posthog.capture("voice_reverted", { source: "onboarding" });
+    } catch (err) {
+      console.error("Error reverting voice:", err);
+      setAiError(err?.message || "Failed to revert voice profile.");
     }
   };
 
@@ -585,6 +627,7 @@ function OnboardingPage() {
           setResponseLength={setResponseLength}
           aiError={aiError}
           onDismissError={dismissError}
+          onRevertVoice={handleRevertVoice}
           onBack={() => setStep(2)}
           onNext={() => {
             setStep(4);

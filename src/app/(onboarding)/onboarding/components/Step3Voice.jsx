@@ -45,6 +45,7 @@ export default function Step3Voice({
   setResponseLength,
   aiError,
   onDismissError,
+  onRevertVoice,
   onBack,
   onNext,
 }) {
@@ -111,10 +112,19 @@ export default function Step3Voice({
             <div className="lg:col-span-7 space-y-8">
               {/* Tone Selection */}
               <div className="bg-white rounded-3xl p-8 soft-shadow border border-stone-100">
-                <h3 className="text-lg font-black mb-6 flex items-center gap-2">
+                <h3 className="text-lg font-black mb-2 flex items-center gap-2">
                   <Mic2 className="w-5 h-5 text-[#ff7e67]" />
                   1. Select Your Core Tone
                 </h3>
+                {voiceProfile?.status === "ready" && (
+                  <p className="text-xs text-stone-500 mb-6 font-medium">
+                    Your analyzed voice is active — tone is used as a fallback
+                    only if you clear your voice profile.
+                  </p>
+                )}
+                {!voiceProfile?.status && (
+                  <div className="mb-6" />
+                )}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {tones.map((tone) => (
                     <label
@@ -229,14 +239,73 @@ export default function Step3Voice({
                       <p className="text-sm italic text-stone-700">
                         &ldquo;{voiceProfile.voice_summary}&rdquo;
                       </p>
+                      {/* Confidence indicator */}
+                      {(() => {
+                        const count = voiceProfile.sample_count || 0;
+                        const isStrong = count >= 8;
+                        const isOk = count >= 5;
+                        return (
+                          <div className={`flex items-center gap-2 rounded-xl px-3 py-2 text-xs font-medium ${
+                            isStrong
+                              ? "bg-green-50 text-green-700"
+                              : isOk
+                              ? "bg-amber-50 text-amber-700"
+                              : "bg-amber-50 text-amber-700"
+                          }`}>
+                            <div className={`flex gap-0.5`}>
+                              {[1, 2, 3].map((bar) => (
+                                <div
+                                  key={bar}
+                                  className={`w-1 rounded-full ${
+                                    bar === 1
+                                      ? "h-2"
+                                      : bar === 2
+                                      ? "h-3"
+                                      : "h-4"
+                                  } ${
+                                    (bar === 1) ||
+                                    (bar === 2 && isOk) ||
+                                    (bar === 3 && isStrong)
+                                      ? isStrong ? "bg-green-500" : "bg-amber-500"
+                                      : "bg-stone-200"
+                                  }`}
+                                />
+                              ))}
+                            </div>
+                            {isStrong
+                              ? `Strong profile (${count} samples)`
+                              : `${count} sample${count !== 1 ? "s" : ""} analyzed — add ${8 - count}+ more for a stronger profile`}
+                          </div>
+                        );
+                      })()}
                     </div>
-                    <button
-                      onClick={() => setVoiceMode("paste")}
-                      className="text-sm text-[#ff7e67] font-bold flex items-center gap-1"
-                    >
-                      <Sparkles className="w-3.5 h-3.5" />
-                      Re-analyze with new samples
-                    </button>
+                    <div className="flex items-center gap-4 flex-wrap">
+                      <button
+                        onClick={() => setVoiceMode("paste")}
+                        className="text-sm text-[#ff7e67] font-bold flex items-center gap-1"
+                      >
+                        <Sparkles className="w-3.5 h-3.5" />
+                        Re-analyze with new samples
+                      </button>
+                      {voiceProfile.previous_profile && onRevertVoice && (
+                        <button
+                          onClick={onRevertVoice}
+                          className="text-sm text-stone-500 font-bold flex items-center gap-1 hover:text-stone-700 transition-colors"
+                        >
+                          <ArrowLeft className="w-3.5 h-3.5" />
+                          Revert to previous
+                        </button>
+                      )}
+                      <a
+                        href="/playground"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-sm text-stone-500 font-bold flex items-center gap-1 hover:text-stone-700 transition-colors"
+                      >
+                        <MessageCircle className="w-3.5 h-3.5" />
+                        Test in Playground
+                      </a>
+                    </div>
                   </div>
                 ) : voiceMode === "paste" ? (
                   <div className="space-y-4">
@@ -429,109 +498,158 @@ export default function Step3Voice({
                     <div className="flex items-center justify-between mb-8">
                       <h3 className="text-xl font-extrabold">Voice Preview</h3>
                       <div className="px-3 py-1 bg-white/10 rounded-full text-[10px] font-black uppercase tracking-widest text-stone-300">
-                        {toneLabels[selectedTone]}
+                        {voiceProfile?.status === "ready" && voiceProfile?.voice_traits?.tone
+                          ? voiceProfile.voice_traits.tone
+                          : toneLabels[selectedTone]}
                       </div>
                     </div>
 
                     <div className="space-y-6">
-                      <div className="space-y-3">
-                        <div className="flex items-start gap-3">
-                          <div className="w-8 h-8 rounded-full bg-stone-700 flex-shrink-0 flex items-center justify-center text-xs">
-                            L
+                      {voiceProfile?.status === "ready" && voiceProfile?.preview_replies?.length >= 2 ? (
+                        /* Dynamic preview — generated from the user's actual voice */
+                        voiceProfile.preview_replies.slice(0, 2).map((pr, i) => (
+                          <div key={i} className="space-y-3">
+                            <div className="flex items-start gap-3">
+                              <div className="w-8 h-8 rounded-full bg-stone-700 flex-shrink-0 flex items-center justify-center text-xs">
+                                L
+                              </div>
+                              <div className="bg-stone-800 p-3 rounded-2xl rounded-tl-none text-xs text-stone-300">
+                                {pr.lead_message}
+                              </div>
+                            </div>
+                            <div className="flex items-start gap-3 justify-end">
+                              <div className="bg-[#ff7e67] p-4 rounded-2xl rounded-tr-none text-xs text-white max-w-[85%] leading-relaxed">
+                                {pr.reply}
+                              </div>
+                              <div className="w-8 h-8 rounded-full bg-[#ff7e67]/30 flex-shrink-0 flex items-center justify-center">
+                                <Zap className="w-3 h-3 text-white" />
+                              </div>
+                            </div>
                           </div>
-                          <div className="bg-stone-800 p-3 rounded-2xl rounded-tl-none text-xs text-stone-300">
-                            How much does this cost?
+                        ))
+                      ) : (
+                        /* Static fallback preview */
+                        <>
+                          <div className="space-y-3">
+                            <div className="flex items-start gap-3">
+                              <div className="w-8 h-8 rounded-full bg-stone-700 flex-shrink-0 flex items-center justify-center text-xs">
+                                L
+                              </div>
+                              <div className="bg-stone-800 p-3 rounded-2xl rounded-tl-none text-xs text-stone-300">
+                                How much does this cost?
+                              </div>
+                            </div>
+                            <div className="flex items-start gap-3 justify-end">
+                              <div className="bg-[#ff7e67] p-4 rounded-2xl rounded-tr-none text-xs text-white max-w-[85%] leading-relaxed">
+                                Great question! The base plan is $49/mo and it
+                                basically pays for itself with the first call you
+                                book. Would you like to see the full breakdown?
+                                {traits.emojis ? " \ud83d\ude0a" : ""}
+                              </div>
+                              <div className="w-8 h-8 rounded-full bg-[#ff7e67]/30 flex-shrink-0 flex items-center justify-center">
+                                <Zap className="w-3 h-3 text-white" />
+                              </div>
+                            </div>
                           </div>
-                        </div>
-                        <div className="flex items-start gap-3 justify-end">
-                          <div className="bg-[#ff7e67] p-4 rounded-2xl rounded-tr-none text-xs text-white max-w-[85%] leading-relaxed">
-                            Great question! The base plan is $49/mo and it
-                            basically pays for itself with the first call you
-                            book. Would you like to see the full breakdown?
-                            {traits.emojis ? " \ud83d\ude0a" : ""}
-                          </div>
-                          <div className="w-8 h-8 rounded-full bg-[#ff7e67]/30 flex-shrink-0 flex items-center justify-center">
-                            <Zap className="w-3 h-3 text-white" />
-                          </div>
-                        </div>
-                      </div>
 
-                      <div className="space-y-3">
-                        <div className="flex items-start gap-3">
-                          <div className="w-8 h-8 rounded-full bg-stone-700 flex-shrink-0 flex items-center justify-center text-xs">
-                            L
+                          <div className="space-y-3">
+                            <div className="flex items-start gap-3">
+                              <div className="w-8 h-8 rounded-full bg-stone-700 flex-shrink-0 flex items-center justify-center text-xs">
+                                L
+                              </div>
+                              <div className="bg-stone-800 p-3 rounded-2xl rounded-tl-none text-xs text-stone-300">
+                                How does this work?
+                              </div>
+                            </div>
+                            <div className="flex items-start gap-3 justify-end">
+                              <div className="bg-[#ff7e67] p-4 rounded-2xl rounded-tr-none text-xs text-white max-w-[85%] leading-relaxed">
+                                It&apos;s super simple. Clinchd monitors your DMs
+                                24/7, qualifies leads based on your script, and
+                                drops your Calendly link when they&apos;re ready to
+                                talk!{traits.emojis ? " \ud83d\ude80" : ""}
+                              </div>
+                              <div className="w-8 h-8 rounded-full bg-[#ff7e67]/30 flex-shrink-0 flex items-center justify-center">
+                                <Zap className="w-3 h-3 text-white" />
+                              </div>
+                            </div>
                           </div>
-                          <div className="bg-stone-800 p-3 rounded-2xl rounded-tl-none text-xs text-stone-300">
-                            How does this work?
-                          </div>
-                        </div>
-                        <div className="flex items-start gap-3 justify-end">
-                          <div className="bg-[#ff7e67] p-4 rounded-2xl rounded-tr-none text-xs text-white max-w-[85%] leading-relaxed">
-                            It&apos;s super simple. Clinchd monitors your DMs
-                            24/7, qualifies leads based on your script, and
-                            drops your Calendly link when they&apos;re ready to
-                            talk!{traits.emojis ? " \ud83d\ude80" : ""}
-                          </div>
-                          <div className="w-8 h-8 rounded-full bg-[#ff7e67]/30 flex-shrink-0 flex items-center justify-center">
-                            <Zap className="w-3 h-3 text-white" />
-                          </div>
-                        </div>
-                      </div>
+                        </>
+                      )}
                     </div>
 
                     <div className="mt-10 pt-8 border-t border-white/10">
-                      <div className="grid grid-cols-2 gap-8">
-                        <div className="space-y-2">
-                          <div className="flex justify-between text-[10px] font-bold text-stone-400 uppercase">
-                            <span>Professionalism</span>
-                            <span>
-                              {selectedTone === "professional"
-                                ? "90%"
-                                : selectedTone === "direct"
-                                ? "75%"
-                                : "60%"}
-                            </span>
+                      {voiceProfile?.status === "ready" && voiceProfile?.voice_traits ? (
+                        <div className="grid grid-cols-2 gap-x-8 gap-y-3">
+                          {[
+                            { label: "Tone", value: voiceProfile.voice_traits.tone },
+                            { label: "Formality", value: voiceProfile.voice_traits.formality },
+                            { label: "Sentences", value: voiceProfile.voice_traits.sentence_length },
+                            { label: "Personality", value: voiceProfile.voice_traits.personality },
+                          ].map(({ label, value }) => (
+                            <div key={label}>
+                              <p className="text-[10px] font-bold text-stone-400 uppercase mb-1">
+                                {label}
+                              </p>
+                              <p className="text-xs text-stone-300 leading-relaxed">
+                                {value || "—"}
+                              </p>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="grid grid-cols-2 gap-8">
+                          <div className="space-y-2">
+                            <div className="flex justify-between text-[10px] font-bold text-stone-400 uppercase">
+                              <span>Professionalism</span>
+                              <span>
+                                {selectedTone === "professional"
+                                  ? "90%"
+                                  : selectedTone === "direct"
+                                  ? "75%"
+                                  : "60%"}
+                              </span>
+                            </div>
+                            <div className="h-1 bg-white/10 rounded-full">
+                              <div
+                                className="h-full bg-white/40 rounded-full transition-all"
+                                style={{
+                                  width:
+                                    selectedTone === "professional"
+                                      ? "90%"
+                                      : selectedTone === "direct"
+                                      ? "75%"
+                                      : "60%",
+                                }}
+                              />
+                            </div>
                           </div>
-                          <div className="h-1 bg-white/10 rounded-full">
-                            <div
-                              className="h-full bg-white/40 rounded-full transition-all"
-                              style={{
-                                width:
-                                  selectedTone === "professional"
-                                    ? "90%"
-                                    : selectedTone === "direct"
-                                    ? "75%"
-                                    : "60%",
-                              }}
-                            />
+                          <div className="space-y-2">
+                            <div className="flex justify-between text-[10px] font-bold text-stone-400 uppercase">
+                              <span>Friendliness</span>
+                              <span>
+                                {selectedTone === "friendly"
+                                  ? "92%"
+                                  : selectedTone === "supportive"
+                                  ? "88%"
+                                  : "65%"}
+                              </span>
+                            </div>
+                            <div className="h-1 bg-white/10 rounded-full">
+                              <div
+                                className="h-full bg-[#ff7e67] rounded-full transition-all"
+                                style={{
+                                  width:
+                                    selectedTone === "friendly"
+                                      ? "92%"
+                                      : selectedTone === "supportive"
+                                      ? "88%"
+                                      : "65%",
+                                }}
+                              />
+                            </div>
                           </div>
                         </div>
-                        <div className="space-y-2">
-                          <div className="flex justify-between text-[10px] font-bold text-stone-400 uppercase">
-                            <span>Friendliness</span>
-                            <span>
-                              {selectedTone === "friendly"
-                                ? "92%"
-                                : selectedTone === "supportive"
-                                ? "88%"
-                                : "65%"}
-                            </span>
-                          </div>
-                          <div className="h-1 bg-white/10 rounded-full">
-                            <div
-                              className="h-full bg-[#ff7e67] rounded-full transition-all"
-                              style={{
-                                width:
-                                  selectedTone === "friendly"
-                                    ? "92%"
-                                    : selectedTone === "supportive"
-                                    ? "88%"
-                                    : "65%",
-                              }}
-                            />
-                          </div>
-                        </div>
-                      </div>
+                      )}
                     </div>
                   </div>
                 </div>
