@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import { generateScript } from "@/lib/anthropic";
+import { enforceAiRateLimit } from "@/lib/rate-limit";
 
 export async function POST(request) {
   try {
@@ -15,6 +16,14 @@ export async function POST(request) {
     if (authError || !user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
+
+    const rl = await enforceAiRateLimit(
+      getSupabaseAdmin(),
+      user.id,
+      "generate_script",
+      30
+    );
+    if (rl) return rl;
 
     const { offer, targetCustomer, objections } = await request.json();
 

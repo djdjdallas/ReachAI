@@ -2,7 +2,7 @@ import Link from "next/link";
 import { ArrowRight } from "lucide-react";
 
 export default function CTABanner({
-  headline = "Ready to automate your DMs?",
+  headline = "Ready to handle your DMs with AI assistance?",
   subheadline = "Start your 7-day free trial — no credit card required.",
   buttonText = "Start Free Trial",
   buttonHref = "/signup",

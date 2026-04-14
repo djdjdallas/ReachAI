@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import { disconnectAccount } from "@/lib/unipile";
+import { decryptToken } from "@/lib/token-utils";
 
 export async function POST() {
   try {
@@ -16,16 +16,38 @@ export async function POST() {
 
     const { data: profile } = await supabase
       .from("users")
-      .select("unipile_account_id, instagram_business_account_id")
+      .select(
+        "instagram_business_account_id, meta_page_access_token"
+      )
       .eq("id", user.id)
       .single();
 
-    // Disconnect from Unipile if legacy connection
-    if (profile?.unipile_account_id) {
+    // Un-subscribe the IG business account from our webhook so future events
+    // don't route to a freed connection. Best-effort: if the token has already
+    // been revoked on Meta's side, log and continue to clear the DB row.
+    if (
+      profile?.instagram_business_account_id &&
+      profile?.meta_page_access_token
+    ) {
       try {
-        await disconnectAccount(profile.unipile_account_id);
+        const token = decryptToken(profile.meta_page_access_token);
+        const res = await fetch(
+          `https://graph.instagram.com/v21.0/${profile.instagram_business_account_id}/subscribed_apps?access_token=${token}`,
+          { method: "DELETE" }
+        );
+        if (!res.ok) {
+          const body = await res.text().catch(() => "");
+          console.warn(
+            "[ig-disconnect] subscribed_apps DELETE non-OK:",
+            res.status,
+            body.slice(0, 200)
+          );
+        }
       } catch (err) {
-        console.warn("Failed to disconnect from Unipile:", err.message);
+        console.warn(
+          "[ig-disconnect] subscribed_apps DELETE failed:",
+          err?.message
+        );
       }
     }
 
@@ -33,7 +55,6 @@ export async function POST() {
     await supabase
       .from("users")
       .update({
-        unipile_account_id: null,
         instagram_business_account_id: null,
         meta_page_id: null,
         meta_page_access_token: null,

@@ -68,10 +68,7 @@ export async function GET(request) {
 
     // Exchange code for long-lived token + Instagram user ID
     const { accessToken, expiresIn, userId } = await exchangeCodeForToken(code);
-    console.log(
-      "[ig-callback] exchangeCodeForToken returned userId (IGSID):",
-      userId
-    );
+    void userId;
 
     // Fetch the Instagram Business Account ID (IGBA ID) — the 17841… format
     // that Meta Dashboard shows and that the webhook fires with.
@@ -87,18 +84,13 @@ export async function GET(request) {
         `https://graph.instagram.com/v21.0/me?fields=id,user_id,username&access_token=${accessToken}`
       );
       const meData = await meRes.json();
-      console.log("[ig-callback] /me response:", meData);
 
       if (meData.user_id) {
         igbaId = meData.user_id;
-      } else if (meData.id) {
-        // Fallback only — this will be the IGSID not the IGBA, so webhook
-        // matches will fail. Log loudly so we notice.
-        console.warn(
-          "[ig-callback] /me did not return user_id — falling back to id which is the IGSID, NOT the IGBA. Webhook matching will likely fail."
-        );
-        igbaId = meData.id;
       }
+      // No fallback to meData.id — that is the IGSID, which will never match
+      // the webhook `recipient.id`. Better to fail the connect and let the
+      // user retry than silently save a broken account.
       igUsername = meData.username || null;
     } catch (err) {
       console.error("[ig-callback] Failed to fetch /me:", err?.message);
@@ -117,8 +109,6 @@ export async function GET(request) {
         `${baseUrl}/onboarding?step=1&error=no_igba_id`
       );
     }
-
-    console.log("[ig-callback] resolved IGBA ID to save:", igbaId);
 
     // Save Instagram connection details
     const expiresAt = new Date(Date.now() + expiresIn * 1000).toISOString();
@@ -154,10 +144,8 @@ export async function GET(request) {
         console.error(
           "[ig-callback] subscribe_apps failed:",
           subRes.status,
-          subData
+          subData?.error?.message
         );
-      } else {
-        console.log("[ig-callback] subscribe_apps ok:", igbaId, subData);
       }
     } catch (subErr) {
       console.error("[ig-callback] subscribe_apps threw:", subErr?.message);

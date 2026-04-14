@@ -66,6 +66,8 @@ export async function updateSession(request) {
   if (
     pathname === "/" ||
     pathname === "/callback" ||
+    pathname === "/forgot-password" ||
+    pathname === "/update-password" ||
     pathname.startsWith("/api/webhooks") ||
     pathname.startsWith("/compare") ||
     pathname.startsWith("/blog") ||

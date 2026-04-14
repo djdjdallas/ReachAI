@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import { summarizeConversation } from "@/lib/anthropic";
+import { enforceAiRateLimit } from "@/lib/rate-limit";
 
 export async function POST(request) {
   try {
@@ -15,6 +16,10 @@ export async function POST(request) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
+    const admin = getSupabaseAdmin();
+    const rl = await enforceAiRateLimit(admin, user.id, "summarize", 120);
+    if (rl) return rl;
+
     const { conversationId } = await request.json();
 
     if (!conversationId) {
@@ -23,8 +28,6 @@ export async function POST(request) {
         { status: 400 }
       );
     }
-
-    const admin = getSupabaseAdmin();
 
     // Verify conversation belongs to user
     const { data: conversation, error: convError } = await admin

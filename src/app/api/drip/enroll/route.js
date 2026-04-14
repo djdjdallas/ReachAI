@@ -7,6 +7,13 @@ const APP_URL = process.env.NEXT_PUBLIC_APP_URL || "https://clinchd.io";
 
 export async function POST(request) {
   try {
+    // Internal-only endpoint — require a shared secret from callers (the
+    // Stripe webhook is the only real caller today; cron uses the same).
+    const provided = request.headers.get("x-internal-secret");
+    if (!process.env.CRON_SECRET || provided !== process.env.CRON_SECRET) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
     const { userId } = await request.json();
     if (!userId) {
       return NextResponse.json({ error: "userId required" }, { status: 400 });

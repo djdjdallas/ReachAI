@@ -1,9 +1,8 @@
 /**
  * instagram.js
  *
- * Meta Instagram Graph API helpers for sending/receiving DMs.
- * Used for users connected via Meta's official OAuth flow.
- * Unipile remains as a fallback for legacy connections.
+ * Meta Instagram Graph API helpers for sending/receiving DMs via the
+ * Instagram Login OAuth flow.
  */
 
 const GRAPH_API_VERSION = "v21.0";
@@ -44,10 +43,6 @@ export async function exchangeCodeForToken(code) {
   }
 
   const redirectUri = `${process.env.NEXT_PUBLIC_APP_URL}/api/auth/instagram/callback`;
-  const mask = (s) =>
-    typeof s === "string" && s.length > 8
-      ? `${s.slice(0, 4)}…${s.slice(-4)}`
-      : "***";
 
   // Step 1: Exchange code for short-lived token via Instagram API
   const shortRes = await fetch("https://api.instagram.com/oauth/access_token", {
@@ -64,13 +59,6 @@ export async function exchangeCodeForToken(code) {
   });
 
   const shortData = await shortRes.json();
-  console.log("[ig-oauth] short-lived response:", {
-    status: shortRes.status,
-    ok: shortRes.ok,
-    // Don't log the token itself, but log the shape + mask
-    shape: Array.isArray(shortData?.data) ? "data-array" : "flat",
-    keys: Object.keys(shortData || {}),
-  });
 
   if (shortData.error_type || shortData.error_message || shortData.error) {
     throw new Error(
@@ -89,10 +77,6 @@ export async function exchangeCodeForToken(code) {
   const userId = shortPayload.user_id;
 
   if (!shortAccessToken) {
-    console.error(
-      "[ig-oauth] short-lived exchange returned no access_token. Raw:",
-      shortData
-    );
     throw new Error("Instagram token exchange returned no access_token");
   }
 
@@ -103,25 +87,11 @@ export async function exchangeCodeForToken(code) {
     access_token: shortAccessToken,
   });
 
-  console.log("[ig-oauth] long-lived exchange:", {
-    url: "https://graph.instagram.com/access_token",
-    method: "GET",
-    grant_type: "ig_exchange_token",
-    client_secret: mask(process.env.INSTAGRAM_APP_SECRET),
-    access_token: mask(shortAccessToken),
-  });
-
   const longRes = await fetch(
     `https://graph.instagram.com/access_token?${longParams}`,
     { method: "GET", cache: "no-store" }
   );
   const longData = await longRes.json();
-
-  console.log("[ig-oauth] long-lived response:", {
-    status: longRes.status,
-    ok: longRes.ok,
-    body: longData,
-  });
 
   if (longData.error) {
     throw new Error(`Instagram long-lived token failed: ${longData.error.message}`);

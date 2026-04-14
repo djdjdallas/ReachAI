@@ -115,7 +115,7 @@ export const DRIP_SEQUENCE = [
       badge: "Welcome to Clinchd",
       content: `
   ${h1("Hey {{full_name}}, welcome aboard!")}
-  ${p("You just unlocked your own AI-powered DM setter. In the next 30 minutes you can have it qualifying leads and booking calls on autopilot.")}
+  ${p("You just unlocked your AI-assisted DM setter. In the next 30 minutes you can have it qualifying leads and booking discovery calls on your behalf.")}
   ${p("<strong style=\"color:#1c1917;\">Here\u2019s your 3-step setup:</strong>")}
   ${checklist([
     { title: "Connect your Instagram", link: "{{app_url}}/settings", linkText: "Connect" },

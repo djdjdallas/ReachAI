@@ -7,7 +7,7 @@ export async function GET(request) {
   const title = searchParams.get("title") || "Clinchd";
   const description =
     searchParams.get("description") ||
-    "AI Instagram DM Automation for Coaches";
+    "AI-assisted Instagram DMs for coaches";
 
   return new ImageResponse(
     (

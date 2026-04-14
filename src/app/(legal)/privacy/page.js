@@ -28,19 +28,19 @@ export default function PrivacyPage() {
         <p>
           When you connect your Instagram account, we collect your Instagram account ID,
           username, profile information, and the content of direct messages sent to and
-          from your account. This data is accessed solely to provide inbox functionality
-          and AI-powered reply features within Clinchd. Message data is never stored beyond
-          what is necessary for conversation context and is not used for any purpose other
-          than operating the service you have explicitly connected.
+          from your account. This data is accessed solely to provide shared-inbox
+          functionality and AI-assisted reply features within Clinchd. Message data is
+          never stored beyond what is necessary for conversation context and is not used
+          for any purpose other than operating the service you have explicitly connected.
         </p>
         <p>
           <strong>Human agent message permission:</strong> Clinchd requests the
           <code> instagram_business_manage_messages </code> permission, which under Meta&apos;s
           policy allows human agents to send follow-up messages within a 7-day window after
           a user initiates a conversation. This permission is used exclusively to support
-          human agent follow-up within the policy-compliant 7-day window. No automated
-          messages are sent using this permission — all automated AI replies operate under
-          Meta&apos;s standard 24-hour messaging window and conversation-initiation rules.
+          human agent follow-up within the policy-compliant 7-day window. AI-assisted replies
+          operate under Meta&apos;s standard 24-hour messaging window and conversation-initiation
+          rules, and the account owner is in control of when the AI is enabled.
         </p>
         <p>
           You can disconnect your Instagram account at any time from the Settings page,
@@ -74,7 +74,7 @@ export default function PrivacyPage() {
         <h2>3. How We Use Your Information</h2>
         <ul>
           <li>To provide, operate, and maintain the Clinchd platform</li>
-          <li>To generate AI-powered DM replies on your behalf</li>
+          <li>To generate AI-assisted DM replies on your behalf</li>
           <li>To process transactions and manage your subscription</li>
           <li>To send service-related communications (account alerts, updates)</li>
           <li>To improve our product and develop new features</li>
@@ -86,8 +86,9 @@ export default function PrivacyPage() {
         <ul>
           <li>
             <strong>Service providers:</strong> Anthropic (AI processing), Google (calendar
-            integration), Stripe (payments), Supabase (database hosting), Unipile
-            (Instagram messaging integration), Vercel (hosting), and PostHog (analytics).
+            integration), Stripe (payments), Supabase (database hosting), Meta (Instagram
+            Graph API for messaging), Resend (transactional email), Twilio (SMS alerts),
+            Vercel (hosting), and PostHog (analytics).
           </li>
           <li>
             <strong>Legal requirements:</strong> When required by law, subpoena, or
@@ -97,9 +98,12 @@ export default function PrivacyPage() {
 
         <h2>5. Data Retention</h2>
         <p>
-          We retain your account data for as long as your account is active. Conversation
-          data is retained to provide AI context and can be deleted upon request. If you
-          delete your account, we will remove your personal data within 30 days.
+          We retain your account data for as long as your account is active. Message
+          content from closed conversations (bookings confirmed or lead marked not-a-fit)
+          is automatically deleted after 7 days, in line with Meta&apos;s messaging retention
+          guidance. Active conversations retain full message history so the AI has context
+          for follow-up. You can request full deletion of any conversation at any time.
+          If you delete your account, we will remove your personal data within 30 days.
         </p>
 
         <h2>6. Data Security</h2>

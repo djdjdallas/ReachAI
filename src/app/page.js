@@ -15,29 +15,29 @@ import Footer from "@/components/landing/footer";
 import JsonLd from "@/components/JsonLd";
 
 export const metadata = {
-  title: "Clinchd — AI Instagram DM Automation for Coaches",
+  title: "Clinchd — AI-Assisted Instagram DMs for Coaches",
   description:
-    "Clinchd qualifies your Instagram DM leads and books discovery calls automatically. Replace your setter for $97/month. No flows, no complexity — just AI that sells.",
+    "Clinchd is a shared Instagram inbox with AI-assisted replies that qualify leads and book discovery calls — with the account owner in full control of every conversation.",
   keywords: [
-    "instagram dm automation for coaches",
+    "instagram dm ai assistant for coaches",
     "ai appointment setter instagram",
     "manychat alternative for coaches 2026",
-    "instagram dm bot for coaches",
-    "automate instagram dms coaching business",
+    "instagram dm ai for coaches",
+    "ai setter for instagram coaches",
   ],
   openGraph: {
-    title: "Clinchd — AI Instagram DM Automation for Coaches",
+    title: "Clinchd — AI-Assisted Instagram DMs for Coaches",
     description:
-      "Clinchd qualifies your Instagram DM leads and books discovery calls automatically. Replace your setter for $97/month.",
+      "A shared Instagram inbox with AI-assisted replies that qualify leads and book discovery calls. You stay in control.",
     url: "https://www.clinchd.io",
     siteName: "Clinchd",
     type: "website",
   },
   twitter: {
     card: "summary_large_image",
-    title: "Clinchd — AI Instagram DM Automation for Coaches",
+    title: "Clinchd — AI-Assisted Instagram DMs for Coaches",
     description:
-      "Clinchd qualifies your Instagram DM leads and books discovery calls automatically. Replace your setter for $97/month.",
+      "A shared Instagram inbox with AI-assisted replies that qualify leads and book discovery calls.",
   },
 };
 
@@ -47,7 +47,7 @@ const organizationSchema = {
   name: "Clinchd",
   url: "https://www.clinchd.io",
   description:
-    "AI-powered Instagram DM automation for coaches and course creators.",
+    "AI-assisted Instagram DM conversations for coaches and course creators — a shared inbox where the owner controls every reply.",
   foundingDate: "2026",
   sameAs: [],
 };
@@ -57,7 +57,7 @@ const softwareSchema = {
   "@type": "SoftwareApplication",
   name: "Clinchd",
   applicationCategory: "BusinessApplication",
-  applicationSubCategory: "Instagram DM Automation",
+  applicationSubCategory: "Instagram DM Assistant",
   operatingSystem: "Web",
   url: "https://www.clinchd.io",
   offers: [
@@ -67,7 +67,7 @@ const softwareSchema = {
       price: "97",
       priceCurrency: "USD",
       priceValidUntil: "2027-12-31",
-      description: "500 DMs/month, AI setter, lead qualification, auto-booking, email support.",
+      description: "500 DMs/month, AI setter, lead qualification, call booking, email support.",
     },
     {
       "@type": "Offer",
@@ -81,7 +81,7 @@ const softwareSchema = {
   description:
     "AI appointment setter that qualifies leads, handles objections, and books discovery calls in Instagram DMs. Built specifically for coaches and course creators selling high-ticket offers.",
   featureList:
-    "AI-powered DM conversations, Comment-to-DM automation, Story reply automation, Lead qualification, Objection handling, Discovery call booking, Analytics dashboard, Human takeover, Flat monthly pricing, Meta Graph API compliance",
+    "AI-powered DM conversations, Comment-to-DM workflows, Story reply workflows, Lead qualification, Objection handling, Discovery call booking, Analytics dashboard, Human takeover, Flat monthly pricing, Meta Graph API compliance",
 };
 
 const faqPageSchema = {
@@ -101,7 +101,7 @@ const faqPageSchema = {
       name: "Will my followers know it's AI?",
       acceptedAnswer: {
         "@type": "Answer",
-        text: "In our testing, over 95% of leads don't realize they're talking to AI. You provide your tone and sales script. Clinchd matches your specific coaching voice with human-like delays so conversations feel natural.",
+        text: "Clinchd matches your coaching voice with human-like cadence, and the AI is honest: if a lead directly asks whether they're talking to an AI, the assistant confirms and offers to hand off to you. You stay in control of every conversation and can jump in at any time.",
       },
     },
     {

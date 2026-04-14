@@ -149,7 +149,7 @@ function alertEmail({ badge, heading, body, ctaText, ctaUrl }) {
 <!-- Footer -->
 <tr><td style="padding:24px 40px;background-color:#f5f5f4;border-top:1px solid #e7e5e4;">
   <p style="margin:0;font-size:12px;color:#a8a29e;line-height:1.5;">
-    Clinchd &middot; AI DM automation for coaches<br/>
+    Clinchd &middot; AI-assisted DM conversations for coaches<br/>
     <a href="${APP_URL}/settings" style="color:#a8a29e;text-decoration:underline;">Notification settings</a>
   </p>
 </td></tr>

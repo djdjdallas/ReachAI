@@ -71,11 +71,58 @@ export async function POST(request) {
           // Enroll new subscriber in drip campaign
           fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/drip/enroll`, {
             method: "POST",
-            headers: { "Content-Type": "application/json" },
+            headers: {
+              "Content-Type": "application/json",
+              "x-internal-secret": process.env.CRON_SECRET || "",
+            },
             body: JSON.stringify({ userId }),
           }).catch((err) =>
             console.error("Drip enrollment failed:", err.message)
           );
+        }
+        break;
+      }
+
+      case "invoice.payment_succeeded": {
+        // Runs on trial → paid conversion and every subsequent renewal.
+        // Make sure the user is `active` (Stripe may fire this before the
+        // customer.subscription.updated event in trial-end flows).
+        const invoice = event.data.object;
+        const customerId = invoice.customer;
+        if (customerId) {
+          await supabase
+            .from("users")
+            .update({ subscription_status: "active" })
+            .eq("stripe_customer_id", customerId);
+        }
+        break;
+      }
+
+      case "customer.subscription.trial_will_end": {
+        // Fires ~3 days before trial ends. Surface a dunning ping so the
+        // account owner knows billing is about to begin.
+        const subscription = event.data.object;
+        const customerId = subscription.customer;
+        const { data: owner } = await supabase
+          .from("users")
+          .select("id, email, full_name")
+          .eq("stripe_customer_id", customerId)
+          .single();
+
+        if (owner?.email) {
+          try {
+            const { sendEmail } = await import("@/lib/notifications");
+            await sendEmail({
+              to: owner.email,
+              subject: "Your Clinchd trial ends soon",
+              html: `<p>Hi ${owner.full_name || "there"},</p>
+                <p>Just a heads-up: your 7-day Clinchd trial ends in a few days, and your card will be charged for the plan you selected. If you'd like to cancel or change plans, open the billing page in your dashboard — no pressure.</p>
+                <p><a href="${process.env.NEXT_PUBLIC_APP_URL}/billing">Manage billing →</a></p>
+                <p>— Clinchd</p>`,
+            });
+          } catch (err) {
+            console.error("trial_will_end email failed:", err?.message);
+          }
         }
         break;
       }

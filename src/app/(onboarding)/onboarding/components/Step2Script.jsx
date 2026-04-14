@@ -210,6 +210,30 @@ export default function Step2Script({
                     onChange={(e) => setCalendlyUrl(e.target.value)}
                   />
                 </div>
+
+                {/* Calendly webhook setup instructions — ensures booked calls
+                    update the conversation status automatically. */}
+                <div className="mt-4 rounded-2xl border border-stone-200 bg-stone-50/80 p-4 text-xs text-stone-600 leading-relaxed space-y-2">
+                  <p className="font-bold text-stone-900">
+                    Optional: auto-mark bookings as confirmed
+                  </p>
+                  <p>
+                    In Calendly, open{" "}
+                    <strong>Integrations → Webhooks</strong> and add this URL:
+                  </p>
+                  <code className="block rounded-lg bg-white border border-stone-200 px-3 py-2 text-[11px] text-stone-800 font-mono break-all">
+                    https://www.clinchd.io/api/webhooks/calendly
+                  </code>
+                  <p>
+                    Subscribe to the{" "}
+                    <strong>invitee.created</strong> and{" "}
+                    <strong>invitee.canceled</strong> events. Copy the signing
+                    secret Calendly gives you — our team will paste it into
+                    your Clinchd environment so bookings flow back into your
+                    dashboard. Until that&apos;s wired up, the AI still sends
+                    the link; you just won&apos;t see bookings auto-confirm.
+                  </p>
+                </div>
               </div>
             </div>
 

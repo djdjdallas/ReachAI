@@ -122,8 +122,8 @@ export default function LoginPage() {
                 Welcome back to <span className="text-[#ff7e67]">Clinchd</span>
               </h1>
               <p className="text-xl text-stone-500 font-medium leading-relaxed max-w-md">
-                Log in to manage your AI sales agent and watch your high-ticket
-                calls book themselves.
+                Log in to manage your shared inbox and watch AI-assisted replies
+                book high-ticket discovery calls on your behalf.
               </p>
             </div>
 
@@ -152,8 +152,8 @@ export default function LoginPage() {
                     Personalized Scripts
                   </h4>
                   <p className="text-sm text-stone-500 leading-relaxed">
-                    Your unique voice, automated. Tweak your AI&apos;s
-                    personality anytime.
+                    Your unique voice, in every reply. Tweak the AI&apos;s
+                    tone and personality anytime.
                   </p>
                 </div>
               </div>
@@ -277,6 +277,12 @@ export default function LoginPage() {
                     >
                       Password
                     </label>
+                    <Link
+                      href="/forgot-password"
+                      className="text-[11px] font-black text-[#ff7e67] uppercase tracking-widest hover:underline"
+                    >
+                      Forgot?
+                    </Link>
                   </div>
                   <div className="relative">
                     <Lock className="absolute left-5 top-1/2 -translate-y-1/2 text-stone-300 w-5 h-5" />

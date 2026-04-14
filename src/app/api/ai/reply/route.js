@@ -6,6 +6,7 @@ import { buildSystemPrompt } from "@/lib/prompts";
 import { sendInstagramMessage } from "@/lib/instagram";
 import { decryptToken } from "@/lib/token-utils";
 import { getPostHogClient } from "@/lib/posthog-server";
+import { enforceAiRateLimit } from "@/lib/rate-limit";
 
 export async function POST(request) {
   try {
@@ -19,6 +20,10 @@ export async function POST(request) {
     if (authError || !user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
+
+    const admin = getSupabaseAdmin();
+    const rl = await enforceAiRateLimit(admin, user.id, "ai_reply", 600);
+    if (rl) return rl;
 
     const { conversationId, message, manual } = await request.json();
 
@@ -120,7 +125,7 @@ export async function POST(request) {
       );
     }
 
-    // Pause AI on manual reply so the bot doesn't also reply next message
+    // Pause AI on manual reply so the assistant doesn't also answer next
     if (manual) {
       await getSupabaseAdmin()
         .from("conversations")

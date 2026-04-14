@@ -16,12 +16,35 @@ const geistMono = localFont({
 
 export const metadata = {
   title: {
-    default: "Clinchd — AI Instagram DM Automation for Coaches",
+    default: "Clinchd — AI-Assisted Instagram DMs for Coaches",
     template: "%s | Clinchd",
   },
   description:
-    "Clinchd is the AI setter that qualifies leads, handles objections, and books discovery calls in your Instagram DMs — replacing your $5K/mo setter for just $97.",
+    "Clinchd is a shared Instagram inbox with AI-assisted replies — a virtual setter that qualifies leads, handles objections, and books discovery calls while you stay in control.",
   metadataBase: new URL("https://www.clinchd.io"),
+  openGraph: {
+    title: "Clinchd — AI-Assisted Instagram DMs for Coaches",
+    description:
+      "A shared Instagram inbox with AI-assisted replies that qualify leads and book discovery calls. You stay in control.",
+    url: "https://www.clinchd.io",
+    siteName: "Clinchd",
+    type: "website",
+    images: [
+      {
+        url: "/og",
+        width: 1200,
+        height: 630,
+        alt: "Clinchd — AI-assisted Instagram DMs for coaches",
+      },
+    ],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Clinchd — AI-Assisted Instagram DMs for Coaches",
+    description:
+      "A shared Instagram inbox with AI-assisted replies that qualify leads and book discovery calls.",
+    images: ["/og"],
+  },
 };
 
 const websiteSchema = {
@@ -30,7 +53,7 @@ const websiteSchema = {
   name: "Clinchd",
   url: "https://www.clinchd.io",
   description:
-    "AI-powered Instagram DM automation for coaches and course creators. Qualify leads, handle objections, and book discovery calls automatically.",
+    "AI-assisted Instagram DM conversations for coaches and course creators. Qualify leads, handle objections, and book discovery calls — with the owner in control of every reply.",
   publisher: {
     "@type": "Organization",
     name: "Clinchd",

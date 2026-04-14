@@ -393,13 +393,12 @@ export default function SettingsPage() {
   const handleDisconnectInstagram = async () => {
     setDisconnecting(true);
     try {
-      // Call backend to disconnect from Unipile + clear DB
+      // Call backend to un-subscribe the webhook + clear DB
       await fetch("/api/auth/instagram/disconnect", { method: "POST" });
 
       posthog.capture("instagram_disconnected");
       setProfile((prev) => ({
         ...prev,
-        unipile_account_id: null,
         instagram_business_account_id: null,
       }));
     } catch (err) {
@@ -417,7 +416,7 @@ export default function SettingsPage() {
     );
   }
 
-  const isInstagramConnected = !!(profile?.unipile_account_id || profile?.instagram_business_account_id);
+  const isInstagramConnected = !!profile?.instagram_business_account_id;
 
   return (
     <div className="space-y-6 p-6 max-w-3xl">
@@ -504,7 +503,7 @@ export default function SettingsPage() {
               <span className="text-xs text-muted-foreground">
                 {profile?.instagram_username
                   ? `@${profile.instagram_username}`
-                  : `Account: ${profile?.instagram_business_account_id || profile?.unipile_account_id}`}
+                  : `Account: ${profile?.instagram_business_account_id}`}
               </span>
             )}
           </div>

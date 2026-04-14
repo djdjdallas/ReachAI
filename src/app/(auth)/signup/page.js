@@ -148,8 +148,8 @@ export default function SignupPage() {
                     Personalized Scripts
                   </h4>
                   <p className="text-sm text-stone-500 leading-relaxed">
-                    Your unique voice, automated. Tweak your AI&apos;s
-                    personality anytime.
+                    Your unique voice, in every reply. Tweak the AI&apos;s
+                    tone and personality anytime.
                   </p>
                 </div>
               </div>

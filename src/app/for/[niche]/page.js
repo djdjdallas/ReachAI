@@ -380,7 +380,7 @@ export default async function NichePage({ params }) {
       <section className="py-16 md:py-24 bg-white">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
           <CTABanner
-            headline={`Ready to automate your DMs as a ${data.nicheLabel.toLowerCase().replace("coaches", "coach")}?`}
+            headline={`Ready to handle your DMs with AI assistance as a ${data.nicheLabel.toLowerCase().replace("coaches", "coach")}?`}
             subheadline="Start your 7-day free trial — no credit card required. Set up in under 30 minutes."
             buttonText="Start Free Trial"
             buttonHref="/signup"

@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import { generateReply } from "@/lib/anthropic";
 import { buildSystemPrompt } from "@/lib/prompts";
+import { enforceAiRateLimit } from "@/lib/rate-limit";
 
 /**
  * POST /api/ai/playground
@@ -36,6 +37,14 @@ export async function POST(request) {
     if (authError || !user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
+
+    const rl = await enforceAiRateLimit(
+      getSupabaseAdmin(),
+      user.id,
+      "playground",
+      30
+    );
+    if (rl) return rl;
 
     const { messages } = await request.json();
 

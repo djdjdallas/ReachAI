@@ -17,7 +17,7 @@ const testimonials = [
   },
   {
     quote:
-      "The human-like delay is the game changer. People think they're talking to my assistant, not a bot. Replaced my $4K setter on day one.",
+      "The natural cadence is the game changer. Conversations feel like I'm writing them myself, and the assistant hands off to me the moment something needs a human touch. Replaced my $4K setter on day one.",
     name: "Emma Rivera",
     role: "Course Creator, 8k followers",
     avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Emma",

@@ -6,6 +6,7 @@ import { sendInstagramMessage, verifyWebhookSignature, getParticipantProfile } f
 import { decryptToken } from "@/lib/token-utils";
 import { sendHotLeadAlert, sendBookingAlert } from "@/lib/notifications";
 import { getPostHogClient } from "@/lib/posthog-server";
+import { log } from "@/lib/logger";
 
 // ── GET: Meta webhook verification ──────────────────────────────────────
 
@@ -50,18 +51,7 @@ async function handleMetaWebhook(body, rawBody, request) {
   if (!process.env.INSTAGRAM_APP_SECRET) {
     console.warn("INSTAGRAM_APP_SECRET not set — skipping signature verification");
   } else if (!verifyWebhookSignature(rawBody, signature)) {
-    // DEBUG: temporary logging to diagnose signature mismatch
-    const crypto = await import("crypto");
-    const secret = process.env.INSTAGRAM_APP_SECRET;
-    const computed = "sha256=" + crypto.createHmac("sha256", secret).update(rawBody, "utf-8").digest("hex");
-    console.error("Signature mismatch debug:", {
-      secretLength: secret.length,
-      secretFirst4: secret.slice(0, 4),
-      receivedSig: signature,
-      computedSig: computed,
-      bodyLength: rawBody.length,
-      bodyFirst80: rawBody.slice(0, 80),
-    });
+    console.warn("[ig-webhook] signature verification failed");
     return NextResponse.json({ error: "Invalid signature" }, { status: 403 });
   }
 
@@ -126,34 +116,23 @@ async function insertMessageIfNew(supabase, { conversation_id, role, content, pr
       .select("id")
       .eq("provider_message_id", provider_message_id)
       .maybeSingle();
-    if (existing) {
-      console.log("[webhook] duplicate message skipped:", provider_message_id);
-      return { duplicate: true };
-    }
+    if (existing) return { duplicate: true };
   }
   const { data, error } = await supabase
     .from("messages")
     .insert({ conversation_id, role, content, provider_message_id })
     .select()
     .single();
-  // Handle unique constraint violation (race condition fallback)
-  if (error?.code === "23505") {
-    console.log("[webhook] duplicate message (unique violation):", provider_message_id);
-    return { duplicate: true };
-  }
+  if (error?.code === "23505") return { duplicate: true };
   if (error) {
-    console.error("[webhook] message insert FAILED:", { conversation_id, role, error });
-  } else {
-    console.log("[webhook] message inserted:", { id: data?.id, conversation_id, role });
+    log.error("[webhook] message insert failed:", { conversation_id, role, code: error.code });
   }
   // Bump the conversation's updated_at so the inbox reorders/realtime fires
   const { error: bumpError } = await supabase
     .from("conversations")
     .update({ last_message_at: new Date().toISOString() })
     .eq("id", conversation_id);
-  if (bumpError) {
-    console.error("[webhook] conversation bump FAILED:", bumpError);
-  }
+  if (bumpError) log.error("[webhook] conversation bump failed:", bumpError.code);
   return { data, error, duplicate: false };
 }
 
@@ -177,16 +156,11 @@ async function processIncomingMessage({
     .single();
 
   if (userError || !user) {
-    console.error(`[webhook] No user found for ${lookupField}:`, lookupValue, userError);
+    log.warn(`[webhook] no user for ${lookupField}:`, lookupValue);
     return;
   }
 
-  console.log("[webhook] processing message for user:", user.id, "sender:", senderId);
-
-  if (!["active", "trialing"].includes(user.subscription_status)) {
-    console.log("[webhook] Inactive subscription for user:", user.id, "status:", user.subscription_status);
-    return;
-  }
+  if (!["active", "trialing"].includes(user.subscription_status)) return;
 
   // Fix #1: Check trial expiry
   if (user.subscription_status === "trialing") {
@@ -196,7 +170,6 @@ async function processIncomingMessage({
         .from("users")
         .update({ subscription_status: "expired", ai_mode: "off" })
         .eq("id", user.id);
-      console.log("Trial expired for user:", user.id);
       return;
     }
   }
@@ -242,28 +215,22 @@ async function processIncomingMessage({
       .single();
 
     if (createError) {
-      console.error("[webhook] Failed to create conversation:", createError);
+      log.error("[webhook] create conversation failed:", createError.code);
       return;
     }
-    console.log("[webhook] conversation created:", newConv?.id, "for user:", user.id);
     getPostHogClient().capture({
       distinctId: user.email || user.id,
       event: "conversation_created",
       properties: { conversation_id: newConv.id, sender_name: senderName },
     });
     conversation = newConv;
-  } else {
-    console.log("[webhook] existing conversation found:", conversation.id);
   }
 
   // ── Global AI mode gate ─────────────────────────────────────────────
   // 'off'     → complete silence: return without saving anything
   // 'handoff' → save inbound message for dashboard, but skip AI reply
   // 'active'  → full processing (may still be paused per-conversation)
-  if (user.ai_mode === "off") {
-    console.log("[webhook] ai_mode=off for user:", user.id, "— skipping entirely");
-    return;
-  }
+  if (user.ai_mode === "off") return;
 
   if (user.ai_mode === "handoff" || conversation.ai_paused) {
     await insertMessageIfNew(supabase, {
@@ -292,13 +259,10 @@ async function processIncomingMessage({
   if (dmLimit !== Infinity) {
     const { data: newCount, error: rpcError } = await supabase.rpc("increment_dm_count", { uid: user.id });
     if (rpcError) {
-      console.error("Failed to increment DM count:", rpcError);
+      log.error("increment_dm_count failed:", rpcError.code);
       return;
     }
-    if (newCount > dmLimit) {
-      console.log("DM limit reached for user:", user.id);
-      return;
-    }
+    if (newCount > dmLimit) return;
   }
 
   // Save incoming message (with deduplication)
@@ -308,10 +272,7 @@ async function processIncomingMessage({
     content: messageText,
     provider_message_id: providerMessageId,
   });
-  if (insertResult.duplicate) {
-    console.log("Duplicate message skipped:", providerMessageId);
-    return;
-  }
+  if (insertResult.duplicate) return;
 
   getPostHogClient().capture({
     distinctId: user.email || user.id,
@@ -331,7 +292,7 @@ async function processIncomingMessage({
     .limit(20);
 
   if (msgError) {
-    console.error("Failed to fetch messages:", msgError);
+    log.error("fetch messages failed:", msgError.code);
     return;
   }
 
@@ -355,11 +316,6 @@ async function processIncomingMessage({
             last_message_at: new Date().toISOString(),
           })
           .eq("id", conversation.id);
-        console.log(
-          "[webhook] human-in-loop pause:",
-          conversation.id,
-          classification.reason
-        );
         getPostHogClient().capture({
           distinctId: user.email || user.id,
           event: "human_in_loop_triggered",
@@ -368,10 +324,7 @@ async function processIncomingMessage({
         return;
       }
     } catch (err) {
-      console.warn(
-        "[webhook] classifier failed, falling through to normal reply:",
-        err?.message
-      );
+      log.warn("[webhook] classifier failed, falling through:", err?.message);
     }
   }
 
@@ -394,46 +347,66 @@ async function processIncomingMessage({
   }
 
   // Save AI reply
-  const { data: aiMsg, error: aiInsertError } = await supabase
+  const { error: aiInsertError } = await supabase
     .from("messages")
     .insert({
       conversation_id: conversation.id,
       role: "assistant",
       content: aiReply,
-    })
-    .select()
-    .single();
-  if (aiInsertError) {
-    console.error("[webhook] AI reply insert FAILED:", aiInsertError);
-  } else {
-    console.log("[webhook] AI reply inserted:", aiMsg?.id);
-  }
+    });
+  if (aiInsertError) log.error("[webhook] AI reply insert failed:", aiInsertError.code);
   await supabase
     .from("conversations")
     .update({ last_message_at: new Date().toISOString() })
     .eq("id", conversation.id);
 
-  // Send reply via Meta Instagram API
+  // Check Meta's 200/hr outbound DM cap before sending. If we're over, the
+  // reply stays saved to DB (the owner can send it manually from the dashboard)
+  // but we skip the API call so we don't burn the rate limit.
+  let canSend = true;
   try {
-    await sendInstagramMessage(
-      user.instagram_business_account_id,
-      senderId,
-      aiReply,
-      decryptToken(user.meta_page_access_token)
+    const { data: allowed, error: rlErr } = await supabase.rpc(
+      "check_and_record_outbound",
+      { uid: user.id }
     );
-    getPostHogClient().capture({
-      distinctId: user.email || user.id,
-      event: "ai_reply_sent",
-      properties: { conversation_id: conversation.id, reply_length: aiReply.length },
-    });
+    if (rlErr) {
+      console.error("outbound rate-limit RPC failed:", rlErr);
+    } else if (allowed === false) {
+      canSend = false;
+      console.warn("[webhook] outbound rate-limit hit for user:", user.id);
+      getPostHogClient().capture({
+        distinctId: user.email || user.id,
+        event: "ai_reply_rate_limited",
+        properties: { conversation_id: conversation.id },
+      });
+    }
   } catch (err) {
-    console.error("sendInstagramMessage failed for conversation:", conversation.id, err.message);
-    getPostHogClient().capture({
-      distinctId: user.email || user.id,
-      event: "message_delivery_failed",
-      properties: { conversation_id: conversation.id, error: err.message },
-    });
-    // Reply is saved to DB but wasn't delivered — continue to status detection
+    console.error("outbound rate-limit threw:", err?.message);
+  }
+
+  if (canSend) {
+    // Send reply via Meta Instagram API
+    try {
+      await sendInstagramMessage(
+        user.instagram_business_account_id,
+        senderId,
+        aiReply,
+        decryptToken(user.meta_page_access_token)
+      );
+      getPostHogClient().capture({
+        distinctId: user.email || user.id,
+        event: "ai_reply_sent",
+        properties: { conversation_id: conversation.id, reply_length: aiReply.length },
+      });
+    } catch (err) {
+      console.error("sendInstagramMessage failed for conversation:", conversation.id, err.message);
+      getPostHogClient().capture({
+        distinctId: user.email || user.id,
+        event: "message_delivery_failed",
+        properties: { conversation_id: conversation.id, error: err.message },
+      });
+      // Reply is saved to DB but wasn't delivered — continue to status detection
+    }
   }
 
   // Status detection — check both AI reply and lead's message
@@ -466,7 +439,6 @@ async function processIncomingMessage({
   }
 
   if (newStatus !== conversation.status) {
-    console.log(`Status change: ${conversation.id} ${conversation.status} → ${newStatus}`);
     await supabase.from("conversations").update({ status: newStatus }).eq("id", conversation.id);
     getPostHogClient().capture({
       distinctId: user.email || user.id,

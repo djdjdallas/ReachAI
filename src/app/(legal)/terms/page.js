@@ -19,9 +19,10 @@ export default function TermsPage() {
 
         <h2>2. Description of Service</h2>
         <p>
-          Clinchd is an AI-powered platform that automates Instagram direct message responses
-          for businesses. The Service uses artificial intelligence to qualify leads, handle
-          objections, and guide prospects through a sales conversation on your behalf.
+          Clinchd is an AI-assisted shared inbox for Instagram direct messages. The Service
+          uses artificial intelligence to draft and send replies that qualify leads, handle
+          objections, and guide prospects through a sales conversation — with the account
+          owner in control of every reply.
         </p>
 
         <h2>3. Account Registration</h2>
@@ -41,7 +42,7 @@ export default function TermsPage() {
           </li>
           <li>
             Confirm that you have the authority to connect the Instagram account and
-            authorize automated responses.
+            authorize AI-assisted responses to be sent on your behalf.
           </li>
           <li>
             Agree to comply with Instagram&apos;s Terms of Use and Community Guidelines.
@@ -54,21 +55,21 @@ export default function TermsPage() {
 
         <h2>5. AI-Generated Content</h2>
         <p>
-          The Service generates AI-powered responses based on your script configuration.
+          The Service generates AI-assisted responses based on your script configuration.
           You acknowledge that:
         </p>
         <ul>
-          <li>AI-generated responses may not always be perfectly accurate or appropriate.</li>
+          <li>AI-assisted responses may not always be perfectly accurate or appropriate.</li>
           <li>
             You are ultimately responsible for the content sent from your Instagram account,
             including AI-generated messages.
           </li>
           <li>
-            You should review and test your AI script configuration before activating
-            automated responses.
+            You should review and test your AI script configuration before enabling the
+            assistant to reply on your behalf.
           </li>
           <li>
-            You can pause or deactivate AI responses at any time from your dashboard.
+            You can pause or disable AI-assisted replies at any time from your dashboard.
           </li>
         </ul>
 
@@ -130,7 +131,7 @@ export default function TermsPage() {
         <p>
           We are not liable for any actions taken by Instagram regarding your account,
           including account suspension or restriction, that may result from the use of
-          automated messaging.
+          AI-assisted messaging.
         </p>
 
         <h2>11. Disclaimer of Warranties</h2>

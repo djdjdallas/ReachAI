@@ -9,6 +9,12 @@ export default function sitemap() {
       priority: 1.0,
     },
     {
+      url: `${baseUrl}/forgot-password`,
+      lastModified: new Date(),
+      changeFrequency: "yearly",
+      priority: 0.3,
+    },
+    {
       url: `${baseUrl}/blog`,
       lastModified: new Date(),
       changeFrequency: "weekly",

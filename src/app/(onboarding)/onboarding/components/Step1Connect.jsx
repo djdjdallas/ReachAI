@@ -219,10 +219,20 @@ export default function Step1Connect({ instagramConnected, onSkip }) {
               </div>
             </div>
 
-            {/* Skip button */}
+            {/* Skip button — gated on the Connected Tools acknowledgement */}
             <button
               onClick={onSkip}
-              className="text-sm font-bold text-stone-400 hover:text-stone-900 transition-colors flex items-center gap-2"
+              disabled={!canConnect}
+              className={`text-sm font-bold transition-colors flex items-center gap-2 ${
+                canConnect
+                  ? "text-stone-400 hover:text-stone-900 cursor-pointer"
+                  : "text-stone-300 cursor-not-allowed"
+              }`}
+              title={
+                canConnect
+                  ? undefined
+                  : "Confirm the Connected Tools checkbox before skipping"
+              }
             >
               Skip for now
               <ArrowRight className="w-4 h-4" />
