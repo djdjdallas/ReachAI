@@ -8,7 +8,7 @@ export default function PrivacyPage() {
     <div className="min-h-screen bg-background px-4 py-16">
       <div className="mx-auto max-w-3xl prose prose-neutral dark:prose-invert">
         <h1>Privacy Policy</h1>
-        <p className="text-muted-foreground">Last updated: April 12, 2026</p>
+        <p className="text-muted-foreground">Last updated: April 13, 2026</p>
 
         <h2>1. Introduction</h2>
         <p>
@@ -26,10 +26,25 @@ export default function PrivacyPage() {
         </p>
         <h3>Instagram Data</h3>
         <p>
-          When you connect your Instagram account, we access your Instagram direct messages
-          solely to provide AI-powered reply functionality. We do not store the full content
-          of your Instagram messages beyond what is necessary to maintain conversation context
-          for the AI agent.
+          When you connect your Instagram account, we collect your Instagram account ID,
+          username, profile information, and the content of direct messages sent to and
+          from your account. This data is accessed solely to provide inbox functionality
+          and AI-powered reply features within Clinchd. Message data is never stored beyond
+          what is necessary for conversation context and is not used for any purpose other
+          than operating the service you have explicitly connected.
+        </p>
+        <p>
+          <strong>Human agent message permission:</strong> Clinchd requests the
+          <code> instagram_business_manage_messages </code> permission, which under Meta&apos;s
+          policy allows human agents to send follow-up messages within a 7-day window after
+          a user initiates a conversation. This permission is used exclusively to support
+          human agent follow-up within the policy-compliant 7-day window. No automated
+          messages are sent using this permission — all automated AI replies operate under
+          Meta&apos;s standard 24-hour messaging window and conversation-initiation rules.
+        </p>
+        <p>
+          You can disconnect your Instagram account at any time from the Settings page,
+          which immediately revokes Clinchd&apos;s access to your Instagram data.
         </p>
         <h3>Google Calendar Data</h3>
         <p>
