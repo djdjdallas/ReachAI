@@ -71,7 +71,7 @@ export default function Hero() {
           className="text-lg md:text-2xl text-stone-500 max-w-3xl mx-auto mb-12 leading-relaxed font-medium"
         >
           Clinchd helps coaches and course creators manage Instagram
-          inquiries, qualify prospects, and get discovery calls booked — all
+          inquiries, qualify prospects, and get discovery calls booked, all
           from one inbox.
         </p>
 
