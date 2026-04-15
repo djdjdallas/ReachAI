@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import posthog from "posthog-js";
 import {
@@ -22,6 +22,7 @@ import {
   RefreshCw,
   Mic2,
   Trash2,
+  X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -50,6 +51,7 @@ import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 
 export default function SettingsPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const supabase = createClient();
 
   const [loading, setLoading] = useState(true);
@@ -70,6 +72,14 @@ export default function SettingsPage() {
 
   // Instagram
   const [disconnecting, setDisconnecting] = useState(false);
+  const [showInstagramDenied, setShowInstagramDenied] = useState(false);
+
+  useEffect(() => {
+    if (searchParams.get("instagram") === "denied") {
+      setShowInstagramDenied(true);
+      router.replace("/settings", { scroll: false });
+    }
+  }, [searchParams, router]);
 
   // Calendar integrations
   const [gcalConnected, setGcalConnected] = useState(false);
@@ -485,6 +495,24 @@ export default function SettingsPage() {
           </Button>
         </CardFooter>
       </Card>
+
+      {showInstagramDenied && (
+        <div className="flex items-start gap-3 rounded-md border border-amber-200 bg-amber-50 p-4 text-amber-900 dark:border-amber-900/40 dark:bg-amber-950/30 dark:text-amber-100">
+          <AlertTriangle className="mt-0.5 h-5 w-5 flex-shrink-0" />
+          <p className="flex-1 text-sm">
+            Instagram connection was cancelled. Connect your account to start
+            receiving DMs from your followers.
+          </p>
+          <button
+            type="button"
+            onClick={() => setShowInstagramDenied(false)}
+            aria-label="Dismiss"
+            className="rounded-sm p-1 opacity-70 transition-opacity hover:opacity-100"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+      )}
 
       {/* Instagram Connection */}
       <Card>

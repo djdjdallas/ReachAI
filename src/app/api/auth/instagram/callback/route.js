@@ -10,8 +10,33 @@ export async function GET(request) {
 
   try {
     const { searchParams } = new URL(request.url);
-    const state = searchParams.get("state");
     const error = searchParams.get("error");
+    const code = searchParams.get("code");
+
+    // Handle user denial / missing code before anything else. Meta sends
+    // `error=access_denied` (sometimes `user_denied` / `user_denied_app`)
+    // when the user cancels the consent dialog, and a stray hit to this URL
+    // with no params shouldn't blow up either. Treat all of these as a
+    // cancelled connection — not an error — and bounce the user to settings
+    // with a friendly banner.
+    if (error || !code) {
+      console.log(
+        "[ig-callback] OAuth denied/aborted:",
+        error || "no_code"
+      );
+      getPostHogClient().capture({
+        distinctId: "anonymous",
+        event: "instagram_connection_failed",
+        properties: { reason: "oauth_denied", error: error || "no_code" },
+      });
+      const response = NextResponse.redirect(
+        `${baseUrl}/settings?instagram=denied`
+      );
+      response.cookies.set("oauth_state", "", { maxAge: 0, path: "/" });
+      return response;
+    }
+
+    const state = searchParams.get("state");
 
     // Verify CSRF state
     const storedState = request.cookies.get("oauth_state")?.value;
@@ -52,21 +77,9 @@ export async function GET(request) {
       : `${baseUrl}/onboarding?step=2`;
 
     // ── Instagram Login OAuth path ───────────────────────────────────
-    const code = searchParams.get("code");
-
-    if (error || !code) {
-      console.error("Instagram OAuth error:", error || "no code returned");
-      getPostHogClient().capture({
-        distinctId: user.email || user.id,
-        event: "instagram_connection_failed",
-        properties: { reason: "oauth_denied" },
-      });
-      return NextResponse.redirect(
-        `${baseUrl}/onboarding?step=1&error=oauth_denied`
-      );
-    }
-
+    // `code` and `error` were validated at the top of the handler.
     // Exchange code for long-lived token + Instagram user ID
+
     const { accessToken, expiresIn, userId } = await exchangeCodeForToken(code);
     void userId;
 
