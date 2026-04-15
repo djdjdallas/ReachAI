@@ -164,7 +164,7 @@ export default function DashboardHeader() {
         {aiMode === "active" && (
           <div className="flex items-center gap-1.5 px-3 py-1 bg-green-50 text-green-600 rounded-full text-xs font-bold">
             <span className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse" />
-            AI AGENT ACTIVE
+            AGENT ACTIVE
           </div>
         )}
         {aiMode === "handoff" && (
