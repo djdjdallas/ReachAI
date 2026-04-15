@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter, usePathname } from "next/navigation";
+import { usePathname } from "next/navigation";
 import Link from "next/link";
 import {
   Zap,
@@ -114,7 +114,6 @@ function SidebarContent({ pathname, onSignOut, conversationCount, onLinkClick })
 }
 
 export default function Sidebar() {
-  const router = useRouter();
   const pathname = usePathname();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [conversationCount, setConversationCount] = useState(0);
@@ -138,7 +137,7 @@ export default function Sidebar() {
   const handleSignOut = async () => {
     const supabase = createClient();
     await supabase.auth.signOut();
-    router.push("/login");
+    window.location.href = "/login";
   };
 
   return (

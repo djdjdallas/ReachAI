@@ -102,9 +102,6 @@ export async function DELETE() {
     const { error: authErr } = await admin.auth.admin.deleteUser(userId);
     if (authErr) throw authErr;
 
-    // Sign the client out so their cookie session is cleared
-    await supabase.auth.signOut();
-
     return NextResponse.json({ success: true });
   } catch (err) {
     console.error("[delete-account] failed:", err);
