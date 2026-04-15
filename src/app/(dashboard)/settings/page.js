@@ -46,6 +46,7 @@ import {
   DialogDescription,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 
 export default function SettingsPage() {
   const router = useRouter();
@@ -100,6 +101,11 @@ export default function SettingsPage() {
   // Voice profile
   const [voiceProfile, setVoiceProfile] = useState(null);
   const [clearingVoice, setClearingVoice] = useState(false);
+
+  // Confirmation dialogs
+  const [confirmDisconnectInstagramOpen, setConfirmDisconnectInstagramOpen] =
+    useState(false);
+  const [confirmClearVoiceOpen, setConfirmClearVoiceOpen] = useState(false);
 
   // Delete dialog
   const [deleteOpen, setDeleteOpen] = useState(false);
@@ -383,6 +389,7 @@ export default function SettingsPage() {
         .eq("id", authUser.id);
       setVoiceProfile(null);
       posthog.capture("voice_profile_cleared", { source: "settings" });
+      setConfirmClearVoiceOpen(false);
     } catch (err) {
       console.error("Error clearing voice profile:", err);
     } finally {
@@ -401,6 +408,7 @@ export default function SettingsPage() {
         ...prev,
         instagram_business_account_id: null,
       }));
+      setConfirmDisconnectInstagramOpen(false);
     } catch (err) {
       console.error("Error disconnecting Instagram:", err);
     } finally {
@@ -520,7 +528,7 @@ export default function SettingsPage() {
             {isInstagramConnected && (
               <Button
                 variant="destructive"
-                onClick={handleDisconnectInstagram}
+                onClick={() => setConfirmDisconnectInstagramOpen(true)}
                 disabled={disconnecting}
               >
                 {disconnecting && (
@@ -988,7 +996,7 @@ export default function SettingsPage() {
                 <Button
                   variant="ghost"
                   size="sm"
-                  onClick={handleClearVoice}
+                  onClick={() => setConfirmClearVoiceOpen(true)}
                   disabled={clearingVoice}
                   className="text-muted-foreground"
                 >
@@ -1100,6 +1108,26 @@ export default function SettingsPage() {
           </div>
         </CardContent>
       </Card>
+
+      <ConfirmDialog
+        open={confirmDisconnectInstagramOpen}
+        onOpenChange={setConfirmDisconnectInstagramOpen}
+        title="Disconnect Instagram?"
+        description="ReachAI will stop responding to DMs on your Instagram account. You can reconnect anytime."
+        confirmText="Disconnect"
+        loading={disconnecting}
+        onConfirm={handleDisconnectInstagram}
+      />
+
+      <ConfirmDialog
+        open={confirmClearVoiceOpen}
+        onOpenChange={setConfirmClearVoiceOpen}
+        title="Clear voice profile?"
+        description="Your trained voice profile will be removed. You'll need to re-train it to restore personalization."
+        confirmText="Clear"
+        loading={clearingVoice}
+        onConfirm={handleClearVoice}
+      />
     </div>
   );
 }

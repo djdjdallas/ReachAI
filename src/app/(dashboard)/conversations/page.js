@@ -34,6 +34,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import StatusBadge from "@/components/app/StatusBadge";
 
 function getInitials(name) {
@@ -373,10 +374,10 @@ function ConversationsPage() {
   };
 
   const [deleting, setDeleting] = useState(false);
+  const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
 
   const handleDeleteConversation = async () => {
     if (!selectedConvo || deleting) return;
-    if (!window.confirm("Delete this conversation? This cannot be undone.")) return;
 
     setDeleting(true);
     try {
@@ -397,6 +398,7 @@ function ConversationsPage() {
       posthog.capture("conversation_deleted", { conversation_id: selectedConvo.id });
       setSelectedConvo(null);
       setMessages([]);
+      setConfirmDeleteOpen(false);
       router.replace("/conversations", { scroll: false });
     } catch (err) {
       console.error("Failed to delete conversation:", err);
@@ -700,7 +702,7 @@ function ConversationsPage() {
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={handleDeleteConversation}
+                  onClick={() => setConfirmDeleteOpen(true)}
                   disabled={deleting}
                   className="gap-1.5 text-red-500 border-red-200 hover:bg-red-50 hover:text-red-600"
                 >
@@ -930,6 +932,16 @@ function ConversationsPage() {
           </div>
         )}
       </div>
+
+      <ConfirmDialog
+        open={confirmDeleteOpen}
+        onOpenChange={setConfirmDeleteOpen}
+        title="Delete this conversation?"
+        description="This will permanently delete the conversation and all its messages. This cannot be undone."
+        confirmText="Delete"
+        loading={deleting}
+        onConfirm={handleDeleteConversation}
+      />
     </div>
   );
 }

@@ -43,6 +43,7 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Separator } from "@/components/ui/separator";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 
 function ChatBubble({ message, isAi }) {
   return (
@@ -312,7 +313,11 @@ export default function ScriptBuilderPage() {
     }
   };
 
+  const [confirmRemoveVoiceOpen, setConfirmRemoveVoiceOpen] = useState(false);
+  const [removingVoice, setRemovingVoice] = useState(false);
+
   const handleRemoveVoice = async () => {
+    setRemovingVoice(true);
     try {
       await supabase
         .from("users")
@@ -320,8 +325,11 @@ export default function ScriptBuilderPage() {
         .eq("id", user.id);
       setVoiceProfile(null);
       posthog.capture("voice_removed");
+      setConfirmRemoveVoiceOpen(false);
     } catch (err) {
       console.error("Error removing voice:", err);
+    } finally {
+      setRemovingVoice(false);
     }
   };
 
@@ -603,7 +611,7 @@ export default function ScriptBuilderPage() {
                       <Button
                         variant="ghost"
                         size="sm"
-                        onClick={handleRemoveVoice}
+                        onClick={() => setConfirmRemoveVoiceOpen(true)}
                         className="text-destructive hover:text-destructive"
                       >
                         <Trash2 className="h-3.5 w-3.5" />
@@ -1144,6 +1152,16 @@ export default function ScriptBuilderPage() {
           </Card>
         </TabsContent>
       </Tabs>
+
+      <ConfirmDialog
+        open={confirmRemoveVoiceOpen}
+        onOpenChange={setConfirmRemoveVoiceOpen}
+        title="Remove voice profile?"
+        description="This will delete your trained voice data. You can re-train from the settings page anytime."
+        confirmText="Remove"
+        loading={removingVoice}
+        onConfirm={handleRemoveVoice}
+      />
     </div>
   );
 }

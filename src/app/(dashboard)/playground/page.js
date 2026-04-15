@@ -29,6 +29,7 @@ import {
 } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import Link from "next/link";
 
 const STARTER_PROMPTS = [
@@ -244,11 +245,23 @@ export default function PlaygroundPage() {
     [input, messages, isThinking]
   );
 
+  const [confirmResetOpen, setConfirmResetOpen] = useState(false);
+
   const resetConversation = () => {
     setMessages([]);
     setError(null);
     setSessionStats({ messageCount: 0, bookingLinkSent: false });
+    setConfirmResetOpen(false);
     setTimeout(() => inputRef.current?.focus(), 100);
+  };
+
+  const handleResetClick = () => {
+    if (messages.length === 0 && !error) return;
+    if (messages.length === 0) {
+      resetConversation();
+      return;
+    }
+    setConfirmResetOpen(true);
   };
 
   const handleKeyDown = (e) => {
@@ -333,7 +346,7 @@ export default function PlaygroundPage() {
           <Button
             variant="outline"
             size="sm"
-            onClick={resetConversation}
+            onClick={handleResetClick}
             disabled={messages.length === 0 && !error}
           >
             <RefreshCw className="h-3.5 w-3.5 mr-1.5" />
@@ -550,6 +563,16 @@ export default function PlaygroundPage() {
           </Card>
         </div>
       </div>
+
+      <ConfirmDialog
+        open={confirmResetOpen}
+        onOpenChange={setConfirmResetOpen}
+        title="Reset conversation?"
+        description="This will clear the current playground session."
+        confirmText="Reset"
+        variant="default"
+        onConfirm={resetConversation}
+      />
     </div>
   );
 }
