@@ -29,7 +29,7 @@ export default function PrivacyPage() {
           When you connect your Instagram account, we collect your Instagram account ID,
           username, profile information, and the content of direct messages sent to and
           from your account. This data is accessed solely to provide shared-inbox
-          functionality and AI-assisted reply features within Clinchd. Message data is
+          functionality and inbox management and response features within Clinchd. Message data is
           never stored beyond what is necessary for conversation context and is not used
           for any purpose other than operating the service you have explicitly connected.
         </p>
@@ -38,13 +38,13 @@ export default function PrivacyPage() {
           <code> instagram_business_manage_messages </code> permission, which under Meta&apos;s
           policy allows human agents to send follow-up messages within a 7-day window after
           a user initiates a conversation. This permission is used exclusively to support
-          human agent follow-up within the policy-compliant 7-day window. AI-assisted replies
-          operate under Meta&apos;s standard 24-hour messaging window and conversation-initiation
-          rules, and the account owner is in control of when the AI is enabled.
+          human agent follow-up within the policy-compliant 7-day window.
         </p>
         <p>
           You can disconnect your Instagram account at any time from the Settings page,
           which immediately revokes Clinchd&apos;s access to your Instagram data.
+          Media content accessed via Instagram CDN URLs is rendered for display purposes
+          only and is not stored or cached on our servers.
         </p>
         <h3>Google Calendar Data</h3>
         <p>
@@ -74,7 +74,7 @@ export default function PrivacyPage() {
         <h2>3. How We Use Your Information</h2>
         <ul>
           <li>To provide, operate, and maintain the Clinchd platform</li>
-          <li>To generate AI-assisted DM replies on your behalf</li>
+          <li>To enable message management and response features on your behalf</li>
           <li>To process transactions and manage your subscription</li>
           <li>To send service-related communications (account alerts, updates)</li>
           <li>To improve our product and develop new features</li>
