@@ -453,7 +453,7 @@ export default function SettingsPage() {
       <div>
         <h1 className="text-2xl font-bold">Settings</h1>
         <p className="text-muted-foreground mt-1">
-          Manage your account, integrations, and AI preferences.
+          Manage your account, integrations, and agent preferences.
         </p>
       </div>
 
@@ -589,7 +589,7 @@ export default function SettingsPage() {
             Calendly
           </CardTitle>
           <CardDescription>
-            Your Calendly booking link. The AI will share this in DMs when a
+            Your Calendly booking link. We'll share this in DMs when a
             prospect is ready to book a call.
           </CardDescription>
         </CardHeader>
@@ -786,7 +786,7 @@ export default function SettingsPage() {
             Email Notifications
           </CardTitle>
           <CardDescription>
-            Get notified by email when your AI flags important lead activity.
+            Get notified by email when we flag important lead activity.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -794,7 +794,7 @@ export default function SettingsPage() {
             <div>
               <p className="text-sm font-medium">Hot Lead Alerts</p>
               <p className="text-xs text-muted-foreground">
-                Get emailed when the AI flags a highly interested lead.
+                Get emailed when we flag a highly interested lead.
               </p>
             </div>
             <Switch
@@ -910,24 +910,24 @@ export default function SettingsPage() {
         </CardContent>
       </Card>
 
-      {/* AI Settings */}
+      {/* Agent Settings */}
       <Card>
         <CardHeader>
           <CardTitle className="text-lg flex items-center gap-2">
             <Bot className="h-5 w-5" />
-            AI Settings
+            Agent Settings
           </CardTitle>
           <CardDescription>
-            Control how your AI agent behaves.
+            Control how your agent behaves.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-5">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium">AI Agent Mode</p>
+              <p className="text-sm font-medium">Agent Mode</p>
               <p className="text-xs text-muted-foreground">
-                {aiMode === "active" && "AI is responding to DMs automatically."}
-                {aiMode === "handoff" && "Messages are logged but AI won\u2019t reply. You can reply manually."}
+                {aiMode === "active" && "Agent is responding to DMs automatically."}
+                {aiMode === "handoff" && "Messages are logged but the agent won\u2019t reply. You can reply manually."}
                 {aiMode === "off" && "Complete silence. No messages logged, no replies sent."}
               </p>
             </div>
@@ -961,7 +961,7 @@ export default function SettingsPage() {
               className="w-32"
             />
             <p className="text-xs text-muted-foreground">
-              Add a delay (1–120 seconds) before the AI responds to feel more
+              Add a delay (1–120 seconds) before the agent responds to feel more
               natural and comply with platform guidelines.
             </p>
           </div>
@@ -975,7 +975,7 @@ export default function SettingsPage() {
             ) : (
               <Save className="h-4 w-4" />
             )}
-            {aiSaved ? "Saved!" : "Save AI Settings"}
+            {aiSaved ? "Saved!" : "Save Settings"}
           </Button>
         </CardFooter>
       </Card>
@@ -988,7 +988,7 @@ export default function SettingsPage() {
             Voice Profile
           </CardTitle>
           <CardDescription>
-            Your AI voice profile controls how DM replies sound. Train or
+            Your voice profile controls how DM replies sound. Train or
             re-train it in the Script Builder.
           </CardDescription>
         </CardHeader>
@@ -1052,7 +1052,7 @@ export default function SettingsPage() {
           ) : (
             <div className="text-center py-4">
               <p className="text-sm text-muted-foreground mb-3">
-                No voice profile set up yet. The AI will use generic writing
+                No voice profile set up yet. We'll use generic writing
                 rules for DM replies.
               </p>
               <Button asChild size="sm">
