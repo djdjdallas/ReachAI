@@ -8,6 +8,11 @@ const nextConfig = {
         destination: "https://www.clinchd.io/:path*",
         permanent: true,
       },
+      {
+        source: "/sitemap-0.xml",
+        destination: "/sitemap.xml",
+        permanent: true,
+      },
     ];
   },
   async rewrites() {
