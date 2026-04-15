@@ -52,16 +52,16 @@ export default function Hero() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center relative">
         <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-[#fff5f2] text-[#ff7e67] text-[13px] font-bold tracking-tight mb-8 shadow-sm border border-[#ff7e67]/10">
           <Sparkles className="w-4 h-4" />
-          The AI Setter Built for Coaches
+          The Inbox Tool Built for Coaches
         </div>
 
         <h1
           ref={headlineRef}
           className="text-5xl md:text-7xl lg:text-8xl font-black tracking-tight text-stone-900 max-w-6xl mx-auto mb-10 leading-[1.05]"
         >
-          Book More Discovery Calls{" "}
+          Never Miss a Lead in{" "}
           <span className="text-[#ff7e67] relative inline-block">
-            While You Sleep.
+            Your DMs Again.
             <span className="absolute bottom-1 left-0 w-full h-3 bg-[#ff7e67]/10 -z-10" />
           </span>
         </h1>
@@ -70,9 +70,9 @@ export default function Hero() {
           ref={subtitleRef}
           className="text-lg md:text-2xl text-stone-500 max-w-3xl mx-auto mb-12 leading-relaxed font-medium"
         >
-          Clinchd is an AI setter that qualifies every DM, handles objections,
-          and drops your Calendly link at the right moment — so you wake up to
-          booked calls, not missed leads.
+          Clinchd helps coaches and course creators manage Instagram
+          inquiries, qualify prospects, and get discovery calls booked — all
+          from one inbox.
         </p>
 
         <div ref={ctaRef} className="flex flex-col items-center gap-5">
