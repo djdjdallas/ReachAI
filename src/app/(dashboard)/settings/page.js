@@ -219,6 +219,18 @@ export default function SettingsPage() {
         .update({ ai_mode: newMode })
         .eq("id", authUser.id);
 
+      // Switching back to "active" should also resume conversations that
+      // got paused by a manual reply during handoff. Leave complex-objection
+      // pauses alone — those are waiting on human review.
+      if (newMode === "active") {
+        await supabase
+          .from("conversations")
+          .update({ ai_paused: false, ai_pause_reason: null })
+          .eq("user_id", authUser.id)
+          .eq("ai_paused", true)
+          .is("ai_pause_reason", null);
+      }
+
       posthog.capture("ai_agent_toggled", { mode: newMode, previous_mode: previousMode });
     } catch (err) {
       console.error("Error setting AI mode:", err);

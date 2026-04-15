@@ -413,6 +413,31 @@ function ConversationsPage() {
         .from("users")
         .update({ ai_mode: mode })
         .eq("id", user.id);
+
+      // Switching back to "active" should also resume conversations that
+      // got paused by a manual reply during handoff. Leave complex-objection
+      // pauses alone — those are waiting on human review.
+      if (mode === "active") {
+        await supabase
+          .from("conversations")
+          .update({ ai_paused: false, ai_pause_reason: null })
+          .eq("user_id", user.id)
+          .eq("ai_paused", true)
+          .is("ai_pause_reason", null);
+        setConversations((prev) =>
+          prev.map((c) =>
+            c.ai_paused && !c.ai_pause_reason
+              ? { ...c, ai_paused: false, ai_pause_reason: null }
+              : c
+          )
+        );
+        setSelectedConvo((prev) =>
+          prev && prev.ai_paused && !prev.ai_pause_reason
+            ? { ...prev, ai_paused: false, ai_pause_reason: null }
+            : prev
+        );
+      }
+
       setProfile((prev) => ({ ...prev, ai_mode: mode }));
     } catch (err) {
       console.error("Failed to set AI mode:", err);
