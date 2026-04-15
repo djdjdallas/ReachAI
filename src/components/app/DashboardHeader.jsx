@@ -56,7 +56,7 @@ export default function DashboardHeader() {
       if (user) {
         supabase
           .from("users")
-          .select("full_name, ai_mode")
+          .select("full_name, ai_mode, instagram_business_account_id")
           .eq("id", user.id)
           .single()
           .then(({ data }) => {
@@ -156,18 +156,19 @@ export default function DashboardHeader() {
     "Dashboard";
 
   const aiMode = profile?.ai_mode;
+  const instagramConnected = !!profile?.instagram_business_account_id;
 
   return (
     <header className="h-16 bg-white border-b border-stone-200 px-6 flex items-center justify-between flex-shrink-0">
       <div className="flex items-center gap-4">
         <h1 className="text-2xl font-extrabold">{title}</h1>
-        {aiMode === "active" && (
+        {aiMode === "active" && instagramConnected && (
           <div className="flex items-center gap-1.5 px-3 py-1 bg-green-50 text-green-600 rounded-full text-xs font-bold">
             <span className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse" />
             AGENT ACTIVE
           </div>
         )}
-        {aiMode === "handoff" && (
+        {aiMode === "handoff" && instagramConnected && (
           <div className="flex items-center gap-1.5 px-3 py-1 bg-amber-50 text-amber-600 rounded-full text-xs font-bold">
             <span className="w-1.5 h-1.5 bg-amber-500 rounded-full" />
             HANDOFF MODE
