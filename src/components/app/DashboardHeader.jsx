@@ -9,6 +9,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 const PAGE_TITLES = {
   "/dashboard": "Inbox",
   "/conversations": "Conversations",
+  "/leads": "Leads",
   "/script-builder": "Sales Script",
   "/playground": "Playground",
   "/billing": "Billing",
