@@ -27,7 +27,7 @@ import AccountUsageWidget from "@/components/app/AccountUsageWidget";
 
 const mainNavLinks = [
   { href: "/dashboard", label: "Inbox", icon: Inbox, showBadge: true },
-  { href: "/conversations", label: "Inbox", icon: MessageSquare },
+  { href: "/conversations", label: "Conversations", icon: MessageSquare },
   { href: "/leads", label: "Leads", icon: Users },
   { href: "/calendar", label: "Calendar", icon: Calendar },
   { href: "/analytics", label: "Analytics", icon: BarChart3 },
