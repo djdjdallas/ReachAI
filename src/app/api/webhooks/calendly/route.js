@@ -1,33 +1,20 @@
 import { NextResponse } from "next/server";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
+import { decryptToken } from "@/lib/token-utils";
 import crypto from "crypto";
 
 /**
  * POST /api/webhooks/calendly
  *
  * Receives Calendly webhook events (invitee.created, invitee.canceled).
- * Creates/updates bookings and links them to conversations when possible.
- *
- * Setup: In Calendly → Integrations → Webhooks, add:
- *   URL: https://clinchd.io/api/webhooks/calendly
- *   Events: invitee.created, invitee.canceled
- *   Copy the signing secret into CALENDLY_WEBHOOK_SECRET env var.
+ * Signing keys are per-user — we look up the owning Clinchd user from the
+ * payload's scheduled_event.event_memberships[].user URI, then verify the
+ * signature against that user's calendly_webhook_signing_key.
  */
 export async function POST(request) {
   try {
     const rawBody = await request.text();
     const body = JSON.parse(rawBody);
-
-    // Verify webhook signature if secret is configured
-    const sigHeader = request.headers.get("calendly-webhook-signature");
-    if (process.env.CALENDLY_WEBHOOK_SECRET) {
-      if (!verifyCalendlySignature(rawBody, sigHeader)) {
-        console.error("Calendly webhook signature verification failed");
-        return NextResponse.json({ error: "Invalid signature" }, { status: 403 });
-      }
-    } else {
-      console.warn("CALENDLY_WEBHOOK_SECRET not set — skipping signature verification");
-    }
 
     const event = body.event;
     const payload = body.payload;
@@ -36,8 +23,36 @@ export async function POST(request) {
       return NextResponse.json({ status: "ok" }, { status: 200 });
     }
 
+    const userUri = extractOwnerUserUri(payload);
+    if (!userUri) {
+      console.warn("Calendly webhook: could not extract owner user URI");
+      return NextResponse.json({ status: "ok" }, { status: 200 });
+    }
+
+    const supabase = getSupabaseAdmin();
+    const { data: owner } = await supabase
+      .from("users")
+      .select("id, calendly_url, calendly_webhook_signing_key")
+      .eq("calendly_user_uri", userUri)
+      .single();
+
+    if (!owner) {
+      console.log("Calendly webhook: no Clinchd user for", userUri);
+      return NextResponse.json({ status: "ok" }, { status: 200 });
+    }
+
+    const sigHeader = request.headers.get("calendly-webhook-signature");
+    const signingKey = owner.calendly_webhook_signing_key
+      ? decryptToken(owner.calendly_webhook_signing_key)
+      : null;
+
+    if (!signingKey || !verifyCalendlySignature(rawBody, sigHeader, signingKey)) {
+      console.error("Calendly webhook signature verification failed for", userUri);
+      return NextResponse.json({ error: "Invalid signature" }, { status: 403 });
+    }
+
     if (event === "invitee.created") {
-      await handleInviteeCreated(payload);
+      await handleInviteeCreated(payload, owner);
     } else if (event === "invitee.canceled") {
       await handleInviteeCanceled(payload);
     }
@@ -45,19 +60,28 @@ export async function POST(request) {
     return NextResponse.json({ status: "ok" }, { status: 200 });
   } catch (error) {
     console.error("Calendly webhook error:", error);
-    // Always return 200 to prevent Calendly from retrying
+    // Always return 200 to prevent Calendly from retrying on our bugs
     return NextResponse.json({ status: "ok" }, { status: 200 });
   }
 }
 
+function extractOwnerUserUri(payload) {
+  const memberships = payload.scheduled_event?.event_memberships;
+  if (Array.isArray(memberships)) {
+    for (const m of memberships) {
+      if (m?.user) return m.user;
+    }
+  }
+  return payload.scheduled_event?.created_by || null;
+}
+
 /**
  * Verify Calendly webhook signature using HMAC-SHA256.
- *
- * Calendly sends: Calendly-Webhook-Signature: t=<timestamp>,v1=<signature>
- * The signed payload is: <timestamp>.<raw_body>
+ * Header format: Calendly-Webhook-Signature: t=<timestamp>,v1=<signature>
+ * Signed payload: <timestamp>.<raw_body>
  */
-function verifyCalendlySignature(rawBody, sigHeader) {
-  if (!sigHeader) return false;
+function verifyCalendlySignature(rawBody, sigHeader, signingKey) {
+  if (!sigHeader || !signingKey) return false;
 
   try {
     const parts = {};
@@ -70,95 +94,45 @@ function verifyCalendlySignature(rawBody, sigHeader) {
     const signature = parts.v1;
     if (!timestamp || !signature) return false;
 
-    // Reject requests older than 5 minutes to prevent replay attacks
     const age = Math.abs(Date.now() / 1000 - Number(timestamp));
     if (age > 300) return false;
 
     const expected = crypto
-      .createHmac("sha256", process.env.CALENDLY_WEBHOOK_SECRET)
+      .createHmac("sha256", signingKey)
       .update(`${timestamp}.${rawBody}`)
       .digest("hex");
 
-    return crypto.timingSafeEqual(
-      Buffer.from(signature, "hex"),
-      Buffer.from(expected, "hex")
-    );
+    const a = Buffer.from(signature, "hex");
+    const b = Buffer.from(expected, "hex");
+    if (a.length !== b.length) return false;
+    return crypto.timingSafeEqual(a, b);
   } catch {
     return false;
   }
 }
 
-/**
- * Handle invitee.created — create a booking and link to conversation if possible.
- */
-async function handleInviteeCreated(payload) {
+async function handleInviteeCreated(payload, owner) {
   const supabase = getSupabaseAdmin();
 
-  const inviteeName = payload.name || payload.invitee?.name || null;
-  const inviteeEmail = payload.email || payload.invitee?.email || null;
-  const eventUri = payload.scheduled_event?.uri || payload.event?.uri || null;
-  const eventName = payload.scheduled_event?.name || payload.event?.name || null;
-  const startTime = payload.scheduled_event?.start_time || payload.event?.start_time || null;
-  const endTime = payload.scheduled_event?.end_time || payload.event?.end_time || null;
+  const inviteeName = payload.name || null;
+  const inviteeEmail = payload.email || null;
+  const inviteeUri = payload.uri || null;
+  const eventUri = payload.scheduled_event?.uri || null;
+  const eventName = payload.scheduled_event?.name || null;
+  const startTime = payload.scheduled_event?.start_time || null;
+  const endTime = payload.scheduled_event?.end_time || null;
 
   if (!startTime) {
     console.warn("Calendly invitee.created missing start_time, skipping");
     return;
   }
 
-  // Extract the event type slug from the event URI to match against user's calendly_url
-  // Calendly event URIs look like: https://api.calendly.com/scheduled_events/UUID
-  // Event type URIs look like: https://api.calendly.com/event_types/UUID
-  const eventTypeUri = payload.scheduled_event?.event_type
-    || payload.event_type?.uri
-    || null;
-
-  // Find the Clinchd user whose calendly_url matches this event
-  let user = null;
-  if (eventTypeUri) {
-    // Try matching by event type slug in the user's calendly_url
-    const slug = extractCalendlySlug(eventTypeUri);
-    if (slug) {
-      const { data } = await supabase
-        .from("users")
-        .select("id, calendly_url")
-        .ilike("calendly_url", `%${slug}%`)
-        .limit(1)
-        .single();
-      user = data;
-    }
-  }
-
-  // Fallback: try matching by invitee email against event organizer
-  if (!user && payload.scheduled_event?.event_memberships) {
-    for (const member of payload.scheduled_event.event_memberships) {
-      const memberEmail = member.user_email;
-      if (memberEmail) {
-        const { data } = await supabase
-          .from("users")
-          .select("id, calendly_url")
-          .eq("email", memberEmail)
-          .single();
-        if (data) {
-          user = data;
-          break;
-        }
-      }
-    }
-  }
-
-  if (!user) {
-    console.log("Calendly webhook: no matching user found for event", eventUri);
-    return;
-  }
-
-  // Try to match a conversation by invitee name
   let conversationId = null;
   if (inviteeName) {
     const { data: conv } = await supabase
       .from("conversations")
       .select("id")
-      .eq("user_id", user.id)
+      .eq("user_id", owner.id)
       .ilike("sender_name", `%${inviteeName}%`)
       .order("updated_at", { ascending: false })
       .limit(1)
@@ -166,12 +140,11 @@ async function handleInviteeCreated(payload) {
     conversationId = conv?.id || null;
   }
 
-  // Upsert the booking
   const { error } = await supabase
     .from("bookings")
     .upsert(
       {
-        user_id: user.id,
+        user_id: owner.id,
         conversation_id: conversationId,
         invitee_name: inviteeName,
         invitee_email: inviteeEmail,
@@ -179,6 +152,7 @@ async function handleInviteeCreated(payload) {
         start_time: startTime,
         end_time: endTime,
         calendly_event_uri: eventUri,
+        calendly_invitee_uri: inviteeUri,
         status: "confirmed",
         source: "calendly",
       },
@@ -192,7 +166,6 @@ async function handleInviteeCreated(payload) {
 
   console.log(`Booking created: ${inviteeName} → ${eventName} at ${startTime}`);
 
-  // Update conversation status to "booked" if we matched one
   if (conversationId) {
     await supabase
       .from("conversations")
@@ -202,13 +175,10 @@ async function handleInviteeCreated(payload) {
   }
 }
 
-/**
- * Handle invitee.canceled — mark the booking as canceled.
- */
 async function handleInviteeCanceled(payload) {
   const supabase = getSupabaseAdmin();
 
-  const eventUri = payload.scheduled_event?.uri || payload.event?.uri || null;
+  const eventUri = payload.scheduled_event?.uri || null;
   if (!eventUri) {
     console.warn("Calendly invitee.canceled missing event URI, skipping");
     return;
@@ -221,19 +191,7 @@ async function handleInviteeCanceled(payload) {
 
   if (error) {
     console.error("Failed to cancel booking:", error);
-    return;
+  } else {
+    console.log(`Booking canceled: ${eventUri}`);
   }
-
-  console.log(`Booking canceled: ${eventUri}`);
-}
-
-/**
- * Extract a usable slug from a Calendly URI for matching.
- * Input:  "https://api.calendly.com/event_types/ABC123"
- * Output: "ABC123"
- */
-function extractCalendlySlug(uri) {
-  if (!uri) return null;
-  const parts = uri.split("/");
-  return parts[parts.length - 1] || null;
 }

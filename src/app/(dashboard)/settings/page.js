@@ -74,9 +74,25 @@ export default function SettingsPage() {
   const [disconnecting, setDisconnecting] = useState(false);
   const [showInstagramDenied, setShowInstagramDenied] = useState(false);
 
+  // Calendly status messages
+  const [calendlyNotice, setCalendlyNotice] = useState(null);
+
   useEffect(() => {
     if (searchParams.get("instagram") === "denied") {
       setShowInstagramDenied(true);
+      router.replace("/settings", { scroll: false });
+    }
+    if (searchParams.get("calendly") === "connected") {
+      const warning = searchParams.get("warning");
+      setCalendlyNotice({
+        kind: warning ? "warning" : "success",
+        warning,
+      });
+      router.replace("/settings", { scroll: false });
+    }
+    const err = searchParams.get("error");
+    if (err && err.startsWith("calendly_")) {
+      setCalendlyNotice({ kind: "error", error: err });
       router.replace("/settings", { scroll: false });
     }
   }, [searchParams, router]);
@@ -87,10 +103,10 @@ export default function SettingsPage() {
   const [syncingGcal, setSyncingGcal] = useState(false);
 
   // Calendly
+  const [calendlyConnected, setCalendlyConnected] = useState(false);
   const [calendlyUrl, setCalendlyUrl] = useState("");
-  const [savingCalendly, setSavingCalendly] = useState(false);
-  const [calendlySaved, setCalendlySaved] = useState(false);
-  const [calendlyError, setCalendlyError] = useState(null);
+  const [disconnectingCalendly, setDisconnectingCalendly] = useState(false);
+  const [confirmDisconnectCalendlyOpen, setConfirmDisconnectCalendlyOpen] = useState(false);
 
   // Revenue / deal value
   const [avgDealValue, setAvgDealValue] = useState("");
@@ -169,6 +185,7 @@ export default function SettingsPage() {
         setAiMode(userProfile.ai_mode || "active");
         setResponseDelay(userProfile.response_delay || 2);
         setGcalConnected(!!userProfile.google_calendar_refresh_token);
+        setCalendlyConnected(!!userProfile.calendly_refresh_token);
         setCalendlyUrl(userProfile.calendly_url || "");
         setAvgDealValue(
           userProfile.avg_deal_value != null
@@ -298,41 +315,20 @@ export default function SettingsPage() {
     }
   };
 
-  const handleSaveCalendly = async () => {
-    setCalendlyError(null);
-    const trimmed = calendlyUrl.trim();
-
-    if (trimmed) {
-      try {
-        const parsed = new URL(trimmed);
-        if (!parsed.hostname.endsWith("calendly.com")) {
-          setCalendlyError("URL must be a calendly.com link.");
-          return;
-        }
-      } catch {
-        setCalendlyError("Please enter a valid URL.");
-        return;
-      }
-    }
-
-    setSavingCalendly(true);
+  const handleDisconnectCalendly = async () => {
+    setDisconnectingCalendly(true);
     try {
-      const { error } = await supabase
-        .from("users")
-        .update({ calendly_url: trimmed || null })
-        .eq("id", authUser.id);
-
-      if (error) throw error;
-
-      setCalendlyUrl(trimmed);
-      setProfile((prev) => ({ ...prev, calendly_url: trimmed || null }));
-      setCalendlySaved(true);
-      setTimeout(() => setCalendlySaved(false), 2000);
+      const res = await fetch("/api/auth/calendly/disconnect", { method: "POST" });
+      if (!res.ok) throw new Error("Disconnect failed");
+      posthog.capture("calendly_disconnected");
+      setCalendlyConnected(false);
+      setCalendlyUrl("");
+      setProfile((prev) => ({ ...prev, calendly_url: null }));
+      setConfirmDisconnectCalendlyOpen(false);
     } catch (err) {
-      console.error("Error saving Calendly URL:", err);
-      setCalendlyError("Failed to save. Please try again.");
+      console.error("Error disconnecting Calendly:", err);
     } finally {
-      setSavingCalendly(false);
+      setDisconnectingCalendly(false);
     }
   };
 
@@ -589,56 +585,75 @@ export default function SettingsPage() {
             Calendly
           </CardTitle>
           <CardDescription>
-            Your Calendly booking link. We'll share this in DMs when a
-            prospect is ready to book a call.
+            Connect Calendly to share your booking link in DMs and track
+            bookings automatically.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="calendlyUrl">Booking Link</Label>
-            <Input
-              id="calendlyUrl"
-              type="url"
-              value={calendlyUrl}
-              onChange={(e) => setCalendlyUrl(e.target.value)}
-              placeholder="https://calendly.com/your-handle/30min"
-            />
-            {calendlyError ? (
-              <p className="text-xs text-destructive">{calendlyError}</p>
-            ) : (
-              <p className="text-xs text-muted-foreground">
-                Paste the full URL of the event type you want prospects to book
-                (e.g. <code>https://calendly.com/your-handle/30min</code>).
-              </p>
+          {calendlyNotice?.kind === "success" && (
+            <div className="rounded-md border border-green-200 bg-green-50 p-3 text-sm text-green-900 dark:border-green-900/40 dark:bg-green-950/30 dark:text-green-100">
+              Calendly connected. Bookings will sync automatically.
+            </div>
+          )}
+          {calendlyNotice?.kind === "warning" &&
+            calendlyNotice.warning === "calendly_plan_limit" && (
+              <div className="rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900 dark:border-amber-900/40 dark:bg-amber-950/30 dark:text-amber-100">
+                Connected, but your Calendly plan doesn&apos;t support webhooks.
+                Booking link will work, but new bookings won&apos;t auto-sync.
+                Upgrade Calendly to Standard+ to enable booking sync.
+              </div>
             )}
-          </div>
+          {calendlyNotice?.kind === "error" && (
+            <div className="rounded-md border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">
+              Couldn&apos;t connect Calendly. Please try again.
+            </div>
+          )}
 
-          {calendlyUrl.trim() && !calendlyError && (
+          <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <Badge variant="success">Link set</Badge>
+              <span className="text-sm font-medium">Status:</span>
+              {calendlyConnected ? (
+                <Badge variant="success">Connected</Badge>
+              ) : (
+                <Badge variant="muted">Not Connected</Badge>
+              )}
+            </div>
+            {calendlyConnected && calendlyUrl && (
               <a
-                href={calendlyUrl.trim()}
+                href={calendlyUrl}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="text-xs text-muted-foreground hover:text-foreground inline-flex items-center gap-1"
               >
-                Preview <ExternalLink className="h-3 w-3" />
+                Preview link <ExternalLink className="h-3 w-3" />
               </a>
-            </div>
-          )}
-        </CardContent>
-        <CardFooter>
-          <Button onClick={handleSaveCalendly} disabled={savingCalendly}>
-            {savingCalendly ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : calendlySaved ? (
-              <Check className="h-4 w-4" />
-            ) : (
-              <Save className="h-4 w-4" />
             )}
-            {calendlySaved ? "Saved!" : "Save Calendly Link"}
-          </Button>
-        </CardFooter>
+          </div>
+
+          <div className="flex gap-2">
+            <Button
+              asChild
+              variant={calendlyConnected ? "outline" : "default"}
+            >
+              <a href="/api/auth/calendly" className="flex items-center gap-2">
+                <CalendarClock className="h-4 w-4" />
+                {calendlyConnected ? "Reconnect" : "Connect Calendly"}
+              </a>
+            </Button>
+            {calendlyConnected && (
+              <Button
+                variant="destructive"
+                onClick={() => setConfirmDisconnectCalendlyOpen(true)}
+                disabled={disconnectingCalendly}
+              >
+                {disconnectingCalendly && (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                )}
+                Disconnect
+              </Button>
+            )}
+          </div>
+        </CardContent>
       </Card>
 
       {/* Revenue tracking */}
@@ -1167,6 +1182,16 @@ export default function SettingsPage() {
         confirmText="Clear"
         loading={clearingVoice}
         onConfirm={handleClearVoice}
+      />
+
+      <ConfirmDialog
+        open={confirmDisconnectCalendlyOpen}
+        onOpenChange={setConfirmDisconnectCalendlyOpen}
+        title="Disconnect Calendly?"
+        description="Clinchd will stop syncing bookings and remove your booking link from DMs. You can reconnect anytime."
+        confirmText="Disconnect"
+        loading={disconnectingCalendly}
+        onConfirm={handleDisconnectCalendly}
       />
     </div>
   );
