@@ -292,6 +292,9 @@ export default function VsManyChat() {
             Related comparisons &amp; guides
           </h3>
           <div className="flex flex-wrap gap-4">
+            <Link href="/compare/vs-inro" className="text-sm font-bold text-[#ff7e67] hover:underline">
+              Clinchd vs Inro &rarr;
+            </Link>
             <Link href="/compare/vs-gohighlevel" className="text-sm font-bold text-[#ff7e67] hover:underline">
               Clinchd vs GoHighLevel &rarr;
             </Link>

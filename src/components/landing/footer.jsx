@@ -42,6 +42,9 @@ export default function Footer() {
                 <Link href="/compare/vs-manychat" className="hover:text-[#ff7e67] transition-colors">vs ManyChat</Link>
               </li>
               <li>
+                <Link href="/compare/vs-inro" className="hover:text-[#ff7e67] transition-colors">vs Inro</Link>
+              </li>
+              <li>
                 <Link href="/compare/vs-gohighlevel" className="hover:text-[#ff7e67] transition-colors">vs GoHighLevel</Link>
               </li>
               <li>

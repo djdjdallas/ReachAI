@@ -146,6 +146,50 @@ export default function Pricing() {
           </div>
         </div>
 
+        {/* Flat-rate wedge */}
+        <div className="mt-20 max-w-4xl mx-auto reveal-up">
+          <div className="rounded-[2rem] bg-stone-900 text-white p-10 md:p-14 relative overflow-hidden">
+            <div className="absolute -right-20 -top-20 w-72 h-72 bg-[#ff7e67]/20 rounded-full blur-3xl" />
+            <div className="relative">
+              <div className="text-[11px] font-bold uppercase tracking-widest text-[#ff7e67] mb-4">
+                Why flat beats per-contact
+              </div>
+              <h3 className="text-2xl md:text-4xl font-black mb-6 leading-tight tracking-tight">
+                Your viral Reel shouldn&apos;t be a billing event.
+              </h3>
+              <p className="text-white/80 text-lg font-medium leading-relaxed mb-8 max-w-2xl">
+                Tools like ManyChat and Inro charge per activated contact. At 2,000 DMs/month
+                — entirely normal after a Reel pops — those bills climb fast and the real
+                discounts only unlock with annual lock-in.
+              </p>
+
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div className="bg-white/5 rounded-2xl p-5 border border-white/10">
+                  <div className="text-[10px] font-bold uppercase tracking-widest text-white/50 mb-2">
+                    ManyChat at 10K contacts
+                  </div>
+                  <div className="text-2xl font-black mb-1">$115/mo</div>
+                  <div className="text-xs text-white/60">+ scales with every new contact</div>
+                </div>
+                <div className="bg-white/5 rounded-2xl p-5 border border-white/10">
+                  <div className="text-[10px] font-bold uppercase tracking-widest text-white/50 mb-2">
+                    Inro at 2,000 DMs/mo
+                  </div>
+                  <div className="text-2xl font-black mb-1">Well past €12.99</div>
+                  <div className="text-xs text-white/60">+ annual lock-in for real discounts</div>
+                </div>
+                <div className="bg-[#ff7e67] rounded-2xl p-5 border border-[#ff7e67]">
+                  <div className="text-[10px] font-bold uppercase tracking-widest text-white/80 mb-2">
+                    Clinchd Unlimited
+                  </div>
+                  <div className="text-2xl font-black mb-1">$197/mo. Flat.</div>
+                  <div className="text-xs text-white/90">500 DMs or 50,000. Same bill.</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
         <div className="mt-16 flex flex-col items-center gap-4 reveal-up">
           <div className="flex items-center gap-3 px-6 py-3 bg-stone-50 rounded-2xl border border-stone-100">
             <ShieldCheck className="w-6 h-6 text-emerald-500" />

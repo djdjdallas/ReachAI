@@ -26,7 +26,7 @@ const features = [
     icon: ShieldAlert,
     title: "Objection Handling",
     description:
-      "Trained on your exact sales script to handle \"I can't afford it\" and \"I need to think about it\" on the spot.",
+      "Trained on your exact sales script — handles \"I can't afford it,\" \"I need to think,\" \"I need to ask my partner,\" and \"what if it doesn't work for me\" the way you would on a discovery call.",
     bgClass: "bg-rose-50",
   },
   {

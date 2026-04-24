@@ -7,6 +7,7 @@ import { ChevronDown, Menu, X } from "lucide-react";
 
 const compareLinks = [
   { href: "/compare/vs-manychat", label: "vs ManyChat" },
+  { href: "/compare/vs-inro", label: "vs Inro" },
   { href: "/compare/vs-setsmart", label: "vs SetSmart" },
   { href: "/compare/vs-gohighlevel", label: "vs GoHighLevel" },
   { href: "/compare/vs-setter-ai", label: "vs Setter AI" },

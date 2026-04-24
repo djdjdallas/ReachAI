@@ -278,6 +278,9 @@ export default function VsSetterAI() {
             <Link href="/compare/vs-manychat" className="text-sm font-bold text-[#ff7e67] hover:underline">
               Clinchd vs ManyChat &rarr;
             </Link>
+            <Link href="/compare/vs-inro" className="text-sm font-bold text-[#ff7e67] hover:underline">
+              Clinchd vs Inro &rarr;
+            </Link>
             <Link href="/compare/vs-gohighlevel" className="text-sm font-bold text-[#ff7e67] hover:underline">
               Clinchd vs GoHighLevel &rarr;
             </Link>

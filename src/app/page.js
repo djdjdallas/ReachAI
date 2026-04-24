@@ -5,6 +5,7 @@ import Problem from "@/components/landing/problem";
 import TrustedBy from "@/components/landing/trusted-by";
 import HowItWorks from "@/components/landing/how-it-works";
 import Features from "@/components/landing/features";
+import ObjectionHandling from "@/components/landing/objection-handling";
 import ComparisonCallout from "@/components/landing/comparison-callout";
 import Integrations from "@/components/landing/integrations";
 import Testimonials from "@/components/landing/testimonials";
@@ -169,6 +170,7 @@ export default function HomePage() {
           <Problem />
           <HowItWorks />
           <Features />
+          <ObjectionHandling />
           <ComparisonCallout />
           <Integrations />
           <Testimonials />

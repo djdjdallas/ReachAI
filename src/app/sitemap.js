@@ -45,6 +45,12 @@ export default function sitemap() {
       changeFrequency: "weekly",
       priority: 0.8,
     },
+    {
+      url: `${baseUrl}/compare/vs-inro`,
+      lastModified: new Date(),
+      changeFrequency: "weekly",
+      priority: 0.8,
+    },
     // Niche landing pages
     {
       url: `${baseUrl}/for/fitness-coaches`,
