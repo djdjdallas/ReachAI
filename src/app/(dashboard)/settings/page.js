@@ -66,6 +66,7 @@ export default function SettingsPage() {
   // AI Settings
   const [aiMode, setAiMode] = useState("active");
   const [togglingAi, setTogglingAi] = useState(false);
+  const [aiModeError, setAiModeError] = useState(null);
   const [responseDelay, setResponseDelay] = useState(2);
   const [savingAi, setSavingAi] = useState(false);
   const [aiSaved, setAiSaved] = useState(false);
@@ -227,14 +228,22 @@ export default function SettingsPage() {
 
   const handleSetAiMode = async (newMode) => {
     setTogglingAi(true);
+    setAiModeError(null);
     const previousMode = aiMode;
     setAiMode(newMode);
 
     try {
-      await supabase
-        .from("users")
-        .update({ ai_mode: newMode })
-        .eq("id", authUser.id);
+      const res = await fetch("/api/users/ai-mode", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ mode: newMode }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setAiMode(previousMode);
+        setAiModeError(data?.error || "Failed to update agent mode.");
+        return;
+      }
 
       // TODO(post-launch): Remove after one release cycle. This branch
       // was previously written to mop up invisible manual-reply pauses
@@ -254,6 +263,7 @@ export default function SettingsPage() {
     } catch (err) {
       console.error("Error setting AI mode:", err);
       setAiMode(previousMode);
+      setAiModeError("Failed to update agent mode.");
     } finally {
       setTogglingAi(false);
     }
@@ -956,6 +966,18 @@ export default function SettingsPage() {
               </TabsList>
             </Tabs>
           </div>
+
+          {aiModeError && (
+            <div className="flex items-start gap-2 px-3 py-2 rounded-lg bg-amber-50 border border-amber-200 text-amber-800 text-xs leading-relaxed">
+              <AlertTriangle className="h-3.5 w-3.5 mt-0.5 shrink-0" />
+              <span>
+                {aiModeError}{" "}
+                <a href="/script-builder" className="underline font-medium">
+                  Complete setup →
+                </a>
+              </span>
+            </div>
+          )}
 
           <Separator />
 

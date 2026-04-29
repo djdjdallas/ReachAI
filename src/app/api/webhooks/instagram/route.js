@@ -51,7 +51,6 @@ async function handleMetaWebhook(body, rawBody, request) {
   if (!process.env.INSTAGRAM_APP_SECRET) {
     console.warn("INSTAGRAM_APP_SECRET not set — skipping signature verification");
   } else if (!verifyWebhookSignature(rawBody, signature)) {
-    console.warn("[ig-webhook] signature verification failed");
     return NextResponse.json({ error: "Invalid signature" }, { status: 403 });
   }
 
@@ -59,10 +58,8 @@ async function handleMetaWebhook(body, rawBody, request) {
 
   for (const entry of entries) {
     const messaging = entry.messaging || [];
-    console.log("[ig-webhook] entry messaging count:", messaging.length);
 
     for (const event of messaging) {
-      console.log("[ig-webhook] event keys:", Object.keys(event || {}), "has_text:", !!event.message?.text, "is_echo:", !!event.message?.is_echo);
       // Only process text messages (not reads, reactions, etc.)
       if (!event.message?.text) continue;
 
@@ -72,7 +69,6 @@ async function handleMetaWebhook(body, rawBody, request) {
       const igAccountId = event.recipient?.id; // Our Instagram Business Account ID
       const senderId = event.sender?.id; // The person who DM'd us (IGSID)
       const messageText = event.message.text;
-      console.log("[ig-webhook] inbound", { igAccountId, senderId, len: messageText?.length, mid: event.message?.mid });
 
       if (!igAccountId || !senderId || !messageText) continue;
 
@@ -112,7 +108,29 @@ async function handleMetaWebhook(body, rawBody, request) {
 
 // ── Helpers ─────────────────────────────────────────────────────────────
 
-async function insertMessageIfNew(supabase, { conversation_id, role, content, provider_message_id }) {
+// Mark a conversation's `last_skip_reason` so the dashboard can explain why
+// the agent didn't reply on a given turn. Cleared by the success path.
+async function markSkip(supabase, conversation_id, reason) {
+  const { error } = await supabase
+    .from("conversations")
+    .update({ last_skip_reason: reason })
+    .eq("id", conversation_id);
+  if (error) log.error("[webhook] markSkip failed:", error.code);
+}
+
+// User-level gates fire before we look up/create a conversation. If a row
+// already exists for this sender we still want to surface the reason on it;
+// otherwise we silently no-op (no conversation yet to annotate).
+async function markSkipForSender(supabase, user_id, sender_id, reason) {
+  const { error } = await supabase
+    .from("conversations")
+    .update({ last_skip_reason: reason })
+    .eq("user_id", user_id)
+    .eq("instagram_sender_id", sender_id);
+  if (error) log.error("[webhook] markSkipForSender failed:", error.code);
+}
+
+async function insertMessageIfNew(supabase, { conversation_id, role, content, provider_message_id, source }) {
   if (provider_message_id) {
     const { data: existing } = await supabase
       .from("messages")
@@ -123,7 +141,7 @@ async function insertMessageIfNew(supabase, { conversation_id, role, content, pr
   }
   const { data, error } = await supabase
     .from("messages")
-    .insert({ conversation_id, role, content, provider_message_id })
+    .insert({ conversation_id, role, content, provider_message_id, source })
     .select()
     .single();
   if (error?.code === "23505") return { duplicate: true };
@@ -162,9 +180,11 @@ async function processIncomingMessage({
     log.warn(`[webhook] no user for ${lookupField}:`, lookupValue);
     return;
   }
-  console.log("[ig-webhook] user:", { id: user.id, ai_mode: user.ai_mode, sub_status: user.subscription_status, has_greeting: !!user.script_config?.greeting });
 
-  if (!["active", "trialing"].includes(user.subscription_status)) return;
+  if (!["active", "trialing"].includes(user.subscription_status)) {
+    await markSkipForSender(supabase, user.id, senderId, "subscription_inactive");
+    return;
+  }
 
   // Fix #1: Check trial expiry
   if (user.subscription_status === "trialing") {
@@ -174,6 +194,7 @@ async function processIncomingMessage({
         .from("users")
         .update({ subscription_status: "expired", ai_mode: "off" })
         .eq("id", user.id);
+      await markSkipForSender(supabase, user.id, senderId, "trial_expired");
       return;
     }
   }
@@ -205,7 +226,6 @@ async function processIncomingMessage({
   conversation = conv;
 
   if (!conversation) {
-    console.log("[ig-webhook] creating new conversation for sender:", senderId);
     const { data: newConv, error: createError } = await supabase
       .from("conversations")
       .insert({
@@ -230,24 +250,20 @@ async function processIncomingMessage({
     });
     conversation = newConv;
   }
-  console.log("[ig-webhook] conversation:", { id: conversation.id, ai_paused: conversation.ai_paused, ai_pause_reason: conversation.ai_pause_reason, status: conversation.status });
 
   // ── Global AI mode gate ─────────────────────────────────────────────
   // 'off'     → complete silence: return without saving anything
   // 'handoff' → save inbound message for dashboard, but skip AI reply
   // 'active'  → full processing (may still be paused per-conversation)
-  if (user.ai_mode === "off") {
-    console.log("[ig-webhook] gate=ai_mode_off skipping");
-    return;
-  }
+  if (user.ai_mode === "off") return;
 
   if (user.ai_mode === "handoff" || conversation.ai_paused) {
-    console.log("[ig-webhook] gate=handoff_or_paused skipping AI reply", { ai_mode: user.ai_mode, ai_paused: conversation.ai_paused, ai_pause_reason: conversation.ai_pause_reason });
     await insertMessageIfNew(supabase, {
       conversation_id: conversation.id,
       role: "user",
       content: messageText,
       provider_message_id: providerMessageId,
+      source: "lead",
     });
     return;
   }
@@ -255,16 +271,16 @@ async function processIncomingMessage({
   // Skip if no script configured
   const sc = user.script_config || {};
   if (!sc.greeting) {
-    console.log("[ig-webhook] gate=no_greeting skipping AI reply");
     await insertMessageIfNew(supabase, {
       conversation_id: conversation.id,
       role: "user",
       content: messageText,
       provider_message_id: providerMessageId,
+      source: "lead",
     });
+    await markSkip(supabase, conversation.id, "no_greeting");
     return;
   }
-  console.log("[ig-webhook] reaching agent invocation for conversation:", conversation.id);
 
   // Atomic DM limit check — increment first, then verify
   const dmLimit = user.plan === "unlimited" ? Infinity : 500;
@@ -274,7 +290,17 @@ async function processIncomingMessage({
       log.error("increment_dm_count failed:", rpcError.code);
       return;
     }
-    if (newCount > dmLimit) return;
+    if (newCount > dmLimit) {
+      await insertMessageIfNew(supabase, {
+        conversation_id: conversation.id,
+        role: "user",
+        content: messageText,
+        provider_message_id: providerMessageId,
+        source: "lead",
+      });
+      await markSkip(supabase, conversation.id, "dm_limit");
+      return;
+    }
   }
 
   // Save incoming message (with deduplication)
@@ -283,6 +309,7 @@ async function processIncomingMessage({
     role: "user",
     content: messageText,
     provider_message_id: providerMessageId,
+    source: "lead",
   });
   if (insertResult.duplicate) return;
 
@@ -365,11 +392,12 @@ async function processIncomingMessage({
       conversation_id: conversation.id,
       role: "assistant",
       content: aiReply,
+      source: "agent",
     });
   if (aiInsertError) log.error("[webhook] AI reply insert failed:", aiInsertError.code);
   await supabase
     .from("conversations")
-    .update({ last_message_at: new Date().toISOString() })
+    .update({ last_message_at: new Date().toISOString(), last_skip_reason: null })
     .eq("id", conversation.id);
 
   // Check Meta's 200/hr outbound DM cap before sending. If we're over, the

@@ -407,12 +407,21 @@ function ConversationsPage() {
     }
   };
 
+  const [aiModeError, setAiModeError] = useState(null);
+
   const handleSetAiMode = async (mode) => {
+    setAiModeError(null);
     try {
-      await supabase
-        .from("users")
-        .update({ ai_mode: mode })
-        .eq("id", user.id);
+      const res = await fetch("/api/users/ai-mode", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ mode }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setAiModeError(data?.error || "Failed to update agent mode.");
+        return;
+      }
 
       // TODO(post-launch): Remove after one release cycle. This branch
       // was previously written to mop up invisible manual-reply pauses
@@ -443,6 +452,7 @@ function ConversationsPage() {
       setProfile((prev) => ({ ...prev, ai_mode: mode }));
     } catch (err) {
       console.error("Failed to set AI mode:", err);
+      setAiModeError("Failed to update agent mode.");
     }
   };
 
@@ -550,6 +560,12 @@ function ConversationsPage() {
               </TabsList>
             </Tabs>
           </div>
+          {aiModeError && (
+            <div className="flex items-start gap-2 px-3 py-2 rounded-lg bg-amber-50 border border-amber-200 text-amber-800 text-xs leading-relaxed">
+              <AlertCircle className="h-3.5 w-3.5 mt-0.5 shrink-0" />
+              <span>{aiModeError}</span>
+            </div>
+          )}
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-stone-400" />
             <Input
@@ -836,21 +852,33 @@ function ConversationsPage() {
 
                   {messages.map((msg) => {
                     const isOutbound = msg.role === "assistant";
+                    // Resolve label: prefer the new `source` column. Fall back
+                    // to `role` for legacy rows where `source` is null —
+                    // pre-migration manual replies will render as "AI".
+                    const isManualReply = msg.source === "manual";
+                    const outboundLabel = isManualReply ? "You" : "AI";
+                    const OutboundIcon = isManualReply ? User : Bot;
                     return (
                       <div key={msg.id}>
                         {isOutbound ? (
                           <div className="flex items-end gap-3 justify-end ml-auto max-w-[80%]">
                             <div className="space-y-1 text-right">
-                              <div className="bg-[#ff7e67] text-white px-4 py-3 text-sm leading-relaxed"
-                                style={{ borderRadius: "18px 18px 4px 18px" }}>
+                              <div
+                                className={`px-4 py-3 text-sm leading-relaxed ${
+                                  isManualReply
+                                    ? "bg-stone-700 text-white"
+                                    : "bg-[#ff7e67] text-white"
+                                }`}
+                                style={{ borderRadius: "18px 18px 4px 18px" }}
+                              >
                                 <p className="whitespace-pre-wrap">
                                   {msg.content}
                                 </p>
                               </div>
                               <div className="flex items-center justify-end gap-1.5 px-1">
                                 <span className="text-[10px] font-medium text-stone-400 flex items-center gap-0.5">
-                                  <Bot className="h-2.5 w-2.5" />
-                                  AI
+                                  <OutboundIcon className="h-2.5 w-2.5" />
+                                  {outboundLabel}
                                 </span>
                                 <span className="text-[10px] text-stone-400">
                                   {timeAgo(msg.created_at)}
@@ -872,9 +900,15 @@ function ConversationsPage() {
                                   {msg.content}
                                 </p>
                               </div>
-                              <span className="text-[10px] text-stone-400 px-1">
-                                {timeAgo(msg.created_at)}
-                              </span>
+                              <div className="flex items-center gap-1.5 px-1">
+                                <span className="text-[10px] font-medium text-stone-400">
+                                  {selectedConvo.sender_name || "Lead"}
+                                </span>
+                                <span className="text-[10px] text-stone-400">·</span>
+                                <span className="text-[10px] text-stone-400">
+                                  {timeAgo(msg.created_at)}
+                                </span>
+                              </div>
                             </div>
                           </div>
                         )}

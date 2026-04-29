@@ -114,6 +114,7 @@ export async function POST(request) {
         conversation_id: conversationId,
         role: "assistant",
         content: replyContent,
+        source: manual ? "manual" : "agent",
       })
       .select()
       .single();
