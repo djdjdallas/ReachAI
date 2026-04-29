@@ -414,9 +414,11 @@ function ConversationsPage() {
         .update({ ai_mode: mode })
         .eq("id", user.id);
 
-      // Switching back to "active" should also resume conversations that
-      // got paused by a manual reply during handoff. Leave complex-objection
-      // pauses alone — those are waiting on human review.
+      // TODO(post-launch): Remove after one release cycle. This branch
+      // was previously written to mop up invisible manual-reply pauses
+      // (ai_paused=true with null reason). That code path was removed
+      // in <commit-sha>. Kept temporarily as defensive cleanup for any
+      // legacy rows that escape the one-shot SQL migration.
       if (mode === "active") {
         await supabase
           .from("conversations")

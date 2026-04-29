@@ -59,8 +59,10 @@ async function handleMetaWebhook(body, rawBody, request) {
 
   for (const entry of entries) {
     const messaging = entry.messaging || [];
+    console.log("[ig-webhook] entry messaging count:", messaging.length);
 
     for (const event of messaging) {
+      console.log("[ig-webhook] event keys:", Object.keys(event || {}), "has_text:", !!event.message?.text, "is_echo:", !!event.message?.is_echo);
       // Only process text messages (not reads, reactions, etc.)
       if (!event.message?.text) continue;
 
@@ -70,6 +72,7 @@ async function handleMetaWebhook(body, rawBody, request) {
       const igAccountId = event.recipient?.id; // Our Instagram Business Account ID
       const senderId = event.sender?.id; // The person who DM'd us (IGSID)
       const messageText = event.message.text;
+      console.log("[ig-webhook] inbound", { igAccountId, senderId, len: messageText?.length, mid: event.message?.mid });
 
       if (!igAccountId || !senderId || !messageText) continue;
 
@@ -159,6 +162,7 @@ async function processIncomingMessage({
     log.warn(`[webhook] no user for ${lookupField}:`, lookupValue);
     return;
   }
+  console.log("[ig-webhook] user:", { id: user.id, ai_mode: user.ai_mode, sub_status: user.subscription_status, has_greeting: !!user.script_config?.greeting });
 
   if (!["active", "trialing"].includes(user.subscription_status)) return;
 
@@ -201,6 +205,7 @@ async function processIncomingMessage({
   conversation = conv;
 
   if (!conversation) {
+    console.log("[ig-webhook] creating new conversation for sender:", senderId);
     const { data: newConv, error: createError } = await supabase
       .from("conversations")
       .insert({
@@ -225,14 +230,19 @@ async function processIncomingMessage({
     });
     conversation = newConv;
   }
+  console.log("[ig-webhook] conversation:", { id: conversation.id, ai_paused: conversation.ai_paused, ai_pause_reason: conversation.ai_pause_reason, status: conversation.status });
 
   // ── Global AI mode gate ─────────────────────────────────────────────
   // 'off'     → complete silence: return without saving anything
   // 'handoff' → save inbound message for dashboard, but skip AI reply
   // 'active'  → full processing (may still be paused per-conversation)
-  if (user.ai_mode === "off") return;
+  if (user.ai_mode === "off") {
+    console.log("[ig-webhook] gate=ai_mode_off skipping");
+    return;
+  }
 
   if (user.ai_mode === "handoff" || conversation.ai_paused) {
+    console.log("[ig-webhook] gate=handoff_or_paused skipping AI reply", { ai_mode: user.ai_mode, ai_paused: conversation.ai_paused, ai_pause_reason: conversation.ai_pause_reason });
     await insertMessageIfNew(supabase, {
       conversation_id: conversation.id,
       role: "user",
@@ -245,6 +255,7 @@ async function processIncomingMessage({
   // Skip if no script configured
   const sc = user.script_config || {};
   if (!sc.greeting) {
+    console.log("[ig-webhook] gate=no_greeting skipping AI reply");
     await insertMessageIfNew(supabase, {
       conversation_id: conversation.id,
       role: "user",
@@ -253,6 +264,7 @@ async function processIncomingMessage({
     });
     return;
   }
+  console.log("[ig-webhook] reaching agent invocation for conversation:", conversation.id);
 
   // Atomic DM limit check — increment first, then verify
   const dmLimit = user.plan === "unlimited" ? Infinity : 500;

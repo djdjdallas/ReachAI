@@ -125,14 +125,6 @@ export async function POST(request) {
       );
     }
 
-    // Pause AI on manual reply so the assistant doesn't also answer next
-    if (manual) {
-      await getSupabaseAdmin()
-        .from("conversations")
-        .update({ ai_paused: true })
-        .eq("id", conversationId);
-    }
-
     // Send via Meta Instagram API
     await sendInstagramMessage(
       userProfile.instagram_business_account_id,

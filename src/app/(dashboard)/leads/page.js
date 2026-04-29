@@ -332,7 +332,7 @@ function LeadsPage() {
                               : "text-green-600"
                           }`}
                         >
-                          {lead.ai_paused ? "Paused" : "Active"}
+                          {lead.ai_paused ? "Needs Review" : "Active"}
                         </span>
                       </div>
                     </td>
