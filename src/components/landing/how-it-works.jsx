@@ -1,9 +1,14 @@
+import ConnectSetup from "@/components/landing/animations/ConnectSetup";
+import QualifyDM from "@/components/landing/animations/QualifyDM";
+import BookingConfirmed from "@/components/landing/animations/BookingConfirmed";
+
 const steps = [
   {
     number: "01",
     title: "Connect & Describe Your Offer",
     description:
       "Link your Instagram account in one click, then tell Clinchd about your coaching offer, ideal client, and how you handle objections. Takes 5 minutes.",
+    Component: ConnectSetup,
     video: "/animations/04-smart-replies.mp4",
   },
   {
@@ -11,6 +16,7 @@ const steps = [
     title: "AI Qualifies Every DM",
     description:
       "Every new message gets read, qualified, and replied to in your voice. Clinchd asks the right questions, handles objections, and filters tire-kickers from real buyers.",
+    Component: QualifyDM,
     video: "/animations/03-lead-qualification.mp4",
   },
   {
@@ -18,6 +24,7 @@ const steps = [
     title: "Discovery Calls Get Booked",
     description:
       "When a lead is qualified and interested, Clinchd drops your Calendly link at exactly the right moment. You show up to pre-qualified calls ready to close.",
+    Component: BookingConfirmed,
     video: "/animations/05-calendar-booking.mp4",
   },
 ];
@@ -42,6 +49,7 @@ export default function HowItWorks() {
         <div className="space-y-20 md:space-y-32">
           {steps.map((step, i) => {
             const isReversed = i % 2 !== 0;
+            const StepComponent = step.Component;
             return (
               <div
                 key={step.number}
@@ -62,18 +70,24 @@ export default function HowItWorks() {
                   </p>
                 </div>
 
-                {/* Video */}
+                {/* Animation */}
                 <div className="flex-1 w-full">
-                  <div className="bg-white border border-stone-100 rounded-[2rem] p-3 md:p-4 soft-shadow overflow-hidden">
-                    <video
-                      autoPlay
-                      loop
-                      muted
-                      playsInline
-                      className="w-full rounded-[1.5rem]"
-                    >
-                      <source src={step.video} type="video/mp4" />
-                    </video>
+                  <div className="aspect-[5/4] w-full">
+                    {StepComponent ? (
+                      <StepComponent />
+                    ) : (
+                      <div className="bg-white border border-stone-100 rounded-[2rem] p-3 md:p-4 soft-shadow overflow-hidden">
+                        <video
+                          autoPlay
+                          loop
+                          muted
+                          playsInline
+                          className="w-full rounded-[1.5rem]"
+                        >
+                          <source src={step.video} type="video/mp4" />
+                        </video>
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>

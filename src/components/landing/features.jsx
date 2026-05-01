@@ -6,6 +6,7 @@ import {
   LayoutDashboard,
   PenTool,
 } from "lucide-react";
+import AgentStats from "@/components/landing/animations/AgentStats";
 
 const features = [
   {
@@ -89,21 +90,10 @@ export default function Features() {
           })}
         </div>
 
-        {/* Analytics Dashboard Video */}
+        {/* Analytics Dashboard Animation */}
         <div className="mt-16 reveal-up">
-          <div className="bg-stone-50 border border-stone-100 rounded-[2rem] p-3 md:p-4 overflow-hidden">
-            <video
-              autoPlay
-              loop
-              muted
-              playsInline
-              className="w-full rounded-[1.5rem]"
-            >
-              <source
-                src="/animations/06-analytics-dashboard.mp4"
-                type="video/mp4"
-              />
-            </video>
+          <div className="aspect-[5/4] w-full max-w-3xl mx-auto">
+            <AgentStats />
           </div>
           <p className="text-center text-sm text-stone-400 font-medium mt-4">
             Track every conversation, qualification, and booking from one dashboard.

@@ -1,4 +1,5 @@
 import { Clock, Bot, MoonStar } from "lucide-react";
+import AlwaysOn from "@/components/landing/animations/AlwaysOn";
 
 const painPoints = [
   {
@@ -57,21 +58,10 @@ export default function Problem() {
           })}
         </div>
 
-        {/* 24/7 Availability Video */}
+        {/* 24/7 Availability Animation */}
         <div className="mt-16 reveal-up">
-          <div className="bg-stone-50 border border-stone-100 rounded-[2rem] p-3 md:p-4 overflow-hidden">
-            <video
-              autoPlay
-              loop
-              muted
-              playsInline
-              className="w-full rounded-[1.5rem]"
-            >
-              <source
-                src="/animations/02-availability-24x7.mp4"
-                type="video/mp4"
-              />
-            </video>
+          <div className="aspect-[5/4] w-full max-w-3xl mx-auto">
+            <AlwaysOn />
           </div>
         </div>
       </div>
