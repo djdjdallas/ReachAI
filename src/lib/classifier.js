@@ -46,6 +46,8 @@ const RECORD_INTENT_TOOL = {
 // The system prompt. Must exceed the 2,048-token minimum cache block for
 // Haiku 4.5 so the ephemeral cache actually takes. Few-shots below intentionally
 // pad the block — do NOT trim them without re-checking the token count.
+// Cache uses the default 5-minute ephemeral TTL (GA, no beta header required);
+// 5 minutes is sufficient because comments on the same post arrive in rapid bursts.
 const SYSTEM_PROMPT = `You are Clinchd's comment intent classifier. You receive Instagram comments posted on a creator's own Reels, photos, and carousels. You classify each comment into exactly one of six buckets, and you record that classification by calling the record_comment_intent tool. You never write free-text replies to the user; you only call the tool.
 
 # Goal
@@ -222,7 +224,7 @@ export async function classifyComment({
       {
         type: "text",
         text: SYSTEM_PROMPT,
-        cache_control: { type: "ephemeral", ttl: "1h" },
+        cache_control: { type: "ephemeral" },
       },
     ],
     messages: [
@@ -232,7 +234,7 @@ export async function classifyComment({
           {
             type: "text",
             text: bundleText,
-            cache_control: { type: "ephemeral", ttl: "1h" },
+            cache_control: { type: "ephemeral" },
           },
           {
             type: "text",
@@ -244,6 +246,9 @@ export async function classifyComment({
       },
     ],
   });
+
+  // TODO: remove once cache hit/miss is verified in Vercel logs
+  console.log("ANTHROPIC_USAGE:", JSON.stringify(response.usage, null, 2));
 
   const latencyMs = Date.now() - startedAt;
 

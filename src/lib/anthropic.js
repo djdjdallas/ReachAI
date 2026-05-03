@@ -5,26 +5,17 @@ let _anthropic;
 /**
  * Returns a singleton Anthropic SDK client.
  *
- * The `anthropic-beta: extended-cache-ttl-2025-04-11` header is set globally
- * because the classifier (src/lib/classifier.js) uses a two-breakpoint
- * cache_control strategy with `ttl: "1h"`. Without this beta header the API
- * silently rejects the `ttl` field, which causes the entire cache_control
- * block to be ignored — both cache_creation_input_tokens and
- * cache_read_input_tokens come back as 0 on every call.
- *
- * The header is additive and harmless on calls that don't use `ttl: "1h"`
- * (generateReply, analyzeVoice, summarizeConversation, generateVoiceChatReply,
- * generateScript, classifyIncomingMessage) — those calls are unaffected.
- *
- * Remove this header once the 1h cache TTL graduates from beta to GA.
+ * The classifier uses the default 5-minute ephemeral prompt cache (GA), which
+ * works without any beta headers. An earlier attempt set the
+ * `extended-cache-ttl-2025-04-11` beta header globally to enable `ttl: "1h"`
+ * on cache_control blocks, but that path was unreliable with @anthropic-ai/sdk
+ * 0.39.0 — caching never fired. The 5-minute TTL is sufficient because
+ * comments on the same post arrive in rapid bursts.
  */
 function getAnthropic() {
   if (!_anthropic) {
     _anthropic = new Anthropic({
       apiKey: process.env.ANTHROPIC_API_KEY,
-      defaultHeaders: {
-        "anthropic-beta": "extended-cache-ttl-2025-04-11",
-      },
     });
   }
   return _anthropic;
