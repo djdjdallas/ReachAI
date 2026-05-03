@@ -960,9 +960,27 @@ export default function SettingsPage() {
             </div>
             <Tabs value={aiMode} onValueChange={handleSetAiMode}>
               <TabsList>
-                <TabsTrigger value="active" disabled={togglingAi}>Active</TabsTrigger>
-                <TabsTrigger value="handoff" disabled={togglingAi}>Handoff</TabsTrigger>
-                <TabsTrigger value="off" disabled={togglingAi}>Off</TabsTrigger>
+                <TabsTrigger
+                  value="active"
+                  disabled={togglingAi}
+                  className="data-[state=active]:bg-green-100 data-[state=active]:text-green-700"
+                >
+                  Active
+                </TabsTrigger>
+                <TabsTrigger
+                  value="handoff"
+                  disabled={togglingAi}
+                  className="data-[state=active]:bg-amber-100 data-[state=active]:text-amber-700"
+                >
+                  Handoff
+                </TabsTrigger>
+                <TabsTrigger
+                  value="off"
+                  disabled={togglingAi}
+                  className="data-[state=active]:bg-red-100 data-[state=active]:text-red-700"
+                >
+                  Off
+                </TabsTrigger>
               </TabsList>
             </Tabs>
           </div>

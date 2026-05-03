@@ -548,13 +548,22 @@ function ConversationsPage() {
             <h2 className="font-semibold text-xl tracking-tight">Conversations</h2>
             <Tabs value={profile?.ai_mode || "active"} onValueChange={handleSetAiMode}>
               <TabsList className="h-8">
-                <TabsTrigger value="active" className="text-[11px] px-2.5">
+                <TabsTrigger
+                  value="active"
+                  className="text-[11px] px-2.5 data-[state=active]:bg-green-100 data-[state=active]:text-green-700"
+                >
                   Active
                 </TabsTrigger>
-                <TabsTrigger value="handoff" className="text-[11px] px-2.5">
+                <TabsTrigger
+                  value="handoff"
+                  className="text-[11px] px-2.5 data-[state=active]:bg-amber-100 data-[state=active]:text-amber-700"
+                >
                   Handoff
                 </TabsTrigger>
-                <TabsTrigger value="off" className="text-[11px] px-2.5">
+                <TabsTrigger
+                  value="off"
+                  className="text-[11px] px-2.5 data-[state=active]:bg-red-100 data-[state=active]:text-red-700"
+                >
                   Off
                 </TabsTrigger>
               </TabsList>
