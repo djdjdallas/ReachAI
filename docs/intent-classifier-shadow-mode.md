@@ -2,7 +2,7 @@
 
 Shadow-mode scaffolding for the comment-intent classifier described in the
 Clinchd PRD v1.0. The feature is gated to the founder account
-(`dom@neuralfeeds.com`) via `src/lib/featureFlags.js` and is not wired into
+(`dominickjerell@gmail.com`) via `src/lib/featureFlags.js` and is not wired into
 any Instagram webhook — it's accessible only through the admin playground at
 `/admin/classifier`.
 
@@ -33,7 +33,7 @@ any Instagram webhook — it's accessible only through the admin playground at
 
 ## Manual verification steps
 
-Run these as `dom@neuralfeeds.com` locally or on preview:
+Run these as `dominickjerell@gmail.com` locally or on preview:
 
 1. Apply the migration in the Supabase SQL editor (paste the file contents).
 2. `npm run dev` → visit `/admin/classifier`. Confirm the form renders with
