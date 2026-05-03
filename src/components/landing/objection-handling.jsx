@@ -19,7 +19,7 @@ export default function ObjectionHandling() {
           </h2>
           <p className="text-stone-500 text-lg md:text-xl font-medium leading-relaxed">
             Most Instagram AI tools train on broad templates. Clinchd is trained on your exact
-            sales script — so when a lead says &ldquo;I can&apos;t afford it,&rdquo; your AI
+            sales script, so when a lead says &ldquo;I can&apos;t afford it,&rdquo; your AI
             answers the way you would on a discovery call. Not the way a chatbot would.
           </p>
         </div>
@@ -67,7 +67,7 @@ export default function ObjectionHandling() {
         <div className="text-center mt-16 reveal-up">
           <p className="text-stone-500 font-medium max-w-2xl mx-auto">
             You paste in your offer, your pricing, and the objections you hear most.
-            Clinchd&apos;s AI handles them on the spot — every DM, 24/7, in your voice.
+            Clinchd&apos;s AI handles them on the spot, every DM, 24/7, in your voice.
           </p>
         </div>
       </div>

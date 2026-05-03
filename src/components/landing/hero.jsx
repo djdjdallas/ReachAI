@@ -4,7 +4,7 @@ import { useEffect, useRef } from "react";
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
 import gsap from "gsap";
-import QualifyDM from "@/components/landing/animations/QualifyDM";
+import DMConversation from "@/components/landing/animations/DMConversation";
 
 /**
  * Hero — Clinchd homepage hero with split layout
@@ -179,14 +179,14 @@ export default function Hero() {
             </div>
           </div>
 
-          {/* ─── RIGHT: QUALIFYDM ANIMATION ─── */}
+          {/* ─── RIGHT: DM CONVERSATION ANIMATION ─── */}
           <div
             ref={animRef}
             className="w-full lg:flex-1 lg:max-w-[480px] relative"
           >
             {/* Soft coral glow behind the demo card */}
             <div className="absolute -inset-8 bg-[#ff7e67]/5 blur-3xl rounded-full -z-10" />
-            <QualifyDM />
+            <DMConversation />
           </div>
         </div>
       </div>

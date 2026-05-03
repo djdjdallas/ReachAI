@@ -14,7 +14,7 @@ const baseFeatures = [
     icon: MessageCircle,
     title: "AI Setter Replies",
     description:
-      "Responds to every DM in your voice, 24/7 — qualifying leads while you coach, sleep, or live your life.",
+      "Responds to every DM in your voice, 24/7, qualifying leads while you coach, sleep, or live your life.",
     bgClass: "bg-[#fff5f2]",
   },
   {
@@ -28,14 +28,14 @@ const baseFeatures = [
     icon: ShieldAlert,
     title: "Objection Handling",
     description:
-      "Trained on your exact sales script — handles \"I can't afford it,\" \"I need to think,\" \"I need to ask my partner,\" and \"what if it doesn't work for me\" the way you would on a discovery call.",
+      "Trained on your exact sales script. Handles \"I can't afford it,\" \"I need to think,\" \"I need to ask my partner,\" and \"what if it doesn't work for me\" the way you would on a discovery call.",
     bgClass: "bg-rose-50",
   },
   {
     icon: CalendarPlus,
     title: "Auto-Book Calls",
     description:
-      "Drops your Calendly or Cal.com link at the perfect moment — when buyer interest peaks, not a second too early.",
+      "Drops your Calendly or Cal.com link at the perfect moment, when buyer interest peaks, not a second too early.",
     bgClass: "bg-amber-50",
   },
   {
@@ -62,7 +62,7 @@ const features =
           icon: Sparkles,
           title: "High-Intent Comment Routing",
           description:
-            "AI grades every comment on your Reels for buyer intent — only the high-intent ones get a personalized DM. The noise stays in the comments; the leads land in your inbox.",
+            "AI grades every comment on your Reels for buyer intent. Only the high-intent ones get a personalized DM. The noise stays in the comments; the leads land in your inbox.",
           bgClass: "bg-[#fff5f2]",
         },
       ]
@@ -77,7 +77,7 @@ export default function Features() {
             Your AI Setter That Never Misses a Lead
           </h2>
           <p className="text-stone-500 text-lg font-medium">
-            Everything a $5K/mo setter does — at a fraction of the cost.
+            Everything a $5K/mo setter does, at a fraction of the cost.
           </p>
         </div>
 

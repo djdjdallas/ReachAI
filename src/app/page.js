@@ -16,9 +16,9 @@ import Footer from "@/components/landing/footer";
 import JsonLd from "@/components/JsonLd";
 
 export const metadata = {
-  title: "Clinchd — AI-Assisted Instagram DMs for Coaches",
+  title: "Clinchd: AI-Assisted Instagram DMs for Coaches",
   description:
-    "Clinchd is a shared Instagram inbox with AI-assisted replies that qualify leads and book discovery calls — with the account owner in full control of every conversation.",
+    "Clinchd is a shared Instagram inbox with AI-assisted replies that qualify leads and book discovery calls, with the account owner in full control of every conversation.",
   keywords: [
     "instagram dm ai assistant for coaches",
     "ai appointment setter instagram",
@@ -27,7 +27,7 @@ export const metadata = {
     "ai setter for instagram coaches",
   ],
   openGraph: {
-    title: "Clinchd — AI-Assisted Instagram DMs for Coaches",
+    title: "Clinchd: AI-Assisted Instagram DMs for Coaches",
     description:
       "A shared Instagram inbox with AI-assisted replies that qualify leads and book discovery calls. You stay in control.",
     url: "https://www.clinchd.io",
@@ -36,7 +36,7 @@ export const metadata = {
   },
   twitter: {
     card: "summary_large_image",
-    title: "Clinchd — AI-Assisted Instagram DMs for Coaches",
+    title: "Clinchd: AI-Assisted Instagram DMs for Coaches",
     description:
       "A shared Instagram inbox with AI-assisted replies that qualify leads and book discovery calls.",
   },
@@ -48,7 +48,7 @@ const organizationSchema = {
   name: "Clinchd",
   url: "https://www.clinchd.io",
   description:
-    "AI-assisted Instagram DM conversations for coaches and course creators — a shared inbox where the owner controls every reply.",
+    "AI-assisted Instagram DM conversations for coaches and course creators. A shared inbox where the owner controls every reply.",
   foundingDate: "2026",
   sameAs: [],
 };
@@ -147,7 +147,7 @@ const faqPageSchema = {
     },
     {
       "@type": "Question",
-      name: "What if I have a VA already — can they use this too?",
+      name: "What if I have a VA already, can they use this too?",
       acceptedAnswer: {
         "@type": "Answer",
         text: "Yes. Your VA can access the Clinchd dashboard to monitor conversations, take over chats, and review lead quality. Many coaches use Clinchd as their AI first responder and have their VA handle warm handoffs for complex conversations.",

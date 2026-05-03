@@ -26,7 +26,7 @@ const unlimitedPlan = {
     "Unlimited DMs / month",
     ...(process.env.NEXT_PUBLIC_COMMENT_TO_DM_VISIBLE === "true"
       ? [
-          "Comment-to-DM with AI intent grading — only high-intent commenters reach your inbox",
+          "Comment-to-DM with AI intent grading. Only high-intent commenters reach your inbox",
         ]
       : []),
     "Everything in Base",
@@ -164,7 +164,7 @@ export default function Pricing() {
               </h3>
               <p className="text-white/80 text-lg font-medium leading-relaxed mb-8 max-w-2xl">
                 Tools like ManyChat and Inro charge per activated contact. At 2,000 DMs/month
-                — entirely normal after a Reel pops — those bills climb fast and the real
+                (entirely normal after a Reel pops), those bills climb fast and the real
                 discounts only unlock with annual lock-in.
               </p>
 

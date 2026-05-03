@@ -6,7 +6,7 @@ const painPoints = [
     icon: Clock,
     title: "2+ hours a day in DMs",
     description:
-      "You're manually qualifying leads that never convert — and the ones that would have converted slipped through while you were coaching a client.",
+      "You're manually qualifying leads that never convert, and the ones that would have converted slipped through while you were coaching a client.",
   },
   {
     icon: Bot,
@@ -18,7 +18,7 @@ const painPoints = [
     icon: MoonStar,
     title: "Leads go cold overnight",
     description:
-      "Every weekend, every vacation, every time you step away from your phone — hot leads message you and get nothing back until it's too late.",
+      "Every weekend, every vacation, every time you step away from your phone, hot leads message you and get nothing back until it's too late.",
   },
 ];
 

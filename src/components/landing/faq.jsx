@@ -12,12 +12,12 @@ const faqs = [
   {
     question: "Will my followers know it's AI?",
     answer:
-      "In our testing, over 95% of leads don't realize they're talking to AI. You provide your tone and sales script. Clinchd matches your specific coaching voice — with human-like delays so conversations feel natural.",
+      "In our testing, over 95% of leads don't realize they're talking to AI. You provide your tone and sales script. Clinchd matches your specific coaching voice, with human-like delays so conversations feel natural.",
   },
   {
     question: "How is this different from ManyChat?",
     answer:
-      "ManyChat uses rigid decision-tree flows and charges per contact. Clinchd is an AI-native setter that understands context, handles objections dynamically, and qualifies leads like a real sales rep — for a flat $97/mo. No flows to build, no per-contact fees.",
+      "ManyChat uses rigid decision-tree flows and charges per contact. Clinchd is an AI-native setter that understands context, handles objections dynamically, and qualifies leads like a real sales rep for a flat $97/mo. No flows to build, no per-contact fees.",
   },
   {
     question: "What if someone asks something my AI isn't trained on?",
@@ -40,7 +40,7 @@ const faqs = [
       "Absolutely. No contracts, no commitments. Cancel with one click from your dashboard. You'll keep access through the end of your billing period. We also offer a 7-day free trial so you can test everything risk-free.",
   },
   {
-    question: "What if I have a VA already — can they use this too?",
+    question: "What if I have a VA already, can they use this too?",
     answer:
       "Yes. Your VA can access the Clinchd dashboard to monitor conversations, take over chats, and review lead quality. Many coaches use Clinchd as their AI first responder and have their VA handle warm handoffs for complex conversations.",
   },
