@@ -28,6 +28,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Separator } from "@/components/ui/separator";
+import { getDmLimit, getPlanDisplay } from "@/lib/plans";
 
 const PLANS = [
   {
@@ -61,6 +62,9 @@ const PLANS = [
       "Advanced analytics & reporting",
       "Priority support",
       "Custom AI personality tuning",
+      ...(process.env.NEXT_PUBLIC_COMMENT_TO_DM_VISIBLE === "true"
+        ? ["Comment-to-DM with AI intent grading"]
+        : []),
     ],
     popular: true,
   },
@@ -152,8 +156,8 @@ export default function BillingPage() {
 
   const currentPlan = profile?.plan || "free";
   const dmCount = profile?.dm_count_this_month || 0;
-  const dmLimit = 500;
-  const isUnlimited = currentPlan === "unlimited";
+  const dmLimit = getDmLimit(currentPlan);
+  const isUnlimited = getDmLimit(currentPlan) === Infinity;
   const usagePercent = isUnlimited
     ? 0
     : Math.min((dmCount / dmLimit) * 100, 100);
@@ -166,19 +170,12 @@ export default function BillingPage() {
       ? "warning"
       : "muted";
 
-  const planDisplayName =
-    currentPlan === "unlimited"
-      ? "Unlimited Plan"
-      : currentPlan === "base"
-      ? "Base Plan"
-      : "Free";
-
+  const planDisplay = getPlanDisplay(currentPlan);
+  const planDisplayName = planDisplay.name;
   const planPrice =
-    currentPlan === "unlimited"
-      ? "$197/mo"
-      : currentPlan === "base"
-      ? "$97/mo"
-      : "$0";
+    currentPlan === "free"
+      ? planDisplay.price
+      : `${planDisplay.price}${planDisplay.period}`;
 
   if (loading) {
     return (

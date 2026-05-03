@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
+import { getDmLimit } from "@/lib/plans";
 
 export default function AccountUsageWidget() {
   const [usage, setUsage] = useState({ current: 0, limit: 500, percent: 0 });
@@ -19,7 +20,8 @@ export default function AccountUsageWidget() {
           .then(({ data }) => {
             if (data) {
               const current = data.dm_count_this_month || 0;
-              const limit = data.plan === "unlimited" ? null : 500;
+              const planLimit = getDmLimit(data.plan);
+              const limit = planLimit === Infinity ? null : planLimit;
               const percent = limit ? Math.min(Math.round((current / limit) * 100), 100) : 0;
               setUsage({ current, limit, percent });
             }

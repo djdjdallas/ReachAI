@@ -24,6 +24,11 @@ const unlimitedPlan = {
   description: "For high-volume coaches scaling past $50K/mo.",
   features: [
     "Unlimited DMs / month",
+    ...(process.env.NEXT_PUBLIC_COMMENT_TO_DM_VISIBLE === "true"
+      ? [
+          "Comment-to-DM with AI intent grading — only high-intent commenters reach your inbox",
+        ]
+      : []),
     "Everything in Base",
     "Advanced analytics",
     "Priority support",

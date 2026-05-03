@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import { isIntentClassifierEnabled } from "@/lib/featureFlags";
+// eslint-disable-next-line no-unused-vars
+import { hasCommentToDM } from "@/lib/plans";
 
 const VALID_FEEDBACK = new Set(["thumbs_up", "thumbs_down"]);
 
@@ -22,6 +24,13 @@ export async function POST(request) {
     if (!isIntentClassifierEnabled(user.email)) {
       return NextResponse.json({ error: "Not found" }, { status: 404 });
     }
+
+    // TODO(comment-to-DM gate): when the feature un-shadows, gate by plan:
+    //   const { data: profile } = await supabase
+    //     .from("users").select("plan").eq("id", user.id).single();
+    //   if (!hasCommentToDM(profile?.plan)) {
+    //     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    //   }
 
     const body = await request.json().catch(() => ({}));
     const { classificationId, feedback, correctClass, notes } = body;

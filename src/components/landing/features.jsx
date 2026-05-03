@@ -5,10 +5,11 @@ import {
   CalendarPlus,
   LayoutDashboard,
   PenTool,
+  Sparkles,
 } from "lucide-react";
 import AgentStats from "@/components/landing/animations/AgentStats";
 
-const features = [
+const baseFeatures = [
   {
     icon: MessageCircle,
     title: "AI Setter Replies",
@@ -52,6 +53,20 @@ const features = [
     bgClass: "bg-blue-50",
   },
 ];
+
+const features =
+  process.env.NEXT_PUBLIC_COMMENT_TO_DM_VISIBLE === "true"
+    ? [
+        ...baseFeatures,
+        {
+          icon: Sparkles,
+          title: "High-Intent Comment Routing",
+          description:
+            "AI grades every comment on your Reels for buyer intent — only the high-intent ones get a personalized DM. The noise stays in the comments; the leads land in your inbox.",
+          bgClass: "bg-[#fff5f2]",
+        },
+      ]
+    : baseFeatures;
 
 export default function Features() {
   return (

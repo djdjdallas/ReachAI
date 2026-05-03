@@ -4,6 +4,8 @@ import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import { classifyComment, CLASSIFIER_MODEL, CLASSIFIER_VERSION } from "@/lib/classifier";
 import { buildContextBundle } from "@/lib/contextBundle";
 import { isIntentClassifierEnabled } from "@/lib/featureFlags";
+// eslint-disable-next-line no-unused-vars
+import { hasCommentToDM } from "@/lib/plans";
 
 // POST /api/admin/classify
 // Body: { caption: string, offer: object|null, comment: string }
@@ -26,6 +28,14 @@ export async function POST(request) {
     if (!isIntentClassifierEnabled(user.email)) {
       return NextResponse.json({ error: "Not found" }, { status: 404 });
     }
+
+    // TODO(comment-to-DM gate): once the feature un-shadows post Meta App
+    // Review, replace the email allowlist above with a plan-tier gate:
+    //   const { data: profile } = await supabase
+    //     .from("users").select("plan").eq("id", user.id).single();
+    //   if (!hasCommentToDM(profile?.plan)) {
+    //     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    //   }
 
     const body = await request.json().catch(() => ({}));
     const caption = typeof body.caption === "string" ? body.caption : "";
