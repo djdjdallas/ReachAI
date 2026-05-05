@@ -98,7 +98,7 @@ export default function Navbar() {
             </div>
 
             <Link href="/blog" className="hover:text-[#ff7e67] transition-colors">Blog</Link>
-            <a href="#testimonials" className="hover:text-[#ff7e67] transition-colors">Testimonials</a>
+            <a href="#why-clinchd" className="hover:text-[#ff7e67] transition-colors">Why Clinchd</a>
           </div>
 
           <div className="flex items-center gap-4">
@@ -155,7 +155,7 @@ export default function Navbar() {
             </Link>
           ))}
           <Link href="/blog" onClick={() => setMobileOpen(false)} className="block px-4 py-3 text-sm font-semibold text-stone-700 hover:text-[#ff7e67] hover:bg-[#fff5f2] rounded-xl transition-colors">Blog</Link>
-          <a href="#testimonials" onClick={() => setMobileOpen(false)} className="block px-4 py-3 text-sm font-semibold text-stone-700 hover:text-[#ff7e67] hover:bg-[#fff5f2] rounded-xl transition-colors">Testimonials</a>
+          <a href="#why-clinchd" onClick={() => setMobileOpen(false)} className="block px-4 py-3 text-sm font-semibold text-stone-700 hover:text-[#ff7e67] hover:bg-[#fff5f2] rounded-xl transition-colors">Why Clinchd</a>
           <div className="pt-4 space-y-3 px-4">
             <Link href="/login" className="block text-center py-3 text-sm font-bold text-stone-900 border border-stone-200 rounded-full hover:border-stone-900 transition-colors">Login</Link>
             <Link href="/signup" className="block text-center py-3 text-sm font-bold text-white bg-[#ff7e67] rounded-full shadow-lg shadow-[#ff7e67]/20">Start Free Trial</Link>

@@ -34,7 +34,7 @@ const comparisonRows = [
   { feature: "Objection handling", competitor: "Scripted responses", clinchd: "AI-powered, adapts to context" },
   { feature: "Calendar booking (Calendly/Cal.com)", competitor: "Manual link drop", clinchd: "AI sends link at the right moment" },
   { feature: "Human takeover + hot lead alerts", competitor: "Basic handoff", clinchd: "Instant alerts with lead context summary" },
-  { feature: "Independent reviews (G2/Capterra)", competitor: "None", clinchd: "Verified coach testimonials" },
+  { feature: "Built only for coaches", competitor: "Coaches + consultants + agencies", clinchd: "Yes, exclusively" },
   { feature: "Meta Business Partner status", competitor: "No", clinchd: "Yes — API-compliant" },
 ];
 
@@ -49,7 +49,7 @@ const faqs = [
   },
   {
     q: "Does SetSmart have independent reviews?",
-    a: "As of 2026, SetSmart has no listings on G2, Capterra, or Trustpilot. There are no independent, verified reviews from real users. Clinchd has published case studies and testimonials from coaches across fitness, business, and life coaching niches, with specific metrics like calls booked and revenue generated.",
+    a: "As of May 2026, SetSmart has limited prominent presence on G2, Capterra, or Trustpilot. Clinchd is in early access and is publishing aggregate engagement data and product methodology rather than individual case studies until our early customers are ready to share results publicly.",
   },
   {
     q: "Can I switch from SetSmart to Clinchd?",
@@ -159,39 +159,34 @@ export default function VsSetSmart() {
 
             <div>
               <h3 className="text-xl font-extrabold text-stone-900 mb-3">
-                The social proof problem
+                Where we both stand on social proof
               </h3>
               <p>
-                As of 2026, SetSmart has zero listings on G2, Capterra, or Trustpilot. There
-                are no independent, verified reviews from real users. That does not mean the
-                product is bad, but it does mean you are making a purchasing decision based
-                entirely on their own marketing. There is no third-party validation to confirm
-                what they claim.
+                As of May 2026, SetSmart has limited prominent presence on G2, Capterra, or Trustpilot. Clinchd is in early access. Neither of us has the depth of independent reviews that a more mature tool would have, and we'd rather be transparent about that than overclaim.
               </p>
               <p className="mt-4">
-                Clinchd publishes case studies from real coaches with specific numbers:
-                discovery calls booked, response times, setter costs replaced. When you are
-                investing $97/month into a tool that handles your sales conversations, you
-                deserve to see proof from people who look like you, sell like you, and coach
-                like you.
+                What we can offer instead is methodology. Clinchd was designed around the qualification patterns, objection scripts, and tone preferences we saw across hundreds of real coach DM conversations. We're publishing aggregate engagement data and product walkthroughs while our earliest customers run their own results, which we'll share publicly with their permission as we go.
               </p>
             </div>
           </div>
         </div>
       </section>
 
-      {/* Testimonial */}
+      {/* What we built differently */}
       <section className="py-16 bg-[#fafaf9]">
-        <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-          <blockquote className="text-xl md:text-2xl font-medium text-stone-700 italic leading-relaxed mb-8">
-            &ldquo;I tested both SetSmart and Clinchd during the same month. SetSmart felt
-            like a general automation tool that happened to work in DMs. Clinchd felt like
-            it actually understood my coaching business. The AI asked qualification questions
-            I would ask myself. Within three weeks I had 19 discovery calls booked, and my
-            SetSmart account had generated 6 in the same window. The difference was obvious.&rdquo;
-          </blockquote>
-          <p className="font-extrabold text-stone-900">Marcus Rivera</p>
-          <p className="text-sm text-stone-400 font-bold">Business Coach, 21K followers &middot; $8K group program</p>
+        <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
+          <p className="text-xs font-bold uppercase tracking-widest text-[#ff7e67] mb-4 text-center">
+            Why we built Clinchd this way
+          </p>
+          <h2 className="text-2xl md:text-3xl font-black text-stone-900 mb-6 text-center">
+            Coaching-specific by design
+          </h2>
+          <p className="text-stone-600 leading-relaxed text-center max-w-2xl mx-auto">
+            Where SetSmart serves coaches, consultants, and agencies with one shared product, Clinchd is built for one job: helping coaches qualify leads and book discovery calls on Instagram. The qualification flows, objection scripts, and tone presets were designed around the patterns we kept seeing in coach DM conversations.
+          </p>
+          <p className="text-sm text-stone-400 mt-6 text-center">
+            We're in early access. Your results would be among the first we publish.
+          </p>
         </div>
       </section>
 

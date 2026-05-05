@@ -223,18 +223,21 @@ export default function VsSetterAI() {
         </div>
       </section>
 
-      {/* Testimonial */}
+      {/* Why Instagram-first */}
       <section className="py-16 bg-white">
-        <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-          <blockquote className="text-xl md:text-2xl font-medium text-stone-700 italic leading-relaxed mb-8">
-            &ldquo;I looked at Setter AI first because the name sounded exactly like what I
-            needed. But then I realized it doesn&apos;t do Instagram. All my leads come from
-            Instagram — I post Reels, people DM me, and that&apos;s my entire funnel. Clinchd
-            was the only tool that actually fit my workflow. First month: 31 calls booked, zero
-            hours spent in DMs.&rdquo;
-          </blockquote>
-          <p className="font-extrabold text-stone-900">Aisha Johnson</p>
-          <p className="text-sm text-stone-400 font-bold">Career Coach, 14K followers</p>
+        <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
+          <p className="text-xs font-bold uppercase tracking-widest text-[#ff7e67] mb-4 text-center">
+            Why we built Instagram-first
+          </p>
+          <h2 className="text-2xl md:text-3xl font-black text-stone-900 mb-6 text-center">
+            That's where the coaching DMs actually happen
+          </h2>
+          <p className="text-stone-600 leading-relaxed text-center max-w-2xl mx-auto">
+            Setter AI is built for outbound and multi-channel pipelines. Most coaches we studied have one channel that drives 80%+ of their pipeline: Instagram. Reels go viral, DMs flood in, and the response window is hours, not days. Clinchd was built to live inside that channel deeply, instead of treating it as one source feeding a broader CRM.
+          </p>
+          <p className="text-sm text-stone-400 mt-6 text-center">
+            We're in early access. Your results would be among the first we publish.
+          </p>
         </div>
       </section>
 

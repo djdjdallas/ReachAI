@@ -72,8 +72,15 @@ export async function updateSession(request) {
     pathname.startsWith("/compare") ||
     pathname.startsWith("/blog") ||
     pathname.startsWith("/for") ||
+    pathname.startsWith("/faq") ||
     pathname === "/privacy" ||
-    pathname === "/terms"
+    pathname === "/terms" ||
+    pathname === "/ai-dm-setter" ||
+    pathname === "/ai-dm-setter-for-coaches" ||
+    pathname === "/instagram-dm-automation-for-coaches" ||
+    pathname === "/instagram-lead-qualification" ||
+    pathname === "/qualify-leads-on-instagram" ||
+    pathname === "/book-discovery-calls-from-instagram"
   ) {
     return supabaseResponse;
   }

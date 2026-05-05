@@ -20,6 +20,99 @@ export default function sitemap() {
       changeFrequency: "weekly",
       priority: 0.8,
     },
+    // Tier 1 pillar pages
+    {
+      url: `${baseUrl}/ai-dm-setter`,
+      lastModified: new Date(),
+      changeFrequency: "weekly",
+      priority: 0.9,
+    },
+    {
+      url: `${baseUrl}/ai-dm-setter-for-coaches`,
+      lastModified: new Date(),
+      changeFrequency: "weekly",
+      priority: 0.9,
+    },
+    {
+      url: `${baseUrl}/instagram-dm-automation-for-coaches`,
+      lastModified: new Date(),
+      changeFrequency: "weekly",
+      priority: 0.9,
+    },
+    {
+      url: `${baseUrl}/instagram-lead-qualification`,
+      lastModified: new Date(),
+      changeFrequency: "weekly",
+      priority: 0.9,
+    },
+    {
+      url: `${baseUrl}/qualify-leads-on-instagram`,
+      lastModified: new Date(),
+      changeFrequency: "weekly",
+      priority: 0.85,
+    },
+    {
+      url: `${baseUrl}/book-discovery-calls-from-instagram`,
+      lastModified: new Date(),
+      changeFrequency: "weekly",
+      priority: 0.9,
+    },
+    // Tier 5 FAQ snippet pages
+    {
+      url: `${baseUrl}/faq/what-is-an-ai-dm-setter`,
+      lastModified: new Date(),
+      changeFrequency: "monthly",
+      priority: 0.7,
+    },
+    {
+      url: `${baseUrl}/faq/how-much-does-a-human-dm-setter-cost`,
+      lastModified: new Date(),
+      changeFrequency: "monthly",
+      priority: 0.7,
+    },
+    {
+      url: `${baseUrl}/faq/can-ai-book-discovery-calls-from-instagram`,
+      lastModified: new Date(),
+      changeFrequency: "monthly",
+      priority: 0.7,
+    },
+    {
+      url: `${baseUrl}/faq/how-fast-should-you-respond-to-instagram-dms`,
+      lastModified: new Date(),
+      changeFrequency: "monthly",
+      priority: 0.7,
+    },
+    // Tier 2 alternative comparison pages
+    {
+      url: `${baseUrl}/compare/setsmart-alternative`,
+      lastModified: new Date(),
+      changeFrequency: "weekly",
+      priority: 0.8,
+    },
+    {
+      url: `${baseUrl}/compare/inro-alternative`,
+      lastModified: new Date(),
+      changeFrequency: "weekly",
+      priority: 0.8,
+    },
+    {
+      url: `${baseUrl}/compare/chatplace-alternative`,
+      lastModified: new Date(),
+      changeFrequency: "weekly",
+      priority: 0.8,
+    },
+    {
+      url: `${baseUrl}/compare/tailortalk-alternative`,
+      lastModified: new Date(),
+      changeFrequency: "weekly",
+      priority: 0.8,
+    },
+    {
+      url: `${baseUrl}/compare/best-ai-dm-tool-for-coaches-2026`,
+      lastModified: new Date(),
+      changeFrequency: "weekly",
+      priority: 0.85,
+    },
     // Comparison pages
     {
       url: `${baseUrl}/compare/vs-manychat`,
@@ -66,6 +159,66 @@ export default function sitemap() {
     },
     {
       url: `${baseUrl}/for/life-coaches`,
+      lastModified: new Date(),
+      changeFrequency: "monthly",
+      priority: 0.8,
+    },
+    {
+      url: `${baseUrl}/for/relationship-coaches`,
+      lastModified: new Date(),
+      changeFrequency: "monthly",
+      priority: 0.8,
+    },
+    {
+      url: `${baseUrl}/for/health-coaches`,
+      lastModified: new Date(),
+      changeFrequency: "monthly",
+      priority: 0.8,
+    },
+    {
+      url: `${baseUrl}/for/mindset-coaches`,
+      lastModified: new Date(),
+      changeFrequency: "monthly",
+      priority: 0.8,
+    },
+    {
+      url: `${baseUrl}/for/dating-coaches`,
+      lastModified: new Date(),
+      changeFrequency: "monthly",
+      priority: 0.8,
+    },
+    {
+      url: `${baseUrl}/for/nutrition-coaches`,
+      lastModified: new Date(),
+      changeFrequency: "monthly",
+      priority: 0.8,
+    },
+    {
+      url: `${baseUrl}/for/career-coaches`,
+      lastModified: new Date(),
+      changeFrequency: "monthly",
+      priority: 0.8,
+    },
+    {
+      url: `${baseUrl}/for/online-course-creators`,
+      lastModified: new Date(),
+      changeFrequency: "monthly",
+      priority: 0.8,
+    },
+    {
+      url: `${baseUrl}/for/wellness-coaches`,
+      lastModified: new Date(),
+      changeFrequency: "monthly",
+      priority: 0.8,
+    },
+    {
+      url: `${baseUrl}/for/spiritual-coaches`,
+      lastModified: new Date(),
+      changeFrequency: "monthly",
+      priority: 0.8,
+    },
+    {
+      url: `${baseUrl}/for/financial-coaches`,
       lastModified: new Date(),
       changeFrequency: "monthly",
       priority: 0.8,
@@ -161,6 +314,43 @@ export default function sitemap() {
       lastModified: new Date("2026-01-15"),
       changeFrequency: "monthly",
       priority: 0.7,
+    },
+    // Tier 3 problem-aware blog posts
+    {
+      url: `${baseUrl}/blog/instagram-dm-templates-for-coaches`,
+      lastModified: new Date("2026-05-04"),
+      changeFrequency: "monthly",
+      priority: 0.8,
+    },
+    {
+      url: `${baseUrl}/blog/how-to-handle-objections-in-instagram-dms`,
+      lastModified: new Date("2026-05-04"),
+      changeFrequency: "monthly",
+      priority: 0.8,
+    },
+    {
+      url: `${baseUrl}/blog/how-to-qualify-leads-on-instagram-dms`,
+      lastModified: new Date("2026-05-04"),
+      changeFrequency: "monthly",
+      priority: 0.8,
+    },
+    {
+      url: `${baseUrl}/blog/what-to-say-when-someone-dms-how-much`,
+      lastModified: new Date("2026-05-04"),
+      changeFrequency: "monthly",
+      priority: 0.8,
+    },
+    {
+      url: `${baseUrl}/blog/does-instagram-allow-dm-automation`,
+      lastModified: new Date("2026-05-04"),
+      changeFrequency: "monthly",
+      priority: 0.8,
+    },
+    {
+      url: `${baseUrl}/blog/how-to-convert-instagram-followers-to-clients`,
+      lastModified: new Date("2026-05-04"),
+      changeFrequency: "monthly",
+      priority: 0.8,
     },
   ];
 }

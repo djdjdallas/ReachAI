@@ -35,12 +35,6 @@ const NICHE_DATA = {
           "Once a lead is qualified, the AI drops your booking link at the right moment in the conversation. No awkward transitions, no premature pitches. The lead feels ready, and the call gets booked.",
       },
     ],
-    testimonial: {
-      quote:
-        "I was paying $2,800/month for a human setter who worked 9-5 EST. Clinchd replaced that entirely. It handles my DMs around the clock, qualifies people on budget and commitment level, and books calls while I am training clients. Last month I had 27 discovery calls booked. My setter was averaging 14.",
-      name: "Jasmine Torres",
-      detail: "Online Personal Trainer, 14K followers",
-    },
     faqs: [
       {
         q: "Will it work for my online personal training program?",
@@ -92,12 +86,6 @@ const NICHE_DATA = {
           "The AI sends your booking link when the prospect is ready, not a moment too soon. It reads the conversation for buying signals and presents the call as the logical next step, keeping your close rate high.",
       },
     ],
-    testimonial: {
-      quote:
-        "I went from 3 booked discovery calls per week to 11 in my first month with Clinchd. The AI qualifies on revenue, business model, and investment readiness before anyone hits my calendar. Every call I take now is with someone who is genuinely ready to invest in a $12K mastermind. My close rate went from 25% to 48%.",
-      name: "David Chen",
-      detail: "Business Coach, 22K followers",
-    },
     faqs: [
       {
         q: "Can it handle questions about my $15K mastermind?",
@@ -149,12 +137,6 @@ const NICHE_DATA = {
           "The AI introduces the discovery call as a safe, pressure-free conversation. It frames the booking as an opportunity for the lead to explore whether the program feels right, not a sales pitch. The result is higher show-up rates and warmer conversations.",
       },
     ],
-    testimonial: {
-      quote:
-        "I was terrified that an AI would sound cold or robotic in my DMs. My audience is people going through real stuff, career transitions, relationship endings, burnout. Clinchd surprised me completely. The AI sounds warm, asks thoughtful questions, and moves people toward a call without ever feeling pushy. I went from 2 calls a week to 14 in my first month.",
-      name: "Anika Patel",
-      detail: "Life Coach, 9K followers",
-    },
     faqs: [
       {
         q: "Will the AI sound warm and empathetic?",
@@ -171,6 +153,516 @@ const NICHE_DATA = {
       {
         q: "What if someone DMs in crisis?",
         a: "Clinchd includes safeguards for sensitive situations. If a message indicates a mental health crisis, the AI responds with care and provides a gentle redirect. It does not attempt to coach or qualify. These conversations are immediately flagged for your personal review so you can respond directly or point them to appropriate resources.",
+      },
+    ],
+  },
+
+  "relationship-coaches": {
+    title: "AI Instagram DM Automation for Relationship Coaches (2026)",
+    description:
+      "Automate your Instagram DMs as a relationship coach. Clinchd responds with empathy, qualifies leads sensitively, and books discovery calls for your couples and dating programs.",
+    nicheLabel: "Relationship Coaches",
+    heroHeadline: "Your DMs Land at 1 AM After a Breakup. Who's Responding?",
+    heroSub:
+      "Clinchd is the AI DM setter built for relationship coaches. It responds with empathy, qualifies leads gently, and books discovery calls for your transformation programs while you sleep.",
+    painHeadline: "The Relationship Coach DM Problem",
+    painParagraphs: [
+      "Relationship coaching leads don't DM you because they saw a marketing funnel. They DM you because you said something on a Reel that made them feel seen, usually right after a fight, a breakup, or a hard conversation. The window for connection is open at 1 AM, not 9 AM.",
+      "By the time you reply the next morning, the vulnerability is gone. The lead has either patched it up, talked themselves out of needing help, or found another coach who answered while the moment was still raw. The opportunity to actually help them is gone with the moment.",
+      "A relationship coach needs an AI that can respond with warmth in the first message, hold space for emotionally loaded conversations, and only move toward booking once the lead feels met. A generic chatbot does the opposite. Clinchd does this exact job for under $200/mo.",
+    ],
+    features: [
+      {
+        title: "Empathy-first qualification",
+        description:
+          "The AI acknowledges the moment first, asks gently about what's going on, and only ladders to qualifying questions once the lead feels heard. No transactional energy in the first 3 messages.",
+      },
+      {
+        title: "Objection handling for couples programs",
+        description:
+          "When leads say their partner isn't on board or they aren't sure if it's the right time, the AI responds with the kind of language a relationship coach would use. No hard close, no pressure.",
+      },
+      {
+        title: "Sensitive-topic safeguards",
+        description:
+          "Crisis-language flags trigger immediate escalation to your inbox without an automated reply. The AI never tries to coach through abuse, mental health crises, or DV scenarios.",
+      },
+    ],
+    faqs: [
+      {
+        q: "Will the AI sound warm enough for relationship coaching?",
+        a: "Yes. During setup you provide example messages and your tone preferences. Clinchd matches the warmth your audience expects. The AI leads with acknowledgment before any qualifying question, which is exactly what relationship leads need in their first message.",
+      },
+      {
+        q: "What if a lead DMs about something serious like abuse?",
+        a: "Clinchd has crisis-language detection built in. If a message indicates DV, abuse, or mental health crisis, the AI does not auto-reply. It flags the conversation for your immediate review so you can respond personally or point them to appropriate resources.",
+      },
+      {
+        q: "Can it handle objections specific to couples programs?",
+        a: "Yes. The AI handles the most common objections in couples coaching: my partner isn't on board, we can't afford it, we tried therapy and it didn't work, I'm not sure we are ready. Each objection has a coach-flavored response framework that builds trust instead of pushing.",
+      },
+      {
+        q: "Will it understand my dating coaching offer differently from couples coaching?",
+        a: "Yes. During setup you describe your specific offer and ICP. The AI qualifies dating coaching leads on different criteria (single-person mindset, willingness to do inner work, urgency around dating goals) than couples coaching leads.",
+      },
+    ],
+  },
+
+  "health-coaches": {
+    title: "AI Instagram DM Automation for Health Coaches (2026)",
+    description:
+      "Automate your Instagram DMs as a health coach. Clinchd qualifies leads, handles compliance edges, and books discovery calls for your wellness and integrative health programs.",
+    nicheLabel: "Health Coaches",
+    heroHeadline: "Health DMs Are High-Stakes. Your Reply Time Shouldn't Be.",
+    heroSub:
+      "Clinchd is the AI DM setter built for health coaches. It qualifies leads, navigates scope-of-practice carefully, and books discovery calls for your programs around the clock.",
+    painHeadline: "The Health Coach DM Problem",
+    painParagraphs: [
+      "Health coaching leads come in two flavors. The first is genuinely curious about working with you. The second is looking for free medical advice, often with a specific diagnosis they want validated. Sorting them by hand takes hours per week and burns you out.",
+      "Compliance is also a real concern. Health coaches operate inside scope-of-practice rules that vary by certification and state. A lead who DMs about a specific symptom needs a careful, compliant response that doesn't drift into medical territory you can't legally cover.",
+      "Hiring a setter at $2,000-$4,000/month doesn't solve this either, because they need to be trained on your specific scope and offer. Clinchd handles both: scope-aware responses, qualification for real coaching prospects, and 24/7 coverage for under $200/mo.",
+    ],
+    features: [
+      {
+        title: "Scope-of-practice aware responses",
+        description:
+          "The AI is trained to respond compliantly to symptom-specific questions, redirect to medical professionals when appropriate, and never make diagnostic or treatment claims outside your coaching scope.",
+      },
+      {
+        title: "Qualification for serious health-program buyers",
+        description:
+          "The AI asks about goals, current health context, what they have already tried, and investment readiness. It filters free-advice seekers from coaching prospects in the first 3-4 message exchanges.",
+      },
+      {
+        title: "Auto-booking via Calendly or Cal.com",
+        description:
+          "When a lead is qualified, the AI sends your booking link with one sentence about what the call covers. Lead picks a time, the call lands on your calendar with full context.",
+      },
+    ],
+    faqs: [
+      {
+        q: "Will the AI stay inside my scope of practice?",
+        a: "Yes. During setup you define your scope, certification, and what you can and cannot legally address. The AI redirects medical-advice questions and only engages on coaching-appropriate topics. You stay compliant without monitoring every conversation.",
+      },
+      {
+        q: "How does it handle leads asking about specific health conditions?",
+        a: "The AI acknowledges the lead's concern, offers what you do (lifestyle coaching, behavior change, accountability), and clearly states what it doesn't do (diagnose, treat, prescribe). It can recommend the lead consult a medical provider for diagnosis-specific questions, then return to coaching qualification.",
+      },
+      {
+        q: "Can it qualify leads for my $1,500 program?",
+        a: "Yes. The AI qualifies on goals, timeline, past attempts, and investment readiness. It handles {'this is too expensive'} and {'I need to talk to my partner'} with the kind of empathy a health coach would use. Filters free-advice seekers from real prospects.",
+      },
+      {
+        q: "What if a lead is in crisis (eating disorder, severe symptoms)?",
+        a: "Clinchd has crisis-language detection. Conversations indicating crisis are flagged for your immediate review with no automated reply. You stay in control of the most sensitive cases.",
+      },
+    ],
+  },
+
+  "mindset-coaches": {
+    title: "AI Instagram DM Automation for Mindset Coaches (2026)",
+    description:
+      "Automate your Instagram DMs as a mindset coach. Clinchd handles emotionally rich conversations, qualifies leads on readiness, and books calls for your transformation programs.",
+    nicheLabel: "Mindset Coaches",
+    heroHeadline: "Mindset DMs Need Depth, Not Scripts",
+    heroSub:
+      "Clinchd is the AI DM setter built for mindset coaches. It handles emotionally rich conversations, qualifies on readiness for change, and books discovery calls for your transformation programs.",
+    painHeadline: "The Mindset Coach DM Problem",
+    painParagraphs: [
+      "Mindset coaching leads are uniquely sensitive. They DM you because something you said about limiting beliefs, self-doubt, or fear hit them in the chest. They are not in shopping mode. They are in a {'maybe this is finally my moment'} mode.",
+      "A scripted chatbot kills that moment instantly. The lead asked a vulnerable question. The bot answered with a sales line. The vulnerability shuts down, and the lead never DMs back.",
+      "What mindset coaches need is an AI that can stay in the emotional register the lead opened, ask thoughtful follow-up questions, and only move toward booking when the lead has shown clear readiness. Clinchd is built for exactly this.",
+    ],
+    features: [
+      {
+        title: "Reads emotional register",
+        description:
+          "The AI matches the depth of the lead's opening message. A vulnerable opener gets a thoughtful, slow response. A casual opener gets a casual reply. No tone mismatches.",
+      },
+      {
+        title: "Qualifies on readiness, not just budget",
+        description:
+          "Mindset coaching is about commitment to inner work. The AI asks about what they have tried, what they have changed, and what they are willing to do differently. Filters out leads who want a quick fix from leads ready for transformation.",
+      },
+      {
+        title: "Books calls when the lead is actually ready",
+        description:
+          "The AI doesn't push the booking link in message 3. It waits for clear readiness signals (specific goal, willingness to invest, a triggering event), then sends the link with context.",
+      },
+    ],
+    faqs: [
+      {
+        q: "Will the AI feel authentic in deep emotional conversations?",
+        a: "Yes. During setup you provide your tone, your typical phrasings, and how you respond to common emotional opens. The AI matches your voice. It doesn't sound like a generic empathy script. It sounds like you on a thoughtful day.",
+      },
+      {
+        q: "How does it qualify for mindset work specifically?",
+        a: "Mindset qualification is about commitment, not just budget. The AI asks about what the lead has changed, what they keep getting stuck on, and what they would be willing to do differently. Filters out quick-fix seekers from people ready for the work.",
+      },
+      {
+        q: "Can it handle leads who are skeptical of coaching?",
+        a: "Yes. The AI handles {'I don't really believe in mindset work'} or {'I've tried therapy and it didn't help'} with curiosity instead of defensiveness. It asks what specifically didn't work, builds nuance, and lets the lead come to their own readiness.",
+      },
+      {
+        q: "What if someone DMs in crisis or shares trauma?",
+        a: "Clinchd has crisis-language detection. Heavy trauma or crisis content is flagged for your immediate review with no auto-reply. You stay in control of the most sensitive cases.",
+      },
+    ],
+  },
+
+  "dating-coaches": {
+    title: "AI Instagram DM Automation for Dating Coaches (2026)",
+    description:
+      "Automate your Instagram DMs as a dating coach. Clinchd handles vulnerable openers, qualifies on readiness, and books discovery calls for your dating and confidence programs.",
+    nicheLabel: "Dating Coaches",
+    heroHeadline: "Dating DMs Are Vulnerable. Your AI Should Treat Them That Way.",
+    heroSub:
+      "Clinchd is the AI DM setter built for dating coaches. It handles vulnerable openers with care, qualifies on readiness, and books discovery calls for your dating and confidence programs.",
+    painHeadline: "The Dating Coach DM Problem",
+    painParagraphs: [
+      "Dating coaching leads DM you after the worst nights of their dating lives. A bad date, a ghosting, a relationship that ended badly. They are reaching out from a place of self-doubt, and the first message they get back determines whether they trust you with the next 90 days.",
+      "Manual replies miss the moment. By morning, the lead is back to numbing scrolls and the urgency is gone. A scripted bot makes it worse. They open up and get a salesy reply. They never DM back.",
+      "Dating coaches need an AI that can lead with empathy, qualify gently, and only book calls with leads who are actually ready to do the work. Clinchd handles all of this for under $200/mo. No human setter, no missed midnight DMs, no scripted chatbot vibes.",
+    ],
+    features: [
+      {
+        title: "Empathy-first responses",
+        description:
+          "The AI opens with acknowledgment, never with a sales pitch. {'That sounds really hard'} hits different than {'Tell me more about your goals'} when someone DMs after a breakup.",
+      },
+      {
+        title: "Qualifies on inner-work readiness",
+        description:
+          "Dating coaching converts when the lead is ready to look inward. The AI qualifies on willingness to do mindset work, take action between sessions, and commit to a 90-day timeline.",
+      },
+      {
+        title: "Auto-booking when the lead is ready",
+        description:
+          "The AI reads buying signals (specific goals, urgency, financial readiness) and sends your Calendly or Cal.com link only when the lead is genuinely ready, not on message 3.",
+      },
+    ],
+    faqs: [
+      {
+        q: "Will it sound warm enough for dating coaching?",
+        a: "Yes. The AI matches the tone your audience needs. During setup you provide your voice, sample messages, and the kind of warmth you bring to first conversations. The AI doesn't sound corporate. It sounds like a coach who cares.",
+      },
+      {
+        q: "How does it handle leads who feel embarrassed or self-conscious?",
+        a: "The AI acknowledges what the lead shares, normalizes their experience without minimizing, and gently moves the conversation forward. It doesn't push, doesn't lecture, doesn't use shame language. Sounds like the kind of friend who happens to be a coach.",
+      },
+      {
+        q: "Can it handle conversations about past trauma in dating contexts?",
+        a: "The AI is built to respond thoughtfully to past relationship trauma. It does not coach through serious abuse or assault contexts. Those conversations are flagged for your immediate review.",
+      },
+      {
+        q: "Will it recognize when a lead is actually a paid client opportunity vs just venting?",
+        a: "Yes. The qualifying flow asks about what they have changed, what they want to be different in 90 days, and what they would invest to make it happen. Vent-only conversations get warm closure. Real prospects get moved toward a discovery call.",
+      },
+    ],
+  },
+
+  "nutrition-coaches": {
+    title: "AI Instagram DM Automation for Nutrition Coaches (2026)",
+    description:
+      "Automate your Instagram DMs as a nutrition coach. Clinchd qualifies leads, navigates scope, and books discovery calls for your nutrition and habit-change programs.",
+    nicheLabel: "Nutrition Coaches",
+    heroHeadline: "You Posted a Reel About Cutting Sugar. Now You Have 200 DMs.",
+    heroSub:
+      "Clinchd is the AI DM setter built for nutrition coaches. It qualifies leads, handles scope-of-practice questions, and books discovery calls for your programs while you actually live your life.",
+    painHeadline: "The Nutrition Coach DM Problem",
+    painParagraphs: [
+      "Nutrition content goes viral fast. A single Reel about gut health, hormones, or cutting sugar can pull 100+ DMs in a night. Most of them are looking for a free meal plan or a quick answer, but a few are real coaching prospects.",
+      "Sorting them by hand is a part-time job, and the longer you wait, the colder every lead gets. Hiring a setter is $2,000-$4,000/month and they only work daytime. Your viral Reel hit at 9 PM. The DMs are sitting unread.",
+      "What nutrition coaches need is an AI that can answer common questions correctly inside scope, filter free-advice seekers from real coaching prospects, and book discovery calls only with leads ready to invest. Clinchd does this for under $200/mo, 24/7.",
+    ],
+    features: [
+      {
+        title: "Scope-aware nutrition responses",
+        description:
+          "The AI handles common questions about macros, food sensitivities, or supplements with scope-aware responses. It redirects to medical professionals on diagnostic-specific questions and never makes prescriptive claims outside your scope.",
+      },
+      {
+        title: "Filters free-advice seekers",
+        description:
+          "Most nutrition DMs are looking for a free answer. The AI provides one piece of value, then qualifies on whether the lead wants real coaching or just a one-off question answered.",
+      },
+      {
+        title: "Books high-intent leads automatically",
+        description:
+          "When a lead signals readiness for actual coaching (specific goal, willingness to invest, timeline urgency), the AI sends your Calendly link inside the conversation.",
+      },
+    ],
+    faqs: [
+      {
+        q: "Will it stay inside my scope of practice?",
+        a: "Yes. During setup you define your scope, certification, and what you can and cannot legally address. The AI redirects diagnostic questions and only engages on nutrition-coaching-appropriate topics.",
+      },
+      {
+        q: "Can it answer common nutrition questions correctly?",
+        a: "The AI is trained on common nutrition questions: macros, hydration, supplements, fasting basics, food sensitivities. It provides accurate one-line answers and then pivots to qualifying whether the lead wants real coaching or just a one-off answer.",
+      },
+      {
+        q: "How does it handle people asking about specific diets (keto, carnivore, vegan)?",
+        a: "The AI acknowledges the dietary approach, asks about the lead's goal, and frames your coaching as the answer to {'how do I make this actually work for my body and lifestyle.'} It never trashes other approaches and stays neutral on diet ideology.",
+      },
+      {
+        q: "Can it qualify on $1K+ nutrition programs?",
+        a: "Yes. The AI qualifies on goal specificity, past attempts, willingness to do the work, and investment readiness. Filters out tire-kickers from real prospects in 3-5 message exchanges.",
+      },
+    ],
+  },
+
+  "career-coaches": {
+    title: "AI Instagram DM Automation for Career Coaches (2026)",
+    description:
+      "Automate your Instagram DMs as a career coach. Clinchd qualifies professional prospects, handles ROI questions, and books discovery calls for your career-transition programs.",
+    nicheLabel: "Career Coaches",
+    heroHeadline: "Career DMs Land at 6 PM Sundays. They Need a Sharp Reply.",
+    heroSub:
+      "Clinchd is the AI DM setter built for career coaches. It qualifies professional prospects, handles ROI-focused questions, and books discovery calls for your career-transition programs.",
+    painHeadline: "The Career Coach DM Problem",
+    painParagraphs: [
+      "Career coaching leads are unique. They DM you on Sunday evening, the night before a Monday they are dreading. They are at a peak moment of professional dissatisfaction. By Monday morning at the office, the urgency has faded under the weight of meetings, and the lead has talked themselves into staying.",
+      "Manual replies miss the Sunday-evening window. Hiring a setter doesn't help because most setters work 9-5 weekdays, exactly when career-coaching leads are too busy at work to DM.",
+      "Career coaches need an AI that can engage at the moments career-doubt peaks (evenings, weekends, Sunday nights), qualify on professional context (current role, salary range, target outcome), and book discovery calls before the urgency fades. Clinchd does this for under $200/mo.",
+    ],
+    features: [
+      {
+        title: "Always on at peak career-doubt hours",
+        description:
+          "The AI works evenings, weekends, and Sunday nights. The exact hours career coaching leads are most likely to reach out, and the exact hours human setters are off the clock.",
+      },
+      {
+        title: "Professional-context qualification",
+        description:
+          "The AI asks about current role, target outcome, salary range, and timeline. It filters out leads who are just venting from leads ready to invest in a real career transition.",
+      },
+      {
+        title: "ROI-focused objection handling",
+        description:
+          "Career coaching prospects often think in ROI. {'Will this actually get me a higher salary?'} The AI handles ROI conversations honestly, citing client outcomes without making guarantees you can't back up.",
+      },
+    ],
+    faqs: [
+      {
+        q: "Can the AI handle ROI-focused conversations?",
+        a: "Yes. Career coaching leads often want to understand expected outcomes (salary increase, role change, time-to-new-job). The AI handles ROI questions honestly, references client outcomes, and acknowledges what it can't promise. It doesn't make claims you can't back up.",
+      },
+      {
+        q: "Will it sound professional enough for executive-level prospects?",
+        a: "Yes. The tone preset can be calibrated for executive audiences. The AI uses precise, professional language for senior leaders and warmer language for early-career prospects.",
+      },
+      {
+        q: "How does it qualify on career-transition readiness?",
+        a: "The AI asks about current role, target role, timeline, and what they have tried so far. A lead who has already started networking and updating their resume is at a different stage than someone who is just thinking about a change.",
+      },
+      {
+        q: "What if my offer is for early-career professionals vs C-suite?",
+        a: "The qualification flow adapts. During setup you define your ICP, and the AI's questions adjust. Early-career qualification looks at first-job navigation; senior qualification looks at compensation expectations and exit timelines.",
+      },
+    ],
+  },
+
+  "online-course-creators": {
+    title: "AI Instagram DM Automation for Online Course Creators (2026)",
+    description:
+      "Automate your Instagram DMs as an online course creator. Clinchd qualifies leads, handles common course objections, and books discovery calls or routes to your course pages.",
+    nicheLabel: "Online Course Creators",
+    heroHeadline: "Your Course Cart Opens in 3 Days. Your DMs Are on Fire.",
+    heroSub:
+      "Clinchd is the AI DM setter built for online course creators. It qualifies leads, handles common course objections, and routes high-intent prospects to your launch funnel automatically.",
+    painHeadline: "The Course Creator DM Problem",
+    painParagraphs: [
+      "Course launches generate brutal DM volume. The 7-day cart-open window is when 80% of DMs hit, all asking variations of the same questions: who is it for, what's included, can I see results, do you have a payment plan, will it work for my situation.",
+      "Answering each one personally takes 10-12 hours per day during launch. Outsourcing it to a $2K-$4K/month setter only works if you launch monthly. Most creators launch quarterly, which makes hiring a setter overkill.",
+      "What course creators need is an AI that wakes up for launches, handles 90% of common questions accurately, and routes high-intent leads to checkout or a discovery call. Clinchd does this for $97-$197/mo and handles every launch with the same depth.",
+    ],
+    features: [
+      {
+        title: "Trained on your course details",
+        description:
+          "The AI is trained on your course curriculum, pricing, payment plans, bonuses, and FAQs during setup. It answers common questions accurately and consistently, every time.",
+      },
+      {
+        title: "Cart-open mode",
+        description:
+          "During launch windows, the AI shifts into cart-open mode: it sends your checkout link inside the conversation when the lead signals buying intent, with one sentence about what to expect after purchase.",
+      },
+      {
+        title: "Launch-specific objection handling",
+        description:
+          "The AI handles {'is the price going up?'} {'can I get a payment plan?'} {'will the lessons be evergreen?'} and {'will it work for my level?'} with consistent, on-brand answers.",
+      },
+    ],
+    faqs: [
+      {
+        q: "Will it know all the details of my course accurately?",
+        a: "Yes. During setup you paste in your full course details: modules, lessons, pricing, payment plans, bonuses, refund policy, and FAQs. The AI answers using only the information you've provided. No hallucinations, no made-up promises.",
+      },
+      {
+        q: "Can it handle cart-close urgency without sounding desperate?",
+        a: "Yes. The AI references cart deadlines as a fact (your course closes Friday) without high-pressure language. It can mention the deadline once per conversation, then pivot to value or qualifying questions.",
+      },
+      {
+        q: "Will it distinguish course buyers from coaching prospects?",
+        a: "Yes. If you offer both a course ($497) and 1:1 coaching ($5K+), the AI qualifies based on the lead's signals. Self-paced learners go to the course funnel; high-touch buyers get routed to a coaching discovery call.",
+      },
+      {
+        q: "What about students asking technical platform questions?",
+        a: "The AI handles common platform questions (login, access, course structure) and escalates to your inbox or a support ticket for anything specific to a paid student's account.",
+      },
+    ],
+  },
+
+  "wellness-coaches": {
+    title: "AI Instagram DM Automation for Wellness Coaches (2026)",
+    description:
+      "Automate your Instagram DMs as a wellness coach. Clinchd qualifies leads holistically, navigates scope, and books discovery calls for your integrative wellness programs.",
+    nicheLabel: "Wellness Coaches",
+    heroHeadline: "Wellness DMs Need a Calm, Considered Reply.",
+    heroSub:
+      "Clinchd is the AI DM setter built for wellness coaches. It qualifies leads holistically, navigates scope-of-practice carefully, and books discovery calls for your integrative wellness programs.",
+    painHeadline: "The Wellness Coach DM Problem",
+    painParagraphs: [
+      "Wellness coaching is a wide field. Your audience could be DMing about stress, sleep, gut health, energy, hormones, or relationships, sometimes all in one message. The qualifying conversation is more nuanced than a quick {'what's your goal?'}",
+      "Manual replies have to slow down to do justice to those conversations. The result: most DMs sit for hours, the leads cool, and the moment that drove the reach-out fades.",
+      "What wellness coaches need is an AI that can hold space for multi-dimensional health conversations, ask thoughtful follow-up questions, navigate scope carefully, and book discovery calls only with leads ready to invest in a real program. Clinchd does this for under $200/mo.",
+    ],
+    features: [
+      {
+        title: "Multi-dimensional qualification",
+        description:
+          "The AI asks about the full picture (sleep, stress, energy, mood, body) and helps the lead surface the through-line in their own situation. Filters surface-level seekers from people ready for a holistic program.",
+      },
+      {
+        title: "Scope-aware responses",
+        description:
+          "The AI navigates scope-of-practice rules carefully. It engages on lifestyle, behavior, and habits, and redirects diagnostic questions to medical professionals.",
+      },
+      {
+        title: "Books leads ready for a real program",
+        description:
+          "Wellness program buyers want commitment. The AI qualifies on willingness to do the work, timeline, and investment readiness before sending your booking link.",
+      },
+    ],
+    faqs: [
+      {
+        q: "Will it stay inside my scope of practice?",
+        a: "Yes. During setup you define your scope and certification. The AI engages on lifestyle, behavior, and coaching topics, and redirects diagnostic or treatment questions to medical professionals.",
+      },
+      {
+        q: "Can it handle multi-dimensional conversations?",
+        a: "Yes. The AI is built to read complex messages and ask the right follow-up question. If a lead shares sleep, stress, and gut health in one message, the AI surfaces the through-line and explores the most pressing area first.",
+      },
+      {
+        q: "How does it qualify for $2K-$5K wellness programs?",
+        a: "Qualification looks at goal specificity, what the lead has already tried, time commitment available, and investment readiness. The AI filters surface-level seekers from people ready for a real holistic program.",
+      },
+      {
+        q: "What if a lead is in crisis (mental health, severe symptoms)?",
+        a: "Crisis-language flags trigger immediate escalation. The AI does not auto-reply on crisis content. You stay in control of the most sensitive conversations.",
+      },
+    ],
+  },
+
+  "spiritual-coaches": {
+    title: "AI Instagram DM Automation for Spiritual Coaches (2026)",
+    description:
+      "Automate your Instagram DMs as a spiritual coach. Clinchd handles soul-led conversations, qualifies on resonance, and books discovery calls for your transformation programs.",
+    nicheLabel: "Spiritual Coaches",
+    heroHeadline: "Your Reels Touch Hearts at 3 AM. Your AI Should Honor That.",
+    heroSub:
+      "Clinchd is the AI DM setter built for spiritual coaches. It handles soul-led conversations with care, qualifies on resonance and readiness, and books discovery calls without breaking the energy.",
+    painHeadline: "The Spiritual Coach DM Problem",
+    painParagraphs: [
+      "Spiritual coaching leads DM you in moments of awakening, doubt, or transition. The energy of those conversations is delicate. A canned chatbot reply breaks it instantly. A delayed reply lets it dissipate.",
+      "Hiring a human setter doesn't really fit spiritual coaching either. The voice, the language, the way a coach holds space, all of it is hard to outsource without losing the thread.",
+      "What spiritual coaches need is an AI that can hold the energy, mirror the lead's language without forcing it, and only move toward booking when the lead is grounded enough to commit. Clinchd is built to handle exactly this.",
+    ],
+    features: [
+      {
+        title: "Energy-matched responses",
+        description:
+          "The AI matches the spiritual register the lead opens with. Reflective, grounded, soul-led language for soul-led messages. No corporate sales energy.",
+      },
+      {
+        title: "Qualification by resonance",
+        description:
+          "Spiritual coaching qualification is about resonance, not just budget. The AI asks about what called them to reach out, what they have been working through, and what they are ready to step into.",
+      },
+      {
+        title: "Books with care",
+        description:
+          "The AI sends your booking link only when the lead is grounded and clear. No hard close, no premature pitches. The booking experience feels consistent with the conversation.",
+      },
+    ],
+    faqs: [
+      {
+        q: "Will the AI sound aligned with my spiritual brand?",
+        a: "Yes. During setup you provide your voice, your typical phrasings, and your preferred way of holding space. The AI adapts. It doesn't impose a generic empathy script. It learns your specific energy.",
+      },
+      {
+        q: "Can it handle conversations about deep transformation?",
+        a: "Yes. The AI is comfortable with soul-led language, archetypal references, and conversations about awakening, grief, or transition. It asks the kind of follow-up question a coach would, not the kind a sales rep would.",
+      },
+      {
+        q: "What if a lead is in spiritual crisis or dark night?",
+        a: "Crisis-language detection flags conversations indicating crisis or severe mental health concerns. The AI does not auto-reply on those. You stay in control of the most sensitive conversations.",
+      },
+      {
+        q: "Will it pressure my audience the way a chatbot would?",
+        a: "No. The AI is calibrated for spiritual coaching specifically. No artificial scarcity, no hard close, no premature pitches. The booking happens when the lead is clear and ready, not when an algorithm thinks they should be.",
+      },
+    ],
+  },
+
+  "financial-coaches": {
+    title: "AI Instagram DM Automation for Financial Coaches (2026)",
+    description:
+      "Automate your Instagram DMs as a financial coach. Clinchd qualifies leads, navigates compliance carefully, and books discovery calls for your money and wealth-building programs.",
+    nicheLabel: "Financial Coaches",
+    heroHeadline: "Money DMs Are High-Stakes. Compliance Is Non-Negotiable.",
+    heroSub:
+      "Clinchd is the AI DM setter built for financial coaches. It qualifies leads, navigates compliance and scope carefully, and books discovery calls for your wealth-building programs.",
+    painHeadline: "The Financial Coach DM Problem",
+    painParagraphs: [
+      "Financial coaching has the most regulatory edge of any coaching niche. The line between coaching and licensed advice is real, and crossing it (even accidentally in a DM) is a problem. A scripted chatbot or untrained setter is a compliance risk.",
+      "On top of that, money DMs are high-stakes for the lead. They are sharing real numbers, real shame, real anxiety. A bad first reply burns the trust instantly. A delayed reply lets the courage that drove them to DM dissipate.",
+      "What financial coaches need is an AI that knows where the compliance line is, responds with empathy without minimizing, and qualifies on income and investment readiness without sounding transactional. Clinchd is built for exactly this job.",
+    ],
+    features: [
+      {
+        title: "Compliance-aware responses",
+        description:
+          "The AI is trained to coach on behavior, habits, and money mindset, and to never give specific investment advice, tax recommendations, or financial planning that requires a license. Stays inside the legal coaching scope.",
+      },
+      {
+        title: "Money-conversation empathy",
+        description:
+          "Financial coaching leads DM with shame. The AI acknowledges the courage it takes to reach out, normalizes the situation, and qualifies gently. No transactional energy, no judgment.",
+      },
+      {
+        title: "Income and readiness qualification",
+        description:
+          "The AI asks about income range, current financial situation, and what they have tried, in a way that feels like a coaching conversation rather than a loan application.",
+      },
+    ],
+    faqs: [
+      {
+        q: "Will the AI stay compliant with financial coaching scope?",
+        a: "Yes. During setup you define your certification, jurisdiction, and the scope you operate within. The AI coaches on behavior, habits, and mindset, and refuses to give specific investment advice, tax recommendations, or anything that requires a financial advisor license. You stay compliant without monitoring every conversation.",
+      },
+      {
+        q: "How does it handle leads asking about specific stocks, crypto, or investments?",
+        a: "The AI redirects investment-specific questions clearly: {'I'm not licensed to give specific investment advice, but I can help you build the habits and mindset that make smart investing possible.'} It pivots to behavior-coaching questions and qualifies for your program.",
+      },
+      {
+        q: "Can it handle leads who are in real financial distress (debt, bankruptcy)?",
+        a: "Yes, with care. The AI acknowledges the situation without minimizing, and depending on severity, either qualifies for your program or recommends the lead consult appropriate licensed professionals. Crisis-level financial situations are flagged for your direct response.",
+      },
+      {
+        q: "Will it qualify on $1K-$10K coaching programs?",
+        a: "Yes. The AI qualifies on income range, current financial situation, and willingness to invest. It handles {'I can't afford it'} with empathy and reframes the investment in terms of long-term outcomes, only when appropriate.",
       },
     ],
   },
@@ -315,14 +807,23 @@ export default async function NichePage({ params }) {
         </div>
       </section>
 
-      {/* Testimonial */}
+      {/* Built for */}
       <section className="py-16 bg-[#fafaf9]">
         <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-          <blockquote className="text-xl md:text-2xl font-medium text-stone-700 italic leading-relaxed mb-8">
-            &ldquo;{data.testimonial.quote}&rdquo;
-          </blockquote>
-          <p className="font-extrabold text-stone-900">{data.testimonial.name}</p>
-          <p className="text-sm text-stone-400 font-bold">{data.testimonial.detail}</p>
+          <p className="text-xs font-bold uppercase tracking-widest text-[#ff7e67] mb-4">
+            Built for {data.nicheLabel.toLowerCase()}
+          </p>
+          <p className="text-xl md:text-2xl font-medium text-stone-700 leading-relaxed">
+            Clinchd's {data.nicheLabel.toLowerCase()} playbook is designed around the qualification patterns, objection scripts, and tone preferences we see across coaching DM conversations in this niche. We're in early access. Be among the first {data.nicheLabel.toLowerCase()} to share public results.
+          </p>
+          <div className="mt-8">
+            <a
+              href="/signup"
+              className="inline-flex items-center text-sm font-bold text-[#ff7e67] hover:underline"
+            >
+              Join early access &rarr;
+            </a>
+          </div>
         </div>
       </section>
 

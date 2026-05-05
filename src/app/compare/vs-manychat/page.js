@@ -240,18 +240,21 @@ export default function VsManyChat() {
         </div>
       </section>
 
-      {/* Testimonial */}
+      {/* Why a language model beats chat flows */}
       <section className="py-16 bg-white">
-        <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-          <blockquote className="text-xl md:text-2xl font-medium text-stone-700 italic leading-relaxed mb-8">
-            &ldquo;I spent two full weekends building ManyChat flows for my coaching program.
-            They worked okay but leads kept getting stuck in dead ends. I switched to Clinchd
-            and had it running in 20 minutes. The AI actually qualifies people — it asks
-            follow-up questions I never would have thought to put in a flow. My booking rate
-            went from 8% to 22% in the first month.&rdquo;
-          </blockquote>
-          <p className="font-extrabold text-stone-900">Rachel Kim</p>
-          <p className="text-sm text-stone-400 font-bold">Fitness Coach, 18K followers &middot; Former ManyChat Pro user</p>
+        <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
+          <p className="text-xs font-bold uppercase tracking-widest text-[#ff7e67] mb-4 text-center">
+            Why we don't use chat flows
+          </p>
+          <h2 className="text-2xl md:text-3xl font-black text-stone-900 mb-6 text-center">
+            Coaching DMs are too messy for if-this-then-that
+          </h2>
+          <p className="text-stone-600 leading-relaxed text-center max-w-2xl mx-auto">
+            ManyChat's drag-and-drop flow builder is great for e-commerce, where customers ask the same three questions in the same order. Coaching DMs don't behave that way. Leads jump topics, share emotional context, and ask things you never thought to anticipate. That's why Clinchd uses a language model that reads each message in context, instead of routing through pre-built blocks that die at the first off-script reply.
+          </p>
+          <p className="text-sm text-stone-400 mt-6 text-center">
+            We're in early access. Your results would be among the first we publish.
+          </p>
         </div>
       </section>
 

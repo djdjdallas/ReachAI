@@ -266,19 +266,21 @@ export default function VsInro() {
         </div>
       </section>
 
-      {/* Testimonial */}
+      {/* Why we focus on coaching */}
       <section className="py-16 bg-[#fafaf9]">
-        <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-          <blockquote className="text-xl md:text-2xl font-medium text-stone-700 italic leading-relaxed mb-8">
-            &ldquo;I tried Inro because it looked like a clean Instagram DM tool. The problem
-            was every conversation felt like a campaign — capture the contact, drop the offer,
-            move on. My business doesn&apos;t work like that. I need someone qualifying budget
-            and handling &lsquo;I can&apos;t afford it&rsquo; before a call gets booked. Clinchd
-            does exactly that. First month: my booking rate went from 9% to 27% on the same DM
-            volume.&rdquo;
-          </blockquote>
-          <p className="font-extrabold text-stone-900">Marcus Lee</p>
-          <p className="text-sm text-stone-400 font-bold">Business Coach, 22K followers &middot; Former Inro user</p>
+        <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
+          <p className="text-xs font-bold uppercase tracking-widest text-[#ff7e67] mb-4 text-center">
+            Why we built only for coaches
+          </p>
+          <h2 className="text-2xl md:text-3xl font-black text-stone-900 mb-6 text-center">
+            High-ticket coaching needs more than capture-and-offer
+          </h2>
+          <p className="text-stone-600 leading-relaxed text-center max-w-2xl mx-auto">
+            Inro's strength is general creator and business automation. Coaches selling $1K+ offers need something different: multi-step qualification on revenue and timeline, empathy-first language, and objection handling for {`"I can't afford it"`} before a call gets booked. Clinchd was designed around those patterns specifically, instead of as one feature inside a broader tool.
+          </p>
+          <p className="text-sm text-stone-400 mt-6 text-center">
+            We're in early access. Your results would be among the first we publish.
+          </p>
         </div>
       </section>
 

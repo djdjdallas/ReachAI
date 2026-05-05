@@ -202,18 +202,21 @@ export default function VsGoHighLevel() {
         </div>
       </section>
 
-      {/* Testimonial */}
+      {/* Why we don't do platform sprawl */}
       <section className="py-16 bg-white">
-        <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-          <blockquote className="text-xl md:text-2xl font-medium text-stone-700 italic leading-relaxed mb-8">
-            &ldquo;I was paying $197/month for GoHighLevel and barely using half the features.
-            My Instagram DM automation was basically nonexistent — I still had to manually
-            respond to every lead. Switched to Clinchd and in the first week it booked 11
-            discovery calls while I was at a conference. I cancelled GHL and haven&apos;t
-            looked back.&rdquo;
-          </blockquote>
-          <p className="font-extrabold text-stone-900">David Chen</p>
-          <p className="text-sm text-stone-400 font-bold">Mindset Coach, 22K followers</p>
+        <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
+          <p className="text-xs font-bold uppercase tracking-widest text-[#ff7e67] mb-4 text-center">
+            Why we don't do everything
+          </p>
+          <h2 className="text-2xl md:text-3xl font-black text-stone-900 mb-6 text-center">
+            One tool, one job, done deeply
+          </h2>
+          <p className="text-stone-600 leading-relaxed text-center max-w-2xl mx-auto">
+            GoHighLevel is a comprehensive marketing operating system: CRM, email, SMS, websites, funnels, calendars, and DM automation as one piece of a much larger product. For coaches whose Instagram DMs are the entire funnel, that breadth is a tax. Clinchd does the one job (qualify Instagram DMs and book discovery calls) and does it deeper than a sub-feature inside a 50-tool suite ever could.
+          </p>
+          <p className="text-sm text-stone-400 mt-6 text-center">
+            We're in early access. Your results would be among the first we publish.
+          </p>
         </div>
       </section>
 
