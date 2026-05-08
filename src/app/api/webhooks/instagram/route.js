@@ -273,7 +273,13 @@ async function processIncomingMessage({
   // source='manual'). Cold/personal inbound DMs leave the earliest row as
   // source='lead' (or no rows at all on first contact) and get skipped.
   // Echo events from the IG mobile app are filtered earlier (is_echo), so
-  // this is the only path that can prove "the founder initiated this."
+  // earliest-message=='manual' is the only signal that can prove
+  // "the founder initiated this."
+  //
+  // Per-conversation escape hatch: `force_agent` lets the founder hand off
+  // an inbound thread to the agent from the dashboard (story replies,
+  // late opt-ins, IG-app DMs they continued manually). When true the gate
+  // passes regardless of the earliest message's source.
   const { data: firstMsg } = await supabase
     .from("messages")
     .select("source")
@@ -282,7 +288,8 @@ async function processIncomingMessage({
     .limit(1)
     .maybeSingle();
 
-  if (!firstMsg || firstMsg.source !== "manual") {
+  const outreachInitiated = firstMsg?.source === "manual";
+  if (!outreachInitiated && !conversation.force_agent) {
     await insertMessageIfNew(supabase, {
       conversation_id: conversation.id,
       role: "user",
