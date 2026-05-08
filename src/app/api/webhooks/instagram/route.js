@@ -268,47 +268,6 @@ async function processIncomingMessage({
     return;
   }
 
-  // Outreach-only gate: only reply if the founder manually started this
-  // thread via the in-app composer (which writes the first row with
-  // source='manual'). Cold/personal inbound DMs leave the earliest row as
-  // source='lead' (or no rows at all on first contact) and get skipped.
-  // Echo events from the IG mobile app are filtered earlier (is_echo), so
-  // earliest-message=='manual' is the only signal that can prove
-  // "the founder initiated this."
-  //
-  // Per-conversation escape hatch: `force_agent` lets the founder hand off
-  // an inbound thread to the agent from the dashboard (story replies,
-  // late opt-ins, IG-app DMs they continued manually). When true the gate
-  // passes regardless of the earliest message's source.
-  const { data: firstMsg } = await supabase
-    .from("messages")
-    .select("source")
-    .eq("conversation_id", conversation.id)
-    .order("created_at", { ascending: true })
-    .limit(1)
-    .maybeSingle();
-
-  const outreachInitiated = firstMsg?.source === "manual";
-  if (!outreachInitiated && !conversation.force_agent) {
-    await insertMessageIfNew(supabase, {
-      conversation_id: conversation.id,
-      role: "user",
-      content: messageText,
-      provider_message_id: providerMessageId,
-      source: "lead",
-    });
-    await markSkip(supabase, conversation.id, "not_outreach_initiated");
-    getPostHogClient().capture({
-      distinctId: user.email || user.id,
-      event: "agent_gate_skipped",
-      properties: {
-        conversation_id: conversation.id,
-        reason: "not_outreach_initiated",
-      },
-    });
-    return;
-  }
-
   // Skip if no script configured
   const sc = user.script_config || {};
   if (!sc.greeting) {

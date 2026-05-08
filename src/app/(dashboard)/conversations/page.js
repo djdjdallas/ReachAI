@@ -21,7 +21,6 @@ import {
   Trash2,
   AlertCircle,
   Plus,
-  BotMessageSquare,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -384,47 +383,6 @@ function ConversationsPage() {
 
   const [deleting, setDeleting] = useState(false);
   const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
-  const [handoffSending, setHandoffSending] = useState(false);
-  const [handoffError, setHandoffError] = useState(null);
-
-  const handleHandoffToAgent = async () => {
-    if (!selectedConvo || handoffSending) return;
-    setHandoffSending(true);
-    setHandoffError(null);
-    try {
-      const res = await fetch(
-        `/api/conversations/${selectedConvo.id}/force-agent`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ force_agent: true }),
-        }
-      );
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        setHandoffError(data?.error || "Failed to hand off to agent.");
-        return;
-      }
-      posthog.capture("agent_handoff_overridden", {
-        conversation_id: selectedConvo.id,
-      });
-      const merged = data.conversation || {
-        ...selectedConvo,
-        force_agent: true,
-        last_skip_reason: null,
-      };
-      setSelectedConvo((prev) => ({ ...prev, ...merged }));
-      setConversations((prev) =>
-        prev.map((c) => (c.id === selectedConvo.id ? { ...c, ...merged } : c))
-      );
-      await fetchMessages(selectedConvo.id);
-    } catch (err) {
-      console.error("Failed to hand off to agent:", err);
-      setHandoffError("Network error.");
-    } finally {
-      setHandoffSending(false);
-    }
-  };
 
   const [outreachOpen, setOutreachOpen] = useState(false);
   const [outreachUsername, setOutreachUsername] = useState("");
@@ -772,11 +730,6 @@ function ConversationsPage() {
                               Needs Review
                             </span>
                           )}
-                        {convo.last_skip_reason === "not_outreach_initiated" && (
-                          <span className="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase bg-stone-100 text-stone-600 border border-stone-200">
-                            Inbound
-                          </span>
-                        )}
                         {convo.lead_temperature && tempColors[convo.lead_temperature] && (
                           <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold uppercase ${tempColors[convo.lead_temperature].bg} ${tempColors[convo.lead_temperature].text}`}>
                             {tempColors[convo.lead_temperature].label}
@@ -854,22 +807,6 @@ function ConversationsPage() {
                     Resume AI
                   </Button>
                 )}
-                {selectedConvo.last_skip_reason === "not_outreach_initiated" && (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={handleHandoffToAgent}
-                    disabled={handoffSending}
-                    className="gap-1.5 border-stone-200 hover:bg-stone-50"
-                  >
-                    {handoffSending ? (
-                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                    ) : (
-                      <BotMessageSquare className="h-3.5 w-3.5" />
-                    )}
-                    Hand off to agent
-                  </Button>
-                )}
                 <Select
                   value={selectedConvo.status || "qualifying"}
                   onValueChange={handleStatusChange}
@@ -916,31 +853,6 @@ function ConversationsPage() {
                   </div>
                 </div>
               )}
-
-            {/* Outreach gate explainer — fires when this conversation was
-                inbound-initiated and the agent is intentionally staying
-                silent. Reply manually from the thread, or use "Hand off to
-                agent" in the header to let the agent take over. */}
-            {selectedConvo.last_skip_reason === "not_outreach_initiated" && (
-              <div className="px-6 py-3 border-b border-stone-100 bg-stone-50">
-                <div className="flex items-start gap-3">
-                  <Info className="w-4 h-4 text-stone-500 mt-0.5 shrink-0" />
-                  <p className="text-xs text-stone-600 leading-relaxed">
-                    <span className="font-bold">Inbound DM —</span> agent
-                    skipped because you didn&apos;t initiate this thread. Reply
-                    manually below, or click{" "}
-                    <span className="font-semibold">Hand off to agent</span> to
-                    let the agent take this thread.
-                  </p>
-                </div>
-                {handoffError && (
-                  <div className="mt-2 flex items-start gap-2 px-3 py-2 rounded-lg bg-amber-50 border border-amber-200 text-amber-800 text-xs leading-relaxed">
-                    <AlertCircle className="h-3.5 w-3.5 mt-0.5 shrink-0" />
-                    <span>{handoffError}</span>
-                  </div>
-                )}
-              </div>
-            )}
 
             {/* Summary Panel */}
             <div className="px-6 py-3 border-b border-stone-100 flex items-center gap-3">
