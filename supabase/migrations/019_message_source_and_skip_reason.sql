@@ -25,7 +25,10 @@ WHERE role = 'user' AND source = 'agent';
 ALTER TABLE public.conversations
   ADD COLUMN IF NOT EXISTS last_skip_reason TEXT DEFAULT NULL;
 -- Values: 'no_greeting' | 'subscription_inactive' | 'dm_limit'
---        | 'trial_expired' | NULL
+--        | 'trial_expired' | 'not_outreach_initiated' | NULL
+-- 'not_outreach_initiated' is set by the webhook gate when the earliest
+-- message in the conversation is not source='manual' — i.e. the founder
+-- did not start the thread via the in-app outreach composer.
 
 -- ── users.has_seen_onboarding_modal ─────────────────────────────────────
 ALTER TABLE public.users
