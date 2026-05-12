@@ -22,6 +22,7 @@ import {
 
 export default function Step3Voice({
   voiceProfile,
+  autoImporting = false,
   voiceMode,
   setVoiceMode,
   sampleText,
@@ -227,18 +228,41 @@ export default function Step3Voice({
                   posts. One per line (minimum 3).
                 </p>
 
-                {voiceProfile?.status === "ready" && !voiceMode ? (
+                {autoImporting && !voiceProfile?.status ? (
+                  <div className="rounded-2xl border border-[#ff7e67]/20 bg-[#fff5f2] p-4 flex items-center gap-3">
+                    <Loader2 className="w-4 h-4 animate-spin text-[#ff7e67]" />
+                    <span className="text-sm font-medium text-stone-700">
+                      Personalizing from your Instagram...
+                    </span>
+                  </div>
+                ) : voiceProfile?.status === "ready" && !voiceMode ? (
                   <div className="space-y-4">
                     <div className="rounded-2xl border bg-stone-50 p-4 space-y-3">
-                      <div className="flex items-center gap-2 mb-2">
+                      <div className="flex items-center gap-2 mb-2 flex-wrap">
                         <Check className="w-4 h-4 text-green-600" />
                         <span className="text-sm font-medium text-green-600">
                           Voice profile captured
                         </span>
+                        {voiceProfile?.source === "instagram_auto" && (
+                          <span
+                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-[#ff7e67]/10 text-[#ff7e67] text-[10px] font-bold uppercase tracking-widest"
+                            title="We generated this from your Instagram bio and recent posts. Paste a few real DMs to refine it."
+                          >
+                            <Sparkles className="w-3 h-3" />
+                            Generated from your Instagram
+                          </span>
+                        )}
                       </div>
                       <p className="text-sm italic text-stone-700">
                         &ldquo;{voiceProfile.voice_summary}&rdquo;
                       </p>
+                      {voiceProfile?.source === "instagram_auto" && (
+                        <p className="text-xs text-stone-500 leading-relaxed">
+                          This was generated from your bio and recent posts.
+                          Want to make it sharper? Paste a few real DMs below
+                          to refine it.
+                        </p>
+                      )}
                       {/* Confidence indicator */}
                       {(() => {
                         const count = voiceProfile.sample_count || 0;

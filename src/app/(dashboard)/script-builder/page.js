@@ -536,9 +536,20 @@ export default function ScriptBuilderPage() {
                         : "Teach the AI to write exactly like you so DM replies sound authentic."}
                     </CardDescription>
                   </div>
-                  {voiceProfile?.status === "ready" && (
-                    <Badge variant="success">Active</Badge>
-                  )}
+                  <div className="flex items-center gap-2">
+                    {voiceProfile?.status === "ready" && (
+                      <Badge variant="success">Active</Badge>
+                    )}
+                    {voiceProfile?.source === "instagram_auto" && (
+                      <Badge
+                        variant="secondary"
+                        title="We generated this from your Instagram bio and recent posts. Paste a few real DMs below to refine it."
+                      >
+                        <Sparkles className="h-3 w-3" />
+                        From Instagram
+                      </Badge>
+                    )}
+                  </div>
                 </div>
               </CardHeader>
               <CardContent>
@@ -549,6 +560,13 @@ export default function ScriptBuilderPage() {
                       <p className="text-sm italic">
                         &ldquo;{voiceProfile.voice_summary}&rdquo;
                       </p>
+                      {voiceProfile?.source === "instagram_auto" && (
+                        <p className="text-xs text-muted-foreground leading-relaxed">
+                          This was generated from your bio and recent posts.
+                          Want to make it sharper? Paste a few real DMs below
+                          to refine.
+                        </p>
+                      )}
                       <Separator />
                       <div className="grid grid-cols-2 gap-2 text-xs">
                         {voiceProfile.voice_traits?.tone && (

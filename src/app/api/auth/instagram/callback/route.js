@@ -164,6 +164,29 @@ export async function GET(request) {
       console.error("[ig-callback] subscribe_apps threw:", subErr?.message);
     }
 
+    // Fire-and-forget: kick off voice profile auto-import. Do NOT await.
+    // We want the user redirected immediately to onboarding; the import
+    // runs in the background and the onboarding page polls for it.
+    try {
+      fetch(`${baseUrl}/api/instagram/auto-profile`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Cookie: request.headers.get("cookie") || "",
+        },
+      }).catch((err) => {
+        console.error(
+          "[ig-callback] auto-profile kickoff failed:",
+          err?.message
+        );
+      });
+    } catch (kickErr) {
+      console.error(
+        "[ig-callback] auto-profile kickoff threw synchronously:",
+        kickErr?.message
+      );
+    }
+
     const response = NextResponse.redirect(successRedirect);
     response.cookies.set("oauth_state", "", { maxAge: 0, path: "/" });
     return response;

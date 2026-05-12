@@ -74,6 +74,10 @@ function OnboardingPage() {
   const [aiError, setAiError] = useState(null);
   const dismissError = () => setAiError(null);
 
+  // Post-OAuth Instagram auto-import — background voice-profile import.
+  // True while we're polling for it to finish (max ~8s).
+  const [autoImporting, setAutoImporting] = useState(false);
+
   // Persisted user preferences (Step 3 + Step 4 controls)
   const [tone, setTone] = useState("professional");
   const [traits, setTraits] = useState({
@@ -97,6 +101,59 @@ function OnboardingPage() {
   }, [voiceMode, voiceChatMessages.length]);
 
   useEffect(() => {
+    let cancelled = false;
+
+    function applyProfile(userProfile) {
+      if (!userProfile) return;
+      setProfile(userProfile);
+      hydrateFromProfile(userProfile);
+    }
+
+    function hydrateFromProfile(userProfile) {
+      if (userProfile.script_config) {
+        const config = userProfile.script_config;
+        setOffer(config.offer || "");
+        setTargetCustomer(config.targetCustomer || "");
+        setObjections(config.objections || "");
+        setGreeting(config.greeting || "");
+        setQualifyingQuestions(
+          Array.isArray(config.qualifying_questions)
+            ? config.qualifying_questions.join("\n")
+            : config.qualifying_questions || ""
+        );
+        setInterestResponse(config.interest_response || "");
+        setObjectionHandlers(
+          typeof config.objection_handlers === "object" &&
+            !Array.isArray(config.objection_handlers)
+            ? Object.entries(config.objection_handlers)
+                .map(([k, v]) => `${k}: ${v}`)
+                .join("\n")
+            : config.objection_handlers || ""
+        );
+        setBookingMessage(config.booking_message || "");
+        setNotAFitMessage(config.not_a_fit_message || "");
+
+        if (config.script_mode) setScriptMode(config.script_mode);
+        if (config.tone) setTone(config.tone);
+        if (config.traits && typeof config.traits === "object") {
+          setTraits((prev) => ({ ...prev, ...config.traits }));
+        }
+        if (config.response_length) setResponseLength(config.response_length);
+        if (typeof config.human_in_loop === "boolean") {
+          setHumanInLoop(config.human_in_loop);
+        }
+      }
+      if (userProfile.calendly_url) {
+        setCalendlyUrl(userProfile.calendly_url);
+      }
+      if (userProfile.voice_profile) {
+        setVoiceProfile(userProfile.voice_profile);
+        if (userProfile.voice_profile.suggested_response_length) {
+          setResponseLength(userProfile.voice_profile.suggested_response_length);
+        }
+      }
+    }
+
     async function init() {
       const {
         data: { user: authUser },
@@ -116,53 +173,6 @@ function OnboardingPage() {
         .single();
 
       if (userProfile) {
-        setProfile(userProfile);
-
-        // Pre-populate form fields from existing config
-        if (userProfile.script_config) {
-          const config = userProfile.script_config;
-          setOffer(config.offer || "");
-          setTargetCustomer(config.targetCustomer || "");
-          setObjections(config.objections || "");
-          setGreeting(config.greeting || "");
-          setQualifyingQuestions(
-            Array.isArray(config.qualifying_questions)
-              ? config.qualifying_questions.join("\n")
-              : config.qualifying_questions || ""
-          );
-          setInterestResponse(config.interest_response || "");
-          setObjectionHandlers(
-            typeof config.objection_handlers === "object" &&
-              !Array.isArray(config.objection_handlers)
-              ? Object.entries(config.objection_handlers)
-                  .map(([k, v]) => `${k}: ${v}`)
-                  .join("\n")
-              : config.objection_handlers || ""
-          );
-          setBookingMessage(config.booking_message || "");
-          setNotAFitMessage(config.not_a_fit_message || "");
-
-          // Persisted user preferences
-          if (config.script_mode) setScriptMode(config.script_mode);
-          if (config.tone) setTone(config.tone);
-          if (config.traits && typeof config.traits === "object") {
-            setTraits((prev) => ({ ...prev, ...config.traits }));
-          }
-          if (config.response_length) setResponseLength(config.response_length);
-          if (typeof config.human_in_loop === "boolean") {
-            setHumanInLoop(config.human_in_loop);
-          }
-        }
-        if (userProfile.calendly_url) {
-          setCalendlyUrl(userProfile.calendly_url);
-        }
-        if (userProfile.voice_profile) {
-          setVoiceProfile(userProfile.voice_profile);
-          if (userProfile.voice_profile.suggested_response_length) {
-            setResponseLength(userProfile.voice_profile.suggested_response_length);
-          }
-        }
-
         // Auto-advance: if Instagram is connected and user is on step 1, go to step 2
         const urlStep = parseInt(searchParams.get("step"), 10);
         if (
@@ -171,12 +181,52 @@ function OnboardingPage() {
         ) {
           setStep(2);
         }
+
+        // Background voice-profile auto-import may still be running. If
+        // Instagram is connected, the voice profile is not yet ready, and
+        // we have not yet stamped attempted_at, we poll for ~8 seconds
+        // before settling on whatever state we end up with.
+        const mayBeImporting =
+          !!userProfile.instagram_business_account_id &&
+          userProfile.voice_profile?.status !== "ready" &&
+          !userProfile.instagram_auto_import_attempted_at;
+
+        if (mayBeImporting) {
+          setAutoImporting(true);
+          // Poll every 1.5s up to 8s. Stop as soon as attempted_at is
+          // stamped — at that point we have a final result (success or
+          // skipped). Always do a final refetch before unsetting.
+          const start = Date.now();
+          let finalProfile = userProfile;
+          while (!cancelled && Date.now() - start < 8000) {
+            await new Promise((r) => setTimeout(r, 1500));
+            if (cancelled) break;
+            const { data: refreshed } = await supabase
+              .from("users")
+              .select("*")
+              .eq("id", authUser.id)
+              .single();
+            if (refreshed) {
+              finalProfile = refreshed;
+              if (refreshed.instagram_auto_import_attempted_at) break;
+            }
+          }
+          if (!cancelled) {
+            applyProfile(finalProfile);
+            setAutoImporting(false);
+          }
+        } else {
+          applyProfile(userProfile);
+        }
       }
 
-      setLoading(false);
+      if (!cancelled) setLoading(false);
     }
 
     init();
+    return () => {
+      cancelled = true;
+    };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // --- Handlers ---
@@ -599,12 +649,19 @@ function OnboardingPage() {
           aiError={aiError}
           onDismissError={dismissError}
           onBack={() => setStep(1)}
+          autoImporting={autoImporting}
+          autoImportedSource={
+            profile?.voice_profile?.source === "instagram_auto"
+              ? "instagram_auto"
+              : null
+          }
         />
       )}
 
       {step === 3 && (
         <Step3Voice
           voiceProfile={voiceProfile}
+          autoImporting={autoImporting}
           voiceMode={voiceMode}
           setVoiceMode={setVoiceMode}
           sampleText={sampleText}

@@ -16,6 +16,7 @@ import {
   Save,
   Loader2,
   X,
+  Sparkles,
 } from "lucide-react";
 
 const INDUSTRY_PRESETS = [
@@ -98,6 +99,8 @@ export default function Step2Script({
   aiError,
   onDismissError,
   onBack,
+  autoImporting = false,
+  autoImportedSource = null,
 }) {
   const charCount = offer.length;
 
@@ -124,6 +127,28 @@ export default function Step2Script({
           >
             <X className="w-4 h-4" />
           </button>
+        </div>
+      )}
+
+      {autoImporting && (
+        <div className="mb-8 flex items-center gap-3 rounded-2xl border border-[#ff7e67]/20 bg-[#fff5f2] p-4 text-sm text-stone-700">
+          <Loader2 className="w-4 h-4 animate-spin text-[#ff7e67]" />
+          <span className="font-medium">Personalizing your script from your Instagram...</span>
+        </div>
+      )}
+
+      {!autoImporting && autoImportedSource === "instagram_auto" && (
+        <div
+          className="mb-8 flex items-start gap-3 rounded-2xl border border-[#ff7e67]/20 bg-[#fff5f2] p-4 text-sm text-stone-700"
+          title="We pre-filled this from your Instagram bio and recent posts. You can edit anything below."
+        >
+          <Sparkles className="w-4 h-4 text-[#ff7e67] shrink-0 mt-0.5" />
+          <div className="flex-1">
+            <span className="font-bold">Generated from your Instagram.</span>{" "}
+            <span className="text-stone-600">
+              Review and adjust the offer, customer, and objections below.
+            </span>
+          </div>
         </div>
       )}
 
