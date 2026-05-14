@@ -4,15 +4,19 @@ import { encryptToken, decryptToken } from "@/lib/token-utils";
 const AUTH_BASE = "https://auth.calendly.com";
 const API_BASE = "https://api.calendly.com";
 
-function redirectUri() {
-  return `${process.env.NEXT_PUBLIC_APP_URL}/api/auth/calendly/callback`;
+export function getCalendlyRedirectUri() {
+  const origin = process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, "");
+  if (!origin) {
+    throw new Error("NEXT_PUBLIC_APP_URL not configured");
+  }
+  return `${origin}/api/auth/calendly/callback`;
 }
 
 export function getAuthorizeUrl(state) {
   const params = new URLSearchParams({
     client_id: process.env.CALENDLY_CLIENT_ID,
     response_type: "code",
-    redirect_uri: redirectUri(),
+    redirect_uri: getCalendlyRedirectUri(),
     state,
   });
   return `${AUTH_BASE}/oauth/authorize?${params.toString()}`;
@@ -24,7 +28,7 @@ export async function exchangeCodeForToken(code) {
     client_id: process.env.CALENDLY_CLIENT_ID,
     client_secret: process.env.CALENDLY_CLIENT_SECRET,
     code,
-    redirect_uri: redirectUri(),
+    redirect_uri: getCalendlyRedirectUri(),
   });
 
   const res = await fetch(`${AUTH_BASE}/oauth/token`, {

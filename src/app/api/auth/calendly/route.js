@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import crypto from "crypto";
 import { createClient } from "@/lib/supabase/server";
-import { getAuthorizeUrl } from "@/lib/calendly";
+import { getAuthorizeUrl, getCalendlyRedirectUri } from "@/lib/calendly";
 
 export async function GET() {
   const baseUrl = process.env.NEXT_PUBLIC_APP_URL;
@@ -23,6 +23,7 @@ export async function GET() {
     }
 
     const state = crypto.randomBytes(32).toString("hex");
+    console.info("[calendly-oauth] redirect_uri:", getCalendlyRedirectUri());
     const authUrl = getAuthorizeUrl(state);
 
     const response = NextResponse.redirect(authUrl);
