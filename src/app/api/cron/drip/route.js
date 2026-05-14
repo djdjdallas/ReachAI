@@ -16,8 +16,38 @@ export async function GET(request) {
   let sent = 0;
   let skipped = 0;
   let errors = 0;
+  let autoEnrolled = 0;
 
   try {
+    // Self-healing fallback: the Stripe webhook calls /api/drip/enroll as a
+    // fire-and-forget fetch. If that request silently fails (cold start,
+    // network blip), the user would never receive any drip emails. Catch
+    // those by auto-enrolling any recently-active subscriber whose enrollment
+    // is missing — limited to the last 14 days so we never back-enroll
+    // legacy users from before this feature shipped.
+    const fourteenDaysAgo = new Date(
+      Date.now() - 14 * 24 * 60 * 60 * 1000
+    ).toISOString();
+
+    const { data: stragglers } = await supabase
+      .from("users")
+      .select("id")
+      .is("drip_enrolled_at", null)
+      .eq("subscription_status", "active")
+      .gte("created_at", fourteenDaysAgo);
+
+    if (stragglers && stragglers.length > 0) {
+      const nowIso = new Date().toISOString();
+      for (const u of stragglers) {
+        const { error: enrollErr } = await supabase
+          .from("users")
+          .update({ drip_enrolled_at: nowIso, drip_step: 0 })
+          .eq("id", u.id)
+          .is("drip_enrolled_at", null);
+        if (!enrollErr) autoEnrolled++;
+      }
+    }
+
     // Find users enrolled in drip who haven't finished all steps
     const { data: users, error: queryErr } = await supabase
       .from("users")
@@ -99,6 +129,7 @@ export async function GET(request) {
     return NextResponse.json({
       status: "ok",
       processed: (users || []).length,
+      autoEnrolled,
       sent,
       skipped,
       errors,

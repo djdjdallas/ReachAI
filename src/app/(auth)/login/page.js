@@ -27,11 +27,13 @@ export default function LoginPage() {
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(false);
   const [deletedNotice, setDeletedNotice] = useState(false);
+  const [resetNotice, setResetNotice] = useState(false);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
     const params = new URLSearchParams(window.location.search);
     if (params.get("deleted") === "true") setDeletedNotice(true);
+    if (params.get("reset") === "success") setResetNotice(true);
   }, []);
 
   const handleGoogleLogin = async () => {
@@ -207,6 +209,12 @@ export default function LoginPage() {
               {deletedNotice && (
                 <div className="mb-6 text-sm font-medium text-stone-700 bg-stone-50 border border-stone-200 rounded-2xl px-4 py-3 text-center">
                   Your account has been deleted.
+                </div>
+              )}
+
+              {resetNotice && (
+                <div className="mb-6 text-sm font-bold text-green-700 bg-green-50 border border-green-200 rounded-2xl px-4 py-3 text-center">
+                  Password updated. Sign in with your new password.
                 </div>
               )}
 
