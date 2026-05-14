@@ -20,6 +20,8 @@ import {
   X,
 } from "lucide-react";
 
+import OnboardingFooter from "./OnboardingFooter";
+
 export default function Step3Voice({
   voiceProfile,
   autoImporting = false,
@@ -48,7 +50,9 @@ export default function Step3Voice({
   onDismissError,
   onRevertVoice,
   onBack,
-  onNext,
+  onSaveAndAdvance,
+  onSkip,
+  saving,
 }) {
   const selectedTone = tone;
 
@@ -701,33 +705,14 @@ export default function Step3Voice({
         </div>
       </main>
 
-      {/* Navigation Footer */}
-      <footer className="bg-white border-t border-stone-200 py-6 px-8 mt-auto sticky bottom-0 z-50">
-        <div className="max-w-7xl mx-auto flex items-center justify-between">
-          <button
-            onClick={onBack}
-            className="px-8 py-4 text-stone-400 hover:text-stone-900 font-bold transition-all flex items-center gap-2"
-          >
-            <ArrowLeft className="w-4 h-4" />
-            Previous Step
-          </button>
-          <div className="hidden md:flex flex-col items-center">
-            <div className="text-[10px] font-black text-stone-400 uppercase tracking-widest mb-1">
-              Completion
-            </div>
-            <div className="text-sm font-black">60% Ready</div>
-          </div>
-          <button
-            onClick={onNext}
-            className="px-10 py-4 bg-[#ff7e67] text-white rounded-full font-black text-lg hover:scale-105 active:scale-95 transition-all shadow-xl shadow-[#ff7e67]/20 flex items-center gap-3"
-          >
-            {voiceProfile?.status === "ready"
-              ? "Continue to Preview"
-              : "Skip for now"}
-            <ChevronRight className="w-5 h-5" />
-          </button>
-        </div>
-      </footer>
+      <OnboardingFooter
+        onBack={onBack}
+        onPrimary={onSaveAndAdvance}
+        primaryLabel="Save & Continue"
+        primaryLoading={saving}
+        onSkip={onSkip}
+        completion="60% Ready"
+      />
     </div>
   );
 }

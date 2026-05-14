@@ -12,6 +12,8 @@ import {
   Loader2,
 } from "lucide-react";
 
+import OnboardingFooter from "./OnboardingFooter";
+
 export default function Step5GoLive({
   profile,
   aiActive,
@@ -20,6 +22,7 @@ export default function Step5GoLive({
   instagramConnected,
   onGoLive,
   onGoToDashboard,
+  onFinalize,
   onBack,
 }) {
   return (
@@ -277,6 +280,14 @@ export default function Step5GoLive({
           </div>
         </div>
       </main>
+
+      <OnboardingFooter
+        onBack={onBack}
+        onPrimary={onFinalize}
+        primaryLabel={aiActive ? "Go Live" : "Continue with Handoff Mode"}
+        primaryLoading={activating}
+        completion="100% Ready"
+      />
 
       <footer className="w-full py-10 border-t border-stone-100 text-center">
         <p className="text-stone-400 text-xs font-bold uppercase tracking-widest">

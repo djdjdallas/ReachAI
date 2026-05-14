@@ -16,11 +16,14 @@ import {
   Check,
 } from "lucide-react";
 
-export default function Step1Connect({ instagramConnected, onSkip }) {
+import OnboardingFooter from "./OnboardingFooter";
+
+export default function Step1Connect({ instagramConnected, onNext }) {
   const [connectedToolsAcknowledged, setConnectedToolsAcknowledged] =
     useState(false);
   const canConnect = instagramConnected || connectedToolsAcknowledged;
   return (
+    <div className="flex-1 flex flex-col">
     <div className="flex-1 flex flex-col items-center pt-12 pb-24 px-4">
       <div className="w-full max-w-5xl space-y-12">
         <div className="grid lg:grid-cols-12 gap-12">
@@ -219,24 +222,6 @@ export default function Step1Connect({ instagramConnected, onSkip }) {
               </div>
             </div>
 
-            {/* Skip button — gated on the Connected Tools acknowledgement */}
-            <button
-              onClick={onSkip}
-              disabled={!canConnect}
-              className={`text-sm font-bold transition-colors flex items-center gap-2 ${
-                canConnect
-                  ? "text-stone-400 hover:text-stone-900 cursor-pointer"
-                  : "text-stone-300 cursor-not-allowed"
-              }`}
-              title={
-                canConnect
-                  ? undefined
-                  : "Confirm the Connected Tools checkbox before skipping"
-              }
-            >
-              Skip for now
-              <ArrowRight className="w-4 h-4" />
-            </button>
           </div>
 
           {/* Right Column */}
@@ -324,6 +309,14 @@ export default function Step1Connect({ instagramConnected, onSkip }) {
           </div>
         </div>
       </div>
+    </div>
+      <OnboardingFooter
+        onPrimary={onNext}
+        primaryLabel="Continue"
+        primaryDisabled={!instagramConnected}
+        primaryTooltip="Connect Instagram to continue."
+        completion="20% Ready"
+      />
     </div>
   );
 }

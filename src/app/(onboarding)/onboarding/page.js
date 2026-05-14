@@ -579,6 +579,72 @@ function OnboardingPage() {
   const scriptReady = !!profile?.script_config?.greeting;
   const instagramConnected = !!profile?.instagram_business_account_id;
 
+  // Step 3 — persist voice prefs (tone/traits/response_length) and advance.
+  // voice_profile itself is already written by /api/ai/analyze-voice and
+  // /api/ai/voice-chat at the time it was analyzed, so we don't re-write it
+  // here; we just save the explicit tone/trait controls and move on.
+  const handleSaveVoiceAndAdvance = async () => {
+    setAiError(null);
+    setSaving(true);
+    try {
+      const scriptConfig = {
+        ...(profile?.script_config || {}),
+        tone,
+        traits,
+        response_length: responseLength,
+      };
+
+      const { error: dbErr } = await supabase
+        .from("users")
+        .update({ script_config: scriptConfig })
+        .eq("id", user.id);
+      if (dbErr) throw dbErr;
+
+      setProfile((prev) => ({ ...prev, script_config: scriptConfig }));
+      setStep(4);
+      posthog.capture("onboarding_step_completed", { step: 3 });
+    } catch (err) {
+      console.error("Error saving voice prefs:", err);
+      setAiError(err?.message || "Failed to save. Please try again.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  // Step 3 — Skip path. Advance without writing anything.
+  const handleSkipVoice = () => {
+    setStep(4);
+    posthog.capture("onboarding_step_completed", { step: 3, skipped: true });
+  };
+
+  // Step 5 — finalize onboarding and route to dashboard. ai_mode is read from
+  // the in-page toggle: ON → active, OFF → handoff (safer default).
+  const handleFinalizeAndGo = async () => {
+    setAiError(null);
+    setActivating(true);
+    try {
+      const { error: dbErr } = await supabase
+        .from("users")
+        .update({
+          ai_mode: aiActive ? "active" : "handoff",
+          onboarding_completed: true,
+        })
+        .eq("id", user.id);
+      if (dbErr) throw dbErr;
+
+      document.cookie =
+        "onboarding_completed=true; path=/; max-age=31536000; samesite=lax";
+
+      if (aiActive) posthog.capture("ai_agent_activated");
+      router.push("/dashboard");
+    } catch (err) {
+      console.error("Error finalizing onboarding:", err);
+      setAiError(err?.message || "Failed to complete onboarding.");
+    } finally {
+      setActivating(false);
+    }
+  };
+
   const handleGoLive = async (checked) => {
     if (checked && !scriptReady) return;
     setAiError(null);
@@ -627,7 +693,7 @@ function OnboardingPage() {
       {step === 1 && (
         <Step1Connect
           instagramConnected={instagramConnected}
-          onSkip={() => setStep(2)}
+          onNext={() => setStep(2)}
         />
       )}
 
@@ -687,10 +753,9 @@ function OnboardingPage() {
           onDismissError={dismissError}
           onRevertVoice={handleRevertVoice}
           onBack={() => setStep(2)}
-          onNext={() => {
-            setStep(4);
-            posthog.capture("onboarding_step_completed", { step: 3 });
-          }}
+          saving={saving}
+          onSaveAndAdvance={handleSaveVoiceAndAdvance}
+          onSkip={handleSkipVoice}
         />
       )}
 
@@ -732,6 +797,7 @@ function OnboardingPage() {
           instagramConnected={instagramConnected}
           onGoLive={handleGoLive}
           onGoToDashboard={() => router.push("/dashboard")}
+          onFinalize={handleFinalizeAndGo}
           onBack={() => setStep(4)}
         />
       )}

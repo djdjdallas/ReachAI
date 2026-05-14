@@ -25,6 +25,8 @@ import {
   Info,
 } from "lucide-react";
 
+import OnboardingFooter from "./OnboardingFooter";
+
 export default function Step4Preview({
   profile,
   greeting,
@@ -557,60 +559,15 @@ export default function Step4Preview({
         </div>
       </main>
 
-      {/* Bottom Action Bar */}
-      <footer className="bg-white border-t border-stone-200 py-6 px-6 sticky bottom-0">
-        <div className="max-w-7xl mx-auto flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <button
-              onClick={onBack}
-              className="px-8 py-4 text-sm font-bold text-stone-500 hover:text-stone-900 transition-colors flex items-center gap-2"
-            >
-              <ArrowLeft className="w-4 h-4" />
-              Back
-            </button>
-          </div>
-          <div className="flex items-center gap-4">
-            {greeting && (
-              <button
-                onClick={onGenerate}
-                disabled={generating}
-                className="hidden sm:flex px-8 py-4 text-sm font-bold text-stone-500 bg-stone-50 rounded-2xl hover:bg-stone-100 transition-colors"
-              >
-                Regenerate Preview
-              </button>
-            )}
-            {greeting ? (
-              <button
-                onClick={onSave}
-                disabled={saving}
-                className="px-12 py-4 bg-[#ff7e67] text-white rounded-2xl font-black text-lg hover:scale-105 active:scale-95 transition-all shadow-xl shadow-[#ff7e67]/20 flex items-center gap-3 group disabled:opacity-50 disabled:hover:scale-100"
-              >
-                {saving && <Loader2 className="w-5 h-5 animate-spin" />}
-                Next: Go Live
-                <Rocket className="w-5 h-5 group-hover:translate-x-1 group-hover:-translate-y-1 transition-transform" />
-              </button>
-            ) : (
-              <div className="flex flex-col items-end gap-1">
-                <button
-                  onClick={onGenerate}
-                  disabled={generating}
-                  className="px-12 py-4 bg-[#ff7e67] text-white rounded-2xl font-black text-lg hover:scale-105 active:scale-95 transition-all shadow-xl shadow-[#ff7e67]/20 flex items-center gap-3 disabled:opacity-50 disabled:hover:scale-100"
-                >
-                  {generating ? (
-                    <Loader2 className="w-5 h-5 animate-spin" />
-                  ) : (
-                    <Sparkles className="w-5 h-5" />
-                  )}
-                  {generating ? "Generating..." : "Generate Script First"}
-                </button>
-                <span className="text-[10px] font-bold text-stone-400 uppercase tracking-widest">
-                  Required before going live
-                </span>
-              </div>
-            )}
-          </div>
-        </div>
-      </footer>
+      <OnboardingFooter
+        onBack={onBack}
+        onPrimary={onSave}
+        primaryLabel="Save & Continue"
+        primaryLoading={saving}
+        primaryDisabled={!greeting}
+        primaryTooltip="Generate or write a greeting first."
+        completion="80% Ready"
+      />
     </div>
   );
 }

@@ -19,6 +19,8 @@ import {
   Sparkles,
 } from "lucide-react";
 
+import OnboardingFooter from "./OnboardingFooter";
+
 const INDUSTRY_PRESETS = [
   {
     id: "fitness",
@@ -104,7 +106,10 @@ export default function Step2Script({
 }) {
   const charCount = offer.length;
 
+  const canContinue = !!offer && !!targetCustomer;
+
   return (
+    <div className="flex-1 flex flex-col">
     <div className="flex-1 max-w-7xl mx-auto w-full px-8 py-10">
       <div className="mb-10 text-center">
         <h2 className="text-4xl font-extrabold mb-3">
@@ -395,25 +400,16 @@ export default function Step2Script({
         </div>
       </div>
 
-      {/* Footer Navigation */}
-      <div className="mt-16 flex items-center justify-between border-t border-stone-200 pt-10">
-        <button
-          onClick={onBack}
-          className="flex items-center gap-2 text-stone-400 hover:text-stone-900 font-black text-xs uppercase tracking-widest transition-colors"
-        >
-          <ArrowLeft className="w-4 h-4" />
-          Back: Connect Instagram
-        </button>
-        <button
-          onClick={onSave}
-          disabled={saving || !offer || !targetCustomer}
-          className="px-12 py-5 bg-[#ff7e67] text-white rounded-full text-lg font-black hover:scale-105 active:scale-95 transition-all shadow-2xl shadow-[#ff7e67]/30 flex items-center gap-3 disabled:opacity-50 disabled:hover:scale-100"
-        >
-          {saving && <Loader2 className="w-5 h-5 animate-spin" />}
-          Save &amp; Continue
-          <ArrowRight className="w-5 h-5" />
-        </button>
-      </div>
+    </div>
+      <OnboardingFooter
+        onBack={onBack}
+        onPrimary={onSave}
+        primaryLabel="Save & Continue"
+        primaryDisabled={!canContinue}
+        primaryLoading={saving}
+        primaryTooltip="Fill in what you sell and your ideal customer to continue."
+        completion="40% Ready"
+      />
     </div>
   );
 }
