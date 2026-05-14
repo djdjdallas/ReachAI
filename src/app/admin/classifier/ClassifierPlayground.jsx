@@ -39,6 +39,7 @@ const CLASS_STYLES = {
   ENGAGED_NOT_BUYING: "bg-blue-500/15 text-blue-700 border border-blue-500/30",
   CRITICAL_NEGATIVE: "bg-red-500/15 text-red-700 border border-red-500/30",
   LOW_SIGNAL: "bg-stone-400/15 text-stone-700 border border-stone-400/30",
+  NOT_A_LEAD: "bg-purple-500/15 text-purple-700 border border-purple-500/30",
   SPAM: "bg-gray-500/20 text-gray-700 border border-gray-500/30",
   UNCERTAIN: "bg-yellow-500/15 text-yellow-700 border border-yellow-500/30",
 };

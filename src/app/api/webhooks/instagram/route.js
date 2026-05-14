@@ -130,6 +130,86 @@ async function markSkipForSender(supabase, user_id, sender_id, reason) {
   if (error) log.error("[webhook] markSkipForSender failed:", error.code);
 }
 
+// v1 qualifying-loop detector. Heuristic, no embeddings:
+// looks at the last 3 agent + last 3 lead messages and returns true when
+//   - all 3 agent messages contain question marks, AND
+//   - they share 3+ identical content words (lowercase tokens >=4 chars,
+//     stopwords removed) — e.g. three rephrasings of "what's your offer"
+//     will keep "offer" in the intersection, three "who's your audience"
+//     attempts will keep "audience", and so on, AND
+//   - all 3 lead replies are < 15 words, AND
+//   - no lead reply names a substantive offer or target-customer noun.
+//
+// `messages` is the full ordered conversation history (oldest → newest).
+// The most recent inbound message MUST already be included.
+const LOOP_STOPWORDS = new Set([
+  "what", "whats", "that", "this", "those", "these",
+  "have", "having", "your", "yours", "youre", "youve",
+  "with", "from", "about", "around", "into",
+  "would", "could", "should", "might", "really", "actually",
+  "just", "well", "like", "okay", "yeah", "sure",
+  "right", "going", "kind", "sort", "tell", "share", "let",
+  "want", "need", "hey", "hello", "thanks", "thank",
+  "today", "lately", "recently", "currently", "happy",
+  "more", "than", "then", "when", "where", "which", "still",
+  "also", "much", "many", "some", "make", "made",
+]);
+const SUBSTANTIVE_LEAD_TOKENS = [
+  "sell", "selling", "sold",
+  "offer", "offering",
+  "program", "course", "ebook", "membership", "mentorship", "mastermind",
+  "coach", "coaching",
+  "consult", "consulting",
+  "service", "services",
+  "product", "products",
+  "agency",
+  "saas",
+  "subscription",
+  "store",
+  "brand",
+  "audience",
+  "client", "clients",
+  "target",
+  "ideal customer",
+  "niche",
+  "business",
+];
+
+function detectQualifyingLoop(messages) {
+  if (!Array.isArray(messages) || messages.length < 6) return false;
+
+  const agentMsgs = messages
+    .filter((m) => m.role === "assistant" && typeof m.content === "string")
+    .slice(-3);
+  const leadMsgs = messages
+    .filter((m) => m.role === "user" && typeof m.content === "string")
+    .slice(-3);
+  if (agentMsgs.length < 3 || leadMsgs.length < 3) return false;
+
+  if (!agentMsgs.every((m) => m.content.includes("?"))) return false;
+
+  const wordSets = agentMsgs.map((m) => {
+    const tokens = m.content.toLowerCase().match(/[a-z']+/g) || [];
+    return new Set(
+      tokens.filter((t) => t.length >= 4 && !LOOP_STOPWORDS.has(t))
+    );
+  });
+  const shared = [...wordSets[0]].filter(
+    (w) => wordSets[1].has(w) && wordSets[2].has(w)
+  );
+  if (shared.length < 3) return false;
+
+  for (const lead of leadMsgs) {
+    const text = (lead.content || "").trim();
+    const words = text.match(/\S+/g) || [];
+    if (words.length >= 15) return false;
+    const lower = text.toLowerCase();
+    if (SUBSTANTIVE_LEAD_TOKENS.some((tok) => lower.includes(tok))) return false;
+  }
+
+  return true;
+}
+
 async function insertMessageIfNew(supabase, { conversation_id, role, content, provider_message_id, source }) {
   if (provider_message_id) {
     const { data: existing } = await supabase
@@ -332,6 +412,27 @@ async function processIncomingMessage({
 
   if (msgError) {
     log.error("fetch messages failed:", msgError.code);
+    return;
+  }
+
+  // Qualifying-loop guard. If the agent has already asked the same kind of
+  // qualifying question 3 turns in a row and the lead has never given a
+  // substantive answer, pause the conversation rather than fire a 4th attempt.
+  if (detectQualifyingLoop(messages)) {
+    await supabase
+      .from("conversations")
+      .update({
+        ai_paused: true,
+        ai_pause_reason: "qualifying_loop_detected",
+        last_skip_reason: "qualifying_loop_detected",
+        last_message_at: new Date().toISOString(),
+      })
+      .eq("id", conversation.id);
+    getPostHogClient().capture({
+      distinctId: user.email || user.id,
+      event: "qualifying_loop_detected",
+      properties: { conversation_id: conversation.id },
+    });
     return;
   }
 

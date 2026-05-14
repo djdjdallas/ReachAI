@@ -730,6 +730,12 @@ function ConversationsPage() {
                               Needs Review
                             </span>
                           )}
+                        {convo.ai_paused &&
+                          convo.ai_pause_reason === "qualifying_loop_detected" && (
+                            <span className="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase bg-amber-50 text-amber-700 border border-amber-200">
+                              Paused — Loop
+                            </span>
+                          )}
                         {convo.lead_temperature && tempColors[convo.lead_temperature] && (
                           <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold uppercase ${tempColors[convo.lead_temperature].bg} ${tempColors[convo.lead_temperature].text}`}>
                             {tempColors[convo.lead_temperature].label}
@@ -849,6 +855,21 @@ function ConversationsPage() {
                       <span className="font-bold">AI paused:</span> complex
                       objection detected. Review the conversation and respond
                       manually, then click Resume AI when ready.
+                    </p>
+                  </div>
+                </div>
+              )}
+
+            {/* Qualifying-loop banner */}
+            {selectedConvo.ai_paused &&
+              selectedConvo.ai_pause_reason === "qualifying_loop_detected" && (
+                <div className="px-6 py-3 border-b border-stone-100 bg-amber-50">
+                  <div className="flex items-start gap-3">
+                    <AlertCircle className="w-4 h-4 text-amber-600 mt-0.5 shrink-0" />
+                    <p className="text-xs text-amber-700 leading-relaxed">
+                      <span className="font-bold">Paused — </span>
+                      conversation wasn&apos;t progressing. Take over manually
+                      to redirect.
                     </p>
                   </div>
                 </div>
