@@ -18,11 +18,15 @@ import {
   FlaskConical,
   CheckCircle2,
   AlertTriangle,
+  Send,
+  Inbox,
+  Ban,
+  Settings2,
 } from "lucide-react";
 
 const CORAL = "#ff7e67";
 
-const DEFAULT_OFFER = {
+const PLACEHOLDER_OFFER = {
   offer_name: "6-Week Sprint Program",
   offer_price_cents: 49700,
   offer_url: "https://clinchd.io/sprint",
@@ -32,6 +36,21 @@ const DEFAULT_OFFER = {
     "What's your current weekly mileage?",
     "What race are you training for?",
   ],
+};
+
+const ACTION_META = {
+  dm: { label: "Send DM", icon: Send, tone: "text-green-700 bg-green-50 border-green-200" },
+  queue_review: {
+    label: "Queue for review",
+    icon: Inbox,
+    tone: "text-amber-700 bg-amber-50 border-amber-200",
+  },
+  ignore: { label: "Ignore", icon: Ban, tone: "text-stone-600 bg-stone-50 border-stone-200" },
+  none: {
+    label: "No action",
+    icon: Ban,
+    tone: "text-stone-600 bg-stone-50 border-stone-200",
+  },
 };
 
 const CLASS_STYLES = {
@@ -72,13 +91,15 @@ function ConfidenceBar({ value }) {
   );
 }
 
-export default function ClassifierPlayground() {
+export default function ClassifierPlayground({ savedOffer = null }) {
   const [caption, setCaption] = useState(
     "New cohort opens Friday — comment COACH for details on the 6-week program."
   );
+  const initialOffer = savedOffer || PLACEHOLDER_OFFER;
   const [offerText, setOfferText] = useState(
-    JSON.stringify(DEFAULT_OFFER, null, 2)
+    JSON.stringify(initialOffer, null, 2)
   );
+  const [showOfferOverride, setShowOfferOverride] = useState(false);
   const [comment, setComment] = useState("how much is the program? i'm ready to join");
 
   const [loading, setLoading] = useState(false);
@@ -93,11 +114,11 @@ export default function ClassifierPlayground() {
     setFeedbackStatus(null);
 
     let offer = null;
-    if (offerText.trim()) {
+    if (showOfferOverride && offerText.trim()) {
       try {
         offer = JSON.parse(offerText);
       } catch {
-        setError("Offer must be valid JSON (or leave empty).");
+        setError("Override offer must be valid JSON (or hide the override).");
         setLoading(false);
         return;
       }
@@ -107,7 +128,12 @@ export default function ClassifierPlayground() {
       const res = await fetch("/api/admin/classify", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ caption, offer, comment }),
+        body: JSON.stringify({
+          caption,
+          offer,
+          offerOverride: showOfferOverride && Boolean(offer),
+          comment,
+        }),
       });
       const data = await res.json();
       if (!res.ok) {
@@ -187,18 +213,60 @@ export default function ClassifierPlayground() {
             />
           </div>
 
-          <div>
-            <label className="text-xs font-semibold uppercase tracking-wide text-stone-500 block mb-1">
-              Creator offer (JSON)
-            </label>
-            <Textarea
-              value={offerText}
-              onChange={(e) => setOfferText(e.target.value)}
-              rows={8}
-              className="text-xs font-mono"
-              placeholder='{"offer_name":"...","offer_price_cents":49700,"ideal_customer":"...","objections":["..."],"qualification_questions":["..."]}'
-            />
+          <div className="rounded-lg border border-stone-200 bg-stone-50/40 px-3 py-2 text-xs flex items-center justify-between gap-2">
+            <span className="text-stone-600">
+              {savedOffer ? (
+                <>
+                  Using saved offer{" "}
+                  <span className="font-mono text-stone-800">
+                    {savedOffer.offer_name}
+                  </span>{" "}
+                  from{" "}
+                  <a href="/settings/offer" className="underline">
+                    Settings → Your Offer
+                  </a>
+                  .
+                </>
+              ) : (
+                <>
+                  No saved offer found —{" "}
+                  <a href="/settings/offer" className="underline">
+                    save your real offer
+                  </a>{" "}
+                  so the classifier doesn&apos;t run against placeholder data.
+                </>
+              )}
+            </span>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={() => setShowOfferOverride((v) => !v)}
+              className="text-xs"
+            >
+              <Settings2 className="h-3.5 w-3.5 mr-1.5" />
+              {showOfferOverride ? "Hide override" : "Advanced: override"}
+            </Button>
           </div>
+
+          {showOfferOverride && (
+            <div>
+              <label className="text-xs font-semibold uppercase tracking-wide text-stone-500 block mb-1">
+                Override offer (JSON, this test only)
+              </label>
+              <Textarea
+                value={offerText}
+                onChange={(e) => setOfferText(e.target.value)}
+                rows={8}
+                className="text-xs font-mono"
+                placeholder='{"offer_name":"...","offer_price_cents":49700,"ideal_customer":"...","objections":["..."],"qualification_questions":["..."]}'
+              />
+              <p className="text-[11px] text-stone-500 mt-1">
+                Only used for this classification — does not modify your saved
+                offer.
+              </p>
+            </div>
+          )}
 
           <div>
             <label className="text-xs font-semibold uppercase tracking-wide text-stone-500 block mb-1">
@@ -347,7 +415,59 @@ export default function ClassifierPlayground() {
           </CardContent>
         </Card>
       )}
+
+      {result?.trigger && <TriggerCard trigger={result.trigger} />}
     </div>
+  );
+}
+
+function TriggerCard({ trigger }) {
+  const meta = ACTION_META[trigger.action] || ACTION_META.none;
+  const Icon = meta.icon;
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-lg">Would trigger</CardTitle>
+        <CardDescription>
+          Shadow mode — nothing is sent. This is what the agent would do if
+          this were a live comment.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <div
+          className={`inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-semibold ${meta.tone}`}
+        >
+          <Icon className="h-3.5 w-3.5" />
+          {meta.label}
+        </div>
+
+        <div className="text-xs text-stone-500">
+          Reason:{" "}
+          <span className="font-mono text-stone-700">{trigger.reason}</span>
+        </div>
+
+        {trigger.action === "dm" && trigger.rendered && (
+          <div className="rounded-lg border border-stone-200 bg-stone-50 p-3">
+            <p className="text-[10px] uppercase tracking-wide text-stone-500 mb-1">
+              Rendered DM
+            </p>
+            <p className="text-sm whitespace-pre-wrap text-stone-800">
+              {trigger.rendered}
+            </p>
+          </div>
+        )}
+
+        {trigger.action === "queue_review" && (
+          <p className="text-xs text-stone-500">
+            Queued for the founder to review at{" "}
+            <a href="/admin/comment-queue" className="underline">
+              /admin/comment-queue
+            </a>
+            .
+          </p>
+        )}
+      </CardContent>
+    </Card>
   );
 }
 

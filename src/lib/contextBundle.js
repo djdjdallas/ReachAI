@@ -38,8 +38,10 @@ function approxTokenCount(text) {
  * @param {string} args.postId
  * @param {string} args.creatorId
  * @param {string} args.caption
- * @param {string} [args.creatorOfferId] - Optional override; otherwise the
- *   most recent creator_offers row for the creator is used.
+ * @param {string} [args.creatorOfferId] - Optional creator_offers row id.
+ * @param {object|null} [args.offerSnapshotOverride] - Inline snapshot used
+ *   instead of looking up creator_offers. Used by the playground "Advanced:
+ *   override" path so a one-off test offer doesn't pollute the saved row.
  * @returns {Promise<{bundle: object, offerSnapshot: object|null, reused: boolean}>}
  */
 export async function buildContextBundle({
@@ -47,6 +49,7 @@ export async function buildContextBundle({
   creatorId,
   caption,
   creatorOfferId,
+  offerSnapshotOverride,
 }) {
   if (!postId) throw new Error("buildContextBundle: postId is required");
   if (!creatorId) throw new Error("buildContextBundle: creatorId is required");
@@ -54,7 +57,9 @@ export async function buildContextBundle({
   const admin = getSupabaseAdmin();
 
   let offerSnapshot = null;
-  if (creatorOfferId) {
+  if (offerSnapshotOverride && typeof offerSnapshotOverride === "object") {
+    offerSnapshot = offerSnapshotOverride;
+  } else if (creatorOfferId) {
     const { data: offerRow } = await admin
       .from("creator_offers")
       .select("*")
@@ -63,10 +68,13 @@ export async function buildContextBundle({
       .maybeSingle();
     if (offerRow) offerSnapshot = offerRow;
   } else {
+    // Most-recent NON-deprecated offer is the active one. Mirrors the lookup
+    // in /settings/offer and /admin/classifier.
     const { data: offerRow } = await admin
       .from("creator_offers")
       .select("*")
       .eq("creator_id", creatorId)
+      .is("deprecated_at", null)
       .order("updated_at", { ascending: false })
       .limit(1)
       .maybeSingle();

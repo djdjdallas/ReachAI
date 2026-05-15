@@ -4,6 +4,8 @@ import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import { classifyComment, CLASSIFIER_MODEL, CLASSIFIER_VERSION } from "@/lib/classifier";
 import { buildContextBundle } from "@/lib/contextBundle";
 import { isIntentClassifierEnabled } from "@/lib/featureFlags";
+import { decideAction } from "@/lib/comment-trigger-rules";
+import { getPostHogClient } from "@/lib/posthog-server";
 // eslint-disable-next-line no-unused-vars
 import { hasCommentToDM } from "@/lib/plans";
 
@@ -40,8 +42,12 @@ export async function POST(request) {
     const body = await request.json().catch(() => ({}));
     const caption = typeof body.caption === "string" ? body.caption : "";
     const comment = typeof body.comment === "string" ? body.comment.trim() : "";
-    const offer =
-      body.offer && typeof body.offer === "object" && !Array.isArray(body.offer)
+    const offerOverride = body.offerOverride === true;
+    const inlineOffer =
+      offerOverride &&
+      body.offer &&
+      typeof body.offer === "object" &&
+      !Array.isArray(body.offer)
         ? body.offer
         : null;
 
@@ -54,53 +60,23 @@ export async function POST(request) {
 
     const admin = getSupabaseAdmin();
 
-    // Upsert a creator_offers row keyed by (creator_id, offer_name) if an offer
-    // was supplied. The shadow-mode test page passes a fresh snapshot each
-    // time; we store it so the classifier sees a persisted record and so the
-    // bundle hash stays stable across repeated classifications of the same
-    // (caption, offer) pair.
-    let offerRow = null;
-    if (offer && (offer.offer_name || offer.offer_url || offer.ideal_customer)) {
-      const payload = {
-        creator_id: user.id,
-        offer_name: offer.offer_name || "Shadow-mode test offer",
-        offer_price_cents:
-          typeof offer.offer_price_cents === "number"
-            ? offer.offer_price_cents
-            : null,
-        offer_url: offer.offer_url || null,
-        ideal_customer: offer.ideal_customer || null,
-        objections: Array.isArray(offer.objections) ? offer.objections : null,
-        qualification_questions: Array.isArray(offer.qualification_questions)
-          ? offer.qualification_questions
-          : null,
-        updated_at: new Date().toISOString(),
-      };
-
-      const { data: existing } = await admin
+    // Default path: use the creator's active saved offer (set via
+    // /settings/offer). Override path: bundle uses the inline JSON snapshot
+    // without persisting, so a one-off test does not create a competing
+    // creator_offers row.
+    let savedOfferRow = null;
+    if (!inlineOffer) {
+      const { data: row } = await admin
         .from("creator_offers")
-        .select("id")
+        .select("*")
         .eq("creator_id", user.id)
-        .eq("offer_name", payload.offer_name)
+        .is("deprecated_at", null)
+        .order("updated_at", { ascending: false })
+        .limit(1)
         .maybeSingle();
-
-      if (existing) {
-        const { data: updated } = await admin
-          .from("creator_offers")
-          .update(payload)
-          .eq("id", existing.id)
-          .select()
-          .single();
-        offerRow = updated;
-      } else {
-        const { data: inserted } = await admin
-          .from("creator_offers")
-          .insert(payload)
-          .select()
-          .single();
-        offerRow = inserted;
-      }
+      savedOfferRow = row;
     }
+    const effectiveOffer = inlineOffer || savedOfferRow || null;
 
     // Find or create a `posts` row for this caption. Shadow mode doesn't have
     // an ig_media_id, so we key off (creator_id, caption) to get stable
@@ -143,13 +119,14 @@ export async function POST(request) {
       postId: postRow.id,
       creatorId: user.id,
       caption,
-      creatorOfferId: offerRow?.id,
+      creatorOfferId: !inlineOffer ? savedOfferRow?.id : undefined,
+      offerSnapshotOverride: inlineOffer || undefined,
     });
 
     const { classification, raw, latencyMs } = await classifyComment({
       commentText: comment,
       postCaption: caption,
-      creatorOffer: offerRow || offer || null,
+      creatorOffer: effectiveOffer,
     });
 
     const usage = raw?.usage || {};
@@ -190,6 +167,90 @@ export async function POST(request) {
       );
     }
 
+    // ── Trigger simulation ───────────────────────────────────────────────
+    // Look up monitoring + templates for this creator/post, run the pure
+    // decideAction(), and persist the simulated outcome to comment_to_dm_log.
+    // Failures here should NOT fail the classification request — the
+    // classification has already been written and the user wants to see it.
+    let triggerDecision = null;
+    let triggerLogId = null;
+    try {
+      const [{ data: monitoringRow }, { data: templateRows }] =
+        await Promise.all([
+          admin
+            .from("post_monitoring_settings")
+            .select("enabled, actions_per_class")
+            .eq("creator_id", user.id)
+            .eq("post_id", postRow.id)
+            .maybeSingle(),
+          admin
+            .from("dm_templates")
+            .select("intent_class, template")
+            .eq("creator_id", user.id),
+        ]);
+
+      const templates = {};
+      for (const row of templateRows || []) {
+        if (row?.intent_class && typeof row.template === "string") {
+          templates[row.intent_class] = row.template;
+        }
+      }
+
+      triggerDecision = decideAction(classification, monitoringRow, templates, {
+        postCaption: caption,
+        commenterName: null,
+        offerName: effectiveOffer?.offer_name || null,
+        bookingLink: null,
+      });
+
+      const { data: logRow, error: logErr } = await admin
+        .from("comment_to_dm_log")
+        .insert({
+          comment_classification_id: persisted.id,
+          creator_id: user.id,
+          decided_action: triggerDecision.action,
+          rendered_dm: triggerDecision.rendered,
+          dispatched: false,
+        })
+        .select("id")
+        .single();
+
+      if (logErr) {
+        console.error("comment_to_dm_log insert failed:", logErr.message);
+      } else {
+        triggerLogId = logRow.id;
+      }
+
+      try {
+        const ph = getPostHogClient();
+        ph.capture({
+          distinctId: user.id,
+          event: "comment_trigger_decided",
+          properties: {
+            action: triggerDecision.action,
+            reason: triggerDecision.reason,
+            class: classification.class,
+            confidence: classification.confidence,
+            has_template: Boolean(templates[classification.class]),
+          },
+        });
+        if (triggerLogId) {
+          ph.capture({
+            distinctId: user.id,
+            event: "comment_simulated",
+            properties: {
+              decided_action: triggerDecision.action,
+              log_id: triggerLogId,
+            },
+          });
+        }
+      } catch (phErr) {
+        console.error("PostHog capture failed:", phErr.message);
+      }
+    } catch (triggerErr) {
+      console.error("Trigger simulation failed:", triggerErr);
+    }
+
     return NextResponse.json({
       classificationId: persisted.id,
       classification,
@@ -203,6 +264,14 @@ export async function POST(request) {
       postId: postRow.id,
       bundleId: bundle.id,
       bundleVersion: bundle.version,
+      trigger: triggerDecision
+        ? {
+            action: triggerDecision.action,
+            reason: triggerDecision.reason,
+            rendered: triggerDecision.rendered,
+            logId: triggerLogId,
+          }
+        : null,
     });
   } catch (err) {
     console.error("Admin classify error:", err);

@@ -31,5 +31,16 @@ export default async function AdminClassifierPage() {
   //     .from("users").select("plan").eq("id", user.id).single();
   //   if (!hasCommentToDM(profile?.plan)) notFound();
 
-  return <ClassifierPlayground />;
+  const { data: activeOffer } = await supabase
+    .from("creator_offers")
+    .select(
+      "offer_name, offer_price_cents, offer_url, ideal_customer, objections, qualification_questions"
+    )
+    .eq("creator_id", user.id)
+    .is("deprecated_at", null)
+    .order("updated_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  return <ClassifierPlayground savedOffer={activeOffer || null} />;
 }

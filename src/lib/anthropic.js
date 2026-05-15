@@ -1,4 +1,28 @@
 import Anthropic from "@anthropic-ai/sdk";
+import { getPostHogClient } from "./posthog-server";
+
+// ── Per-helper model overrides (kill switches) ─────────────────────────────
+// classifyIncomingMessage and summarizeConversation were migrated from
+// Sonnet 4.6 to Haiku 4.5 because they're high-volume structured-output
+// calls. Set the env var below to claude-sonnet-4-6 to instantly revert
+// without a code change (Vercel env var save + redeploy of the function).
+// ALL OTHER call sites in this file remain on Sonnet 4.6 — see the audit
+// in the comment-to-DM PR for the per-site rationale.
+const CLASSIFY_INCOMING_MODEL =
+  process.env.CLASSIFY_INCOMING_MODEL || "claude-haiku-4-5-20251001";
+const SUMMARIZE_CONVERSATION_MODEL =
+  process.env.SUMMARIZE_CONVERSATION_MODEL || "claude-haiku-4-5-20251001";
+
+// Helper that fires a PostHog telemetry event without ever throwing into
+// the caller — these helpers are called from webhook handlers where any
+// crash would silently break user-facing flows.
+function safePostHogCapture(distinctId, event, properties) {
+  try {
+    getPostHogClient().capture({ distinctId, event, properties });
+  } catch (err) {
+    console.error(`PostHog capture (${event}) failed:`, err.message);
+  }
+}
 
 let _anthropic;
 
@@ -159,8 +183,10 @@ EXAMPLE OUTPUT:
  * @returns {Promise<{summary: string, temperature: string}>}
  */
 export async function summarizeConversation(messages) {
+  const model = SUMMARIZE_CONVERSATION_MODEL;
+  const startedAt = Date.now();
   const response = await getAnthropic().messages.create({
-    model: "claude-sonnet-4-6",
+    model,
     max_tokens: 300,
     temperature: 0.3,
     system: `You are a sales conversation analyst. Analyze the DM conversation and return a JSON object with exactly these fields:
@@ -182,18 +208,43 @@ Example: {"summary": "Prospect runs a fitness coaching business doing $8k/month 
     ],
   });
 
+  const latencyMs = Date.now() - startedAt;
+  const usage = response?.usage || {};
+  const inputTokens = usage.input_tokens || 0;
+  const outputTokens = usage.output_tokens || 0;
+
   const raw = response.content[0].text.trim();
+  let result;
   try {
     const stripped = raw.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/i, "").trim();
     const match = stripped.match(/\{[\s\S]*\}/);
     const parsed = JSON.parse(match ? match[0] : stripped);
-    return {
+    result = {
       summary: parsed.summary || "No summary available.",
       temperature: ["hot", "warm", "cold"].includes(parsed.temperature) ? parsed.temperature : "warm",
     };
   } catch {
-    return { summary: raw.slice(0, 200), temperature: "warm" };
+    result = { summary: raw.slice(0, 200), temperature: "warm" };
   }
+
+  console.info(
+    "[summarizeConversation] model:",
+    model,
+    "tokens:",
+    { in: inputTokens, out: outputTokens },
+    "latency_ms:",
+    latencyMs
+  );
+
+  safePostHogCapture("system_summarizer", "conversation_summarized", {
+    model,
+    temperature: result.temperature,
+    latency_ms: latencyMs,
+    input_tokens: inputTokens,
+    output_tokens: outputTokens,
+  });
+
+  return result;
 }
 
 /**
@@ -358,10 +409,14 @@ export async function classifyIncomingMessage(incomingMessage, recentMessages = 
     .map((m) => `${m.role === "assistant" ? "AI" : "Lead"}: ${m.content}`)
     .join("\n");
 
+  const model = CLASSIFY_INCOMING_MODEL;
+  const startedAt = Date.now();
   const response = await getAnthropic().messages.create({
-    model: "claude-sonnet-4-6",
+    model,
     max_tokens: 150,
-    temperature: 0.2,
+    // 0 (was 0.2 on Sonnet) — Haiku 4.5 handles structured triage best at
+    // deterministic temperature; the prompt is rules-based, not creative.
+    temperature: 0,
     system: `You are a triage classifier for a sales DM automation. Decide whether an incoming DM should be answered by the AI or escalated to the human business owner.
 
 Return ONLY a valid JSON object. No markdown. No explanation. Format:
@@ -399,12 +454,36 @@ Classify this message.`,
     ],
   });
 
+  const latencyMs = Date.now() - startedAt;
+  const usage = response?.usage || {};
+  const inputTokens = usage.input_tokens || 0;
+  const outputTokens = usage.output_tokens || 0;
+
   const raw = response.content[0].text.trim();
   const parsed = extractAndParseJSON(raw);
-  return {
+  const result = {
     needs_human: parsed.needs_human === true,
     reason: typeof parsed.reason === "string" ? parsed.reason : "",
   };
+
+  console.info(
+    "[classifyIncomingMessage] model:",
+    model,
+    "tokens:",
+    { in: inputTokens, out: outputTokens },
+    "latency_ms:",
+    latencyMs
+  );
+
+  safePostHogCapture("system_classifier", "classify_incoming_message", {
+    model,
+    needs_human: result.needs_human,
+    latency_ms: latencyMs,
+    input_tokens: inputTokens,
+    output_tokens: outputTokens,
+  });
+
+  return result;
 }
 
 /**

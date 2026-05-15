@@ -1,7 +1,7 @@
-// Founder identity — distinct from `isAdmin` (that's a separate concept
-// scoped to internal classifier-feedback tooling). Founder bypass governs
-// product gates the founder shouldn't be subject to while dogfooding:
-// trial expiry, paywalls, etc.
+// Founder identity. Founder bypass governs product gates the founder
+// shouldn't be subject to while dogfooding: trial expiry, paywalls, etc.
+// (The classifier admin gate uses isIntentClassifierEnabled() in
+// featureFlags.js, which compares against ADMIN_EMAIL.)
 //
 // Configurable via FOUNDER_EMAILS (comma-separated). Falls back to the
 // personal admin address when unset, matching the pattern used by

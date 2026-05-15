@@ -61,6 +61,21 @@ export async function POST(request) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
+    // One feedback row per classification — latest wins. Delete + insert
+    // (rather than UPSERT) keeps the schema identical to the original
+    // migration: no UNIQUE constraint on classification_id required.
+    const { error: deleteErr } = await admin
+      .from("classifier_feedback")
+      .delete()
+      .eq("classification_id", classificationId);
+
+    if (deleteErr) {
+      return NextResponse.json(
+        { error: `Failed to clear prior feedback: ${deleteErr.message}` },
+        { status: 500 }
+      );
+    }
+
     const { data: inserted, error: insertErr } = await admin
       .from("classifier_feedback")
       .insert({
