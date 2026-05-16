@@ -26,17 +26,17 @@ import {
 
 const CORAL = "#ff7e67";
 
-const PLACEHOLDER_OFFER = {
-  offer_name: "6-Week Sprint Program",
-  offer_price_cents: 49700,
-  offer_url: "https://clinchd.io/sprint",
-  ideal_customer: "Runners training for a half-marathon who want a structured plan.",
-  objections: ["too expensive", "not enough time", "already have a coach"],
-  qualification_questions: [
-    "What's your current weekly mileage?",
-    "What race are you training for?",
-  ],
-};
+// Placeholder JSON shown in the override textarea's placeholder= attribute
+// when no saved offer exists — documents the schema without ever being
+// auto-submitted as a value.
+const OFFER_PLACEHOLDER_JSON = `{
+  "offer_name": "6-Week Sprint Program",
+  "offer_price_cents": 49700,
+  "offer_url": "https://clinchd.io/sprint",
+  "ideal_customer": "...",
+  "objections": ["too expensive", "..."],
+  "qualification_questions": ["...", "..."]
+}`;
 
 const ACTION_META = {
   dm: { label: "Send DM", icon: Send, tone: "text-green-700 bg-green-50 border-green-200" },
@@ -91,16 +91,23 @@ function ConfidenceBar({ value }) {
   );
 }
 
-export default function ClassifierPlayground({ savedOffer = null }) {
+export default function ClassifierPlayground({
+  savedOffer = null,
+  visionEnabled = false,
+}) {
   const [caption, setCaption] = useState(
     "New cohort opens Friday — comment COACH for details on the 6-week program."
   );
-  const initialOffer = savedOffer || PLACEHOLDER_OFFER;
+  // Override textarea is pre-filled with the saved offer (so users can tweak
+  // a known-good baseline) ONLY when one exists. With no saved offer, the
+  // textarea starts empty so a user opening "Advanced: override" can't
+  // silently classify against the placeholder fitness offer.
   const [offerText, setOfferText] = useState(
-    JSON.stringify(initialOffer, null, 2)
+    savedOffer ? JSON.stringify(savedOffer, null, 2) : ""
   );
   const [showOfferOverride, setShowOfferOverride] = useState(false);
   const [comment, setComment] = useState("how much is the program? i'm ready to join");
+  const [imageUrl, setImageUrl] = useState("");
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -133,6 +140,7 @@ export default function ClassifierPlayground({ savedOffer = null }) {
           offer,
           offerOverride: showOfferOverride && Boolean(offer),
           comment,
+          imageUrl: visionEnabled && imageUrl.trim() ? imageUrl.trim() : null,
         }),
       });
       const data = await res.json();
@@ -259,11 +267,31 @@ export default function ClassifierPlayground({ savedOffer = null }) {
                 onChange={(e) => setOfferText(e.target.value)}
                 rows={8}
                 className="text-xs font-mono"
-                placeholder='{"offer_name":"...","offer_price_cents":49700,"ideal_customer":"...","objections":["..."],"qualification_questions":["..."]}'
+                placeholder={OFFER_PLACEHOLDER_JSON}
               />
               <p className="text-[11px] text-stone-500 mt-1">
-                Only used for this classification — does not modify your saved
-                offer.
+                {savedOffer
+                  ? "Pre-filled from your saved offer — edits are used for this classification only."
+                  : "Empty by default. Anything you paste here is used for this classification only and is NOT saved."}
+              </p>
+            </div>
+          )}
+
+          {visionEnabled && (
+            <div>
+              <label className="text-xs font-semibold uppercase tracking-wide text-stone-500 block mb-1">
+                Image URL (optional, vision)
+              </label>
+              <input
+                type="url"
+                value={imageUrl}
+                onChange={(e) => setImageUrl(e.target.value)}
+                placeholder="https://example.com/post-image.jpg"
+                className="w-full rounded border border-stone-300 px-2 py-1 text-sm bg-white"
+              />
+              <p className="text-[11px] text-stone-500 mt-1">
+                Haiku 4.5 will look at the image alongside the caption and
+                offer. Max 5 MB. Leave blank for text-only classification.
               </p>
             </div>
           )}

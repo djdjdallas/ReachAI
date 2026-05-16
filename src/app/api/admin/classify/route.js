@@ -10,11 +10,21 @@ import { getPostHogClient } from "@/lib/posthog-server";
 import { hasCommentToDM } from "@/lib/plans";
 
 // POST /api/admin/classify
-// Body: { caption: string, offer: object|null, comment: string }
+// Body: {
+//   caption: string,
+//   comment: string,                       // required, the comment to classify
+//   offer?: object,                        // only honored when offerOverride === true
+//   offerOverride?: boolean,               // when true, `offer` is used as a one-off
+//                                          // bundle snapshot WITHOUT persisting to
+//                                          // creator_offers (admin override path)
+//   imageUrl?: string                      // optional, requires VISION_ENABLED env
+// }
 //
 // Shadow-mode test endpoint used only by the admin-only /admin/classifier page.
-// Persists a post + offer + bundle + classification so the founder can verify
-// caching, accuracy, and feedback end-to-end.
+// Default path reads the creator's active (non-deprecated) creator_offers row.
+// Persists a `posts` row, a `post_context_bundles` row (versioned), the
+// `comment_classifications` row, and a `comment_to_dm_log` simulation row.
+// Does NOT write to `creator_offers` — that's owned by /api/settings/offer.
 export async function POST(request) {
   try {
     const supabase = await createClient();
@@ -49,6 +59,12 @@ export async function POST(request) {
       typeof body.offer === "object" &&
       !Array.isArray(body.offer)
         ? body.offer
+        : null;
+    // Optional vision input. classifyComment() ignores this when
+    // VISION_ENABLED is unset, so passing a URL with the env off is a no-op.
+    const imageUrl =
+      typeof body.imageUrl === "string" && body.imageUrl.trim()
+        ? body.imageUrl.trim()
         : null;
 
     if (!comment) {
@@ -127,6 +143,7 @@ export async function POST(request) {
       commentText: comment,
       postCaption: caption,
       creatorOffer: effectiveOffer,
+      imageUrl,
     });
 
     const usage = raw?.usage || {};

@@ -1,24 +1,28 @@
-// Aggregates feedback rows into per-class precision/recall/F1.
-// Rows shape: [{ correct_class, comment_classifications: { class } }, ...]
-// All math runs once over the array — no per-class queries.
+// Renders per-class precision/recall/F1 from the aggregated confusion
+// matrix returned by the classifier_confusion_matrix RPC.
+// Rows shape: [{ predicted, actual, n }, ...]
+// All math is constant-time over the matrix size (≤ 7×7), no per-row work.
 
-function computeF1(rows, classes) {
+function computeF1(matrix, classes) {
   const counts = {};
+  let totalLabeled = 0;
   for (const cls of classes) counts[cls] = { tp: 0, fp: 0, fn: 0 };
 
-  for (const r of rows) {
-    const predicted = r?.comment_classifications?.class;
-    const correct = r?.correct_class;
-    if (!predicted || !correct) continue;
-    if (predicted === correct) {
-      if (counts[predicted]) counts[predicted].tp += 1;
+  for (const cell of matrix || []) {
+    const predicted = cell?.predicted;
+    const actual = cell?.actual;
+    const n = Number(cell?.n) || 0;
+    if (!predicted || !actual || n === 0) continue;
+    totalLabeled += n;
+    if (predicted === actual) {
+      if (counts[predicted]) counts[predicted].tp += n;
     } else {
-      if (counts[predicted]) counts[predicted].fp += 1;
-      if (counts[correct]) counts[correct].fn += 1;
+      if (counts[predicted]) counts[predicted].fp += n;
+      if (counts[actual]) counts[actual].fn += n;
     }
   }
 
-  return classes.map((cls) => {
+  const stats = classes.map((cls) => {
     const { tp, fp, fn } = counts[cls];
     const precision = tp + fp === 0 ? null : tp / (tp + fp);
     const recall = tp + fn === 0 ? null : tp / (tp + fn);
@@ -28,6 +32,8 @@ function computeF1(rows, classes) {
         : (2 * precision * recall) / (precision + recall);
     return { cls, tp, fp, fn, precision, recall, f1 };
   });
+
+  return { stats, totalLabeled };
 }
 
 function fmtPct(value) {
@@ -36,8 +42,10 @@ function fmtPct(value) {
 }
 
 export default function F1Panel({ rows, classes }) {
-  const stats = computeF1(rows || [], classes);
-  const totalLabeled = rows?.length || 0;
+  // `rows` is the confusion matrix from the RPC. Older callers passed raw
+  // feedback rows; the API surface is intentionally the same parameter
+  // name so the page just swaps its data source.
+  const { stats, totalLabeled } = computeF1(rows || [], classes);
 
   return (
     <div className="rounded-lg border border-stone-200 bg-white">

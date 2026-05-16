@@ -68,14 +68,14 @@ export default async function ClassifierHistoryPage({ searchParams }) {
 
   const { data: rows, error } = await query;
 
-  // F1 aggregate: one query that returns (predicted, correct) pairs grouped
-  // and counted across ALL feedback for this creator (filters above are for
-  // the row list only — the panel reflects the entire labeled corpus).
-  const { data: confusion } = await supabase
-    .from("classifier_feedback")
-    .select("correct_class, comment_classifications!inner(class, creator_id)")
-    .eq("creator_id", user.id)
-    .not("correct_class", "is", null);
+  // F1 aggregate: a single GROUP BY in Postgres returns the confusion
+  // matrix, so the page only ships the summarized counts to JS. RLS still
+  // applies because the RPC runs SECURITY INVOKER and the WHERE clause
+  // pins to p_creator_id.
+  const { data: confusion } = await supabase.rpc(
+    "classifier_confusion_matrix",
+    { p_creator_id: user.id }
+  );
 
   return (
     <div className="max-w-6xl mx-auto p-6 md:p-10 space-y-6">

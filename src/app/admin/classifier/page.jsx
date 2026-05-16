@@ -42,5 +42,13 @@ export default async function AdminClassifierPage() {
     .limit(1)
     .maybeSingle();
 
-  return <ClassifierPlayground savedOffer={activeOffer || null} />;
+  const visionEnabled =
+    String(process.env.VISION_ENABLED || "").toLowerCase() === "true";
+
+  return (
+    <ClassifierPlayground
+      savedOffer={activeOffer || null}
+      visionEnabled={visionEnabled}
+    />
+  );
 }
