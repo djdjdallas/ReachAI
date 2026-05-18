@@ -16,6 +16,7 @@ import {
   Menu,
   MessageSquare,
   Send,
+  MessageCircleReply,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -30,6 +31,12 @@ const mainNavLinks = [
   { href: "/dashboard", label: "Inbox", icon: Inbox, showBadge: true },
   { href: "/conversations", label: "Conversations", icon: MessageSquare },
   { href: "/native-send", label: "Native Send", icon: Send },
+  {
+    href: "/comment-to-dm",
+    label: "Comment to DM",
+    icon: MessageCircleReply,
+    activePaths: ["/comment-to-dm", "/comment-triggers", "/dm-templates"],
+  },
   { href: "/leads", label: "Leads", icon: Users },
   { href: "/calendar", label: "Calendar", icon: Calendar },
   { href: "/analytics", label: "Analytics", icon: BarChart3 },
@@ -54,8 +61,11 @@ function SidebarContent({ pathname, onSignOut, conversationCount, onLinkClick })
 
       {/* Navigation */}
       <nav className="flex-1 px-4 py-4 space-y-1 overflow-y-auto">
-        {mainNavLinks.map(({ href, label, icon: Icon, showBadge }) => {
-          const isActive = pathname === href || pathname.startsWith(href + "/");
+        {mainNavLinks.map(({ href, label, icon: Icon, showBadge, activePaths }) => {
+          const matchPaths = activePaths || [href];
+          const isActive = matchPaths.some(
+            (p) => pathname === p || pathname.startsWith(p + "/")
+          );
           return (
             <Link
               key={href}
