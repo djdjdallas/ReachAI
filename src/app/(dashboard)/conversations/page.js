@@ -21,11 +21,13 @@ import {
   Trash2,
   AlertCircle,
   Plus,
+  Smartphone,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   Select,
@@ -44,6 +46,88 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 import StatusBadge from "@/components/app/StatusBadge";
+
+// Banner rendered at the top of a thread flagged missing_outbound_context —
+// surfaces a paste-the-original-DM CTA so the AI can be backfilled with full
+// context. On save, calls /api/native-send/backfill which links the new row
+// to this conversation; realtime subscription on conversations then refreshes
+// selectedConvo and this banner unmounts naturally.
+function BackfillBanner({ conversation }) {
+  const [dmText, setDmText] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [errorMsg, setErrorMsg] = useState(null);
+
+  async function handleSave() {
+    if (!dmText.trim() || saving) return;
+    setSaving(true);
+    setErrorMsg(null);
+    try {
+      const res = await fetch("/api/native-send/backfill", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          conversationId: conversation.id,
+          dm_text: dmText,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setErrorMsg(data.error || "Failed to save.");
+        return;
+      }
+      // Don't reset dmText — realtime will unmount this banner via the
+      // missing_outbound_context flag clearing. If the realtime sub is slow,
+      // showing the saved text briefly is better than a blank field flash.
+    } catch (err) {
+      setErrorMsg(err.message || "Network error.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="px-6 py-3 border-b border-stone-100 bg-amber-50">
+      <div className="flex items-start gap-3">
+        <AlertCircle className="w-4 h-4 text-amber-600 mt-0.5 shrink-0" />
+        <div className="flex-1 space-y-2">
+          <p className="text-xs text-amber-800 leading-relaxed">
+            <span className="font-bold">Backfill needed: </span>
+            did you send this lead a DM from native Instagram? Paste it here so
+            the AI has full context for this conversation.
+          </p>
+          <Textarea
+            value={dmText}
+            onChange={(e) => setDmText(e.target.value)}
+            placeholder="Paste the exact DM you sent."
+            rows={3}
+            disabled={saving}
+            className="bg-white border-amber-200 focus-visible:ring-amber-400"
+          />
+          <div className="flex items-center justify-between gap-2">
+            <p className="text-[11px] text-amber-700">
+              {errorMsg ? errorMsg : "Saving links the DM to this thread so the AI's next reply has both turns."}
+            </p>
+            <Button
+              size="sm"
+              onClick={handleSave}
+              disabled={saving || !dmText.trim()}
+              className="bg-amber-600 hover:bg-amber-700 text-white"
+            >
+              {saving ? (
+                <>
+                  <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
+                  Saving...
+                </>
+              ) : (
+                "Save"
+              )}
+            </Button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 function getInitials(name) {
   if (!name) return "?";
@@ -875,6 +959,11 @@ function ConversationsPage() {
                 </div>
               )}
 
+            {/* Native-send backfill banner */}
+            {selectedConvo.missing_outbound_context && (
+              <BackfillBanner conversation={selectedConvo} />
+            )}
+
             {/* Summary Panel */}
             <div className="px-6 py-3 border-b border-stone-100 flex items-center gap-3">
               {selectedConvo.lead_temperature && tempColors[selectedConvo.lead_temperature] ? (
@@ -957,8 +1046,17 @@ function ConversationsPage() {
                     // to `role` for legacy rows where `source` is null —
                     // pre-migration manual replies will render as "AI".
                     const isManualReply = msg.source === "manual";
-                    const outboundLabel = isManualReply ? "You" : "AI";
-                    const OutboundIcon = isManualReply ? User : Bot;
+                    const isNativeSend = msg.source === "native_send";
+                    const outboundLabel = isManualReply
+                      ? "You"
+                      : isNativeSend
+                        ? "Sent from IG mobile"
+                        : "AI";
+                    const OutboundIcon = isManualReply
+                      ? User
+                      : isNativeSend
+                        ? Smartphone
+                        : Bot;
                     return (
                       <div key={msg.id}>
                         {isOutbound ? (

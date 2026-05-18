@@ -83,10 +83,12 @@ async function handleMetaWebhook(body, rawBody, request) {
           .single();
 
         let senderName = null;
+        let senderUsername = null;
         if (ownerUser?.meta_page_access_token) {
           const pageToken = decryptToken(ownerUser.meta_page_access_token);
           const profile = await getParticipantProfile(senderId, pageToken);
           senderName = profile?.name || profile?.username || null;
+          senderUsername = profile?.username || null;
         }
 
         await processIncomingMessage({
@@ -95,6 +97,7 @@ async function handleMetaWebhook(body, rawBody, request) {
           senderId,
           messageText,
           senderName,
+          senderUsername,
           providerMessageId: event.message?.mid || null,
         });
       } catch (err) {
@@ -237,6 +240,106 @@ async function insertMessageIfNew(supabase, { conversation_id, role, content, pr
   return { data, error, duplicate: false };
 }
 
+// Native Send bridge: when a conversation is first created from an inbound
+// reply, check whether the user pre-logged a manual cold DM to this lead. If
+// matched, inject the original outbound as the first assistant message so the
+// AI sees both turns on its first generation. If not matched, flag the
+// conversation so the dashboard can surface a backfill banner.
+//
+// Runs only on the first inbound that creates a conversation. Subsequent
+// replies skip this path so a 2nd reply never re-matches a different unmatched
+// native-send record.
+async function attachNativeSendContext(supabase, {
+  userId,
+  userEmail,
+  conversationId,
+  senderId,
+  senderUsername,
+}) {
+  try {
+    const { data: claimed, error: matchError } = await supabase.rpc(
+      "match_and_claim_native_send",
+      {
+        p_user_id: userId,
+        p_conversation_id: conversationId,
+        p_recipient_ig_user_id: senderId || null,
+        p_recipient_handle: senderUsername || null,
+      }
+    );
+
+    if (matchError) {
+      log.warn("[webhook] native_send match RPC failed:", matchError.code);
+      return { matched: false, missing: false };
+    }
+
+    const row = Array.isArray(claimed) && claimed.length > 0 ? claimed[0] : null;
+
+    if (!row) {
+      // Flag the conversation for backfill, but ONLY if origin is still
+      // 'clinchd_sent'. If the dashboard's opportunistic backfill or banner
+      // save raced ahead and already set origin='native_send', we must not
+      // overwrite their cleared flag.
+      const { data: flagged, error: flagError } = await supabase
+        .from("conversations")
+        .update({ missing_outbound_context: true })
+        .eq("id", conversationId)
+        .eq("origin", "clinchd_sent")
+        .select("id");
+      if (flagError) {
+        log.error("[webhook] flag missing_outbound_context failed:", flagError.code);
+        return { matched: false, missing: false };
+      }
+      if (!flagged || flagged.length === 0) {
+        // A racing path already matched this conversation. Nothing to do.
+        return { matched: false, missing: false };
+      }
+      getPostHogClient().capture({
+        distinctId: userEmail || userId,
+        event: "native_send_missing_context",
+        properties: { conversation_id: conversationId },
+      });
+      return { matched: false, missing: true };
+    }
+
+    // Inject the original outbound as the first message in the thread. Use the
+    // original sent_at as created_at so it sorts before the lead's reply when
+    // history is loaded with ORDER BY created_at ASC.
+    const { error: injectError } = await supabase.from("messages").insert({
+      conversation_id: conversationId,
+      role: "assistant",
+      content: row.dm_text,
+      source: "native_send",
+      created_at: row.sent_at,
+    });
+    if (injectError) {
+      log.error("[webhook] native_send message inject failed:", injectError.code);
+      return { matched: false, missing: false };
+    }
+
+    const { error: originError } = await supabase
+      .from("conversations")
+      .update({ origin: "native_send", missing_outbound_context: false })
+      .eq("id", conversationId);
+    if (originError) {
+      log.error("[webhook] set conversation origin failed:", originError.code);
+      return { matched: false, missing: false };
+    }
+
+    getPostHogClient().capture({
+      distinctId: userEmail || userId,
+      event: "native_send_matched",
+      properties: {
+        conversation_id: conversationId,
+        native_send_id: row.id,
+      },
+    });
+    return { matched: true, missing: false };
+  } catch (err) {
+    log.error("[webhook] attachNativeSendContext threw:", err?.message);
+    return { matched: false, missing: false };
+  }
+}
+
 // ── Shared message processing logic ─────────────────────────────────────
 
 async function processIncomingMessage({
@@ -245,6 +348,7 @@ async function processIncomingMessage({
   senderId,
   messageText,
   senderName,
+  senderUsername,
   providerMessageId,
 }) {
   const supabase = getSupabaseAdmin();
@@ -296,6 +400,7 @@ async function processIncomingMessage({
 
   // Find or create conversation by instagram_sender_id
   let conversation;
+  let conversationWasJustCreated = false;
 
   const { data: conv } = await supabase
     .from("conversations")
@@ -329,6 +434,28 @@ async function processIncomingMessage({
       properties: { conversation_id: newConv.id, sender_name: senderName },
     });
     conversation = newConv;
+    conversationWasJustCreated = true;
+  }
+
+  // Native Send context bridge — runs once, on conversation creation. Sets
+  // origin='native_send' on match, or missing_outbound_context=true on miss.
+  // Must run BEFORE history load so generateReply sees both turns on its
+  // first call for this lead. We patch the local conversation object so step
+  // 3 (system prompt) reads the updated origin without a refetch.
+  if (conversationWasJustCreated) {
+    const result = await attachNativeSendContext(supabase, {
+      userId: user.id,
+      userEmail: user.email,
+      conversationId: conversation.id,
+      senderId,
+      senderUsername,
+    });
+    if (result?.matched) {
+      conversation.origin = "native_send";
+      conversation.missing_outbound_context = false;
+    } else if (result?.missing) {
+      conversation.missing_outbound_context = true;
+    }
   }
 
   // ── Global AI mode gate ─────────────────────────────────────────────
@@ -471,6 +598,7 @@ async function processIncomingMessage({
   // Build prompt and generate reply
   const systemPrompt = buildSystemPrompt(sc, user.calendly_url, {
     voiceProfile: user.voice_profile,
+    conversation,
   });
 
   let aiReply;

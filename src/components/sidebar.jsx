@@ -15,6 +15,7 @@ import {
   LogOut,
   Menu,
   MessageSquare,
+  Send,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -28,6 +29,7 @@ import AccountUsageWidget from "@/components/app/AccountUsageWidget";
 const mainNavLinks = [
   { href: "/dashboard", label: "Inbox", icon: Inbox, showBadge: true },
   { href: "/conversations", label: "Conversations", icon: MessageSquare },
+  { href: "/native-send", label: "Native Send", icon: Send },
   { href: "/leads", label: "Leads", icon: Users },
   { href: "/calendar", label: "Calendar", icon: Calendar },
   { href: "/analytics", label: "Analytics", icon: BarChart3 },

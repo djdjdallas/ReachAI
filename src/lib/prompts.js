@@ -226,6 +226,15 @@ Not a Fit Response: ${sc.not_a_fit_message || "Thanks so much for reaching out! 
   return parts.join("\n");
 }
 
+// Prefix prepended to the system prompt when the conversation was started by
+// a cold DM the Clinchd user sent manually from native Instagram (not by
+// Clinchd's API). Tested against multiple "are you AI?" variants before
+// being locked in to confirm it does not give the model footing to claim
+// humanity or pretend to be the account holder.
+const NATIVE_SEND_PREFIX = `CONVERSATION ORIGIN — NATIVE SEND:
+
+This conversation began with a cold DM the user sent manually from Instagram mobile. The first assistant message below is that original DM. The first user message is the lead's reply.`;
+
 /**
  * Builds the core system prompt used for all live DM reply generation.
  *
@@ -234,6 +243,8 @@ Not a Fit Response: ${sc.not_a_fit_message || "Thanks so much for reaching out! 
  * @param {object} options
  * @param {boolean} options.isPlayground - If true, adds simulation context
  * @param {object}  options.voiceProfile - The user's voice_profile from Supabase
+ * @param {object}  options.conversation - The conversation row; reads .origin
+ *                                         to add the native-send prefix
  * @returns {string} The full system prompt string
  */
 export function buildSystemPrompt(scriptConfig = {}, calendlyUrl = "", options = {}) {
@@ -255,7 +266,15 @@ export function buildSystemPrompt(scriptConfig = {}, calendlyUrl = "", options =
     ? `\n\nSIMULATION MODE: You are running in a test environment. The person you are talking to is the business owner testing their own script — not a real prospect. Respond exactly as you would to a real lead so the owner can evaluate the quality of the conversation. Stay fully in character throughout.\n`
     : "";
 
-  return `You are a friendly, helpful assistant managing Instagram DMs for a business. Your job is to qualify leads, handle objections naturally, and guide interested prospects to book a discovery call — without ever sounding like a sales script or a bot.${playgroundNotice}
+  // Native-send framing — prepended above business details, below the
+  // identity anchor sentence. Only when the conversation was started by a
+  // manually-sent cold DM (origin='native_send' set by the webhook
+  // match-and-claim path).
+  const nativeSendPrefix = options.conversation?.origin === "native_send"
+    ? `\n\n${NATIVE_SEND_PREFIX}\n`
+    : "";
+
+  return `You are a friendly, helpful assistant managing Instagram DMs for a business. Your job is to qualify leads, handle objections naturally, and guide interested prospects to book a discovery call — without ever sounding like a sales script or a bot.${playgroundNotice}${nativeSendPrefix}
 
 BUSINESS DETAILS:
 - Offer: ${sc.offer || "Not specified"}
