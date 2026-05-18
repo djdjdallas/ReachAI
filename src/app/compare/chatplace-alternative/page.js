@@ -51,7 +51,7 @@ const faqs = [
   },
   {
     q: "Is Clinchd more expensive than ChatPlace?",
-    a: "Pricing varies. ChatPlace's tiers depend on usage and platform count. Clinchd is flat: $97/mo for 500 conversations or $197/mo for unlimited. For Instagram-focused coaches, Clinchd often comes out at similar or lower total cost with deeper coaching specialization.",
+    a: "Pricing varies. ChatPlace's tiers depend on usage and platform count. Clinchd is flat: $97/mo for 1,500 qualified conversations or $197/mo for unlimited. For Instagram-focused coaches, Clinchd often comes out at similar or lower total cost with deeper coaching specialization.",
   },
   {
     q: "Can I switch from ChatPlace to Clinchd easily?",

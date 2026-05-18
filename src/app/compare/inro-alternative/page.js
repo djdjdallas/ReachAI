@@ -129,7 +129,7 @@ export default function InroAlternativePage() {
                 You want predictable monthly cost
               </h3>
               <p>
-                Inro's pricing scales with usage. Clinchd is flat-rate at $97/mo for 500 conversations or $197/mo for unlimited. When your Reel goes viral and 2,000 DMs hit in a weekend, your Clinchd bill stays the same. Predictable pricing matters when planning ad spend, content cadence, and growth.
+                Inro's pricing scales with usage. Clinchd is flat-rate at $97/mo for 1,500 qualified conversations or $197/mo for unlimited. When your Reel goes viral and 2,000 DMs hit in a weekend, your Clinchd bill stays the same. Predictable pricing matters when planning ad spend, content cadence, and growth.
               </p>
             </div>
           </div>

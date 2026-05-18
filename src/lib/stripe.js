@@ -14,7 +14,9 @@ export const PLANS = {
     name: "Clinchd Base",
     price: 9700, // $97.00
     priceId: process.env.STRIPE_BASE_PRICE_ID,
-    dmLimit: 500,
+    dmLimit: 1500,
+    // Stripe-side product description: "1,500 qualified conversations per month."
+    // Update in Stripe dashboard manually — not pushed from this file.
   },
   unlimited: {
     name: "Clinchd Unlimited",

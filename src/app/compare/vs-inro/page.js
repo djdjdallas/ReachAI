@@ -19,7 +19,7 @@ export const metadata = {
 
 const comparisonRows = [
   { feature: "Built for", competitor: "Brands running campaigns", clinchd: "Coaches booking discovery calls" },
-  { feature: "Pricing model", competitor: "Per activated contact (scales up)", clinchd: "Flat $97 (500 DMs) or $197 unlimited" },
+  { feature: "Pricing model", competitor: "Per activated contact (scales up)", clinchd: "Flat $97 (1,500 qualified conversations) or $197 unlimited" },
   { feature: "Starting price", competitor: "€12.99/mo (low-tier contacts)", clinchd: "$97/mo flat" },
   { feature: "Cost at 2,000 DMs/month", competitor: "Significantly more than €12.99", clinchd: "$197 — same as 200 or 20,000 DMs" },
   { feature: "AI training", competitor: "Generic brand-voice templates", clinchd: "Trained on your exact sales script" },
@@ -161,8 +161,8 @@ export default function VsInro() {
                 That&apos;s fine for a brand piloting a small campaign. For a coach who does 2,000
                 DMs in a month — entirely normal after a Reel goes well — Inro&apos;s bill climbs
                 with every additional activated contact, and the real discounts only unlock with
-                an annual commitment. Clinchd&apos;s Unlimited plan is $197/mo flat. 500 DMs or
-                50,000 DMs, the bill is the same. Your viral Reel shouldn&apos;t be a billing event.
+                an annual commitment. Clinchd&apos;s Unlimited plan is $197/mo flat. 1,500 qualified
+                conversations or 50,000, the bill is the same. Your viral Reel shouldn&apos;t be a billing event.
               </p>
             </div>
           </div>
@@ -258,7 +258,7 @@ export default function VsInro() {
               </div>
               <div className="text-3xl font-black mb-2">$197/mo. Flat.</div>
               <p className="text-white/90 text-sm leading-relaxed">
-                500 DMs or 50,000 DMs, the bill is $197. No per-contact fees, no annual lock-in,
+                1,500 qualified conversations or 50,000, the bill is $197. No per-contact fees, no annual lock-in,
                 no surprise charges when a Reel hits 500K views. Cancel anytime.
               </p>
             </div>

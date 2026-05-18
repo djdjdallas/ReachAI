@@ -10,7 +10,7 @@ const basePlan = {
   price: "$97",
   description: "For coaches ready to stop losing leads in their DMs.",
   features: [
-    "500 DMs / month",
+    "1,500 qualified conversations / month",
     "AI setter replies in your voice",
     "Lead qualification",
     "Auto-book discovery calls",
@@ -188,7 +188,7 @@ export default function Pricing() {
                     Clinchd Unlimited
                   </div>
                   <div className="text-2xl font-black mb-1">$197/mo. Flat.</div>
-                  <div className="text-xs text-white/90">500 DMs or 50,000. Same bill.</div>
+                  <div className="text-xs text-white/90">1,500 conversations or 50,000. Same bill.</div>
                 </div>
               </div>
             </div>

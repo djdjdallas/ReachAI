@@ -490,7 +490,7 @@ async function processIncomingMessage({
   }
 
   // Atomic DM limit check — increment first, then verify
-  const dmLimit = user.plan === "unlimited" ? Infinity : 500;
+  const dmLimit = user.plan === "unlimited" ? Infinity : 1500;
   if (dmLimit !== Infinity) {
     const { data: newCount, error: rpcError } = await supabase.rpc("increment_dm_count", { uid: user.id });
     if (rpcError) {

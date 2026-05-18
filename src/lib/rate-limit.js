@@ -55,7 +55,7 @@ export function sleep(ms) {
 }
 
 /**
- * Check if user has exceeded their monthly DM limit.
+ * Check if user has exceeded their monthly conversation limit.
  */
 export async function checkDmLimit(supabase, userId, plan = "base") {
   const now = new Date();
@@ -69,13 +69,13 @@ export async function checkDmLimit(supabase, userId, plan = "base") {
     .eq("conversation_id.user_id", userId);
 
   const limits = {
-    base: 500,
+    base: 1500,
     unlimited: Infinity,
   };
 
   return {
     used: count || 0,
-    limit: limits[plan] || 500,
-    exceeded: (count || 0) >= (limits[plan] || 500),
+    limit: limits[plan] || 1500,
+    exceeded: (count || 0) >= (limits[plan] || 1500),
   };
 }

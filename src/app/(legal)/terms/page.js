@@ -107,11 +107,12 @@ export default function TermsPage() {
           </li>
         </ul>
 
-        <h2>8. DM Limits</h2>
+        <h2>8. Conversation Limits</h2>
         <p>
-          Your subscription plan includes a monthly limit on AI-generated DM responses.
-          Once the limit is reached, AI responses will be paused until the next billing
-          cycle. You can monitor your usage from the dashboard.
+          Your subscription plan includes a monthly cap on AI-generated qualified
+          conversations. When the cap is reached, in-flight conversations continue
+          to be handled, and new conversations are paused until the next billing
+          cycle or until you upgrade. You can monitor your usage from the dashboard.
         </p>
 
         <h2>9. Intellectual Property</h2>

@@ -113,7 +113,7 @@ export default function TailorTalkAlternativePage() {
                 Public pricing
               </h3>
               <p>
-                Coaching businesses don't have a procurement department. Decisions get made by the coach, often in a single afternoon. A tool that requires a sales call to learn the price doesn't fit that workflow. Clinchd publishes pricing on the homepage, the comparison pages, and every signup flow. $97/mo for 500 conversations, $197/mo for unlimited. No call required.
+                Coaching businesses don't have a procurement department. Decisions get made by the coach, often in a single afternoon. A tool that requires a sales call to learn the price doesn't fit that workflow. Clinchd publishes pricing on the homepage, the comparison pages, and every signup flow. $97/mo for 1,500 qualified conversations, $197/mo for unlimited. No call required.
               </p>
             </div>
             <div>

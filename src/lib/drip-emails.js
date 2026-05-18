@@ -176,7 +176,7 @@ export const DRIP_SEQUENCE = [
   ${p("<strong style=\"color:#1c1917;\">Quick FAQ:</strong>")}
   ${tipBox("<strong>AI sounds off?</strong> Tweak your script or update your voice profile.")}
   ${tipBox("<strong>Want to pause?</strong> Switch to Handoff mode in Settings \u2014 messages still get logged.")}
-  ${tipBox("<strong>Need more DMs?</strong> Upgrade to Unlimited for uncapped conversations.")}
+  ${tipBox("<strong>Need more conversations?</strong> Upgrade to Unlimited for uncapped qualified conversations.")}
   ${button("View My Dashboard", "{{app_url}}/dashboard")}
   ${divider()}
   ${p("<span style=\"font-size:14px;color:#a8a29e;\">Questions? Reply any time \u2014 we\u2019re here to help you close.</span>")}

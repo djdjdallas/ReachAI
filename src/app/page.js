@@ -68,7 +68,7 @@ const softwareSchema = {
       price: "97",
       priceCurrency: "USD",
       priceValidUntil: "2027-12-31",
-      description: "500 DMs/month, AI setter, lead qualification, call booking, email support.",
+      description: "1,500 qualified conversations/month, AI setter, lead qualification, call booking, email support.",
     },
     {
       "@type": "Offer",

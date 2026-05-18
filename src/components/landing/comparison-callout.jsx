@@ -3,7 +3,7 @@ import { ArrowRight, Check, X, Minus } from "lucide-react";
 
 const rows = [
   { feature: "Setup time", manychat: "5+ hours", clinchd: "Under 30 minutes" },
-  { feature: "Pricing", manychat: "Per contact, scales with every DM", clinchd: "Flat $97/mo (500 DMs) or $197 unlimited" },
+  { feature: "Pricing", manychat: "Per contact, scales with every DM", clinchd: "Flat $97/mo (1,500 qualified conversations) or $197 unlimited" },
   { feature: "AI quality", manychat: "Rule-based flows", clinchd: "True AI conversations" },
   { feature: "Instagram-native", manychat: "Adapted from Messenger", clinchd: "Built for Instagram" },
   { feature: "Designed for coaches", manychat: "Generic platform", clinchd: "100% coach-focused" },

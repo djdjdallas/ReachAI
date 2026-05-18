@@ -6,7 +6,7 @@ import { createClient } from "@/lib/supabase/client";
 import { getDmLimit } from "@/lib/plans";
 
 export default function AccountUsageWidget() {
-  const [usage, setUsage] = useState({ current: 0, limit: 500, percent: 0 });
+  const [usage, setUsage] = useState({ current: 0, limit: 1500, percent: 0 });
 
   useEffect(() => {
     const supabase = createClient();

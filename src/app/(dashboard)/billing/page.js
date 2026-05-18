@@ -36,9 +36,9 @@ const PLANS = [
     name: "Base Plan",
     price: "$97",
     period: "/mo",
-    dmLimit: "500 DMs/month",
+    dmLimit: "1,500 qualified conversations/month",
     features: [
-      "500 AI-assisted DM responses per month",
+      "1,500 AI-assisted qualified conversations per month",
       "AI-assisted lead qualification",
       "Calendar-connected call booking",
       "Script builder with AI generation",
@@ -52,9 +52,9 @@ const PLANS = [
     name: "Unlimited Plan",
     price: "$197",
     period: "/mo",
-    dmLimit: "Unlimited DMs",
+    dmLimit: "Unlimited conversations",
     features: [
-      "Unlimited AI-assisted DM responses",
+      "Unlimited AI-assisted conversations",
       "AI-assisted lead qualification",
       "Calendar-connected call booking",
       "Script builder with AI generation",
@@ -260,8 +260,8 @@ export default function BillingPage() {
               <span className="text-3xl font-bold">{dmCount}</span>
               <span className="text-sm text-muted-foreground">
                 {isUnlimited
-                  ? "DMs sent (Unlimited)"
-                  : `of ${dmLimit} DMs used`}
+                  ? "conversations (Unlimited)"
+                  : `of ${dmLimit.toLocaleString()} conversations used`}
               </span>
             </div>
             {!isUnlimited && (
@@ -269,13 +269,19 @@ export default function BillingPage() {
                 <Progress value={usagePercent} className="h-3" />
                 <p className="text-xs text-muted-foreground">
                   {dmLimit - dmCount > 0
-                    ? `${dmLimit - dmCount} DMs remaining this month`
-                    : "Monthly limit reached. Upgrade to continue sending DMs."}
+                    ? `${(dmLimit - dmCount).toLocaleString()} conversations remaining this month`
+                    : `You've hit your monthly cap of ${dmLimit.toLocaleString()} conversations. Existing conversations continue — upgrade to Unlimited to handle new ones.`}
                 </p>
-                {usagePercent >= 80 && dmLimit - dmCount > 0 && (
+                {usagePercent >= 90 && dmLimit - dmCount > 0 && (
                   <p className="text-sm text-yellow-600 dark:text-yellow-400">
-                    You&apos;re approaching your monthly DM limit. Consider
-                    upgrading to Unlimited.
+                    You&apos;re at {dmCount.toLocaleString()} / {dmLimit.toLocaleString()} conversations.
+                    To make sure no leads slip, upgrade to Unlimited now.
+                  </p>
+                )}
+                {usagePercent >= 75 && usagePercent < 90 && (
+                  <p className="text-sm text-yellow-600 dark:text-yellow-400">
+                    You&apos;ve used {dmCount.toLocaleString()} of {dmLimit.toLocaleString()} conversations
+                    this cycle. Upgrade to Unlimited if you&apos;d like to remove the cap.
                   </p>
                 )}
               </>
@@ -283,7 +289,7 @@ export default function BillingPage() {
             {isUnlimited && (
               <div className="flex items-center gap-2 text-sm text-muted-foreground">
                 <Zap className="h-4 w-4 text-primary" />
-                Unlimited DMs with your current plan
+                Unlimited conversations with your current plan
               </div>
             )}
           </CardContent>

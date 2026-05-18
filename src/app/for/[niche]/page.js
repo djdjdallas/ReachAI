@@ -716,7 +716,7 @@ export default async function NichePage({ params }) {
         price: "97",
         priceCurrency: "USD",
         name: "Base Plan",
-        description: "500 DM conversations per month",
+        description: "1,500 qualified conversations per month",
       },
       {
         "@type": "Offer",
@@ -841,7 +841,7 @@ export default async function NichePage({ params }) {
             <div className="bg-white rounded-[2rem] border border-stone-100 p-8 soft-shadow">
               <p className="text-sm font-bold uppercase tracking-widest text-stone-400 mb-2">Base</p>
               <p className="text-4xl font-black text-stone-900 mb-2">$97<span className="text-lg font-bold text-stone-400">/mo</span></p>
-              <p className="text-sm text-stone-500">500 DM conversations/month</p>
+              <p className="text-sm text-stone-500">1,500 qualified conversations/month</p>
             </div>
             <div className="bg-stone-900 rounded-[2rem] p-8 text-white">
               <p className="text-sm font-bold uppercase tracking-widest text-stone-400 mb-2">Unlimited</p>
