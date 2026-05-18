@@ -3,11 +3,9 @@ import { createClient } from "@/lib/supabase/server";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import { classifyComment, CLASSIFIER_MODEL, CLASSIFIER_VERSION } from "@/lib/classifier";
 import { buildContextBundle } from "@/lib/contextBundle";
-import { isIntentClassifierEnabled } from "@/lib/featureFlags";
 import { decideAction } from "@/lib/comment-trigger-rules";
 import { getPostHogClient } from "@/lib/posthog-server";
-// eslint-disable-next-line no-unused-vars
-import { hasCommentToDM } from "@/lib/plans";
+import { canUseCommentToDM } from "@/lib/comment-to-dm-gate";
 
 // POST /api/admin/classify
 // Body: {
@@ -37,17 +35,15 @@ export async function POST(request) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    if (!isIntentClassifierEnabled(user.email)) {
+    const { data: profile } = await supabase
+      .from("users")
+      .select("plan, email")
+      .eq("id", user.id)
+      .maybeSingle();
+
+    if (!canUseCommentToDM({ plan: profile?.plan, email: user.email })) {
       return NextResponse.json({ error: "Not found" }, { status: 404 });
     }
-
-    // TODO(comment-to-DM gate): once the feature un-shadows post Meta App
-    // Review, replace the email allowlist above with a plan-tier gate:
-    //   const { data: profile } = await supabase
-    //     .from("users").select("plan").eq("id", user.id).single();
-    //   if (!hasCommentToDM(profile?.plan)) {
-    //     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-    //   }
 
     const body = await request.json().catch(() => ({}));
     const caption = typeof body.caption === "string" ? body.caption : "";

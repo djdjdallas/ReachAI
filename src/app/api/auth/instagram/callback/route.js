@@ -141,13 +141,17 @@ export async function GET(request) {
     // firing incoming DM events. Non-blocking: log failures and continue to
     // the redirect — the user can reconnect / re-subscribe later if needed.
     try {
+      // IMPORTANT: This field list must match what's declared in the Meta App Dashboard.
+      // `comments` requires the `instagram_business_manage_comments` permission to be approved.
+      // Until that permission is approved, Meta will accept the subscription but only deliver
+      // `messages` and `messaging_postbacks` events in production. Development mode accepts all.
       const subRes = await fetch(
         `https://graph.instagram.com/v21.0/${igbaId}/subscribed_apps`,
         {
           method: "POST",
           headers: { "Content-Type": "application/x-www-form-urlencoded" },
           body: new URLSearchParams({
-            subscribed_fields: "messages,messaging_postbacks",
+            subscribed_fields: "messages,messaging_postbacks,comments",
             access_token: accessToken,
           }),
         }

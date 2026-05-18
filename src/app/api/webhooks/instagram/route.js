@@ -7,6 +7,7 @@ import { decryptToken } from "@/lib/token-utils";
 import { sendHotLeadAlert, sendBookingAlert } from "@/lib/notifications";
 import { getPostHogClient } from "@/lib/posthog-server";
 import { log } from "@/lib/logger";
+import { handleCommentEvent } from "@/lib/webhooks/comment-event";
 
 // ── GET: Meta webhook verification ──────────────────────────────────────
 
@@ -46,17 +47,49 @@ export async function POST(request) {
 // ── Meta Instagram Messaging webhook ────────────────────────────────────
 
 async function handleMetaWebhook(body, rawBody, request) {
-  // Verify signature
+  // ── HMAC verification (fail-closed) ───────────────────────────────────
+  // Previously this branch logged a warning and accepted unverified bodies
+  // when INSTAGRAM_APP_SECRET was unset. A misconfigured deploy would then
+  // accept spoofed comment payloads. Now we 403 in every failure case.
+  //
+  // Dev escape hatch: when NODE_ENV !== "production" AND the request carries
+  // x-clinchd-dev-bypass matching WEBHOOK_DEV_BYPASS_TOKEN, accept the body.
+  // Lets the local simulation script POST without computing real HMACs.
   const signature = request.headers.get("x-hub-signature-256");
-  if (!process.env.INSTAGRAM_APP_SECRET) {
-    console.warn("INSTAGRAM_APP_SECRET not set — skipping signature verification");
+  const devBypassHeader = request.headers.get("x-clinchd-dev-bypass");
+  const devBypassToken = process.env.WEBHOOK_DEV_BYPASS_TOKEN;
+  const devBypassAllowed =
+    process.env.NODE_ENV !== "production" &&
+    devBypassToken &&
+    devBypassHeader &&
+    devBypassHeader === devBypassToken;
+
+  if (devBypassAllowed) {
+    console.warn("[webhook] HMAC bypassed via x-clinchd-dev-bypass (non-production)");
+  } else if (!process.env.INSTAGRAM_APP_SECRET) {
+    console.error("[webhook] HMAC verification failed:", { reason: "missing_secret" });
+    return new Response("Forbidden", { status: 403 });
+  } else if (!signature) {
+    console.error("[webhook] HMAC verification failed:", { reason: "missing_signature" });
+    return new Response("Forbidden", { status: 403 });
   } else if (!verifyWebhookSignature(rawBody, signature)) {
-    return NextResponse.json({ error: "Invalid signature" }, { status: 403 });
+    console.error("[webhook] HMAC verification failed:", { reason: "invalid_signature" });
+    return new Response("Forbidden", { status: 403 });
   }
 
   const entries = body.entry || [];
 
   for (const entry of entries) {
+    // ── comments branch ────────────────────────────────────────────────
+    // Meta delivers comment events under entry.changes (not entry.messaging).
+    // handleCommentEvent does its own try/catch and never throws — keep this
+    // loop fast so we 200 OK before Meta retries.
+    for (const change of entry.changes || []) {
+      if (change.field === "comments") {
+        await handleCommentEvent(entry, change);
+      }
+    }
+
     const messaging = entry.messaging || [];
 
     for (const event of messaging) {

@@ -1,8 +1,6 @@
 import { notFound, redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { isIntentClassifierEnabled } from "@/lib/featureFlags";
-// eslint-disable-next-line no-unused-vars
-import { hasCommentToDM } from "@/lib/plans";
+import { canUseCommentToDM } from "@/lib/comment-to-dm-gate";
 import ClassifierPlayground from "./ClassifierPlayground";
 
 export const metadata = {
@@ -20,16 +18,15 @@ export default async function AdminClassifierPage() {
     redirect("/login");
   }
 
-  if (!isIntentClassifierEnabled(user.email)) {
+  const { data: profile } = await supabase
+    .from("users")
+    .select("plan, email")
+    .eq("id", user.id)
+    .maybeSingle();
+
+  if (!canUseCommentToDM({ plan: profile?.plan, email: user.email })) {
     notFound();
   }
-
-  // TODO(comment-to-DM gate): once Meta App Review approves
-  // instagram_manage_comments and this feature un-shadows, enforce the
-  // production plan gate here:
-  //   const { data: profile } = await supabase
-  //     .from("users").select("plan").eq("id", user.id).single();
-  //   if (!hasCommentToDM(profile?.plan)) notFound();
 
   const { data: activeOffer } = await supabase
     .from("creator_offers")

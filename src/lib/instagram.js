@@ -153,8 +153,12 @@ export async function getUserPagesWithInstagram(userAccessToken) {
  * Subscribes a Facebook Page to receive webhook events (messages, etc.).
  */
 export async function subscribePageToWebhooks(pageId, pageAccessToken) {
+  // IMPORTANT: This field list must match what's declared in the Meta App Dashboard.
+  // `comments` requires the `instagram_business_manage_comments` permission to be approved.
+  // Until that permission is approved, Meta will accept the subscription but only deliver
+  // `messages` and `messaging_postbacks` events in production. Development mode accepts all.
   const res = await fetch(
-    `${GRAPH_BASE}/${pageId}/subscribed_apps?subscribed_fields=messages,messaging_postbacks&access_token=${pageAccessToken}`,
+    `${GRAPH_BASE}/${pageId}/subscribed_apps?subscribed_fields=messages,messaging_postbacks,comments&access_token=${pageAccessToken}`,
     { method: "POST" }
   );
   const data = await res.json();
@@ -198,6 +202,72 @@ export async function sendInstagramMessage(igAccountId, recipientId, text, pageA
   }
 
   return data;
+}
+
+/**
+ * Sends a private reply to an Instagram comment via Meta's Messaging API.
+ *
+ * Uses the same /{igAccountId}/messages endpoint as sendInstagramMessage,
+ * but addresses the recipient by comment_id rather than IGSID. Required for
+ * comment-to-DM where we never see the commenter's IGSID directly.
+ *
+ * Meta enforces a 7-day window from the comment timestamp. After that, the
+ * Graph API returns error code 100 / subcode 2018278 ("comment is older
+ * than 7 days"). We also surface the "cannot reply to your own comment"
+ * case (subcode 2018065) and rate-limit errors so the caller can store an
+ * actionable reason in comment_to_dm_log.dispatch_error.
+ *
+ * @param {string} igAccountId    - Instagram Business Account ID
+ * @param {string} commentId      - The comment we're privately replying to
+ * @param {string} text           - Message text
+ * @param {string} pageAccessToken - Decrypted Page Access Token
+ * @returns {Promise<{success: boolean, messageId?: string, error?: string, retryable?: boolean}>}
+ */
+export async function sendPrivateReplyToComment(igAccountId, commentId, text, pageAccessToken) {
+  const url = `https://graph.instagram.com/${GRAPH_API_VERSION}/${igAccountId}/messages`;
+  let data;
+  try {
+    const res = await fetch(url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${pageAccessToken}`,
+      },
+      body: JSON.stringify({
+        recipient: { comment_id: commentId },
+        message: { text },
+      }),
+    });
+    data = await res.json().catch(() => ({}));
+  } catch (err) {
+    return { success: false, error: `network_error:${err?.message || "unknown"}`, retryable: true };
+  }
+
+  if (data?.error) {
+    const code = data.error.code;
+    const subcode = data.error.error_subcode;
+    const message = data.error.message || "unknown_error";
+    console.error("Instagram private-reply error:", { code, subcode, message });
+
+    if (code === 100 && subcode === 2018278) {
+      return { success: false, error: "stale_comment", retryable: false };
+    }
+    if (code === 10 && subcode === 2018065) {
+      return { success: false, error: "self_comment", retryable: false };
+    }
+    // Meta's rate-limit family: 4 (app), 17 (user), 32 (page), 613 (custom),
+    // plus the explicit "rate limited" subcode 2018109. Treat all as
+    // retryable so a future queue worker can re-attempt with backoff.
+    if (code === 4 || code === 17 || code === 32 || code === 613 || subcode === 2018109) {
+      return { success: false, error: "rate_limited", retryable: true };
+    }
+    return { success: false, error: message, retryable: false };
+  }
+
+  return {
+    success: true,
+    messageId: data?.message_id || data?.id || null,
+  };
 }
 
 /**

@@ -267,6 +267,24 @@ export async function classifyComment({
   recentCreatorReplies = [],
   imageUrl,
 }) {
+  // Kill switch: lets ops disable the classifier in production without a
+  // redeploy when Anthropic spikes, Meta limits trip, or we need to pause
+  // the comment pipeline. Default (unset or "true") = classifier runs.
+  if (process.env.COMMENT_CLASSIFIER_ENABLED === "false") {
+    return {
+      classification: {
+        class: "UNCERTAIN",
+        confidence: 0,
+        language: "unknown",
+        reasoning: "Classifier disabled via env",
+        signals: [],
+        skipped: true,
+      },
+      raw: { usage: {} },
+      latencyMs: 0,
+    };
+  }
+
   const anthropic = getAnthropic();
   const bundleText = [
     "POST CONTEXT BUNDLE (stable per post — use as ground truth for what the creator sells):",
