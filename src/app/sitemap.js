@@ -236,6 +236,12 @@ export default function sitemap() {
       changeFrequency: "monthly",
       priority: 0.3,
     },
+    {
+      url: `${baseUrl}/data-deletion`,
+      lastModified: new Date(),
+      changeFrequency: "yearly",
+      priority: 0.3,
+    },
     // Blog posts
     {
       url: `${baseUrl}/blog/best-manychat-alternative-for-coaches-2026`,

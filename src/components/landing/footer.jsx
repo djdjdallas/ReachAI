@@ -80,6 +80,9 @@ export default function Footer() {
             <Link href="/terms" className="text-stone-300 text-[13px] font-bold hover:text-[#ff7e67] transition-colors">
               Terms
             </Link>
+            <Link href="/data-deletion" className="text-stone-300 text-[13px] font-bold hover:text-[#ff7e67] transition-colors">
+              Data Deletion
+            </Link>
           </div>
           <div className="flex items-center gap-8 text-stone-300">
             <a href="#" className="hover:text-[#ff7e67] text-xl transition-colors">

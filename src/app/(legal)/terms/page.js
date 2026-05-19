@@ -8,7 +8,7 @@ export default function TermsPage() {
     <div className="min-h-screen bg-background px-4 py-16">
       <div className="mx-auto max-w-3xl prose prose-neutral dark:prose-invert">
         <h1>Terms of Service</h1>
-        <p className="text-muted-foreground">Last updated: March 27, 2026</p>
+        <p className="text-muted-foreground">Last updated: May 19, 2026</p>
 
         <h2>1. Acceptance of Terms</h2>
         <p>
@@ -73,7 +73,21 @@ export default function TermsPage() {
           </li>
         </ul>
 
-        <h2>6. Acceptable Use</h2>
+        <h2>6. Comment Review and AI-Assisted Replies</h2>
+        <p>
+          Clinchd&apos;s comment-to-DM feature reviews public comments on Instagram posts
+          you have explicitly enabled for review. The AI classifies the intent of each
+          comment and, when configured, sends private replies on your behalf using your
+          saved sales script and offer information.
+        </p>
+        <p>
+          You are responsible for the content of any reply Clinchd sends on your behalf.
+          You agree not to use Clinchd for spam, harassment, or any purpose that violates
+          Instagram&apos;s Platform Policy. You can disable comment review for any post at
+          any time from your dashboard.
+        </p>
+
+        <h2>7. Acceptable Use</h2>
         <p>You agree not to use the Service to:</p>
         <ul>
           <li>Send spam, unsolicited messages, or engage in harassment.</li>
@@ -87,14 +101,14 @@ export default function TermsPage() {
           </li>
         </ul>
 
-        <h2>7. Subscription and Billing</h2>
+        <h2>8. Subscription and Billing</h2>
         <ul>
           <li>
             The Service is offered on a subscription basis with pricing as displayed on
             our website.
           </li>
           <li>
-            Subscriptions renew automatically unless cancelled before the renewal date.
+            Subscriptions renew on a recurring basis unless cancelled before the renewal date.
           </li>
           <li>All payments are processed securely through Stripe.</li>
           <li>
@@ -107,22 +121,22 @@ export default function TermsPage() {
           </li>
         </ul>
 
-        <h2>8. Conversation Limits</h2>
+        <h2>9. Conversation Limits</h2>
         <p>
           Your subscription plan includes a monthly cap on AI-generated qualified
           conversations. When the cap is reached, in-flight conversations continue
           to be handled, and new conversations are paused until the next billing
-          cycle or until you upgrade. You can monitor your usage from the dashboard.
+          cycle or until you upgrade. You can review your usage from the dashboard.
         </p>
 
-        <h2>9. Intellectual Property</h2>
+        <h2>10. Intellectual Property</h2>
         <p>
           The Clinchd platform, including its design, code, and AI models, is owned by us
           and protected by intellectual property laws. Your script configurations, voice
           profiles, and business content remain your property.
         </p>
 
-        <h2>10. Limitation of Liability</h2>
+        <h2>11. Limitation of Liability</h2>
         <p>
           To the maximum extent permitted by law, Clinchd shall not be liable for any
           indirect, incidental, special, consequential, or punitive damages, including but
@@ -135,7 +149,7 @@ export default function TermsPage() {
           AI-assisted messaging.
         </p>
 
-        <h2>11. Disclaimer of Warranties</h2>
+        <h2>12. Disclaimer of Warranties</h2>
         <p>
           The Service is provided &quot;as is&quot; and &quot;as available&quot; without
           warranties of any kind, either express or implied. We do not guarantee that AI
@@ -143,28 +157,28 @@ export default function TermsPage() {
           business outcome.
         </p>
 
-        <h2>12. Termination</h2>
+        <h2>13. Termination</h2>
         <p>
           We reserve the right to suspend or terminate your account at any time for
           violation of these Terms. You may cancel your account at any time through your
           account settings or by contacting support@clinchd.com.
         </p>
 
-        <h2>13. Changes to Terms</h2>
+        <h2>14. Changes to Terms</h2>
         <p>
           We may update these Terms from time to time. We will notify you of material
           changes via email or through the Service. Continued use of the Service after
           changes constitutes acceptance of the updated Terms.
         </p>
 
-        <h2>14. Governing Law</h2>
+        <h2>15. Governing Law</h2>
         <p>
           These Terms shall be governed by and construed in accordance with the laws of
           the United States. Any disputes arising under these Terms shall be resolved
           through binding arbitration.
         </p>
 
-        <h2>15. Contact Us</h2>
+        <h2>16. Contact Us</h2>
         <p>
           If you have questions about these Terms of Service, contact us at{" "}
           <a href="mailto:support@clinchd.com">support@clinchd.com</a>.
