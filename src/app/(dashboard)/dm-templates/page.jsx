@@ -22,7 +22,7 @@ export default async function DmTemplatesPage() {
 
   const { data: profile } = await supabase
     .from("users")
-    .select("plan, email")
+    .select("plan, email, calendly_url")
     .eq("id", user.id)
     .maybeSingle();
 
@@ -56,17 +56,55 @@ export default async function DmTemplatesPage() {
   }
 
   const admin = getSupabaseAdmin();
-  const { data: rows } = await admin
-    .from("dm_templates")
-    .select("intent_class, template")
-    .eq("creator_id", user.id);
+
+  // Parallel: templates, active offer, most-recent comment for preview seed.
+  const [templatesRes, offerRes, latestCommentRes] = await Promise.all([
+    admin
+      .from("dm_templates")
+      .select("intent_class, template")
+      .eq("creator_id", user.id),
+    admin
+      .from("creator_offers")
+      .select("offer_name")
+      .eq("creator_id", user.id)
+      .is("deprecated_at", null)
+      .order("updated_at", { ascending: false })
+      .limit(1)
+      .maybeSingle(),
+    admin
+      .from("comment_classifications")
+      .select("ig_commenter_username, posts ( caption )")
+      .eq("creator_id", user.id)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle(),
+  ]);
 
   const templates = {};
-  for (const row of rows || []) {
+  for (const row of templatesRes.data || []) {
     if (row?.intent_class && typeof row.template === "string") {
       templates[row.intent_class] = row.template;
     }
   }
 
-  return <TemplateEditor initialTemplates={templates} />;
+  const latestPostCaption =
+    latestCommentRes.data?.posts?.caption ||
+    latestCommentRes.data?.posts?.[0]?.caption ||
+    null;
+
+  const placeholderValues = {
+    commenterName: latestCommentRes.data?.ig_commenter_username || "sarah_example",
+    postCaption: latestPostCaption || "your latest post caption goes here…",
+    commenterIsSample: !latestCommentRes.data?.ig_commenter_username,
+    postCaptionIsSample: !latestPostCaption,
+    offerName: offerRes.data?.offer_name || null,
+    bookingLink: profile?.calendly_url || null,
+  };
+
+  return (
+    <TemplateEditor
+      initialTemplates={templates}
+      placeholderValues={placeholderValues}
+    />
+  );
 }

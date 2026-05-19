@@ -182,10 +182,33 @@ async function processCommentEvent(entry, change) {
   // to queue_review with reason "no_template_for_class" when no template
   // exists, so reaching action === "dm" implies decision.rendered is
   // non-empty.
-  const { data: templateRows } = await admin
-    .from("dm_templates")
-    .select("intent_class, template")
-    .eq("creator_id", creatorId);
+  // Fetch templates, offer name, and booking link in parallel. Offer and
+  // booking link feed the renderTemplate substitutions for {{OFFER_NAME}}
+  // and {{BOOKING_LINK}} — without these, DMs render the fallback strings
+  // ("our offer" / empty) regardless of what the coach has saved.
+  const [
+    { data: templateRows },
+    { data: userRow },
+    { data: offerRow },
+  ] = await Promise.all([
+    admin
+      .from("dm_templates")
+      .select("intent_class, template")
+      .eq("creator_id", creatorId),
+    admin
+      .from("users")
+      .select("calendly_url")
+      .eq("id", creatorId)
+      .maybeSingle(),
+    admin
+      .from("creator_offers")
+      .select("offer_name")
+      .eq("creator_id", creatorId)
+      .is("deprecated_at", null)
+      .order("updated_at", { ascending: false })
+      .limit(1)
+      .maybeSingle(),
+  ]);
 
   const templates = {};
   for (const row of templateRows || []) {
@@ -197,8 +220,8 @@ async function processCommentEvent(entry, change) {
   const decision = decideAction(classification, monitoringRow, templates, {
     postCaption: postRow.caption || "",
     commenterName: fromUsername,
-    offerName: null,
-    bookingLink: null,
+    offerName: offerRow?.offer_name || null,
+    bookingLink: userRow?.calendly_url || null,
   });
 
   // 11. Decide branches:
