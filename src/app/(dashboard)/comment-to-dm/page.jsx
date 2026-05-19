@@ -81,7 +81,7 @@ export default async function CommentToDmLandingPage() {
       .select("id", { count: "exact", head: true })
       .eq("creator_id", user.id)
       .eq("dispatched", true)
-      .gt("created_at", thirtyDaysAgo),
+      .gt("dispatched_at", thirtyDaysAgo),
   ]);
 
   const postsCount = postsRes.count ?? 0;
