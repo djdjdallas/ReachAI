@@ -23,6 +23,8 @@ import {
   Mic2,
   Trash2,
   X,
+  Package,
+  ChevronRight,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -129,6 +131,10 @@ export default function SettingsPage() {
   const [voiceProfile, setVoiceProfile] = useState(null);
   const [clearingVoice, setClearingVoice] = useState(false);
 
+  // Active offer — the source of truth the classifier ultimately reads
+  // (see /settings/offer/page.js for the same query convention).
+  const [activeOffer, setActiveOffer] = useState(null);
+
   // Confirmation dialogs
   const [confirmDisconnectInstagramOpen, setConfirmDisconnectInstagramOpen] =
     useState(false);
@@ -202,6 +208,16 @@ export default function SettingsPage() {
           setVoiceProfile(userProfile.voice_profile);
         }
       }
+
+      const { data: offerRow } = await supabase
+        .from("creator_offers")
+        .select("id, offer_name, offer_price_cents, offer_url")
+        .eq("creator_id", currentUser.id)
+        .is("deprecated_at", null)
+        .order("updated_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (offerRow) setActiveOffer(offerRow);
 
       setLoading(false);
     }
@@ -587,6 +603,60 @@ export default function SettingsPage() {
             )}
           </div>
         </CardContent>
+      </Card>
+
+      {/* Your Offer */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-lg flex items-center gap-2">
+            <Package className="h-5 w-5" />
+            Your Offer
+          </CardTitle>
+          <CardDescription>
+            What Clinchd pitches in DMs and qualifies leads against. Powers
+            comment-to-DM templates, the agent&apos;s pitch, and the
+            classifier&apos;s buy-signal detection.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {activeOffer ? (
+            <div className="flex items-center justify-between rounded-lg border bg-muted/30 p-3">
+              <div className="min-w-0">
+                <p className="text-sm font-medium truncate">
+                  {activeOffer.offer_name || "Untitled offer"}
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  {activeOffer.offer_price_cents != null
+                    ? `$${(activeOffer.offer_price_cents / 100).toLocaleString(
+                        "en-US",
+                        { minimumFractionDigits: 0, maximumFractionDigits: 2 }
+                      )}`
+                    : "No price set"}
+                  {activeOffer.offer_url ? " · link configured" : ""}
+                </p>
+              </div>
+              <Badge variant="success">Active</Badge>
+            </div>
+          ) : (
+            <div className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 p-3 text-amber-900 dark:border-amber-900/40 dark:bg-amber-950/30 dark:text-amber-100">
+              <AlertTriangle className="mt-0.5 h-4 w-4 flex-shrink-0" />
+              <p className="text-xs">
+                No offer set up yet. Without one, the agent falls back to
+                generic copy and can&apos;t qualify leads against your ideal
+                customer or objections.
+              </p>
+            </div>
+          )}
+        </CardContent>
+        <CardFooter>
+          <Button asChild variant={activeOffer ? "outline" : "default"}>
+            <a href="/settings/offer" className="flex items-center gap-2">
+              <Package className="h-4 w-4" />
+              {activeOffer ? "Edit offer" : "Set up offer"}
+              <ChevronRight className="h-4 w-4" />
+            </a>
+          </Button>
+        </CardFooter>
       </Card>
 
       {/* Calendly */}
