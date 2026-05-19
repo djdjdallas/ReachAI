@@ -628,10 +628,37 @@ async function processIncomingMessage({
     }
   }
 
+  // If the conversation was started by a cold DM the coach sent natively but
+  // we never saw the outbound text, fetch the active creator_offers row so the
+  // prompt builder can ground the reply in the offer instead of falling back
+  // to a generic inbound greeting.
+  let activeOffer = null;
+  if (
+    conversation.origin === "clinchd_sent" &&
+    conversation.missing_outbound_context === true
+  ) {
+    const { data: offerRow } = await supabase
+      .from("creator_offers")
+      .select("offer_name, ideal_customer, objections")
+      .eq("creator_id", user.id)
+      .is("deprecated_at", null)
+      .order("updated_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    activeOffer = offerRow || null;
+    console.log(JSON.stringify({
+      event: "ai_prompt_missing_outbound_context",
+      conversation_id: conversation.id,
+      user_id: user.id,
+      has_offer: !!activeOffer?.offer_name,
+    }));
+  }
+
   // Build prompt and generate reply
   const systemPrompt = buildSystemPrompt(sc, user.calendly_url, {
     voiceProfile: user.voice_profile,
     conversation,
+    activeOffer,
   });
 
   let aiReply;

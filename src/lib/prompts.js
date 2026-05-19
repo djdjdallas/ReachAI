@@ -235,6 +235,41 @@ const NATIVE_SEND_PREFIX = `CONVERSATION ORIGIN — NATIVE SEND:
 
 This conversation began with a cold DM the user sent manually from Instagram mobile. The first assistant message below is that original DM. The first user message is the lead's reply.`;
 
+// Block appended when the conversation was started by a cold DM the coach
+// sent from native Instagram but the outbound message was NOT pre-logged via
+// /native-send, so we don't have its text. Without this, the AI defaults to
+// inbound greetings ("thanks for reaching out") which are wrong — the lead is
+// responding to OUR pitch, not initiating.
+function buildMissingOutboundContextBlock({ offerName, idealCustomer, objections } = {}) {
+  const objectionsText = Array.isArray(objections)
+    ? objections.filter((s) => typeof s === "string" && s.trim()).join("; ")
+    : (typeof objections === "string" ? objections : "");
+
+  const offerLines = [];
+  if (offerName) offerLines.push(`   - Offer: ${offerName}`);
+  if (idealCustomer) offerLines.push(`   - Ideal customer: ${idealCustomer}`);
+  if (objectionsText) offerLines.push(`   - Common objections to address: ${objectionsText}`);
+  const offerBlock = offerLines.length ? `\n${offerLines.join("\n")}` : "";
+
+  return `
+
+IMPORTANT CONTEXT — OUTBOUND-INITIATED CONVERSATION:
+This person is responding to a cold DM that the coach sent them via Instagram natively. The coach did NOT pre-log the outbound message in Clinchd, so you don't have its exact text. Critical rules:
+
+1. The lead did NOT reach out to the coach. The coach reached out first. Do NOT use phrases like "thanks for reaching out", "what brought you here", "how did you find me", or "how can I help you today".
+
+2. Treat the lead's message as a positive response to the coach's pitch about ${offerName || "the coach's offer"}.
+
+3. Ground your reply in what you know about the offer:${offerBlock}
+
+4. Ask ONE natural follow-up question that moves toward qualifying them. Avoid generic openers. Example good follow-ups:
+   - "great — quick one before I send more info: are you currently [pain point related to ideal customer]?"
+   - "love it. what's your current situation with [relevant context]?"
+
+5. Keep it under 2 short sentences. Match the coach's voice profile.
+`;
+}
+
 /**
  * Builds the core system prompt used for all live DM reply generation.
  *
@@ -245,6 +280,10 @@ This conversation began with a cold DM the user sent manually from Instagram mob
  * @param {object}  options.voiceProfile - The user's voice_profile from Supabase
  * @param {object}  options.conversation - The conversation row; reads .origin
  *                                         to add the native-send prefix
+ * @param {object}  options.activeOffer  - Optional creator_offers row, used to
+ *                                         ground the missing-outbound-context
+ *                                         block when origin='clinchd_sent' and
+ *                                         missing_outbound_context=true
  * @returns {string} The full system prompt string
  */
 export function buildSystemPrompt(scriptConfig = {}, calendlyUrl = "", options = {}) {
@@ -274,7 +313,21 @@ export function buildSystemPrompt(scriptConfig = {}, calendlyUrl = "", options =
     ? `\n\n${NATIVE_SEND_PREFIX}\n`
     : "";
 
-  return `You are a friendly, helpful assistant managing Instagram DMs for a business. Your job is to qualify leads, handle objections naturally, and guide interested prospects to book a discovery call — without ever sounding like a sales script or a bot.${playgroundNotice}${nativeSendPrefix}
+  // Missing-outbound-context branch — coach sent a cold DM natively but did
+  // NOT pre-log it. Webhook flags conversation.missing_outbound_context=true
+  // and leaves origin='clinchd_sent'. Append a block that forbids inbound
+  // greetings and grounds the AI in the active offer.
+  const missingOutboundBlock =
+    options.conversation?.origin === "clinchd_sent" &&
+    options.conversation?.missing_outbound_context === true
+      ? buildMissingOutboundContextBlock({
+          offerName: options.activeOffer?.offer_name,
+          idealCustomer: options.activeOffer?.ideal_customer,
+          objections: options.activeOffer?.objections,
+        })
+      : "";
+
+  return `You are a friendly, helpful assistant managing Instagram DMs for a business. Your job is to qualify leads, handle objections naturally, and guide interested prospects to book a discovery call — without ever sounding like a sales script or a bot.${playgroundNotice}${nativeSendPrefix}${missingOutboundBlock}
 
 BUSINESS DETAILS:
 - Offer: ${sc.offer || "Not specified"}
