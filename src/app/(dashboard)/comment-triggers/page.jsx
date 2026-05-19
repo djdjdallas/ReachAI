@@ -7,7 +7,7 @@ import { decryptToken } from "@/lib/token-utils";
 import PostPicker from "./PostPicker";
 
 export const metadata = {
-  title: "Comment triggers · Clinchd",
+  title: "Comment to DM · Clinchd",
   robots: { index: false, follow: false },
 };
 
@@ -134,11 +134,27 @@ export default async function CommentTriggersPage() {
     }
   }
 
+  // Surface "no template written" warnings inline next to each per-intent
+  // dropdown. Without this, picking "Send DM" for a class without a template
+  // silently downgrades to queue_review at runtime via decideAction().
+  const { data: templates } = await admin
+    .from("dm_templates")
+    .select("intent_class, body")
+    .eq("creator_id", user.id);
+
+  const templatesByClass = {};
+  for (const t of templates || []) {
+    if (!t?.intent_class) continue;
+    templatesByClass[t.intent_class] =
+      typeof t.body === "string" && t.body.trim().length > 0;
+  }
+
   return (
     <PostPicker
       mediaItems={mediaItems}
       monitoringByMediaId={monitoringByMediaId}
       mediaError={mediaError}
+      templatesByClass={templatesByClass}
     />
   );
 }

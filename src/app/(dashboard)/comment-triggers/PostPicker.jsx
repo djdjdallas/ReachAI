@@ -1,10 +1,18 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import Link from "next/link";
-import { MessageSquare, Loader2, ChevronDown, ChevronUp, AlertTriangle } from "lucide-react";
+import {
+  MessageSquare,
+  Loader2,
+  ChevronDown,
+  ChevronUp,
+  AlertTriangle,
+  RotateCcw,
+} from "lucide-react";
 
 const CORAL = "#ff7e67";
+const AMBER = "#f59e0b";
 
 // Pulled at module load from src/lib/comment-trigger-rules.js so the
 // fallback shown in the UI matches what decideAction() actually uses when
@@ -30,7 +38,7 @@ const ACTION_LABELS = {
 
 const ACTION_OPTIONS = ["dm", "queue_review", "ignore"];
 
-function snippet(text, max = 100) {
+function snippet(text, max = 240) {
   if (typeof text !== "string" || !text) return "";
   const trimmed = text.trim().replace(/\s+/g, " ");
   if (trimmed.length <= max) return trimmed;
@@ -57,7 +65,34 @@ function PostThumbnail({ item }) {
   );
 }
 
-function PostCard({ item, initial, onChange }) {
+// Build a short, human-readable summary of the per-intent overrides for the
+// collapsed Advanced section. Helps coaches see current state at a glance.
+function summarizeOverrides(actionsPerClass) {
+  const effective = { ...DEFAULT_ACTIONS_PER_CLASS, ...(actionsPerClass || {}) };
+  const dmClasses = Object.keys(effective).filter(
+    (cls) => effective[cls] === "dm"
+  );
+
+  const isDefault =
+    !actionsPerClass ||
+    Object.keys(actionsPerClass).every(
+      (cls) => actionsPerClass[cls] === DEFAULT_ACTIONS_PER_CLASS[cls]
+    );
+
+  if (isDefault) return "Using default behavior (recommended).";
+  if (dmClasses.length === 0) return "No classes will send DMs from this post.";
+  if (dmClasses.length === 1) {
+    return `Currently sending DMs on ${dmClasses[0]} only.`;
+  }
+  if (dmClasses.length === 2) {
+    return `Currently sending DMs on ${dmClasses[0]} and ${dmClasses[1]}.`;
+  }
+  const head = dmClasses.slice(0, -1).join(", ");
+  const tail = dmClasses[dmClasses.length - 1];
+  return `Currently sending DMs on ${head}, and ${tail}.`;
+}
+
+function PostCard({ item, initial, templatesByClass, onChange }) {
   const [enabled, setEnabled] = useState(initial?.enabled === true);
   const [actionsPerClass, setActionsPerClass] = useState(
     initial?.actions_per_class || null
@@ -65,6 +100,7 @@ function PostCard({ item, initial, onChange }) {
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
+  const [resetToast, setResetToast] = useState(false);
 
   function resolveAction(cls) {
     return actionsPerClass?.[cls] || DEFAULT_ACTIONS_PER_CLASS[cls] || "none";
@@ -116,19 +152,41 @@ function PostCard({ item, initial, onChange }) {
     if (!ok) setActionsPerClass(prev);
   }
 
+  async function resetOverrides() {
+    const prev = actionsPerClass;
+    setActionsPerClass(null);
+    // sanitizeActionsPerClass in the route returns null for null input,
+    // which clears the column.
+    const ok = await persist(enabled, null);
+    if (!ok) {
+      setActionsPerClass(prev);
+      return;
+    }
+    setResetToast(true);
+  }
+
+  // Auto-dismiss the reset confirmation after 3s.
+  useEffect(() => {
+    if (!resetToast) return;
+    const t = setTimeout(() => setResetToast(false), 3000);
+    return () => clearTimeout(t);
+  }, [resetToast]);
+
+  const hasOverrides = actionsPerClass && Object.keys(actionsPerClass).length > 0;
+
   return (
     <div
       className="rounded-[2rem] bg-white border border-stone-200 p-4 md:p-5 space-y-4"
       style={{ boxShadow: "0 1px 0 rgba(15,15,15,0.04)" }}
     >
       <div className="flex items-start gap-4">
-        <div className="w-24 md:w-28 shrink-0">
+        <div className="w-28 md:w-32 shrink-0">
           <PostThumbnail item={item} />
         </div>
         <div className="flex-1 min-w-0">
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
-              <p className="text-sm text-stone-800 whitespace-pre-wrap break-words">
+              <p className="text-sm text-stone-800 break-words line-clamp-2">
                 {snippet(item.caption) || (
                   <span className="text-stone-400">(no caption)</span>
                 )}
@@ -179,41 +237,123 @@ function PostCard({ item, initial, onChange }) {
                 )}
                 Advanced — per-intent overrides
               </button>
+              {!showAdvanced && (
+                <p className="mt-1 text-xs text-stone-500">
+                  {summarizeOverrides(actionsPerClass)}
+                </p>
+              )}
             </div>
           )}
 
-          {error && (
-            <p className="mt-2 text-xs text-red-600">{error}</p>
-          )}
+          {error && <p className="mt-2 text-xs text-red-600">{error}</p>}
         </div>
       </div>
 
       {enabled && showAdvanced && (
-        <div className="border-t border-stone-100 pt-4 space-y-2">
-          {Object.keys(DEFAULT_ACTIONS_PER_CLASS).map((cls) => (
-            <div key={cls} className="flex items-center justify-between gap-3">
-              <div className="min-w-0">
-                <p className="text-xs font-semibold text-stone-700">{cls}</p>
-                <p className="text-[11px] text-stone-500">
-                  {CLASS_DESCRIPTIONS[cls]}
-                </p>
+        <div className="border-t border-stone-100 pt-4 space-y-3">
+          {Object.keys(DEFAULT_ACTIONS_PER_CLASS).map((cls) => {
+            const action = resolveAction(cls);
+            const templateMissing =
+              action === "dm" && templatesByClass?.[cls] !== true;
+            return (
+              <div key={cls} className="space-y-1">
+                <div className="flex items-center justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="text-xs font-semibold text-stone-700">{cls}</p>
+                    <p className="text-[11px] text-stone-500">
+                      {CLASS_DESCRIPTIONS[cls]}
+                    </p>
+                  </div>
+                  <select
+                    value={action}
+                    onChange={(e) => changeAction(cls, e.target.value)}
+                    disabled={saving}
+                    className="rounded-full border border-stone-300 px-3 py-1 text-xs bg-white"
+                  >
+                    {ACTION_OPTIONS.map((a) => (
+                      <option key={a} value={a}>
+                        {ACTION_LABELS[a]}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                {templateMissing && (
+                  <p
+                    className="text-[11px] inline-flex items-center gap-1"
+                    style={{ color: AMBER }}
+                  >
+                    <AlertTriangle className="h-3 w-3" />
+                    <span>
+                      No template written —{" "}
+                      <Link href="/dm-templates" className="underline">
+                        write one in DM Templates →
+                      </Link>
+                    </span>
+                  </p>
+                )}
               </div>
-              <select
-                value={resolveAction(cls)}
-                onChange={(e) => changeAction(cls, e.target.value)}
-                disabled={saving}
-                className="rounded-full border border-stone-300 px-3 py-1 text-xs bg-white"
-              >
-                {ACTION_OPTIONS.map((a) => (
-                  <option key={a} value={a}>
-                    {ACTION_LABELS[a]}
-                  </option>
-                ))}
-              </select>
-            </div>
-          ))}
+            );
+          })}
+
+          <div className="pt-2 flex items-center justify-between">
+            <button
+              type="button"
+              onClick={resetOverrides}
+              disabled={saving || !hasOverrides}
+              className="inline-flex items-center gap-1 text-xs text-stone-500 hover:underline disabled:opacity-40 disabled:hover:no-underline"
+            >
+              <RotateCcw className="h-3 w-3" />
+              Reset overrides to defaults
+            </button>
+            {resetToast && (
+              <span className="text-xs text-stone-500">
+                Overrides reset to defaults.
+              </span>
+            )}
+          </div>
         </div>
       )}
+    </div>
+  );
+}
+
+// Empty state shown while the IG /me/media response is still null. Holds a
+// spinner for 5 seconds before swapping to a reconnect prompt — most
+// "no posts" cases are stale tokens, not literally-empty accounts.
+function NoPostsEmptyState() {
+  const [showReconnect, setShowReconnect] = useState(false);
+  useEffect(() => {
+    const t = setTimeout(() => setShowReconnect(true), 5000);
+    return () => clearTimeout(t);
+  }, []);
+
+  if (!showReconnect) {
+    return (
+      <div className="rounded-[2rem] bg-white border border-stone-200 p-10 text-center">
+        <Loader2 className="mx-auto h-6 w-6 text-stone-400 animate-spin" />
+        <p className="mt-3 text-sm text-stone-500">
+          Looking for your Instagram posts…
+        </p>
+      </div>
+    );
+  }
+  return (
+    <div className="rounded-[2rem] bg-white border border-stone-200 p-10 text-center">
+      <p className="text-sm text-stone-700 font-semibold">
+        We couldn&apos;t find any recent posts on your connected Instagram
+        account.
+      </p>
+      <p className="mt-2 text-sm text-stone-500 max-w-md mx-auto">
+        This may take a moment after first connecting — try refreshing in a
+        few seconds. If posts still don&apos;t appear, your account may need
+        to be reconnected.
+      </p>
+      <Link
+        href="/settings"
+        className="mt-4 inline-flex items-center justify-center rounded-full bg-stone-900 text-white px-4 py-2 text-xs font-semibold"
+      >
+        Reconnect Instagram →
+      </Link>
     </div>
   );
 }
@@ -222,6 +362,7 @@ export default function PostPicker({
   mediaItems,
   monitoringByMediaId,
   mediaError,
+  templatesByClass,
 }) {
   const [overrides, setOverrides] = useState({});
 
@@ -231,14 +372,22 @@ export default function PostPicker({
     setOverrides((prev) => ({ ...prev, [mediaId]: next }));
   }
 
+  // Live count of monitored posts. Merges initial server state with any
+  // toggles the coach has made this session so the "no posts monitored"
+  // callout dismisses as soon as the first toggle flips on.
+  const monitoredCount = useMemo(() => {
+    return items.reduce((acc, item) => {
+      const state = overrides[item.id] ?? monitoringByMediaId[item.id] ?? null;
+      return state?.enabled === true ? acc + 1 : acc;
+    }, 0);
+  }, [items, overrides, monitoringByMediaId]);
+
   return (
-    <div className="max-w-3xl mx-auto p-6 md:p-10 space-y-6">
+    <div className="max-w-4xl mx-auto p-3 md:p-5 space-y-6">
       <div>
         <div className="flex items-center gap-2 mb-1">
-          <MessageSquare className="h-5 w-5" style={{ color: CORAL }} />
-          <h1 className="text-2xl font-bold tracking-tight">
-            Comment triggers
-          </h1>
+          <MessageSquare className="h-5 w-5 text-stone-900" />
+          <h1 className="text-2xl font-bold tracking-tight">Comment to DM</h1>
         </div>
         <p className="text-sm text-stone-600">
           Pick which posts Clinchd should monitor. When someone comments on
@@ -268,14 +417,21 @@ export default function PostPicker({
         </div>
       )}
 
-      {items.length === 0 && !mediaError && (
-        <div className="rounded-[2rem] bg-white border border-stone-200 p-10 text-center">
-          <Loader2 className="mx-auto h-6 w-6 text-stone-400 animate-spin" />
-          <p className="mt-3 text-sm text-stone-500">
-            No posts found yet. Post something on Instagram and refresh.
-          </p>
+      {items.length > 0 && monitoredCount === 0 && (
+        <div
+          className="rounded-[2rem] border p-4 text-sm"
+          style={{
+            backgroundColor: "#fef3c7",
+            borderColor: "#fde68a",
+            color: "#78350f",
+          }}
+        >
+          No posts being monitored yet. Toggle a post ON below to start
+          replying to commenters with AI.
         </div>
       )}
+
+      {items.length === 0 && !mediaError && <NoPostsEmptyState />}
 
       <div className="space-y-4">
         {items.map((item) => {
@@ -285,6 +441,7 @@ export default function PostPicker({
               key={item.id}
               item={item}
               initial={initial}
+              templatesByClass={templatesByClass}
               onChange={(next) => handleChange(item.id, next)}
             />
           );
