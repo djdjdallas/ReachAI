@@ -8,10 +8,23 @@ import {
   AlertTriangle,
   Loader2,
   ArrowRight,
+  Copy,
 } from "lucide-react";
 import { renderTemplate } from "@/lib/comment-trigger-rules";
 
 const CORAL = "#ff7e67";
+
+// Regex used in two places: (a) inline [BRACKET_SYNTAX] warning beneath the
+// textarea, (b) one-click convert to {{CURLY_BRACE_SYNTAX}}. Matches uppercase
+// + underscore tokens inside square brackets so it won't trip on prose like
+// "[just saying]". Anchored to the same shape as the renderer's tokens.
+const BRACKET_TOKEN_RE = /\[([A-Z_]+)\]/g;
+const KNOWN_TOKENS = new Set([
+  "COMMENTER_NAME",
+  "POST_CAPTION_SNIPPET",
+  "OFFER_NAME",
+  "BOOKING_LINK",
+]);
 
 // One row per intent class, in display order. Class names must match
 // src/lib/classifier.js's CLASS_ENUM so dm_templates row lookups in
@@ -23,7 +36,11 @@ const CLASS_META = [
     description: "Clear buy signal — price questions, link requests, 'sign me up'.",
     sendByDefault: true,
     placeholder:
-      "Hey {{COMMENTER_NAME}}! Saw your comment — yes, this is exactly what you're asking about. Want me to send the details on {{OFFER_NAME}}?",
+      "hey {{COMMENTER_NAME}} — appreciate the comment! grab a quick call and i'll walk you through {{OFFER_NAME}}: {{BOOKING_LINK}}",
+    // Pre-filled into the textarea when no saved row exists, so new coaches
+    // land on demo-ready copy and can save with one blur.
+    defaultBody:
+      "hey {{COMMENTER_NAME}} — appreciate the comment! grab a quick call and i'll walk you through {{OFFER_NAME}}: {{BOOKING_LINK}}",
   },
   {
     cls: "ENGAGED_NOT_BUYING",
@@ -31,7 +48,7 @@ const CLASS_META = [
     description: "Warm audience — praise, fire emojis, encouragement.",
     sendByDefault: false,
     placeholder:
-      "Thanks {{COMMENTER_NAME}}! Really appreciate you saying that.",
+      "hey {{COMMENTER_NAME}} — appreciate the love on the post! drop me a dm anytime if you want to chat about {{OFFER_NAME}}.",
   },
   {
     cls: "UNCERTAIN",
@@ -39,7 +56,7 @@ const CLASS_META = [
     description: "Plausibly interested but evidence too thin to label confidently.",
     sendByDefault: false,
     placeholder:
-      "Hey {{COMMENTER_NAME}} — curious what you meant by your comment on {{POST_CAPTION_SNIPPET}}? Happy to help.",
+      "hey {{COMMENTER_NAME}} — curious what you meant by your comment on {{POST_CAPTION_SNIPPET}}? happy to help.",
   },
   {
     cls: "LOW_SIGNAL",
@@ -126,8 +143,14 @@ function PlaceholderReference({ rows }) {
       className="rounded-[2rem] bg-white border border-stone-200 p-5 md:p-6"
       style={{ boxShadow: "0 1px 0 rgba(15,15,15,0.04)" }}
     >
-      <p className="text-xs font-bold text-stone-400 uppercase tracking-wide mb-3">
+      <p className="text-xs font-bold text-stone-400 uppercase tracking-wide mb-1">
         Placeholders available in your templates
+      </p>
+      <p className="text-xs italic text-stone-500 mb-3">
+        Use the exact <code className="not-italic font-mono">{`{{TOKEN}}`}</code>{" "}
+        syntax below. Other formats like{" "}
+        <code className="not-italic font-mono">[TOKEN]</code> or{" "}
+        <code className="not-italic font-mono">(TOKEN)</code> won&apos;t be replaced. Click a token to copy it.
       </p>
       <div className="space-y-2.5">
         {rows.map((row) => (
@@ -140,6 +163,28 @@ function PlaceholderReference({ rows }) {
 
 function PlaceholderRow({ row }) {
   const { token, resolved, sourceLabel, missing, configHref, configLabel } = row;
+  const [copied, setCopied] = useState(false);
+
+  async function handleCopy() {
+    try {
+      if (navigator?.clipboard?.writeText) {
+        await navigator.clipboard.writeText(token);
+      } else {
+        // Fallback: select+execCommand for older browsers / non-HTTPS dev.
+        const el = document.createElement("textarea");
+        el.value = token;
+        document.body.appendChild(el);
+        el.select();
+        document.execCommand("copy");
+        document.body.removeChild(el);
+      }
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    } catch {
+      // Swallow — UX feedback fails silently rather than blocking input.
+    }
+  }
+
   return (
     <div
       className={`flex items-start gap-3 rounded-2xl border p-3 ${
@@ -148,15 +193,23 @@ function PlaceholderRow({ row }) {
           : "border-stone-100 bg-stone-50"
       }`}
     >
-      <code
-        className={`shrink-0 rounded-md px-2 py-1 font-mono text-[11px] font-semibold ${
+      <button
+        type="button"
+        onClick={handleCopy}
+        title={copied ? "copied!" : "click to copy"}
+        className={`shrink-0 inline-flex items-center gap-1 rounded-md px-2 py-1 font-mono text-[11px] font-semibold cursor-pointer transition-colors ${
           missing
-            ? "bg-amber-100 text-amber-900"
-            : "bg-white text-stone-700 border border-stone-200"
+            ? "bg-amber-100 text-amber-900 hover:bg-amber-200"
+            : "bg-white text-stone-700 border border-stone-200 hover:bg-stone-100"
         }`}
       >
-        {token}
-      </code>
+        <code>{token}</code>
+        {copied ? (
+          <CheckCircle2 className="h-3 w-3 text-green-600" />
+        ) : (
+          <Copy className="h-3 w-3 opacity-60" />
+        )}
+      </button>
       <div className="min-w-0 flex-1 text-xs">
         {missing ? (
           <>
@@ -207,12 +260,28 @@ function TemplatePreview({ body, context }) {
 }
 
 function TemplateCard({ meta, initialBody, onSave, renderCtx }) {
-  const [body, setBody] = useState(initialBody || "");
+  // Pre-fill the textarea with the polished default for send-by-default
+  // classes when no saved row exists. Coach can edit or save as-is; the
+  // existing blur-diff persists on first focus-out.
+  const seededBody =
+    initialBody || (meta.sendByDefault && meta.defaultBody) || "";
+  const [body, setBody] = useState(seededBody);
   const [doNotSend, setDoNotSend] = useState(
     !meta.sendByDefault && (initialBody || "") === ""
   );
   const [state, setState] = useState("idle"); // idle | saving | saved | error
   const [error, setError] = useState(null);
+
+  // Detect [BRACKET_SYNTAX] usage. Coaches copy-pasting from other tools
+  // bring this and it silently survives renderTemplate(). One-click convert.
+  const bracketMatches = body.match(BRACKET_TOKEN_RE) || [];
+  const hasKnownBracketToken = bracketMatches.some((m) =>
+    KNOWN_TOKENS.has(m.slice(1, -1))
+  );
+
+  function handleConvert() {
+    setBody((prev) => prev.replace(BRACKET_TOKEN_RE, "{{$1}}"));
+  }
 
   // Auto-save on blur. Picked over an explicit Save button so the page
   // doesn't accumulate 7 unsaved-textarea states the coach has to remember
@@ -318,6 +387,23 @@ function TemplateCard({ meta, initialBody, onSave, renderCtx }) {
             className="w-full rounded-2xl border border-stone-200 bg-white px-3 py-2 text-sm font-normal text-stone-800 placeholder:text-stone-400 focus:outline-none focus:ring-2"
             style={{ "--tw-ring-color": CORAL }}
           />
+          {hasKnownBracketToken && (
+            <div className="flex items-start gap-2 rounded-2xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+              <AlertTriangle className="h-3.5 w-3.5 shrink-0 mt-0.5" />
+              <div className="flex-1">
+                Looks like you&apos;ve used{" "}
+                <code className="font-mono">[BRACKET_SYNTAX]</code> — Clinchd uses{" "}
+                <code className="font-mono">{`{{CURLY_BRACE_SYNTAX}}`}</code>. Square brackets won&apos;t be replaced.
+              </div>
+              <button
+                type="button"
+                onClick={handleConvert}
+                className="shrink-0 rounded-md bg-amber-900 px-2 py-1 text-[11px] font-semibold text-white hover:bg-amber-800"
+              >
+                Convert
+              </button>
+            </div>
+          )}
           <TemplatePreview body={body} context={renderCtx} />
           {error && <p className="text-xs text-red-600">{error}</p>}
         </>
