@@ -1,10 +1,6 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
-import {
-  MessageCircleReply,
-  ExternalLink,
-  ChevronRight,
-} from "lucide-react";
+import { MessageCircleReply, ChevronRight } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { canUseCommentToDM } from "@/lib/comment-to-dm-gate";
 import {
@@ -213,18 +209,6 @@ function PostCard({ entry }) {
             </div>
           )}
 
-          {post.permalink && (
-            <a
-              href={post.permalink}
-              target="_blank"
-              rel="noopener noreferrer"
-              onClick={(e) => e.stopPropagation()}
-              className="mt-3 inline-flex items-center gap-1 text-xs font-medium text-stone-500 hover:text-stone-800"
-            >
-              View on Instagram
-              <ExternalLink className="h-3 w-3" />
-            </a>
-          )}
         </div>
 
         <ChevronRight className="h-5 w-5 text-stone-300 group-hover:text-stone-500 transition-colors shrink-0 mt-1" />
