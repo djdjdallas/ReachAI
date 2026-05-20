@@ -3,91 +3,102 @@ import Link from "next/link";
 import {
   MessageCircleReply,
   ExternalLink,
-  CheckCircle2,
-  XCircle,
-  Clock,
-  MinusCircle,
+  ChevronRight,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { canUseCommentToDM } from "@/lib/comment-to-dm-gate";
+import {
+  CORAL,
+  CARD_SHADOW,
+  INTENT_BADGE_STYLES,
+  INTENT_LABELS,
+  relativeTime,
+} from "./_components";
 
 export const metadata = {
   title: "Activity · Comment to DM · Clinchd",
   robots: { index: false, follow: false },
 };
 
-const CORAL = "#ff7e67";
-const CARD_SHADOW = "0 1px 0 rgba(15,15,15,0.04)";
+// Pragmatic tonight choice: fetch the most recent N classifications joined
+// with posts + log and aggregate in JS. We don't have a Supabase RPC for
+// group-by yet, and adding one is a schema change. 500 covers a normal
+// coach's recent history; if a single account ever exceeds that, promote
+// this to an RPC. The drilldown route does its own per-post query so the
+// cap here only affects which posts surface on the overview.
+const OVERVIEW_LIMIT = 500;
 
-const INTENT_BADGE_STYLES = {
-  HIGH_INTENT: "bg-emerald-100 text-emerald-800",
-  LOW_SIGNAL: "bg-blue-100 text-blue-800",
-  UNCERTAIN: "bg-yellow-100 text-yellow-800",
-  ENGAGED_NOT_BUYING: "bg-purple-100 text-purple-800",
-  NOT_A_LEAD: "bg-stone-100 text-stone-600",
-  CRITICAL_NEGATIVE: "bg-red-100 text-red-800",
-  SPAM: "bg-stone-100 text-stone-500",
-};
-
-const INTENT_LABELS = {
-  HIGH_INTENT: "High intent",
-  LOW_SIGNAL: "Low signal",
-  UNCERTAIN: "Uncertain",
-  ENGAGED_NOT_BUYING: "Engaged (not buying)",
-  NOT_A_LEAD: "Not a lead",
-  CRITICAL_NEGATIVE: "Negative",
-  SPAM: "Spam",
-};
-
-function relativeTime(iso) {
-  if (!iso) return "";
-  const then = new Date(iso).getTime();
-  const now = Date.now();
-  const diff = Math.floor((now - then) / 1000);
-  if (diff < 60) return "just now";
-  if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
-  if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
-  if (diff < 604800) return `${Math.floor(diff / 86400)}d ago`;
-  return new Date(iso).toLocaleDateString();
-}
-
-async function getActivity(supabase, userId) {
+async function getPostsWithActivity(supabase, userId) {
   const { data, error } = await supabase
     .from("comment_classifications")
     .select(
       `
       id,
-      ig_comment_id,
-      ig_commenter_username,
-      comment_text,
       class,
-      confidence,
       classified_at,
+      post_id,
       posts!inner (
+        id,
+        ig_media_id,
         permalink,
         caption,
-        ig_media_id
+        media_type,
+        posted_at
       ),
       comment_to_dm_log (
         decided_action,
-        rendered_dm,
-        dispatched,
-        dispatched_at,
-        dispatched_message_id,
-        dispatch_error,
-        dispatch_retryable
+        dispatched
       )
     `
     )
     .eq("creator_id", userId)
     .order("classified_at", { ascending: false })
-    .limit(50);
+    .limit(OVERVIEW_LIMIT);
 
   if (error) {
-    console.error("[activity-log] fetch error:", error);
+    console.error("[activity-overview] fetch error:", error);
     return [];
   }
-  return data || [];
+
+  const byPost = new Map();
+  for (const row of data || []) {
+    const post = Array.isArray(row.posts) ? row.posts[0] : row.posts;
+    if (!post) continue;
+    if (!byPost.has(post.id)) {
+      byPost.set(post.id, {
+        post,
+        total: 0,
+        dispatched: 0,
+        failed: 0,
+        pending: 0,
+        skipped: 0,
+        latestAt: row.classified_at,
+        classCounts: {},
+      });
+    }
+    const agg = byPost.get(post.id);
+    agg.total += 1;
+    agg.classCounts[row.class] = (agg.classCounts[row.class] || 0) + 1;
+
+    const log = Array.isArray(row.comment_to_dm_log)
+      ? row.comment_to_dm_log[0]
+      : row.comment_to_dm_log;
+    if (!log) {
+      agg.pending += 1;
+    } else if (log.decided_action === "dm" && log.dispatched === true) {
+      agg.dispatched += 1;
+    } else if (log.decided_action === "dm" && log.dispatched === false) {
+      agg.failed += 1;
+    } else if (log.decided_action === "skip") {
+      agg.skipped += 1;
+    } else if (log.decided_action === "queue_review") {
+      agg.pending += 1;
+    }
+  }
+
+  return Array.from(byPost.values()).sort(
+    (a, b) => new Date(b.latestAt) - new Date(a.latestAt)
+  );
 }
 
 export default async function CommentActivityPage() {
@@ -108,7 +119,7 @@ export default async function CommentActivityPage() {
     redirect("/comment-to-dm");
   }
 
-  const activity = await getActivity(supabase, user.id);
+  const posts = await getPostsWithActivity(supabase, user.id);
 
   return (
     <div className="max-w-4xl mx-auto p-6 md:p-10 space-y-6">
@@ -118,17 +129,17 @@ export default async function CommentActivityPage() {
           <h1 className="text-2xl font-bold tracking-tight">Comment Activity</h1>
         </div>
         <p className="text-sm text-stone-600">
-          Recent comments reviewed by Clinchd on your enabled posts, including
-          the classification and the reply sent on your behalf.
+          Posts Clinchd is reviewing comments on. Click any post to see the
+          original comments, classifications, and replies sent on your behalf.
         </p>
       </div>
 
-      {activity.length === 0 ? (
+      {posts.length === 0 ? (
         <EmptyState />
       ) : (
         <div className="space-y-3">
-          {activity.map((row) => (
-            <ActivityRow key={row.id} row={row} />
+          {posts.map((entry) => (
+            <PostCard key={entry.post.id} entry={entry} />
           ))}
         </div>
       )}
@@ -136,173 +147,122 @@ export default async function CommentActivityPage() {
   );
 }
 
-function ActivityRow({ row }) {
-  const log = Array.isArray(row.comment_to_dm_log)
-    ? row.comment_to_dm_log[0]
-    : row.comment_to_dm_log;
-  const post = Array.isArray(row.posts) ? row.posts[0] : row.posts;
+function PostCard({ entry }) {
+  const { post, total, dispatched, failed, pending, skipped, latestAt, classCounts } = entry;
 
-  const intentLabel = INTENT_LABELS[row.class] || row.class;
-  const intentStyle =
-    INTENT_BADGE_STYLES[row.class] || "bg-stone-100 text-stone-600";
-  const confidencePct =
-    typeof row.confidence === "number"
-      ? `${Math.round(row.confidence * 100)}%`
-      : null;
+  const captionSnippet = post.caption
+    ? post.caption.replace(/\s+/g, " ").trim()
+    : "(No caption)";
+
+  const topClasses = Object.entries(classCounts)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 3);
 
   return (
-    <div
-      className="rounded-[2rem] bg-white border border-stone-200 p-5 md:p-6"
+    <Link
+      href={`/comment-to-dm/activity/${post.id}`}
+      className="block rounded-[2rem] bg-white border border-stone-200 p-5 md:p-6 hover:border-stone-300 transition-all group"
       style={{ boxShadow: CARD_SHADOW }}
     >
-      <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
-        <span className="font-semibold text-stone-900 text-sm">
-          @{row.ig_commenter_username || "unknown"}
-        </span>
-        <span
-          className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold ${intentStyle}`}
-        >
-          {intentLabel}
-        </span>
-        {confidencePct && (
-          <span className="text-xs text-stone-500 font-medium">
-            {confidencePct} confidence
-          </span>
-        )}
-        <span className="text-xs text-stone-400 ml-auto">
-          {relativeTime(row.classified_at)}
-        </span>
+      <div className="flex items-start gap-4">
+        <div className="flex-1 min-w-0">
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-stone-500">
+            {post.media_type && (
+              <span className="font-semibold uppercase tracking-wide text-stone-600">
+                {humanizeMediaType(post.media_type)}
+              </span>
+            )}
+            {post.posted_at && (
+              <>
+                <span className="text-stone-300">·</span>
+                <span>Posted {formatPostedAt(post.posted_at)}</span>
+              </>
+            )}
+            <span className="text-stone-300">·</span>
+            <span>Last activity {relativeTime(latestAt)}</span>
+          </div>
+
+          <p className="mt-1.5 text-sm font-medium text-stone-900 line-clamp-2 leading-relaxed">
+            {captionSnippet}
+          </p>
+
+          <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1.5 text-xs text-stone-600">
+            <Stat label={total === 1 ? "classified" : "classified"} value={total} />
+            {dispatched > 0 && (
+              <Stat label="DM sent" value={dispatched} tone="green" />
+            )}
+            {failed > 0 && <Stat label="failed" value={failed} tone="red" />}
+            {pending > 0 && (
+              <Stat label="pending" value={pending} tone="yellow" />
+            )}
+            {skipped > 0 && <Stat label="skipped" value={skipped} tone="gray" />}
+          </div>
+
+          {topClasses.length > 0 && (
+            <div className="mt-3 flex flex-wrap gap-1.5">
+              {topClasses.map(([cls, count]) => (
+                <span
+                  key={cls}
+                  className={`inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-semibold ${
+                    INTENT_BADGE_STYLES[cls] || "bg-stone-100 text-stone-600"
+                  }`}
+                >
+                  {count} {INTENT_LABELS[cls] || cls}
+                </span>
+              ))}
+            </div>
+          )}
+
+          {post.permalink && (
+            <a
+              href={post.permalink}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={(e) => e.stopPropagation()}
+              className="mt-3 inline-flex items-center gap-1 text-xs font-medium text-stone-500 hover:text-stone-800"
+            >
+              View on Instagram
+              <ExternalLink className="h-3 w-3" />
+            </a>
+          )}
+        </div>
+
+        <ChevronRight className="h-5 w-5 text-stone-300 group-hover:text-stone-500 transition-colors shrink-0 mt-1" />
       </div>
-
-      <p className="mt-3 text-sm text-stone-700 leading-relaxed line-clamp-2">
-        {row.comment_text || <em className="text-stone-400">No text</em>}
-      </p>
-
-      {post?.permalink && (
-        <a
-          href={post.permalink}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="mt-2 inline-flex items-center gap-1 text-xs font-medium text-stone-500 hover:text-stone-800"
-        >
-          View post on Instagram
-          <ExternalLink className="h-3 w-3" />
-        </a>
-      )}
-
-      <div className="mt-4 pt-4 border-t border-stone-100">
-        <Outcome log={log} />
-      </div>
-    </div>
+    </Link>
   );
 }
 
-function Outcome({ log }) {
-  if (!log) {
-    return (
-      <div className="flex items-start gap-2">
-        <Pill tone="yellow" icon={Clock}>
-          Pending
-        </Pill>
-        <p className="text-xs text-stone-500 mt-1">
-          Classified but not yet processed for dispatch.
-        </p>
-      </div>
-    );
-  }
-
-  if (log.decided_action === "dm" && log.dispatched === true) {
-    return (
-      <div className="space-y-2">
-        <div className="flex items-center gap-2">
-          <Pill tone="green" icon={CheckCircle2}>
-            DM sent
-          </Pill>
-          {log.dispatched_at && (
-            <span className="text-xs text-stone-400">
-              {relativeTime(log.dispatched_at)}
-            </span>
-          )}
-        </div>
-        {log.rendered_dm && (
-          <div className="rounded-xl bg-stone-50 border border-stone-100 px-3 py-2 text-sm text-stone-700 leading-relaxed whitespace-pre-wrap">
-            {log.rendered_dm}
-          </div>
-        )}
-      </div>
-    );
-  }
-
-  if (log.decided_action === "dm" && log.dispatched === false) {
-    return (
-      <div className="space-y-2">
-        <div className="flex items-center gap-2">
-          <Pill tone="red" icon={XCircle}>
-            DM failed
-          </Pill>
-          {log.dispatch_retryable && (
-            <span className="text-xs text-stone-400">will retry</span>
-          )}
-        </div>
-        {log.dispatch_error && (
-          <div className="rounded-xl bg-red-50 border border-red-100 px-3 py-2 text-xs text-red-800 leading-relaxed whitespace-pre-wrap">
-            {log.dispatch_error}
-          </div>
-        )}
-      </div>
-    );
-  }
-
-  if (log.decided_action === "skip") {
-    return (
-      <div className="flex items-start gap-2">
-        <Pill tone="gray" icon={MinusCircle}>
-          No reply sent
-        </Pill>
-        <p className="text-xs text-stone-500 mt-1">
-          Configured to not auto-reply for this intent.
-        </p>
-      </div>
-    );
-  }
-
-  if (log.decided_action === "queue_review") {
-    return (
-      <div className="flex items-start gap-2">
-        <Pill tone="yellow" icon={Clock}>
-          Queued for review
-        </Pill>
-        <p className="text-xs text-stone-500 mt-1">
-          Held back for manual approval before any DM goes out.
-        </p>
-      </div>
-    );
-  }
-
+function Stat({ label, value, tone }) {
+  const toneClass =
+    {
+      green: "text-emerald-700",
+      red: "text-red-700",
+      yellow: "text-yellow-700",
+      gray: "text-stone-500",
+    }[tone] || "text-stone-700";
   return (
-    <div className="flex items-center gap-2">
-      <Pill tone="gray" icon={MinusCircle}>
-        {log.decided_action || "Unknown"}
-      </Pill>
-    </div>
-  );
-}
-
-function Pill({ tone, icon: Icon, children }) {
-  const tones = {
-    green: "bg-emerald-100 text-emerald-800",
-    red: "bg-red-100 text-red-800",
-    yellow: "bg-yellow-100 text-yellow-800",
-    gray: "bg-stone-100 text-stone-700",
-  };
-  return (
-    <span
-      className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-semibold ${tones[tone] || tones.gray}`}
-    >
-      {Icon && <Icon className="h-3 w-3" />}
-      {children}
+    <span className="inline-flex items-baseline gap-1">
+      <span className={`text-sm font-bold tabular-nums ${toneClass}`}>{value}</span>
+      <span className="text-xs text-stone-500">{label}</span>
     </span>
   );
+}
+
+function humanizeMediaType(type) {
+  if (!type) return "Post";
+  const t = String(type).toUpperCase();
+  if (t === "VIDEO") return "Video";
+  if (t === "REEL" || t === "REELS") return "Reel";
+  if (t === "CAROUSEL_ALBUM" || t === "CAROUSEL") return "Carousel";
+  if (t === "IMAGE") return "Photo";
+  return type[0].toUpperCase() + type.slice(1).toLowerCase();
+}
+
+function formatPostedAt(iso) {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "";
+  return d.toLocaleDateString(undefined, { month: "short", day: "numeric" });
 }
 
 function EmptyState() {
@@ -316,8 +276,8 @@ function EmptyState() {
       </h2>
       <p className="mt-2 text-sm text-stone-600 max-w-md mx-auto">
         Once you enable comment review on a post and a comment is left, you&rsquo;ll
-        see the original comment, our classification, and any reply sent on your
-        behalf here.
+        see the post here with the original comments, our classification, and
+        any reply sent on your behalf.
       </p>
       <div className="mt-6 flex justify-center gap-3 flex-wrap">
         <Link
