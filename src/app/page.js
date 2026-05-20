@@ -14,6 +14,7 @@ import Faq from "@/components/landing/faq";
 import FinalCta from "@/components/landing/final-cta";
 import Footer from "@/components/landing/footer";
 import JsonLd from "@/components/JsonLd";
+import RecoveryRedirect from "@/components/RecoveryRedirect";
 
 export const metadata = {
   title: "Clinchd: AI-Assisted Instagram DMs for Coaches",
@@ -159,6 +160,7 @@ const faqPageSchema = {
 export default function HomePage() {
   return (
     <div className="landing-theme min-h-screen flex flex-col">
+      <RecoveryRedirect />
       <JsonLd data={organizationSchema} />
       <JsonLd data={softwareSchema} />
       <JsonLd data={faqPageSchema} />
