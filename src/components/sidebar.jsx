@@ -36,6 +36,9 @@ const mainNavLinks = [
     label: "Comment to DM",
     icon: MessageCircleReply,
     activePaths: ["/comment-to-dm", "/comment-triggers", "/dm-templates"],
+    subLinks: [
+      { href: "/comment-to-dm/activity", label: "Activity" },
+    ],
   },
   { href: "/leads", label: "Leads", icon: Users },
   { href: "/calendar", label: "Calendar", icon: Calendar },
@@ -61,30 +64,54 @@ function SidebarContent({ pathname, onSignOut, conversationCount, onLinkClick })
 
       {/* Navigation */}
       <nav className="flex-1 px-4 py-4 space-y-1 overflow-y-auto">
-        {mainNavLinks.map(({ href, label, icon: Icon, showBadge, activePaths }) => {
+        {mainNavLinks.map(({ href, label, icon: Icon, showBadge, activePaths, subLinks }) => {
           const matchPaths = activePaths || [href];
           const isActive = matchPaths.some(
             (p) => pathname === p || pathname.startsWith(p + "/")
           );
           return (
-            <Link
-              key={href}
-              href={href}
-              onClick={onLinkClick}
-              className={`flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all ${
-                isActive
-                  ? "bg-[#fff5f2] text-[#ff7e67] font-semibold"
-                  : "text-stone-500 hover:bg-stone-50 hover:text-stone-900 font-medium"
-              }`}
-            >
-              <Icon className="h-5 w-5" />
-              <span>{label}</span>
-              {showBadge && conversationCount > 0 && (
-                <span className="ml-auto bg-[#ff7e67] text-white text-[10px] px-2 py-0.5 rounded-full">
-                  {conversationCount}
-                </span>
+            <div key={href}>
+              <Link
+                href={href}
+                onClick={onLinkClick}
+                className={`flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all ${
+                  isActive
+                    ? "bg-[#fff5f2] text-[#ff7e67] font-semibold"
+                    : "text-stone-500 hover:bg-stone-50 hover:text-stone-900 font-medium"
+                }`}
+              >
+                <Icon className="h-5 w-5" />
+                <span>{label}</span>
+                {showBadge && conversationCount > 0 && (
+                  <span className="ml-auto bg-[#ff7e67] text-white text-[10px] px-2 py-0.5 rounded-full">
+                    {conversationCount}
+                  </span>
+                )}
+              </Link>
+              {isActive && subLinks && subLinks.length > 0 && (
+                <div className="mt-1 ml-9 space-y-0.5">
+                  {subLinks.map((sub) => {
+                    const subActive =
+                      pathname === sub.href ||
+                      pathname.startsWith(sub.href + "/");
+                    return (
+                      <Link
+                        key={sub.href}
+                        href={sub.href}
+                        onClick={onLinkClick}
+                        className={`block px-3 py-1.5 rounded-lg text-sm transition-all ${
+                          subActive
+                            ? "text-[#ff7e67] font-semibold"
+                            : "text-stone-500 hover:text-stone-900 font-medium"
+                        }`}
+                      >
+                        {sub.label}
+                      </Link>
+                    );
+                  })}
+                </div>
               )}
-            </Link>
+            </div>
           );
         })}
 

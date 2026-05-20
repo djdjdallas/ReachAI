@@ -161,14 +161,12 @@ export default async function CommentToDmLandingPage() {
             {dmsCount === 1 ? "DM sent" : "DMs sent"} from comments
           </p>
         </div>
-        {dmsCount > 0 && (
-          <Link
-            href="/conversations"
-            className="text-sm font-semibold text-stone-600 hover:text-stone-900 inline-flex items-center gap-1 pb-1"
-          >
-            View conversations <ArrowRight className="h-4 w-4" />
-          </Link>
-        )}
+        <Link
+          href="/comment-to-dm/activity"
+          className="text-sm font-semibold text-stone-600 hover:text-stone-900 inline-flex items-center gap-1 pb-1"
+        >
+          View activity <ArrowRight className="h-4 w-4" />
+        </Link>
       </div>
     </div>
   );
