@@ -205,6 +205,45 @@ export async function sendInstagramMessage(igAccountId, recipientId, text, pageA
 }
 
 /**
+ * Sends a pre-recorded audio attachment via the Instagram Messaging API.
+ *
+ * Mirrors sendInstagramMessage but delivers an audio attachment from a
+ * URL Meta can fetch server-side. The URL must be reachable without
+ * auth and long-lived enough to survive Meta's retry behavior (10-minute
+ * signed URLs are the floor).
+ *
+ * @param {string} igAccountId      - Instagram Business Account ID (sender)
+ * @param {string} recipientId      - The recipient IGSID
+ * @param {string} audioUrl         - Publicly fetchable URL to the audio file
+ * @param {string} pageAccessToken  - Decrypted Page Access Token
+ */
+export async function sendInstagramAudio(igAccountId, recipientId, audioUrl, pageAccessToken) {
+  const url = `https://graph.instagram.com/${GRAPH_API_VERSION}/${igAccountId}/messages`;
+  const res = await fetch(url, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "Authorization": `Bearer ${pageAccessToken}`,
+    },
+    body: JSON.stringify({
+      recipient: { id: recipientId },
+      message: {
+        attachment: { type: "audio", payload: { url: audioUrl } },
+      },
+    }),
+  });
+
+  const data = await res.json();
+
+  if (data.error) {
+    console.error("Instagram send audio error:", data.error);
+    throw new Error(`Failed to send Instagram audio: ${data.error.message}`);
+  }
+
+  return data;
+}
+
+/**
  * Sends a private reply to an Instagram comment via Meta's Messaging API.
  *
  * Uses the same /{igAccountId}/messages endpoint as sendInstagramMessage,

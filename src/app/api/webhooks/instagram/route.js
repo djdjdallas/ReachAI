@@ -8,6 +8,14 @@ import { sendHotLeadAlert, sendBookingAlert } from "@/lib/notifications";
 import { getPostHogClient } from "@/lib/posthog-server";
 import { log } from "@/lib/logger";
 import { handleCommentEvent } from "@/lib/webhooks/comment-event";
+import {
+  classifyDMIntent,
+  DM_INTENT_VERSION,
+  DO_NOT_SEND_PAUSE_THRESHOLD,
+  VOICE_ROUTING_THRESHOLD,
+} from "@/lib/dm-intent";
+import { findVoiceSnippetForIntent, getSendableAudioUrl } from "@/lib/voice/matcher";
+import { sendVoiceMessage, logVoiceSend } from "@/lib/voice/sender";
 
 // ── GET: Meta webhook verification ──────────────────────────────────────
 
@@ -628,6 +636,111 @@ async function processIncomingMessage({
     }
   }
 
+  // ── DM intent classifier (always-on) ────────────────────────────────
+  // Runs regardless of human_in_loop. Used for voice routing below and
+  // for persisting an intent label on the messages row (powers the
+  // future Inbox Insights view). Split into three independent try blocks
+  // so a failure in persistence or telemetry doesn't kill the others.
+  // Fail-open across the board — the existing text reply path is the
+  // safety net.
+
+  // 1) Classify. The critical call. If this throws, dmIntent stays null
+  //    and voice routing short-circuits below.
+  let dmIntent = null;
+  try {
+    dmIntent = await classifyDMIntent({
+      messageText,
+      recentMessages: messages,
+      scriptConfig: sc,
+      offer: sc.offer,
+    });
+  } catch (err) {
+    log.warn("[webhook] dm intent classifier failed, falling through:", err?.message);
+  }
+
+  // 2) Persist. Best-effort write to messages.intent_classification.
+  //    A failure here (row not yet committed, provider_message_id absent)
+  //    does NOT block the PostHog capture below or downstream routing.
+  if (dmIntent && providerMessageId) {
+    try {
+      await supabase
+        .from("messages")
+        .update({
+          intent_classification: {
+            class: dmIntent.class,
+            confidence: dmIntent.confidence,
+            language: dmIntent.language,
+            reasoning: dmIntent.reasoning,
+            signals: dmIntent.signals,
+            version: DM_INTENT_VERSION,
+          },
+        })
+        .eq("conversation_id", conversation.id)
+        .eq("provider_message_id", providerMessageId);
+    } catch (err) {
+      log.warn("[webhook] failed to persist intent_classification:", err?.message);
+    }
+  }
+
+  // 3) Telemetry. Best-effort PostHog capture. Independent so a transient
+  //    PostHog failure doesn't lose the classification or block routing.
+  if (dmIntent) {
+    try {
+      getPostHogClient().capture({
+        distinctId: user.email || user.id,
+        event: "dm_intent_classified",
+        properties: {
+          conversation_id: conversation.id,
+          intent_class: dmIntent.class,
+          confidence: dmIntent.confidence,
+          language: dmIntent.language,
+          latency_ms: dmIntent.latencyMs,
+          input_tokens: dmIntent.inputTokens,
+          output_tokens: dmIntent.outputTokens,
+          cache_read_tokens: dmIntent.cacheReadTokens,
+          cache_write_tokens: dmIntent.cacheWriteTokens,
+        },
+      });
+    } catch (err) {
+      log.warn("[webhook] posthog capture failed:", err?.message);
+    }
+  }
+
+  // do_not_send → pause the conversation, exit cleanly. Mirrors the
+  // human_in_loop pause pattern but with a distinct reason code so the
+  // dashboard can render a different reason chip.
+  if (
+    dmIntent?.class === "do_not_send" &&
+    dmIntent.confidence >= DO_NOT_SEND_PAUSE_THRESHOLD
+  ) {
+    await supabase
+      .from("conversations")
+      .update({
+        ai_paused: true,
+        ai_pause_reason: "hostile_or_refund",
+        last_message_at: new Date().toISOString(),
+      })
+      .eq("id", conversation.id);
+    await logVoiceSend({
+      userId: user.id,
+      voiceSnippetId: null,
+      conversationId: conversation.id,
+      recipientPsid: senderId,
+      intentClass: dmIntent.class,
+      status: "skipped_do_not_send",
+    });
+    getPostHogClient().capture({
+      distinctId: user.email || user.id,
+      event: "dm_paused_do_not_send",
+      properties: {
+        conversation_id: conversation.id,
+        signals: dmIntent.signals,
+        reasoning: dmIntent.reasoning,
+      },
+    });
+    return;
+  }
+
   // If the conversation was started by a cold DM the coach sent natively but
   // we never saw the outbound text, fetch the active creator_offers row so the
   // prompt builder can ground the reply in the offer instead of falling back
@@ -660,6 +773,123 @@ async function processIncomingMessage({
     conversation,
     activeOffer,
   });
+
+  // ── Voice routing ──────────────────────────────────────────────────
+  // When the DM intent classifier returned a confident class AND the coach
+  // has an active voice snippet for that class, send the audio and exit
+  // before generateReply. Falls through to the text path on ANY failure
+  // (rate limit, signed-URL error, Meta send error) so the lead is never
+  // ghosted by a misfiring voice path.
+  if (dmIntent && dmIntent.confidence >= VOICE_ROUTING_THRESHOLD) {
+    const { snippet: voiceSnippet, reason: voiceSkipReason } =
+      await findVoiceSnippetForIntent(user.id, dmIntent.class);
+
+    if (!voiceSnippet && voiceSkipReason === "kill_switch") {
+      // Observable signal for the Meta App Review window — confirms the
+      // kill switch is actively blocking sends on the reviewer account.
+      // 'no_snippet' and 'lookup_error' are intentionally NOT logged here
+      // (the former is noisy on every uncovered class; the latter already
+      // warns to console inside the matcher).
+      await logVoiceSend({
+        userId: user.id,
+        voiceSnippetId: null,
+        conversationId: conversation.id,
+        recipientPsid: senderId,
+        intentClass: dmIntent.class,
+        status: "skipped_kill_switch",
+      });
+    }
+
+    if (voiceSnippet) {
+      // Voice replies count toward Meta's 200/hr outbound DM cap. Reserve
+      // the slot first so we don't double-send if generateReply fires later.
+      let canSendVoice = true;
+      try {
+        const { data: allowed, error: rlErr } = await supabase.rpc(
+          "check_and_record_outbound",
+          { uid: user.id }
+        );
+        if (rlErr) {
+          log.warn("[webhook] voice outbound rate-limit RPC failed:", rlErr.message);
+        } else if (allowed === false) {
+          canSendVoice = false;
+          await logVoiceSend({
+            userId: user.id,
+            voiceSnippetId: voiceSnippet.id,
+            conversationId: conversation.id,
+            recipientPsid: senderId,
+            intentClass: dmIntent.class,
+            status: "fallback_text",
+            errorMessage: "rate_limited",
+          });
+        }
+      } catch (err) {
+        log.warn("[webhook] voice outbound rate-limit threw:", err?.message);
+      }
+
+      if (canSendVoice) {
+        try {
+          const audioUrl = await getSendableAudioUrl(voiceSnippet.storage_path);
+          await sendVoiceMessage({
+            igUserId: user.instagram_business_account_id,
+            encryptedAccessToken: user.meta_page_access_token,
+            recipientPsid: senderId,
+            audioUrl,
+          });
+
+          await supabase
+            .from("messages")
+            .insert({
+              conversation_id: conversation.id,
+              role: "assistant",
+              content: `[voice reply: ${voiceSnippet.label}]`,
+              source: "agent",
+            });
+
+          await supabase
+            .from("conversations")
+            .update({
+              last_message_at: new Date().toISOString(),
+              last_skip_reason: null,
+            })
+            .eq("id", conversation.id);
+
+          await logVoiceSend({
+            userId: user.id,
+            voiceSnippetId: voiceSnippet.id,
+            conversationId: conversation.id,
+            recipientPsid: senderId,
+            intentClass: dmIntent.class,
+            status: "sent",
+          });
+
+          getPostHogClient().capture({
+            distinctId: user.email || user.id,
+            event: "ai_reply_sent",
+            properties: {
+              conversation_id: conversation.id,
+              reply_mode: "voice",
+              intent_class: dmIntent.class,
+              snippet_id: voiceSnippet.id,
+            },
+          });
+
+          return;
+        } catch (err) {
+          log.error("[webhook] voice send failed, falling back to text:", err?.message);
+          await logVoiceSend({
+            userId: user.id,
+            voiceSnippetId: voiceSnippet.id,
+            conversationId: conversation.id,
+            recipientPsid: senderId,
+            intentClass: dmIntent.class,
+            status: "fallback_text",
+            errorMessage: err?.message || "voice_send_failed",
+          });
+        }
+      }
+    }
+  }
 
   let aiReply;
   try {

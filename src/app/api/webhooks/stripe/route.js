@@ -160,6 +160,14 @@ export async function POST(request) {
           updateData.plan = plan;
         }
 
+        // Voice Replies: kill switch follows the plan. Any non-unlimited
+        // plan (downgrade to base, etc.) disables voice immediately so a
+        // downgraded coach can't keep firing existing snippets. Upgrades
+        // back to unlimited do NOT auto-re-enable — coach contacts support.
+        if (plan && plan !== "unlimited") {
+          updateData.voice_replies_enabled = false;
+        }
+
         await supabase
           .from("users")
           .update(updateData)
@@ -182,6 +190,7 @@ export async function POST(request) {
           .update({
             subscription_status: "canceled",
             ai_mode: "off",
+            voice_replies_enabled: false,
           })
           .eq("stripe_customer_id", customerId);
 

@@ -17,6 +17,7 @@ import {
   MessageSquare,
   Send,
   MessageCircleReply,
+  Mic,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -40,6 +41,7 @@ const mainNavLinks = [
       { href: "/comment-to-dm/activity", label: "Activity" },
     ],
   },
+  { href: "/voice-replies", label: "Voice Replies", icon: Mic },
   { href: "/leads", label: "Leads", icon: Users },
   { href: "/calendar", label: "Calendar", icon: Calendar },
   { href: "/analytics", label: "Analytics", icon: BarChart3 },

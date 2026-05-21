@@ -36,10 +36,102 @@ This file is the source of truth for what's been built and is live in production
 | Hot-lead + booking email alerts | LIVE | 2026-04-12 | [link](#hot-lead--booking-email-alerts) |
 | Token refresh cron | LIVE | 2026-03-27 | [link](#token-refresh-cron) |
 | Encryption helper (AES-256-GCM) | LIVE | 2026-02-27 | [link](#encryption-helper-aes-256-gcm) |
+| Voice Replies + DM intent classifier | LIVE (Unlimited plan, kill-switch gated) | 2026-05-20 | [link](#voice-replies--dm-intent-classifier) |
 
 ---
 
 ## Detailed entries
+
+### Voice Replies + DM intent classifier
+
+**Date:** 2026-05-20
+
+**What it is.** Paying coaches on the Unlimited plan can upload short
+m4a/mp3/wav/ogg voice memos tagged with an intent class. When a lead's
+incoming DM matches the intent, the AI sends the coach's pre-recorded
+audio in place of a text reply. Hard product rule: coach-uploaded audio
+only — no AI-generated, cloned, or synthesized voices.
+
+**New DM-side AI classifier.** This release also introduces the first
+real DM intent classifier in the codebase: `classifyDMIntent` in
+`src/lib/dm-intent.js`. Architectural twin of `classifyComment` (Haiku
+4.5, forced tool use, ephemeral prompt cache, XML-escaped untrusted
+input, 8-second `Promise.race` timeout, multilingual + prompt-injection
+defense). Seven classes: `warm_intent`, `objection_price`,
+`objection_time`, `objection_trust`, `booking_cta`, `follow_up`,
+`do_not_send`. Runs on every inbound DM regardless of `human_in_loop`.
+
+**Where the code lives.**
+
+- `src/lib/dm-intent.js` — the classifier
+- `src/lib/voice/snippets.js` — list/create/toggle/delete + signed
+  playback URLs
+- `src/lib/voice/matcher.js` — kill-switch + do_not_send gate +
+  snippet lookup + 10-minute send URL
+- `src/lib/voice/sender.js` — Meta audio POST + `voice_send_log`
+  writer + send-count RPC bump
+- `src/lib/instagram.js` — new `sendInstagramAudio` sibling to
+  `sendInstagramMessage`
+- `src/lib/plan.js` — `canUseVoiceReplies(user)` Unlimited gate
+- `src/app/api/voice-snippets/{route,[id]/route,[id]/playback-url/route,upload-url/route}.js`
+- `src/app/api/webhooks/instagram/route.js` — Insertion A (classifier
+  + do_not_send pause) and Insertion B (voice routing) inside
+  `processIncomingMessage`
+- `src/app/(dashboard)/voice-replies/{page,VoiceRepliesClient}.jsx`
+- `src/components/voice/{VoiceUploader,VoiceSnippetCard}.jsx`
+
+**Schema (migrations 20260520120000 + 20260520120100).**
+
+- `users.voice_replies_enabled` (boolean, default `true`) — per-user
+  kill switch
+- `messages.intent_classification` (jsonb) — DM classifier output
+- `voice_snippets` (id, user_id, intent_class, label, storage_path,
+  duration_ms, mime_type, file_size_bytes, transcript, is_active,
+  send_count, consent_acknowledged_at, created_at, updated_at) — RLS
+  on `auth.uid() = user_id`; partial unique index on
+  `(user_id, intent_class) WHERE is_active = true`
+- `voice_send_log` (id, user_id, voice_snippet_id, conversation_id,
+  recipient_psid, intent_class, send_status, error_message, sent_at)
+  — RLS select-only; writes are service-role
+- RPC `increment_voice_send_count(snippet_id uuid)`
+- Storage bucket `voice-snippets` (private, 5 MB cap, audio mime
+  types) with insert/select/delete policies gating on
+  `(storage.foldername(name))[1] = auth.uid()::text`
+
+**Webhook integration.** Two insertions in `processIncomingMessage`:
+
+1. **Insertion A** — `classifyDMIntent` runs always, persists output
+   on the `messages` row, and fires `dm_intent_classified` PostHog.
+   On `do_not_send` with confidence ≥ 0.7, pauses the conversation
+   with `ai_pause_reason = 'hostile_or_refund'` and logs
+   `skipped_do_not_send` to `voice_send_log`.
+2. **Insertion B** — after `buildSystemPrompt` but before
+   `generateReply`. If `dmIntent.confidence >= 0.5` and the matcher
+   finds an active snippet for the class, reserves the outbound DM
+   slot via `check_and_record_outbound`, signs a 10-minute URL, POSTs
+   to Meta as an audio attachment, inserts a visible messages row
+   (`[voice reply: <label>]`), fires `ai_reply_sent` with
+   `reply_mode: 'voice'`, and returns. Any failure falls through to
+   the existing text reply path.
+
+**Plan gating.** `canUseVoiceReplies(user)` returns true for founders
+(via `isFounder`) OR for `plan === 'unlimited'` with
+`subscription_status ∈ ['active', 'trialing']`. Founder bypass
+governs the subscription gate ONLY — the per-user kill switch
+(`voice_replies_enabled`) is enforced inside the matcher even for
+founders.
+
+**Pre-deploy.** Run the commented-out
+`UPDATE public.users SET voice_replies_enabled = false WHERE email = 'highflyinnick@gmail.com';`
+in the Supabase SQL editor BEFORE making the page accessible — keeps
+the Meta App Review test account out of the voice path.
+
+**Followups deferred** (`docs/dm-intent-router-followups.md`): the
+audit also flagged 4 issues in the existing
+`classifyIncomingMessage` (no injection defense, sub-cache-min
+prompt, no SDK timeout, English-only). The new `dm-intent.js` fixes
+all four for itself; backport into `classifyIncomingMessage` after
+Meta App Review concludes.
 
 ### Instagram OAuth + webhook receiver
 - **Code:** `src/app/api/auth/instagram/{route.js,callback/route.js,disconnect/route.js}`, `src/app/api/webhooks/instagram/route.js`, `src/lib/instagram.js`
