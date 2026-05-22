@@ -341,3 +341,13 @@ TWILIO_PHONE_NUMBER
 2. If the requested feature appears in the Quick Reference table → check the Detailed Entries section for current state before proposing new work.
 3. If the feature appears in "Known gaps / not yet built" → confirm the gap still exists, then propose the build.
 4. If the feature isn't listed at all → it's either truly new OR documentation drifted. Confirm with the founder before committing significant work.
+
+---
+
+## Changelog
+
+### 2026-05-21 — Comment-to-DM bracket substitution fix
+- **Bug:** Coach saved a template like `hey [dominickjerell] heres the offer`. The renderer (`renderTemplate` in `src/lib/comment-trigger-rules.js`) only substitutes the four `{{TOKEN}}` placeholders, so the bracketed lowercase handle and the literal word "offer" were delivered to the lead verbatim. The editor already had a bracket-syntax warning, but it only fired for `[UPPERCASE]` tokens that matched a known name — `[dominickjerell]` (lowercase, unknown name) slipped through with zero feedback.
+- **Fix:** (1) Broadened the editor's bracket regex to `/\[([A-Za-z_][A-Za-z0-9_]*)\]/g` and split matches into two buckets — known names still get the one-click Convert button (now case-insensitive, normalizes to `{{UPPERCASE}}`); unknown names get a new soft warning panel listing the offending tokens and pointing at the available-tokens reference. (2) Added a server-side-only `console.warn` in `renderTemplate` when any `[bracketed_token]` survives substitution, so the next stray template shows up in logs without a user report. No schema changes, no DM hot-path changes, no API behavior changes — Meta App Review test path is byte-identical for correctly-written templates.
+- **Files:** `src/app/(dashboard)/dm-templates/TemplateEditor.jsx`, `src/lib/comment-trigger-rules.js`
+- **Verified:** `npm run build` ✓, `npx eslint` on both modified files ✓ (no findings), no Meta App Review impact.

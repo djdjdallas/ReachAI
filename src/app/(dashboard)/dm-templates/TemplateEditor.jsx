@@ -14,11 +14,15 @@ import { renderTemplate } from "@/lib/comment-trigger-rules";
 
 const CORAL = "#ff7e67";
 
-// Regex used in two places: (a) inline [BRACKET_SYNTAX] warning beneath the
-// textarea, (b) one-click convert to {{CURLY_BRACE_SYNTAX}}. Matches uppercase
-// + underscore tokens inside square brackets so it won't trip on prose like
-// "[just saying]". Anchored to the same shape as the renderer's tokens.
-const BRACKET_TOKEN_RE = /\[([A-Z_]+)\]/g;
+// Regex used in two places: (a) inline bracket-syntax warning beneath the
+// textarea, (b) one-click convert to {{CURLY_BRACE_SYNTAX}}. Matches any
+// identifier-shaped token inside square brackets — case-insensitive because
+// coaches paste from other tools that use [username]/[firstname], or even
+// type their own handle like [dominickjerell] expecting substitution. We
+// split matches into two buckets downstream: known names get a Convert
+// button, unknown names get a soft "won't be substituted" warning so the
+// coach doesn't ship a literal "[handle]" to a lead.
+const BRACKET_TOKEN_RE = /\[([A-Za-z_][A-Za-z0-9_]*)\]/g;
 const KNOWN_TOKENS = new Set([
   "COMMENTER_NAME",
   "POST_CAPTION_SNIPPET",
@@ -272,15 +276,34 @@ function TemplateCard({ meta, initialBody, onSave, renderCtx }) {
   const [state, setState] = useState("idle"); // idle | saving | saved | error
   const [error, setError] = useState(null);
 
-  // Detect [BRACKET_SYNTAX] usage. Coaches copy-pasting from other tools
-  // bring this and it silently survives renderTemplate(). One-click convert.
+  // Detect bracket-style placeholders. Two buckets, two remediations:
+  // known names get a one-click convert to {{NAME}}; unknown names (the
+  // [dominickjerell] case) get a soft warning pointing at the available
+  // tokens. Compare case-insensitively so [offer_name] and [OFFER_NAME]
+  // both count as known.
   const bracketMatches = body.match(BRACKET_TOKEN_RE) || [];
-  const hasKnownBracketToken = bracketMatches.some((m) =>
-    KNOWN_TOKENS.has(m.slice(1, -1))
+  const knownBracketTokens = bracketMatches.filter((m) =>
+    KNOWN_TOKENS.has(m.slice(1, -1).toUpperCase())
   );
+  const unknownBracketTokens = Array.from(
+    new Set(
+      bracketMatches.filter(
+        (m) => !KNOWN_TOKENS.has(m.slice(1, -1).toUpperCase())
+      )
+    )
+  );
+  const hasKnownBracketToken = knownBracketTokens.length > 0;
+  const hasUnknownBracketToken = unknownBracketTokens.length > 0;
 
   function handleConvert() {
-    setBody((prev) => prev.replace(BRACKET_TOKEN_RE, "{{$1}}"));
+    // Only rewrite recognized names. Leave unknown brackets alone in case
+    // they're intentional literal prose ("[redacted]"). Normalize to
+    // uppercase because the renderer's match is case-sensitive.
+    setBody((prev) =>
+      prev.replace(BRACKET_TOKEN_RE, (match, name) =>
+        KNOWN_TOKENS.has(name.toUpperCase()) ? `{{${name.toUpperCase()}}}` : match
+      )
+    );
   }
 
   // Auto-save on blur. Picked over an explicit Save button so the page
@@ -402,6 +425,23 @@ function TemplateCard({ meta, initialBody, onSave, renderCtx }) {
               >
                 Convert
               </button>
+            </div>
+          )}
+          {hasUnknownBracketToken && (
+            <div className="flex items-start gap-2 rounded-2xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+              <AlertTriangle className="h-3.5 w-3.5 shrink-0 mt-0.5" />
+              <div className="flex-1">
+                {unknownBracketTokens.slice(0, 3).map((t, i, arr) => (
+                  <span key={t}>
+                    <code className="font-mono">{t}</code>
+                    {i < arr.length - 1 ? ", " : ""}
+                  </span>
+                ))}
+                {unknownBracketTokens.length > 3 ? " and others" : ""} won&apos;t
+                be substituted — Clinchd only replaces the four{" "}
+                <code className="font-mono">{`{{TOKEN}}`}</code> names listed
+                above. Square brackets are sent to the lead exactly as typed.
+              </div>
             </div>
           )}
           <TemplatePreview body={body} context={renderCtx} />

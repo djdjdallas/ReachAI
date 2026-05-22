@@ -48,6 +48,16 @@ export function renderTemplate(template, context = {}) {
   for (const [token, value] of Object.entries(replacements)) {
     out = out.split(token).join(value);
   }
+  // Server-side breadcrumb when a [bracketed_token] survives render — the
+  // coach wrote unrecognized placeholder syntax (the dashboard editor warns
+  // on save now, but pre-existing rows still trip this). Skipped in the
+  // browser because the editor re-renders the preview on every keystroke.
+  if (typeof window === "undefined") {
+    const stray = out.match(/\[[A-Za-z_][A-Za-z0-9_]*\]/g);
+    if (stray) {
+      console.warn("[renderTemplate] unsubstituted bracket tokens:", stray);
+    }
+  }
   return out;
 }
 
