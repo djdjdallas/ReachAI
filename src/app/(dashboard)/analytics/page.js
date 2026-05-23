@@ -322,11 +322,11 @@ export default function AnalyticsPage() {
           <div className="flex items-center justify-between mb-2">
             <h3 className="text-lg font-extrabold">Bookings Over Time</h3>
             <span className="text-[10px] font-bold text-stone-400 uppercase tracking-widest">
-              Calls/day
+              Booked/day
             </span>
           </div>
           <p className="text-xs text-stone-400 mb-6">
-            Confirmed bookings by day, from Calendly or manual.
+            Calls booked per day, from Calendly or manual.
           </p>
           <Sparkline points={bookingsOverTime} color="#3b82f6" />
         </div>

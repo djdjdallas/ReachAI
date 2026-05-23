@@ -51,20 +51,23 @@ export async function GET(request) {
       .eq("user_id", userId)
       .gte("created_at", prevStart.toISOString())
       .lte("created_at", prevEnd.toISOString()),
+    // Filter bookings by booked_at (when the call was scheduled), not
+    // start_time (when the call happens). Otherwise future-dated bookings
+    // are excluded from the "last N days" KPIs.
     supabase
       .from("bookings")
-      .select("id, start_time, status, source")
+      .select("id, booked_at, start_time, status, source")
       .eq("user_id", userId)
       .eq("status", "confirmed")
-      .gte("start_time", start.toISOString())
-      .lte("start_time", end.toISOString()),
+      .gte("booked_at", start.toISOString())
+      .lte("booked_at", end.toISOString()),
     supabase
       .from("bookings")
-      .select("id, start_time, status")
+      .select("id, booked_at, status")
       .eq("user_id", userId)
       .eq("status", "confirmed")
-      .gte("start_time", prevStart.toISOString())
-      .lte("start_time", prevEnd.toISOString()),
+      .gte("booked_at", prevStart.toISOString())
+      .lte("booked_at", prevEnd.toISOString()),
     // RLS on messages restricts to conversations owned by the authed user.
     supabase
       .from("messages")
@@ -121,8 +124,8 @@ export async function GET(request) {
 
   const bookingsOverTime = buildDailySeries(start, days, (dayStart, dayEnd) =>
     bCur.filter((b) => {
-      if (!b.start_time) return false;
-      const t = new Date(b.start_time).getTime();
+      if (!b.booked_at) return false;
+      const t = new Date(b.booked_at).getTime();
       return t >= dayStart && t < dayEnd;
     }).length
   );
