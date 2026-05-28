@@ -49,7 +49,7 @@ const INDUSTRY_PRESETS = [
       targetCustomer:
         "DTC brand owners who get steady inbound DMs but let most of them go cold because they can't respond fast enough.",
       objections:
-        "I already have a chatbot: rigid bot flows kill conversions, we replace them with qualified 1:1 conversations.\nToo expensive: the average client recovers the cost in the first week of recovered DM conversions.",
+        "I already tried something like this: rigid flows kill conversions, we replace them with qualified 1:1 conversations.\nToo expensive: the average client recovers the cost in the first week of recovered DM conversions.",
     },
   },
   {
@@ -57,7 +57,7 @@ const INDUSTRY_PRESETS = [
     icon: Layers,
     title: "SaaS Founders",
     preview:
-      '"Automation is the name of the game. I saw your SaaS platform and thought..."',
+      '"Scaling lean is the name of the game. I saw your SaaS platform and thought..."',
     template: {
       offer:
         "1:1 onboarding accelerator for early-stage SaaS founders bottlenecked on manual customer setup.",
@@ -393,7 +393,7 @@ export default function Step2Script({
                 <span className="text-[#ff7e67] font-bold">[niche]</span>{" "}
                 increases response rates by up to{" "}
                 <span className="font-bold text-stone-900">42%</span>. Clinchd
-                fills these in automatically.
+                fills these in for you.
               </p>
             </div>
           </div>

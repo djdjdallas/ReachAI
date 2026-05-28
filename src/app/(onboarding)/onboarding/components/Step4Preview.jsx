@@ -473,9 +473,9 @@ export default function Step4Preview({
                       </div>
                       {greeting ||
                         (activeScenario === "cold"
-                          ? "Hey! Great to connect. We help e-commerce store owners automate their DM outreach and book more calls. Want me to share how it works?"
+                          ? "Hey! Great to connect. We help e-commerce store owners handle their DM outreach and book more calls. Want me to share how it works?"
                           : activeScenario === "objection"
-                          ? "I totally get that burnout, Jordan. Most programs just give you more 'to-do' lists. We focus strictly on building the automated systems so your business scales while you actually step back."
+                          ? "I totally get that burnout, Jordan. Most programs just give you more 'to-do' lists. We focus strictly on building the systems so your business scales while you actually step back."
                           : "Love the energy! Let me grab a time that works for a quick call — here's my calendar link.")}
                     </div>
                     <p className="text-[10px] text-stone-400 font-bold px-1 italic">

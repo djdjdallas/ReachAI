@@ -10,6 +10,7 @@ import {
   Lock,
   ArrowRight,
   Check,
+  CheckCircle2,
   BarChart3,
   MessageSquareText,
   CalendarCheck,
@@ -28,12 +29,19 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [deletedNotice, setDeletedNotice] = useState(false);
   const [resetNotice, setResetNotice] = useState(false);
+  const [verifiedNotice, setVerifiedNotice] = useState(false);
+  // Set when Supabase returns "Email not confirmed". Drives the friendly
+  // copy + resend button below the error banner.
+  const [emailUnconfirmed, setEmailUnconfirmed] = useState(false);
+  const [resendLoading, setResendLoading] = useState(false);
+  const [resendNotice, setResendNotice] = useState(null);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
     const params = new URLSearchParams(window.location.search);
     if (params.get("deleted") === "true") setDeletedNotice(true);
     if (params.get("reset") === "success") setResetNotice(true);
+    if (params.get("verified") === "1") setVerifiedNotice(true);
   }, []);
 
   const handleGoogleLogin = async () => {
@@ -50,6 +58,8 @@ export default function LoginPage() {
   const handleLogin = async (e) => {
     e.preventDefault();
     setError(null);
+    setEmailUnconfirmed(false);
+    setResendNotice(null);
     setLoading(true);
 
     try {
@@ -61,7 +71,16 @@ export default function LoginPage() {
 
       if (error) {
         posthog.capture("login_failed", { method: "email", error: error.message });
-        setError(error.message);
+        // Map Supabase's raw "Email not confirmed" to friendly copy + a
+        // visible resend affordance instead of a verbatim error string.
+        if (/email not confirmed/i.test(error.message)) {
+          setEmailUnconfirmed(true);
+          setError(
+            "Please confirm your email before signing in. Check your inbox or resend the confirmation below."
+          );
+        } else {
+          setError(error.message);
+        }
         return;
       }
 
@@ -73,6 +92,43 @@ export default function LoginPage() {
       setError("An unexpected error occurred. Please try again.");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleResendConfirmation = async () => {
+    if (!email) {
+      setResendNotice({
+        kind: "error",
+        message: "Enter your email above first.",
+      });
+      return;
+    }
+    setResendLoading(true);
+    setResendNotice(null);
+    try {
+      const supabase = createClient();
+      const { error: resendErr } = await supabase.auth.resend({
+        type: "signup",
+        email,
+        options: {
+          emailRedirectTo: `${window.location.origin}/login?verified=1`,
+        },
+      });
+      if (resendErr) {
+        setResendNotice({ kind: "error", message: resendErr.message });
+      } else {
+        setResendNotice({
+          kind: "success",
+          message: "Confirmation email resent.",
+        });
+      }
+    } catch (err) {
+      setResendNotice({
+        kind: "error",
+        message: "Couldn't resend right now. Try again in a moment.",
+      });
+    } finally {
+      setResendLoading(false);
     }
   };
 
@@ -139,7 +195,7 @@ export default function LoginPage() {
                     Real-Time Analytics
                   </h4>
                   <p className="text-sm text-stone-500 leading-relaxed">
-                    Monitor qualification rates and revenue generated in
+                    Track qualification rates and revenue generated in
                     real-time.
                   </p>
                 </div>
@@ -169,7 +225,7 @@ export default function LoginPage() {
                     Calendly Integration
                   </h4>
                   <p className="text-sm text-stone-500 leading-relaxed">
-                    Automatic booking for hot leads. No manual back-and-forth
+                    AI-assisted booking for hot leads. No manual back-and-forth
                     needed.
                   </p>
                 </div>
@@ -215,6 +271,13 @@ export default function LoginPage() {
               {resetNotice && (
                 <div className="mb-6 text-sm font-bold text-green-700 bg-green-50 border border-green-200 rounded-2xl px-4 py-3 text-center">
                   Password updated. Sign in with your new password.
+                </div>
+              )}
+
+              {verifiedNotice && (
+                <div className="mb-6 text-sm font-bold text-green-700 bg-green-50 border border-green-200 rounded-2xl px-4 py-3 flex items-center justify-center gap-2">
+                  <CheckCircle2 className="w-4 h-4" />
+                  Email confirmed — sign in below.
                 </div>
               )}
 
@@ -327,6 +390,35 @@ export default function LoginPage() {
                 {error && (
                   <div className="text-sm text-destructive bg-destructive/10 border border-destructive/20 rounded-2xl p-3">
                     {error}
+                  </div>
+                )}
+
+                {emailUnconfirmed && (
+                  <div className="space-y-2">
+                    {resendNotice && (
+                      <div
+                        className={`text-sm rounded-2xl px-4 py-2 ${
+                          resendNotice.kind === "success"
+                            ? "bg-green-50 border border-green-200 text-green-800 font-semibold"
+                            : "bg-destructive/10 border border-destructive/20 text-destructive"
+                        }`}
+                      >
+                        {resendNotice.message}
+                      </div>
+                    )}
+                    <button
+                      type="button"
+                      onClick={handleResendConfirmation}
+                      disabled={resendLoading}
+                      className="w-full py-3 bg-stone-50 border border-stone-200 rounded-2xl font-bold text-sm text-stone-900 hover:bg-stone-100 transition-all flex items-center justify-center gap-2 disabled:opacity-70"
+                    >
+                      {resendLoading ? (
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                      ) : (
+                        <Mail className="w-4 h-4" />
+                      )}
+                      Resend confirmation email
+                    </button>
                   </div>
                 )}
 

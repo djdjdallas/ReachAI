@@ -42,7 +42,7 @@ const faqs = [
   {
     question: "What if I have a VA already, can they use this too?",
     answer:
-      "Yes. Your VA can access the Clinchd dashboard to monitor conversations, take over chats, and review lead quality. Many coaches use Clinchd as their AI first responder and have their VA handle warm handoffs for complex conversations.",
+      "Yes. Your VA can access the Clinchd dashboard to review conversations, take over chats, and check lead quality. Many coaches use Clinchd as their AI first responder and have their VA handle warm handoffs for complex conversations.",
   },
 ];
 

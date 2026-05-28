@@ -218,7 +218,7 @@ function PostCard({ item, initial, templatesByClass, onChange }) {
                 }`}
               />
               <span className="sr-only">
-                {enabled ? "Disable monitoring" : "Enable monitoring"}
+                {enabled ? "Stop watching post" : "Start watching post"}
               </span>
             </button>
           </div>
@@ -390,8 +390,8 @@ export default function PostPicker({
           <h1 className="text-2xl font-bold tracking-tight">Comment to DM</h1>
         </div>
         <p className="text-sm text-stone-600">
-          Pick which posts Clinchd should monitor. When someone comments on
-          a monitored post, the classifier decides whether to DM, queue for
+          Pick which posts Clinchd should watch. When someone comments on
+          a watched post, the classifier decides whether to DM, queue for
           review, or ignore — based on your{" "}
           <Link href="/dm-templates" className="underline">
             DM templates
@@ -426,7 +426,7 @@ export default function PostPicker({
             color: "#78350f",
           }}
         >
-          No posts being monitored yet. Toggle a post ON below to start
+          No posts being watched yet. Toggle a post ON below to start
           replying to commenters with AI.
         </div>
       )}
@@ -451,7 +451,7 @@ export default function PostPicker({
       {items.length === 25 && (
         <p className="text-xs text-stone-500 text-center pt-2">
           Showing your 25 most recent posts. Pagination beyond 25 isn&apos;t
-          in this release — older posts can be monitored once we ship it.
+          in this release — older posts can be watched once we ship it.
         </p>
       )}
     </div>

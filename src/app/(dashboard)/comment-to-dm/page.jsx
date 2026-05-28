@@ -98,9 +98,9 @@ export default async function CommentToDmLandingPage() {
           <h1 className="text-2xl font-bold tracking-tight">Comment to DM</h1>
         </div>
         <p className="text-sm text-stone-600">
-          Turn comments on your Instagram posts into qualified DMs,
-          automatically. Two-step setup: pick which posts to monitor, then
-          write a DM template for each intent class.
+          Turn comments on your Instagram posts into qualified DMs.
+          Two-step setup: pick which posts to watch, then write a DM template
+          for each intent class.
         </p>
       </div>
 
@@ -109,7 +109,7 @@ export default async function CommentToDmLandingPage() {
           <AlertTriangle className="h-5 w-5 text-amber-700 shrink-0 mt-0.5" />
           <div className="text-sm">
             <p className="font-semibold text-amber-900">
-              You&rsquo;re monitoring posts but haven&rsquo;t written any DM
+              You&rsquo;re watching posts but haven&rsquo;t written any DM
               templates yet.
             </p>
             <p className="text-amber-800 mt-0.5">
@@ -125,9 +125,9 @@ export default async function CommentToDmLandingPage() {
         <StepCard
           stepNumber={1}
           icon={MessageCircleReply}
-          title="Pick posts to monitor"
-          description="Choose which Instagram posts Clinchd should watch. Every new comment on a monitored post gets classified by intent."
-          statLabel="posts monitored"
+          title="Pick posts to watch"
+          description="Choose which Instagram posts Clinchd should watch. Every new comment on a watched post gets classified by intent."
+          statLabel="posts watched"
           statValue={postsCount}
           isComplete={postsCount > 0}
           href="/comment-triggers"

@@ -4,7 +4,7 @@ import { useState, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import posthog from "posthog-js";
-import { Loader2 } from "lucide-react";
+import { Loader2, AlertCircle, X } from "lucide-react";
 
 import OnboardingHeader from "./components/OnboardingHeader";
 import Step1Connect from "./components/Step1Connect";
@@ -73,6 +73,38 @@ function OnboardingPage() {
   // AI/API errors surfaced to the user
   const [aiError, setAiError] = useState(null);
   const dismissError = () => setAiError(null);
+
+  // Instagram OAuth error from the callback redirect. The callback at
+  // /api/auth/instagram/callback redirects with ?error=<code> on failure
+  // (no_igba_id = personal account, invalid_state = CSRF/expired,
+  // callback_failed = outer catch). Surface a friendly banner instead of
+  // silently dropping the coach back on step 1.
+  const [igConnectError, setIgConnectError] = useState(null);
+
+  useEffect(() => {
+    if (!searchParams) return;
+    const code = searchParams.get("error");
+    if (!code) return;
+    const map = {
+      no_igba_id:
+        "It looks like you connected a personal Instagram account. Clinchd needs an Instagram Business or Creator account to qualify DMs. Switch your Instagram to a Business or Creator account and try again. Help: https://help.instagram.com/502981923235522",
+      invalid_state:
+        "Your connection attempt expired. Please click Connect Instagram to try again.",
+      callback_failed:
+        "Instagram didn't return a successful response. Try reconnecting, or contact support@clinchd.io if it keeps failing.",
+      auth_failed:
+        "Authorization was denied. Click Connect Instagram to try again.",
+    };
+    const message =
+      map[code] ||
+      "Something went wrong connecting your Instagram account. Try again, or contact support@clinchd.io.";
+    setIgConnectError({ code, message });
+    // Strip the error param so a refresh doesn't re-show the banner.
+    const params = new URLSearchParams(searchParams.toString());
+    params.delete("error");
+    const next = params.toString();
+    router.replace(`/onboarding${next ? `?${next}` : ""}`, { scroll: false });
+  }, [searchParams, router]);
 
   // Post-OAuth Instagram auto-import — background voice-profile import.
   // True while we're polling for it to finish (max ~8s).
@@ -689,6 +721,23 @@ function OnboardingPage() {
     <div className="min-h-screen flex flex-col">
       {/* Step 5 has its own header */}
       {step !== 5 && <OnboardingHeader currentStep={step} />}
+
+      {igConnectError && step === 1 && (
+        <div className="px-4 pt-4">
+          <div className="max-w-5xl mx-auto flex items-start gap-3 rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-900">
+            <AlertCircle className="mt-0.5 h-5 w-5 flex-shrink-0" />
+            <p className="flex-1 leading-relaxed">{igConnectError.message}</p>
+            <button
+              type="button"
+              onClick={() => setIgConnectError(null)}
+              aria-label="Dismiss"
+              className="rounded-sm p-1 opacity-70 transition-opacity hover:opacity-100"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+        </div>
+      )}
 
       {step === 1 && (
         <Step1Connect

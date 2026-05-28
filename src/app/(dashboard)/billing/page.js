@@ -79,6 +79,10 @@ export default function BillingPage() {
   const [profile, setProfile] = useState(null);
   const [checkoutLoading, setCheckoutLoading] = useState(null);
   const [portalLoading, setPortalLoading] = useState(false);
+  // User-visible billing error. Either checkout (Stripe Checkout link
+  // returned nothing / threw) or portal (manage-subscription link did the
+  // same). Cleared the next time the user clicks either button.
+  const [billingError, setBillingError] = useState(null);
 
   useEffect(() => {
     async function init() {
@@ -113,6 +117,7 @@ export default function BillingPage() {
 
   const handleSubscribe = async (planId) => {
     setCheckoutLoading(planId);
+    setBillingError(null);
     try {
       const res = await fetch("/api/stripe/create-checkout", {
         method: "POST",
@@ -120,36 +125,56 @@ export default function BillingPage() {
         body: JSON.stringify({ planId }),
       });
 
-      const data = await res.json();
+      const data = await res.json().catch(() => ({}));
 
       if (data.url) {
         posthog.capture("checkout_started", { plan_id: planId });
-        window.location.href = data.url;
+        window.location.assign(data.url);
+        // Leave the spinner up — we're navigating away. If something else
+        // goes wrong below, the finally block resets it.
+        return;
       }
+
+      // No URL = server didn't return a Checkout session. Surface it.
+      setBillingError(
+        "Couldn't start checkout. Try again, or contact support@clinchd.io."
+      );
+      setCheckoutLoading(null);
     } catch (err) {
       console.error("Error creating checkout:", err);
-    } finally {
+      setBillingError(
+        "Couldn't start checkout. Try again, or contact support@clinchd.io."
+      );
       setCheckoutLoading(null);
     }
   };
 
   const handleManageSubscription = async () => {
     setPortalLoading(true);
+    setBillingError(null);
     try {
       const res = await fetch("/api/stripe/create-portal", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
       });
 
-      const data = await res.json();
+      const data = await res.json().catch(() => ({}));
 
       if (data.url) {
         posthog.capture("subscription_portal_opened");
-        window.location.href = data.url;
+        window.location.assign(data.url);
+        return;
       }
+
+      setBillingError(
+        "Couldn't open the billing portal. Try again, or contact support@clinchd.io."
+      );
+      setPortalLoading(false);
     } catch (err) {
       console.error("Error creating portal:", err);
-    } finally {
+      setBillingError(
+        "Couldn't open the billing portal. Try again, or contact support@clinchd.io."
+      );
       setPortalLoading(false);
     }
   };
@@ -190,9 +215,23 @@ export default function BillingPage() {
       <div>
         <h1 className="text-2xl font-bold">Billing</h1>
         <p className="text-muted-foreground mt-1">
-          Manage your subscription and monitor usage.
+          Manage your subscription and track usage.
         </p>
       </div>
+
+      {billingError && (
+        <div className="flex items-start gap-3 rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-900 dark:border-red-900/40 dark:bg-red-950/30 dark:text-red-100">
+          <span className="flex-1">{billingError}</span>
+          <button
+            type="button"
+            onClick={() => setBillingError(null)}
+            className="rounded-sm p-1 opacity-70 transition-opacity hover:opacity-100"
+            aria-label="Dismiss"
+          >
+            <span aria-hidden>×</span>
+          </button>
+        </div>
+      )}
 
       {/* Current Plan & Usage */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">

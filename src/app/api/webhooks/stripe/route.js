@@ -52,14 +52,30 @@ export async function POST(request) {
             console.error("Failed to retrieve checkout line items:", err.message);
           }
 
+          // Mirror the .updated handler: if trial expiry hard-flipped
+          // ai_mode to 'off', restore on checkout completion. We always
+          // resolve to subscription_status='active' here so no extra
+          // status guard is needed. 'handoff' is intentionally preserved.
+          const { data: currentUser } = await supabase
+            .from("users")
+            .select("ai_mode")
+            .eq("id", userId)
+            .maybeSingle();
+
+          const updateData = {
+            subscription_status: "active",
+            stripe_customer_id: session.customer,
+            stripe_subscription_id: session.subscription,
+            plan,
+          };
+
+          if (currentUser?.ai_mode === "off") {
+            updateData.ai_mode = "active";
+          }
+
           await supabase
             .from("users")
-            .update({
-              subscription_status: "active",
-              stripe_customer_id: session.customer,
-              stripe_subscription_id: session.subscription,
-              plan,
-            })
+            .update(updateData)
             .eq("id", userId);
 
           getPostHogClient().capture({
@@ -155,9 +171,30 @@ export async function POST(request) {
           plan = getPlanFromPriceId(subscription.items.data[0].price.id);
         }
 
+        // Fetch current ai_mode so we can decide whether to restore it on
+        // reactivation. Trial expiry (webhook AI path + /api/ai/reply C1
+        // gate) hard-flips ai_mode='off'; without restoration here a
+        // coach who pays after expiry comes back as a silent account.
+        const { data: currentUser } = await supabase
+          .from("users")
+          .select("ai_mode")
+          .eq("stripe_customer_id", customerId)
+          .maybeSingle();
+
         const updateData = { subscription_status: subscriptionStatus };
         if (plan) {
           updateData.plan = plan;
+        }
+
+        // Reactivation: only flip ai_mode back to 'active' when the
+        // subscription is becoming active AND the account is currently
+        // hard-off. The '=== off' guard preserves an intentional
+        // 'handoff' choice (e.g. Meta App Review window).
+        if (
+          subscriptionStatus === "active" &&
+          currentUser?.ai_mode === "off"
+        ) {
+          updateData.ai_mode = "active";
         }
 
         // Voice Replies + Drip: kill switches follow the plan. Any

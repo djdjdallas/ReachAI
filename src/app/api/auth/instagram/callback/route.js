@@ -118,9 +118,13 @@ export async function GET(request) {
         event: "instagram_connection_failed",
         properties: { reason: "no_igba_id" },
       });
-      return NextResponse.redirect(
-        `${baseUrl}/onboarding?step=1&error=no_igba_id`
-      );
+      // Route already-onboarded coaches (reconnects) back to /settings so
+      // the IG card's error banner can render. New coaches stay on the
+      // onboarding step so the funnel doesn't break.
+      const errorRedirect = profile?.onboarding_completed
+        ? `${baseUrl}/settings?error=no_igba_id`
+        : `${baseUrl}/onboarding?step=1&error=no_igba_id`;
+      return NextResponse.redirect(errorRedirect);
     }
 
     // Save Instagram connection details

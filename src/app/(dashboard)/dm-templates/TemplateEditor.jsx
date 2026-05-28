@@ -110,7 +110,7 @@ function buildPlaceholderRows(values) {
       resolved: values.postCaption,
       sourceLabel: values.postCaptionIsSample
         ? "sample — no comments yet"
-        : "from your most recent monitored post",
+        : "from your most recent watched post",
       missing: false,
     },
     {

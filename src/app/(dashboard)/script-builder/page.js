@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import posthog from "posthog-js";
@@ -27,6 +27,8 @@ import {
   Compass,
   Wand2,
   Info,
+  AlertCircle,
+  X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -120,6 +122,21 @@ export default function ScriptBuilderPage() {
   // Preview conversation
   const [previewMessages, setPreviewMessages] = useState([]);
 
+  // User-visible error state. `source` controls which card the banner
+  // appears above; `message` is the human-readable copy. Auto-clears after
+  // 5 seconds via the effect below.
+  // Sources: 'voice' (analyze/chat handlers), 'generate' (script gen),
+  //          'save' (script save).
+  const [error, setError] = useState(null);
+  const errorTimerRef = useRef(null);
+
+  useEffect(() => {
+    if (!error) return;
+    clearTimeout(errorTimerRef.current);
+    errorTimerRef.current = setTimeout(() => setError(null), 5000);
+    return () => clearTimeout(errorTimerRef.current);
+  }, [error]);
+
   useEffect(() => {
     async function init() {
       const {
@@ -186,6 +203,7 @@ export default function ScriptBuilderPage() {
 
     if (messages.length < 3) return;
 
+    setError(null);
     setAnalyzingVoice(true);
     try {
       const res = await fetch("/api/ai/analyze-voice", {
@@ -194,21 +212,31 @@ export default function ScriptBuilderPage() {
         body: JSON.stringify({ sample_messages: messages }),
       });
 
-      const data = await res.json();
-      if (data.voice_profile) {
-        setVoiceProfile(data.voice_profile);
-        setVoiceMode(null);
-        setSampleText("");
-        posthog.capture("voice_analyzed", { method: "paste" });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.voice_profile) {
+        setError({
+          source: "voice",
+          message: "We couldn't analyze your voice profile. Try again in a moment.",
+        });
+        return;
       }
+      setVoiceProfile(data.voice_profile);
+      setVoiceMode(null);
+      setSampleText("");
+      posthog.capture("voice_analyzed", { method: "paste" });
     } catch (err) {
       console.error("Error analyzing voice:", err);
+      setError({
+        source: "voice",
+        message: "We couldn't analyze your voice profile. Try again in a moment.",
+      });
     } finally {
       setAnalyzingVoice(false);
     }
   };
 
   const handleStartVoiceChat = async () => {
+    setError(null);
     setVoiceMode("chat");
     setVoiceChatMessages([]);
     setVoiceChatLoading(true);
@@ -228,12 +256,21 @@ export default function ScriptBuilderPage() {
         }),
       });
 
-      const data = await res.json();
-      if (data.reply) {
-        setVoiceChatMessages([{ role: "assistant", content: data.reply }]);
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.reply) {
+        setError({
+          source: "voice",
+          message: "Voice chat is temporarily unavailable. Refresh and try again.",
+        });
+        return;
       }
+      setVoiceChatMessages([{ role: "assistant", content: data.reply }]);
     } catch (err) {
       console.error("Error starting voice chat:", err);
+      setError({
+        source: "voice",
+        message: "Voice chat is temporarily unavailable. Refresh and try again.",
+      });
     } finally {
       setVoiceChatLoading(false);
     }
@@ -241,6 +278,8 @@ export default function ScriptBuilderPage() {
 
   const handleSendVoiceChat = async () => {
     if (!voiceChatInput.trim() || voiceChatLoading) return;
+
+    setError(null);
 
     const newMessages = [
       ...voiceChatMessages,
@@ -266,21 +305,31 @@ export default function ScriptBuilderPage() {
         }),
       });
 
-      const data = await res.json();
-      if (data.reply) {
-        setVoiceChatMessages([
-          ...newMessages,
-          { role: "assistant", content: data.reply },
-        ]);
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.reply) {
+        setError({
+          source: "voice",
+          message: "Voice chat is temporarily unavailable. Refresh and try again.",
+        });
+        return;
       }
+      setVoiceChatMessages([
+        ...newMessages,
+        { role: "assistant", content: data.reply },
+      ]);
     } catch (err) {
       console.error("Error in voice chat:", err);
+      setError({
+        source: "voice",
+        message: "Voice chat is temporarily unavailable. Refresh and try again.",
+      });
     } finally {
       setVoiceChatLoading(false);
     }
   };
 
   const handleFinalizeVoiceChat = async () => {
+    setError(null);
     setFinalizingVoice(true);
     try {
       const res = await fetch("/api/ai/voice-chat", {
@@ -299,15 +348,24 @@ export default function ScriptBuilderPage() {
         }),
       });
 
-      const data = await res.json();
-      if (data.voice_profile) {
-        setVoiceProfile(data.voice_profile);
-        setVoiceMode(null);
-        setVoiceChatMessages([]);
-        posthog.capture("voice_analyzed", { method: "chat" });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.voice_profile) {
+        setError({
+          source: "voice",
+          message: "Voice chat is temporarily unavailable. Refresh and try again.",
+        });
+        return;
       }
+      setVoiceProfile(data.voice_profile);
+      setVoiceMode(null);
+      setVoiceChatMessages([]);
+      posthog.capture("voice_analyzed", { method: "chat" });
     } catch (err) {
       console.error("Error finalizing voice:", err);
+      setError({
+        source: "voice",
+        message: "Voice chat is temporarily unavailable. Refresh and try again.",
+      });
     } finally {
       setFinalizingVoice(false);
     }
@@ -409,6 +467,7 @@ export default function ScriptBuilderPage() {
   };
 
   const handleGenerateScript = async () => {
+    setError(null);
     setGenerating(true);
     try {
       const res = await fetch("/api/ai/generate-script", {
@@ -417,37 +476,50 @@ export default function ScriptBuilderPage() {
         body: JSON.stringify({ offer, targetCustomer, objections }),
       });
 
-      const data = await res.json();
+      const data = await res.json().catch(() => ({}));
 
-      if (data.script) {
-        const script = data.script;
-        setGreeting(script.greeting || "");
-        setQualifyingQuestions(
-          Array.isArray(script.qualifying_questions)
-            ? script.qualifying_questions.join("\n")
-            : script.qualifying_questions || ""
-        );
-        setInterestResponse(script.interest_response || "");
-        setObjectionHandlers(
-          typeof script.objection_handlers === "object" &&
-            !Array.isArray(script.objection_handlers)
-            ? Object.entries(script.objection_handlers)
-                .map(([k, v]) => `${k}: ${v}`)
-                .join("\n")
-            : script.objection_handlers || ""
-        );
-        setBookingMessage(script.booking_message || "");
-        setNotAFitMessage(script.not_a_fit_message || "");
-        posthog.capture("script_generated");
+      if (!res.ok || !data.script) {
+        setError({
+          source: "generate",
+          message:
+            "Script generation failed. Check your inputs and try again, or contact support@clinchd.io.",
+        });
+        return;
       }
+
+      const script = data.script;
+      setGreeting(script.greeting || "");
+      setQualifyingQuestions(
+        Array.isArray(script.qualifying_questions)
+          ? script.qualifying_questions.join("\n")
+          : script.qualifying_questions || ""
+      );
+      setInterestResponse(script.interest_response || "");
+      setObjectionHandlers(
+        typeof script.objection_handlers === "object" &&
+          !Array.isArray(script.objection_handlers)
+          ? Object.entries(script.objection_handlers)
+              .map(([k, v]) => `${k}: ${v}`)
+              .join("\n")
+          : script.objection_handlers || ""
+      );
+      setBookingMessage(script.booking_message || "");
+      setNotAFitMessage(script.not_a_fit_message || "");
+      posthog.capture("script_generated");
     } catch (err) {
       console.error("Error generating script:", err);
+      setError({
+        source: "generate",
+        message:
+          "Script generation failed. Check your inputs and try again, or contact support@clinchd.io.",
+      });
     } finally {
       setGenerating(false);
     }
   };
 
   const handleSave = async () => {
+    setError(null);
     setSaving(true);
     try {
       const scriptConfig = {
@@ -463,7 +535,7 @@ export default function ScriptBuilderPage() {
         script_mode: scriptMode,
       };
 
-      await supabase
+      const { error: dbErr } = await supabase
         .from("users")
         .update({
           script_config: scriptConfig,
@@ -471,9 +543,16 @@ export default function ScriptBuilderPage() {
         })
         .eq("id", user.id);
 
+      if (dbErr) throw dbErr;
+
       posthog.capture("script_saved");
     } catch (err) {
       console.error("Error saving script:", err);
+      setError({
+        source: "save",
+        message:
+          "Couldn't save your changes. Check your connection and try again — your edits are still here.",
+      });
     } finally {
       setSaving(false);
     }
@@ -502,6 +581,25 @@ export default function ScriptBuilderPage() {
       </div>
     );
   }
+
+  const errorBannerFor = (source) =>
+    error?.source === source ? (
+      <div
+        className="flex items-start gap-2 rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-900 dark:border-red-900/40 dark:bg-red-950/30 dark:text-red-100"
+        role="alert"
+      >
+        <AlertCircle className="mt-0.5 h-4 w-4 flex-shrink-0" />
+        <span className="flex-1">{error.message}</span>
+        <button
+          type="button"
+          onClick={() => setError(null)}
+          aria-label="Dismiss"
+          className="rounded-sm p-0.5 opacity-70 transition-opacity hover:opacity-100"
+        >
+          <X className="h-3.5 w-3.5" />
+        </button>
+      </div>
+    ) : null;
 
   return (
     <div className="space-y-6 p-6">
@@ -552,7 +650,8 @@ export default function ScriptBuilderPage() {
                   </div>
                 </div>
               </CardHeader>
-              <CardContent>
+              <CardContent className="space-y-4">
+                {errorBannerFor("voice")}
                 {voiceProfile?.status === "ready" && !voiceMode ? (
                   // Configured state — show voice summary
                   <div className="space-y-4">
@@ -789,6 +888,7 @@ export default function ScriptBuilderPage() {
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-5">
+                {errorBannerFor("generate")}
                 <div className="space-y-2">
                   <Label htmlFor="offer" className="flex items-center gap-2">
                     <ShoppingBag className="h-3.5 w-3.5" />
@@ -883,6 +983,7 @@ export default function ScriptBuilderPage() {
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-5">
+                {errorBannerFor("save")}
                 {/* Script Mode Toggle */}
                 <div className="rounded-xl border bg-muted/30 p-4 space-y-3">
                   <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">

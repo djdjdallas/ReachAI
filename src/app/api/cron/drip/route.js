@@ -29,11 +29,13 @@ export async function GET(request) {
       Date.now() - 14 * 24 * 60 * 60 * 1000
     ).toISOString();
 
+    // Includes trialing users so a coach who closes the tab mid-onboarding
+    // still gets the welcome / activation drip during their 7-day trial.
     const { data: stragglers } = await supabase
       .from("users")
       .select("id")
       .is("drip_enrolled_at", null)
-      .eq("subscription_status", "active")
+      .in("subscription_status", ["active", "trialing"])
       .gte("created_at", fourteenDaysAgo);
 
     if (stragglers && stragglers.length > 0) {
@@ -48,13 +50,15 @@ export async function GET(request) {
       }
     }
 
-    // Find users enrolled in drip who haven't finished all steps
+    // Find users enrolled in drip who haven't finished all steps. Includes
+    // trialing users (matches the straggler enrollment above) so the welcome
+    // drip reaches a coach during their 7-day trial, not only after they pay.
     const { data: users, error: queryErr } = await supabase
       .from("users")
       .select("id, email, full_name, drip_enrolled_at, drip_step")
       .not("drip_enrolled_at", "is", null)
       .lt("drip_step", DRIP_SEQUENCE.length)
-      .eq("subscription_status", "active");
+      .in("subscription_status", ["active", "trialing"]);
 
     if (queryErr) {
       console.error("Drip cron query error:", queryErr);

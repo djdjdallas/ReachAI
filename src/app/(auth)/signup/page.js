@@ -15,6 +15,7 @@ import {
   CalendarCheck,
   ShieldCheck,
   UserCheck,
+  CheckCircle2,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import posthog from "posthog-js";
@@ -26,6 +27,18 @@ export default function SignupPage() {
   const [fullName, setFullName] = useState("");
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(false);
+  // Inline post-submit state: instead of routing straight into onboarding
+  // (which only worked because Supabase confirmation was effectively off),
+  // we show a "Check your inbox" panel that mirrors the email Supabase
+  // sends. Tracks the email so resend works after a stale page reload.
+  const [checkEmailSent, setCheckEmailSent] = useState(false);
+  const [pendingEmail, setPendingEmail] = useState("");
+  const [resendLoading, setResendLoading] = useState(false);
+  const [resendNotice, setResendNotice] = useState(null);
+  // Suppress the unused warning while preserving the import; router is kept
+  // for future use (e.g. if confirmation is disabled in the dashboard we
+  // could fall back to direct routing).
+  void router;
 
   const handleGoogleSignup = async () => {
     const supabase = createClient();
@@ -51,6 +64,10 @@ export default function SignupPage() {
           data: {
             full_name: fullName,
           },
+          // Land confirmed users on /login with a success banner so they
+          // can sign in. /callback would also work but bounces through OAuth
+          // logic; /login is the simpler honest path.
+          emailRedirectTo: `${window.location.origin}/login?verified=1`,
         },
       });
 
@@ -61,12 +78,47 @@ export default function SignupPage() {
 
       posthog.identify(email, { email, full_name: fullName });
       posthog.capture("user_signed_up", { email, full_name: fullName });
-      router.push("/onboarding");
+      setPendingEmail(email);
+      setCheckEmailSent(true);
     } catch (err) {
       setError("An unexpected error occurred. Please try again.");
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleResend = async () => {
+    if (!pendingEmail) return;
+    setResendLoading(true);
+    setResendNotice(null);
+    try {
+      const supabase = createClient();
+      const { error: resendErr } = await supabase.auth.resend({
+        type: "signup",
+        email: pendingEmail,
+        options: {
+          emailRedirectTo: `${window.location.origin}/login?verified=1`,
+        },
+      });
+      if (resendErr) {
+        setResendNotice({ kind: "error", message: resendErr.message });
+      } else {
+        setResendNotice({ kind: "success", message: "Confirmation email resent." });
+      }
+    } catch (err) {
+      setResendNotice({
+        kind: "error",
+        message: "Couldn't resend right now. Try again in a moment.",
+      });
+    } finally {
+      setResendLoading(false);
+    }
+  };
+
+  const handleStartOver = () => {
+    setCheckEmailSent(false);
+    setPendingEmail("");
+    setResendNotice(null);
   };
 
   return (
@@ -133,7 +185,7 @@ export default function SignupPage() {
                     Real-Time Analytics
                   </h4>
                   <p className="text-sm text-stone-500 leading-relaxed">
-                    Monitor qualification rates and revenue generated in
+                    Track qualification rates and revenue generated in
                     real-time.
                   </p>
                 </div>
@@ -163,7 +215,7 @@ export default function SignupPage() {
                     Calendly Integration
                   </h4>
                   <p className="text-sm text-stone-500 leading-relaxed">
-                    Automatic booking for hot leads. No manual back-and-forth
+                    AI-assisted booking for hot leads. No manual back-and-forth
                     needed.
                   </p>
                 </div>
@@ -193,6 +245,58 @@ export default function SignupPage() {
           {/* Form */}
           <div className="w-full max-w-md mx-auto">
             <div className="bg-white rounded-[2.5rem] p-8 sm:p-10 soft-shadow border border-stone-100">
+              {checkEmailSent ? (
+                <div className="space-y-6 text-center">
+                  <div className="mx-auto w-14 h-14 rounded-2xl bg-green-50 flex items-center justify-center">
+                    <CheckCircle2 className="w-7 h-7 text-green-500" />
+                  </div>
+                  <div className="space-y-2">
+                    <h2 className="text-3xl font-black">Check your inbox</h2>
+                    <p className="text-sm text-stone-500 font-medium leading-relaxed">
+                      We sent a confirmation link to{" "}
+                      <span className="font-bold text-stone-900">
+                        {pendingEmail}
+                      </span>
+                      . Click it to finish signing up.
+                    </p>
+                  </div>
+                  {resendNotice && (
+                    <div
+                      className={`text-sm rounded-2xl px-4 py-3 text-left ${
+                        resendNotice.kind === "success"
+                          ? "bg-green-50 border border-green-200 text-green-800 font-semibold"
+                          : "bg-destructive/10 border border-destructive/20 text-destructive"
+                      }`}
+                    >
+                      {resendNotice.message}
+                    </div>
+                  )}
+                  <button
+                    type="button"
+                    onClick={handleResend}
+                    disabled={resendLoading}
+                    className="w-full py-4 bg-stone-50 border border-stone-200 rounded-2xl font-bold text-stone-900 hover:bg-stone-100 transition-all flex items-center justify-center gap-2 disabled:opacity-70"
+                  >
+                    {resendLoading ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <Mail className="w-4 h-4" />
+                    )}
+                    Resend confirmation email
+                  </button>
+                  <p className="text-sm text-stone-500">
+                    Wrong email?{" "}
+                    <button
+                      type="button"
+                      onClick={handleStartOver}
+                      className="text-[#ff7e67] font-bold hover:underline"
+                    >
+                      Sign up again
+                    </button>
+                  </p>
+                </div>
+              ) : (
+              <>
               <div className="mb-8 text-center">
                 <h2 className="text-3xl font-black mb-2">Create Account</h2>
                 <p className="text-sm text-stone-500 font-medium">
@@ -377,6 +481,8 @@ export default function SignupPage() {
                   </span>
                 </div>
               </div>
+              </>
+              )}
             </div>
 
             <p className="mt-8 text-center text-xs font-bold text-stone-400 uppercase tracking-widest leading-relaxed px-4">

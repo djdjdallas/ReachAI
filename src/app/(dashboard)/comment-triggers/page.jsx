@@ -79,7 +79,7 @@ export default async function CommentTriggersPage() {
           <h1 className="text-2xl font-bold">Connect Instagram first</h1>
           <p className="mt-2 text-stone-600">
             We need an Instagram Business account connected before you can
-            pick posts to monitor.
+            pick posts to watch.
           </p>
           <div className="mt-6">
             <Link

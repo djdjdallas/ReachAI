@@ -231,6 +231,13 @@ export default function DashboardPage() {
   if (loading) return <DashboardSkeleton />;
 
   const igConnected = !!profile?.instagram_business_account_id;
+  // Surface expired Meta tokens up here too — otherwise the coach has to
+  // navigate to /settings to discover why replies stopped going out.
+  const igTokenExpiresAt = profile?.meta_token_expires_at
+    ? new Date(profile.meta_token_expires_at)
+    : null;
+  const igTokenExpired =
+    igConnected && igTokenExpiresAt && igTokenExpiresAt < new Date();
 
   const statCards = [
     {
@@ -265,6 +272,23 @@ export default function DashboardPage() {
   return (
     <div className="space-y-8 p-8">
       {/* Warning banners */}
+      {igTokenExpired && (
+        <div className="flex items-center gap-3 p-4 rounded-2xl border border-red-200 bg-red-50">
+          <AlertTriangle className="h-5 w-5 text-red-600 shrink-0" />
+          <div className="flex-1">
+            <p className="text-sm font-medium text-red-700">
+              Instagram connection expired
+            </p>
+            <p className="text-xs text-red-600/80">
+              Reconnect Instagram to resume AI replies — incoming DMs aren&apos;t
+              being answered right now.
+            </p>
+          </div>
+          <Button size="sm" variant="outline" asChild>
+            <Link href="/settings">Reconnect</Link>
+          </Button>
+        </div>
+      )}
       {!igConnected && (
         <div className="flex items-center gap-3 p-4 rounded-2xl border border-yellow-200 bg-yellow-50">
           <Instagram className="h-5 w-5 text-yellow-600 shrink-0" />
@@ -273,7 +297,7 @@ export default function DashboardPage() {
               Instagram not connected
             </p>
             <p className="text-xs text-yellow-600/70">
-              Connect your Instagram to start handling DMs automatically.
+              Connect your Instagram so your AI can start handling DMs.
             </p>
           </div>
           <Button size="sm" variant="outline" asChild>

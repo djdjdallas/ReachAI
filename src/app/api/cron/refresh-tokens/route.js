@@ -58,9 +58,21 @@ export async function GET(request) {
 
       refreshed++;
     } catch (err) {
-      console.error(`Token refresh failed for user ${user.id}:`, err.message);
+      // Greppable prefix so server logs can be filtered for cron token
+      // failures. Settings + dashboard now show an expiry banner derived
+      // from meta_token_expires_at, so a stuck token won't be silent on
+      // the user side; this log is for ops triage.
+      console.error(
+        `[refresh-tokens] user=${user.id} expires_at=${user.meta_token_expires_at} error=${err?.message || "unknown"}`
+      );
       failed++;
     }
+  }
+
+  if (failed > 0) {
+    console.error(
+      `[refresh-tokens] summary refreshed=${refreshed} failed=${failed} total=${(users || []).length}`
+    );
   }
 
   return NextResponse.json({

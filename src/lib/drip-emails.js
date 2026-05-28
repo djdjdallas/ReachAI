@@ -119,7 +119,7 @@ export const DRIP_SEQUENCE = [
   ${p("<strong style=\"color:#1c1917;\">Here\u2019s your 3-step setup:</strong>")}
   ${checklist([
     { title: "Connect your Instagram", link: "{{app_url}}/settings", linkText: "Connect" },
-    { title: "Build your AI script", link: "{{app_url}}/script", linkText: "Build script" },
+    { title: "Build your AI script", link: "{{app_url}}/script-builder", linkText: "Build script" },
     { title: "Activate your AI agent", link: "{{app_url}}/settings", linkText: "Go live" },
   ])}
   ${button("Set Up My Account", "{{app_url}}/onboarding")}
@@ -138,7 +138,7 @@ export const DRIP_SEQUENCE = [
   ${h1("Time to make your AI sound like you")}
   ${p("The script builder is where the magic happens. Tell the AI about your offer, your ideal client, and the questions that matter \u2014 it\u2019ll handle the rest.")}
   ${tipBox("<strong>\uD83D\uDCA1 Pro tip:</strong> Use your voice profile so the AI matches your natural tone. Prospects can\u2019t tell it\u2019s not you.")}
-  ${button("Build My Script", "{{app_url}}/script")}
+  ${button("Build My Script", "{{app_url}}/script-builder")}
   ${divider()}
   ${p("<span style=\"font-size:14px;color:#a8a29e;\">Most users finish their script in under 10 minutes.</span>")}
 `,

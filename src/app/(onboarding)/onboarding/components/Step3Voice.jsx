@@ -591,10 +591,10 @@ export default function Step3Voice({
                             </div>
                             <div className="flex items-start gap-3 justify-end">
                               <div className="bg-[#ff7e67] p-4 rounded-2xl rounded-tr-none text-xs text-white max-w-[85%] leading-relaxed">
-                                It&apos;s super simple. Clinchd monitors your DMs
-                                24/7, qualifies leads based on your script, and
-                                drops your Calendly link when they&apos;re ready to
-                                talk!{traits.emojis ? " \ud83d\ude80" : ""}
+                                It&apos;s super simple. Clinchd stays on top of
+                                your DMs around the clock, qualifies leads based
+                                on your script, and drops your Calendly link when
+                                they&apos;re ready to talk!{traits.emojis ? " \ud83d\ude80" : ""}
                               </div>
                               <div className="w-8 h-8 rounded-full bg-[#ff7e67]/30 flex-shrink-0 flex items-center justify-center">
                                 <Zap className="w-3 h-3 text-white" />

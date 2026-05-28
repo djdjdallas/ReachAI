@@ -76,6 +76,9 @@ export default function SettingsPage() {
   // Instagram
   const [disconnecting, setDisconnecting] = useState(false);
   const [showInstagramDenied, setShowInstagramDenied] = useState(false);
+  // OAuth error redirected here from the callback for already-onboarded
+  // coaches (the callback now sends no_igba_id → /settings for them).
+  const [igConnectError, setIgConnectError] = useState(null);
 
   // Calendly status messages
   const [calendlyNotice, setCalendlyNotice] = useState(null);
@@ -96,6 +99,20 @@ export default function SettingsPage() {
     const err = searchParams.get("error");
     if (err && err.startsWith("calendly_")) {
       setCalendlyNotice({ kind: "error", error: err });
+      router.replace("/settings", { scroll: false });
+    }
+    if (err === "no_igba_id" || err === "invalid_state" || err === "callback_failed" || err === "auth_failed") {
+      const map = {
+        no_igba_id:
+          "It looks like you connected a personal Instagram account. Clinchd needs an Instagram Business or Creator account. Switch your Instagram to a Business or Creator account and try again. Help: https://help.instagram.com/502981923235522",
+        invalid_state:
+          "Your reconnect attempt expired. Click Reconnect to try again.",
+        callback_failed:
+          "Instagram didn't return a successful response. Try reconnecting, or contact support@clinchd.io if it keeps failing.",
+        auth_failed:
+          "Authorization was denied. Click Reconnect to try again.",
+      };
+      setIgConnectError({ code: err, message: map[err] });
       router.replace("/settings", { scroll: false });
     }
   }, [searchParams, router]);
@@ -472,6 +489,26 @@ export default function SettingsPage() {
 
   const isInstagramConnected = !!profile?.instagram_business_account_id;
 
+  // Token expiry derivations. The cron at /api/cron/refresh-tokens proactively
+  // refreshes tokens expiring in ≤7 days, but if that fails (user revoked,
+  // 60-day lapse), the token can be past expiry while the connection row
+  // still looks "Connected". Surface both states so the coach can reconnect
+  // before — and especially after — replies start silently failing.
+  const igTokenExpiresAt = profile?.meta_token_expires_at
+    ? new Date(profile.meta_token_expires_at)
+    : null;
+  const igExpired =
+    isInstagramConnected && igTokenExpiresAt && igTokenExpiresAt < new Date();
+  const igDaysUntilExpiry =
+    igTokenExpiresAt
+      ? Math.floor((igTokenExpiresAt - new Date()) / (1000 * 60 * 60 * 24))
+      : null;
+  const igExpiringSoon =
+    isInstagramConnected &&
+    !igExpired &&
+    igDaysUntilExpiry !== null &&
+    igDaysUntilExpiry <= 7;
+
   return (
     <div className="space-y-6 p-6 max-w-3xl">
       <div>
@@ -562,10 +599,45 @@ export default function SettingsPage() {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
+          {igConnectError && (
+            <div className="flex items-start gap-3 rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-900 dark:border-red-900/40 dark:bg-red-950/30 dark:text-red-100">
+              <AlertTriangle className="mt-0.5 h-5 w-5 flex-shrink-0" />
+              <p className="flex-1 leading-relaxed">{igConnectError.message}</p>
+              <button
+                type="button"
+                onClick={() => setIgConnectError(null)}
+                aria-label="Dismiss"
+                className="rounded-sm p-1 opacity-70 transition-opacity hover:opacity-100"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+          )}
+          {igExpired && (
+            <div className="flex items-start gap-3 rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-900 dark:border-red-900/40 dark:bg-red-950/30 dark:text-red-100">
+              <AlertTriangle className="mt-0.5 h-5 w-5 flex-shrink-0" />
+              <p className="flex-1">
+                Your Instagram connection has expired. Reconnect to resume AI
+                replies.
+              </p>
+            </div>
+          )}
+          {igExpiringSoon && (
+            <div className="flex items-start gap-3 rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900 dark:border-amber-900/40 dark:bg-amber-950/30 dark:text-amber-100">
+              <AlertTriangle className="mt-0.5 h-5 w-5 flex-shrink-0" />
+              <p className="flex-1">
+                Your Instagram connection expires in {igDaysUntilExpiry}{" "}
+                {igDaysUntilExpiry === 1 ? "day" : "days"}. Reconnect now to
+                avoid interruption.
+              </p>
+            </div>
+          )}
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <span className="text-sm font-medium">Status:</span>
-              {isInstagramConnected ? (
+              {igExpired ? (
+                <Badge variant="destructive">Expired</Badge>
+              ) : isInstagramConnected ? (
                 <Badge variant="success">Connected</Badge>
               ) : (
                 <Badge variant="muted">Not Connected</Badge>
@@ -668,13 +740,13 @@ export default function SettingsPage() {
           </CardTitle>
           <CardDescription>
             Connect Calendly to share your booking link in DMs and track
-            bookings automatically.
+            bookings as they come in.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           {calendlyNotice?.kind === "success" && (
             <div className="rounded-md border border-green-200 bg-green-50 p-3 text-sm text-green-900 dark:border-green-900/40 dark:bg-green-950/30 dark:text-green-100">
-              Calendly connected. Bookings will sync automatically.
+              Calendly connected. Bookings will sync as they come in.
             </div>
           )}
           {calendlyNotice?.kind === "warning" &&
@@ -1023,7 +1095,7 @@ export default function SettingsPage() {
             <div>
               <p className="text-sm font-medium">Agent Mode</p>
               <p className="text-xs text-muted-foreground">
-                {aiMode === "active" && "Agent is responding to DMs automatically."}
+                {aiMode === "active" && "Agent is actively responding to DMs."}
                 {aiMode === "handoff" && "Messages are logged but the agent won\u2019t reply. You can reply manually."}
                 {aiMode === "off" && "Complete silence. No messages logged, no replies sent."}
               </p>
@@ -1280,7 +1352,7 @@ export default function SettingsPage() {
         open={confirmDisconnectInstagramOpen}
         onOpenChange={setConfirmDisconnectInstagramOpen}
         title="Disconnect Instagram?"
-        description="ReachAI will stop responding to DMs on your Instagram account. You can reconnect anytime."
+        description="Clinchd will stop responding to DMs on your Instagram account. You can reconnect anytime."
         confirmText="Disconnect"
         loading={disconnecting}
         onConfirm={handleDisconnectInstagram}

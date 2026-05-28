@@ -209,7 +209,7 @@ export default function AnalyticsPage() {
               <Link href="/settings" className="underline font-semibold">
                 Settings → Revenue Tracking
               </Link>{" "}
-              and it will appear here automatically.
+              and it will appear here.
             </p>
           </div>
         </div>

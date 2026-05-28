@@ -78,7 +78,8 @@ export default function Step5GoLive({
           </h1>
           <p className="text-stone-500 text-xl font-medium max-w-2xl mx-auto">
             Link your script and voice profiles to activation. Once live,
-            Clinchd will monitor your DMs 24/7 to book qualified calls.
+            Clinchd will stay on top of your DMs around the clock to book
+            qualified calls.
           </p>
 
           {/* Activation Toggle */}
@@ -147,8 +148,8 @@ export default function Step5GoLive({
           {[
             {
               icon: Monitor,
-              title: "DMs Monitored",
-              desc: "Clinchd scans every incoming Instagram DM in real-time, even while you sleep or work on your business.",
+              title: "DMs Reviewed",
+              desc: "Clinchd reads every incoming Instagram DM in real-time, even while you sleep or work on your business.",
               color: "bg-blue-50 text-blue-500",
             },
             {
@@ -160,7 +161,7 @@ export default function Step5GoLive({
             {
               icon: CalendarCheck,
               title: "Calls Booked",
-              desc: "When a lead is hot, your Calendly link is dropped automatically. You show up to pre-qualified calls.",
+              desc: "When a lead is hot, your Calendly link is dropped in the chat. You show up to pre-qualified calls.",
               color: "bg-green-50 text-green-500",
             },
           ].map(({ icon: Icon, title, desc, color }) => (
@@ -211,7 +212,7 @@ export default function Step5GoLive({
                 },
                 {
                   icon: Eye,
-                  title: "Real-Time Monitoring",
+                  title: "Real-Time Visibility",
                   desc: "Watch every reply live",
                   iconBg: "bg-white/10 text-white",
                 },

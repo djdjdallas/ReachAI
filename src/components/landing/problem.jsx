@@ -12,7 +12,7 @@ const painPoints = [
     icon: Bot,
     title: "ManyChat feels robotic",
     description:
-      "You tried flow-based automation but the rigid decision trees feel impersonal, take hours to set up, and still miss the nuance of a real conversation.",
+      "You tried flow-based tools but the rigid decision trees feel impersonal, take hours to set up, and still miss the nuance of a real conversation.",
   },
   {
     icon: MoonStar,
