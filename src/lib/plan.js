@@ -26,3 +26,33 @@ export function canUseVoiceReplies(user) {
   if (user.plan !== "unlimited") return false;
   return user.subscription_status === "active" || user.subscription_status === "trialing";
 }
+
+/**
+ * Returns true when the user is allowed to use Drip Sequences (in-window
+ * follow-up nudges). Mirrors canUseVoiceReplies exactly.
+ *
+ * Gating rules:
+ *   - Founders bypass the subscription gate so we can dogfood on the
+ *     production account.
+ *   - Everyone else needs plan === 'unlimited' AND a subscription_status of
+ *     'active' or 'trialing'.
+ *
+ * IMPORTANT: founder bypass covers the SUBSCRIPTION gate ONLY. The per-user
+ * master toggle (users.drip_enabled) is the kill switch for ALL users,
+ * founder included — it is checked separately at enqueue time (webhook
+ * Insertion C) and re-verified at fire time (drip processor, Condition 1).
+ * A founder can browse /drip-sequences but no nudge fires until they flip
+ * drip_enabled on, which keeps the Meta App Review test account safe by
+ * default.
+ *
+ * @param {object} user - public.users row (must include plan, email,
+ *                        subscription_status)
+ * @returns {boolean}
+ */
+export function canUseDripSequences(user) {
+  if (!user) return false;
+  if (isFounder(user.email)) return true;
+  const okPlan = user.plan === "unlimited";
+  const okStatus = ["active", "trialing"].includes(user.subscription_status);
+  return okPlan && okStatus;
+}

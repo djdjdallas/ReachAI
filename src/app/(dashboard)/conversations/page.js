@@ -213,6 +213,8 @@ function ConversationsPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [summarizing, setSummarizing] = useState(false);
+  const [scheduledDrip, setScheduledDrip] = useState(null);
+  const [cancelingDrip, setCancelingDrip] = useState(false);
 
   const scrollToBottom = useCallback(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -316,6 +318,58 @@ function ConversationsPage() {
       setMessages([]);
     }
   }, [selectedConvo?.id, fetchMessages]);
+
+  // Load any scheduled follow-up nudge for the selected conversation so we can
+  // render the "Follow-up scheduled in X hours" badge. Silently no-ops for
+  // non-Unlimited accounts (the endpoint 403s and we just show nothing).
+  useEffect(() => {
+    let canceled = false;
+    if (!selectedConvo?.id) {
+      setScheduledDrip(null);
+      return;
+    }
+    fetch(`/api/drip-queue/conversation/${selectedConvo.id}`)
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (!canceled) setScheduledDrip(data?.drip || null);
+      })
+      .catch(() => {
+        if (!canceled) setScheduledDrip(null);
+      });
+    return () => {
+      canceled = true;
+    };
+  }, [selectedConvo?.id]);
+
+  const handleCancelDrip = async () => {
+    if (!selectedConvo || cancelingDrip) return;
+    setCancelingDrip(true);
+    // Optimistic clear.
+    const prev = scheduledDrip;
+    setScheduledDrip(null);
+    try {
+      const res = await fetch(`/api/drip-queue/conversation/${selectedConvo.id}`, {
+        method: "DELETE",
+      });
+      if (!res.ok) {
+        setScheduledDrip(prev);
+        return;
+      }
+      posthog.capture("drip_canceled_manual", { conversation_id: selectedConvo.id });
+    } catch {
+      setScheduledDrip(prev);
+    } finally {
+      setCancelingDrip(false);
+    }
+  };
+
+  function dripHoursFromNow(scheduledAt) {
+    if (!scheduledAt) return null;
+    const ms = new Date(scheduledAt).getTime() - Date.now();
+    if (ms <= 0) return "soon";
+    const hours = Math.round(ms / (1000 * 60 * 60));
+    return hours <= 1 ? "under 1h" : `${hours}h`;
+  }
 
   useEffect(() => {
     if (!user?.id) return;
@@ -462,6 +516,15 @@ function ConversationsPage() {
         user_id: user.id,
         conversation_id: selectedConvo.id,
       });
+    }
+
+    // A terminal status means no follow-up nudge should fire — cancel any
+    // scheduled one. Best-effort; the drip processor also re-checks status at
+    // fire time, so this is a fast-path UX cancel, not the only guard.
+    if (newStatus === "booked" || newStatus === "not_a_fit") {
+      fetch(`/api/drip-queue/conversation/${selectedConvo.id}`, {
+        method: "DELETE",
+      }).catch(() => {});
     }
   };
 
@@ -871,6 +934,22 @@ function ConversationsPage() {
                     <p className="text-[11px] font-medium text-stone-500">
                       Activity: {timeAgo(selectedConvo.updated_at)}
                     </p>
+                    {scheduledDrip && scheduledDrip.status === "scheduled" && (
+                      <div className="mt-1 inline-flex items-center gap-2">
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase bg-[#fff5f2] text-[#ff7e67] border border-[#ff7e67]/20">
+                          <Send className="h-2.5 w-2.5" />
+                          Follow-up in {dripHoursFromNow(scheduledDrip.scheduled_at)}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={handleCancelDrip}
+                          disabled={cancelingDrip}
+                          className="text-[10px] font-medium text-stone-400 hover:text-stone-600 underline underline-offset-2 disabled:opacity-50"
+                        >
+                          Cancel follow-up
+                        </button>
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
@@ -1047,16 +1126,21 @@ function ConversationsPage() {
                     // pre-migration manual replies will render as "AI".
                     const isManualReply = msg.source === "manual";
                     const isNativeSend = msg.source === "native_send";
+                    const isDrip = msg.source === "drip";
                     const outboundLabel = isManualReply
                       ? "You"
                       : isNativeSend
                         ? "Sent from IG mobile"
-                        : "AI";
+                        : isDrip
+                          ? "Follow-up nudge"
+                          : "AI";
                     const OutboundIcon = isManualReply
                       ? User
                       : isNativeSend
                         ? Smartphone
-                        : Bot;
+                        : isDrip
+                          ? Send
+                          : Bot;
                     return (
                       <div key={msg.id}>
                         {isOutbound ? (

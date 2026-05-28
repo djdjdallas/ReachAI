@@ -351,3 +351,23 @@ TWILIO_PHONE_NUMBER
 - **Fix:** (1) Broadened the editor's bracket regex to `/\[([A-Za-z_][A-Za-z0-9_]*)\]/g` and split matches into two buckets — known names still get the one-click Convert button (now case-insensitive, normalizes to `{{UPPERCASE}}`); unknown names get a new soft warning panel listing the offending tokens and pointing at the available-tokens reference. (2) Added a server-side-only `console.warn` in `renderTemplate` when any `[bracketed_token]` survives substitution, so the next stray template shows up in logs without a user report. No schema changes, no DM hot-path changes, no API behavior changes — Meta App Review test path is byte-identical for correctly-written templates.
 - **Files:** `src/app/(dashboard)/dm-templates/TemplateEditor.jsx`, `src/lib/comment-trigger-rules.js`
 - **Verified:** `npm run build` ✓, `npx eslint` on both modified files ✓ (no findings), no Meta App Review impact.
+
+## 2026-05-27 — Drip Sequences v1 (Version A: in-window nudges)
+- New tables: dm_drip_templates, dm_drip_queue
+- New columns: users.drip_enabled (default false), users.drip_delay_hours (default 18, CHECK 6-22)
+- messages.source extended to allow 'drip'
+- New page: /drip-sequences (Unlimited-gated, deploy-dark)
+- New cron: /api/cron/drip-process every 15 minutes (Vercel Pro required)
+- New PostHog events: drip_scheduled, drip_canceled, drip_fired
+- Text-only for v1 (no voice drips)
+- One drip per conversation enforced via partial unique index
+  (drip_queue_one_active_per_conversation, scoped to scheduled/processing)
+- 24-hour Meta window: enforced via drip_delay_hours CHECK (6-22)
+  AND 23.5h safety check in processor before send
+- 8 conditions re-verified at fire time, every drip
+- Stripe webhook updated: drip_enabled flipped false on downgrade/cancel,
+  scheduled drips canceled
+- Default OFF for all users including founder — opt-in via UI
+- DEPLOY NOTE: requires CRON_SECRET env var in Vercel; */15 cron requires
+  Vercel Pro. If on Hobby, move to Supabase pg_cron. (vercel.json already
+  carries two daily crons — confirm the plan supports sub-daily schedules.)

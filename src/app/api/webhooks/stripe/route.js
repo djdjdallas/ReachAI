@@ -160,18 +160,41 @@ export async function POST(request) {
           updateData.plan = plan;
         }
 
-        // Voice Replies: kill switch follows the plan. Any non-unlimited
-        // plan (downgrade to base, etc.) disables voice immediately so a
-        // downgraded coach can't keep firing existing snippets. Upgrades
-        // back to unlimited do NOT auto-re-enable — coach contacts support.
+        // Voice Replies + Drip: kill switches follow the plan. Any
+        // non-unlimited plan (downgrade to base, etc.) disables both
+        // immediately so a downgraded coach can't keep firing existing
+        // snippets or queued nudges. Upgrades back to unlimited do NOT
+        // auto-re-enable — coach contacts support.
         if (plan && plan !== "unlimited") {
           updateData.voice_replies_enabled = false;
+          updateData.drip_enabled = false;
         }
 
         await supabase
           .from("users")
           .update(updateData)
           .eq("stripe_customer_id", customerId);
+
+        // When drip is being disabled by a downgrade, cancel every scheduled
+        // nudge for that coach so nothing fires mid-cycle after they downgrade.
+        if (updateData.drip_enabled === false) {
+          const { data: downgraded } = await supabase
+            .from("users")
+            .select("id")
+            .eq("stripe_customer_id", customerId)
+            .maybeSingle();
+          if (downgraded?.id) {
+            await supabase
+              .from("dm_drip_queue")
+              .update({
+                status: "canceled",
+                skip_reason: "user_drip_disabled_by_stripe",
+                updated_at: new Date().toISOString(),
+              })
+              .eq("user_id", downgraded.id)
+              .eq("status", "scheduled");
+          }
+        }
         break;
       }
 
@@ -191,8 +214,22 @@ export async function POST(request) {
             subscription_status: "canceled",
             ai_mode: "off",
             voice_replies_enabled: false,
+            drip_enabled: false,
           })
           .eq("stripe_customer_id", customerId);
+
+        // Cancel any scheduled follow-up nudges so none fire after cancellation.
+        if (canceledUser?.id) {
+          await supabase
+            .from("dm_drip_queue")
+            .update({
+              status: "canceled",
+              skip_reason: "user_drip_disabled_by_stripe",
+              updated_at: new Date().toISOString(),
+            })
+            .eq("user_id", canceledUser.id)
+            .eq("status", "scheduled");
+        }
 
         if (canceledUser) {
           getPostHogClient().capture({

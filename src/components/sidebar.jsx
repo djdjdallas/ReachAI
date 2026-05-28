@@ -42,6 +42,7 @@ const mainNavLinks = [
     ],
   },
   { href: "/voice-replies", label: "Voice Replies", icon: Mic },
+  { href: "/drip-sequences", label: "Follow-ups", icon: Send },
   { href: "/leads", label: "Leads", icon: Users },
   { href: "/calendar", label: "Calendar", icon: Calendar },
   { href: "/analytics", label: "Analytics", icon: BarChart3 },

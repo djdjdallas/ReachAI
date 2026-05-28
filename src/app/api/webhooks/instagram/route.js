@@ -561,6 +561,29 @@ async function processIncomingMessage({
   });
   if (insertResult.duplicate) return;
 
+  // Drip cancel (Insertion D)
+  // A genuine new inbound from the lead → cancel any scheduled follow-up
+  // nudge for this conversation. Runs here (after dedupe, BEFORE the intent
+  // classifier) so a lead reply always cancels the nudge even if the
+  // classifier later throws. Best-effort: never blocks the reply path.
+  try {
+    const { cancelDripForConversation } = await import("@/lib/drip/queue");
+    const canceled = await cancelDripForConversation(conversation.id, "lead_replied");
+    if (canceled > 0) {
+      getPostHogClient().capture({
+        distinctId: user.email || user.id,
+        event: "drip_canceled",
+        properties: {
+          conversation_id: conversation.id,
+          reason: "lead_replied",
+          count: canceled,
+        },
+      });
+    }
+  } catch (err) {
+    log.warn("[webhook] drip cancel failed:", err?.message);
+  }
+
   getPostHogClient().capture({
     distinctId: user.email || user.id,
     event: "message_received",
@@ -703,6 +726,60 @@ async function processIncomingMessage({
       });
     } catch (err) {
       log.warn("[webhook] posthog capture failed:", err?.message);
+    }
+  }
+
+  // Drip enqueue helper (Insertion C)
+  // Schedules a single in-window follow-up nudge after a successful AI reply
+  // (text OR voice). Called from both reply paths below with the conversation's
+  // effective status. Gates:
+  //   - drip_enabled must be true (the deploy-dark safety — no nudge is
+  //     scheduled for anyone until they opt in, founder included)
+  //   - the classified intent must be one of the 6 nudge-eligible classes.
+  //     do_not_send is excluded here (defense in depth — the do_not_send
+  //     branch already returns before either reply path runs)
+  //   - the conversation must still be in a follow-up-eligible status
+  // Best-effort: never throws into the reply path. enqueueDrip itself returns
+  // null (no throw) if a nudge is already scheduled for this conversation.
+  const DRIP_ELIGIBLE_CLASSES = [
+    "warm_intent",
+    "objection_price",
+    "objection_time",
+    "objection_trust",
+    "booking_cta",
+    "follow_up",
+  ];
+  async function maybeEnqueueDrip(effectiveStatus) {
+    if (
+      user.drip_enabled !== true ||
+      !dmIntent ||
+      !DRIP_ELIGIBLE_CLASSES.includes(dmIntent.class) ||
+      !["qualifying", "interested"].includes(effectiveStatus)
+    ) {
+      return;
+    }
+    try {
+      const { enqueueDrip } = await import("@/lib/drip/queue");
+      const enqueued = await enqueueDrip({
+        userId: user.id,
+        conversationId: conversation.id,
+        recipientPsid: senderId,
+        intentClass: dmIntent.class,
+        delayHours: user.drip_delay_hours || 18,
+      });
+      if (enqueued) {
+        getPostHogClient().capture({
+          distinctId: user.email || user.id,
+          event: "drip_scheduled",
+          properties: {
+            conversation_id: conversation.id,
+            intent_class: dmIntent.class,
+            delay_hours: user.drip_delay_hours || 18,
+          },
+        });
+      }
+    } catch (err) {
+      log.warn("[webhook] drip enqueue failed:", err?.message);
     }
   }
 
@@ -874,6 +951,11 @@ async function processIncomingMessage({
             },
           });
 
+          // Insertion C — schedule a follow-up nudge after the voice reply.
+          // The voice path returns before status detection, so use the
+          // conversation's current status.
+          await maybeEnqueueDrip(conversation.status);
+
           return;
         } catch (err) {
           log.error("[webhook] voice send failed, falling back to text:", err?.message);
@@ -1018,4 +1100,9 @@ async function processIncomingMessage({
       sendBookingAlert(user, conversation).catch(console.error);
     }
   }
+
+  // Insertion C — schedule a follow-up nudge after the text reply. Use the
+  // resolved status so a reply that just moved the lead to booked/not_a_fit
+  // never schedules a nudge.
+  await maybeEnqueueDrip(newStatus);
 }
