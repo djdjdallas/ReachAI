@@ -20,9 +20,13 @@ const GRAPH_BASE = `https://graph.facebook.com/${GRAPH_API_VERSION}`;
 export function getOAuthUrl(state) {
   const appId = process.env.INSTAGRAM_APP_ID;
   const redirectUri = `${process.env.NEXT_PUBLIC_APP_URL}/api/auth/instagram/callback`;
+  // instagram_business_manage_comments powers comment-to-DM. It is requested at
+  // connect time so it appears on the Instagram consent screen and the coach
+  // grants it during OAuth.
   const scopes = [
     "instagram_business_basic",
     "instagram_business_manage_messages",
+    "instagram_business_manage_comments",
   ].join(",");
 
   return `https://www.instagram.com/oauth/authorize?client_id=${appId}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=${scopes}&response_type=code&state=${state}`;
