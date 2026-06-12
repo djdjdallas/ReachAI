@@ -2,6 +2,7 @@ import GsapProvider from "@/components/landing/gsap-provider";
 import Navbar from "@/components/landing/navbar";
 import Hero from "@/components/landing/hero";
 import Problem from "@/components/landing/problem";
+import WhoItsFor from "@/components/landing/who-its-for";
 import TrustedBy from "@/components/landing/trusted-by";
 import HowItWorks from "@/components/landing/how-it-works";
 import Features from "@/components/landing/features";
@@ -77,7 +78,7 @@ const softwareSchema = {
       price: "197",
       priceCurrency: "USD",
       priceValidUntil: "2027-12-31",
-      description: "Unlimited DMs/month, advanced analytics, priority support, custom AI personality tuning.",
+      description: "Unlimited conversations/month, voice replies in your own recorded audio, advanced analytics, priority support, custom AI personality tuning.",
     },
   ],
   description:
@@ -108,10 +109,34 @@ const faqPageSchema = {
     },
     {
       "@type": "Question",
-      name: "How is Clinchd different from ManyChat?",
+      name: "Do I need to be doing $50k a month?",
       acceptedAnswer: {
         "@type": "Answer",
-        text: "ManyChat uses rigid decision-tree flows and charges per contact. Clinchd is an AI-native setter that understands context, handles objections dynamically, and qualifies leads like a real sales rep for a flat $97/mo. No flows to build, no per-contact fees.",
+        text: "No. Clinchd is built for coaches earning well below that. If you have more DMs than hours, you're the fit. There's no application and no minimum to clear.",
+      },
+    },
+    {
+      "@type": "Question",
+      name: "Is this just a chatbot with a script?",
+      acceptedAnswer: {
+        "@type": "Answer",
+        text: "No. It reads what each person actually says, figures out intent, and responds in your tone. If someone gets hostile or asks for a refund, it steps back instead of barreling ahead.",
+      },
+    },
+    {
+      "@type": "Question",
+      name: "Do you fake my voice?",
+      acceptedAnswer: {
+        "@type": "Answer",
+        text: "Never a synthetic clone of you. On the Unlimited plan you can record your own audio snippets and Clinchd uses your real voice on the replies that fit. What you record is what they hear.",
+      },
+    },
+    {
+      "@type": "Question",
+      name: "What does it cost? Really.",
+      acceptedAnswer: {
+        "@type": "Answer",
+        text: "$97/month for up to 1,500 qualified conversations. $197/month for unlimited plus voice replies. The price is on this page because you shouldn't have to book a call to learn it.",
       },
     },
     {
@@ -170,6 +195,7 @@ export default function HomePage() {
           <Hero />
           <TrustedBy />
           <Problem />
+          <WhoItsFor />
           <HowItWorks />
           <Features />
           <ObjectionHandling />

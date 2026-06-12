@@ -5,6 +5,26 @@ import { ChevronDown } from "lucide-react";
 
 const faqs = [
   {
+    question: "Do I need to be doing $50k a month?",
+    answer:
+      "No. Clinchd is built for coaches earning well below that. If you have more DMs than hours, you're the fit. There's no application and no minimum to clear.",
+  },
+  {
+    question: "Is this just a chatbot with a script?",
+    answer:
+      "No. It reads what each person actually says, figures out intent, and responds in your tone. If someone gets hostile or asks for a refund, it steps back instead of barreling ahead.",
+  },
+  {
+    question: "Do you fake my voice?",
+    answer:
+      "Never a synthetic clone of you. On the Unlimited plan you can record your own audio snippets and Clinchd uses your real voice on the replies that fit. What you record is what they hear.",
+  },
+  {
+    question: "What does it cost? Really.",
+    answer:
+      "$97/month for up to 1,500 qualified conversations. $197/month for unlimited plus voice replies. The price is on this page because you shouldn't have to book a call to learn it.",
+  },
+  {
     question: "Is this compliant with Instagram's API?",
     answer:
       "Yes. Clinchd uses the official Meta Graph API and only responds to inbound messages. We never send unsolicited spam or cold outreach. We follow all of Instagram's platform policies.",
@@ -13,11 +33,6 @@ const faqs = [
     question: "Will my followers know it's AI?",
     answer:
       "In our testing, over 95% of leads don't realize they're talking to AI. You provide your tone and sales script. Clinchd matches your specific coaching voice, with human-like delays so conversations feel natural.",
-  },
-  {
-    question: "How is this different from ManyChat?",
-    answer:
-      "ManyChat uses rigid decision-tree flows and charges per contact. Clinchd is an AI-native setter that understands context, handles objections dynamically, and qualifies leads like a real sales rep for a flat $97/mo. No flows to build, no per-contact fees.",
   },
   {
     question: "What if someone asks something my AI isn't trained on?",
