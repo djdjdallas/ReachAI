@@ -87,7 +87,7 @@ export default function Hero() {
                 <span className="absolute -inset-1 rounded-full bg-[#ff7e67] opacity-40 animate-ping" />
               </span>
               <span className="text-[13px] font-bold text-[#ff7e67] tracking-tight">
-                The AI Setter Built for Coaches
+                The DM setter you don&apos;t have to apply for
               </span>
             </div>
 
@@ -101,10 +101,10 @@ export default function Hero() {
                 letterSpacing: "-0.035em",
               }}
             >
-              Never Miss a Lead in{" "}
+              A DM setter that&apos;s live today.{" "}
               <span className="relative inline-block">
                 <span className="text-[#ff7e67] relative z-10">
-                  Your DMs Again.
+                  No application required.
                 </span>
                 <span className="absolute bottom-2 left-0 w-full h-[0.4em] bg-[#ff7e67]/12 -z-0" />
               </span>
@@ -115,9 +115,10 @@ export default function Hero() {
               ref={subtitleRef}
               className="text-stone-600 text-base md:text-lg lg:text-xl leading-relaxed font-medium mb-8 max-w-xl"
             >
-              Clinchd helps coaches and course creators manage Instagram
-              inquiries, qualify prospects, and get discovery calls booked, all
-              from one inbox.
+              Clinchd qualifies every conversation, handles the usual
+              objections, and books calls in your tone, 24/7. Pick a plan,
+              connect Instagram, go live in minutes. No $3,000 setter, no
+              qualifying call, no waiting on a build team.
             </p>
 
             {/* CTAs */}
@@ -126,7 +127,7 @@ export default function Hero() {
                 href="/signup"
                 className="inline-flex items-center gap-2 px-7 py-4 bg-[#ff7e67] text-white rounded-full text-[15px] font-bold tracking-tight shadow-[0_4px_14px_rgba(255,126,103,0.35)] hover:shadow-[0_6px_20px_rgba(255,126,103,0.45)] hover:-translate-y-px transition-all"
               >
-                Start Free Trial
+                Start for $97/month
                 <ArrowRight className="w-4 h-4" />
               </Link>
 
@@ -140,7 +141,7 @@ export default function Hero() {
 
             {/* Trust microcopy */}
             <p className="text-[13px] font-medium text-stone-500 tracking-tight mb-7">
-              7-day free trial · 30-day money-back guarantee
+              No application · No sales call · Live in minutes
             </p>
 
             {/* Social proof strip */}

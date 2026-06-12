@@ -1,12 +1,13 @@
 import Link from "next/link";
-import { ArrowRight, Check, X, Minus } from "lucide-react";
+import { ArrowRight } from "lucide-react";
 
 const rows = [
-  { feature: "Setup time", manychat: "5+ hours", clinchd: "Under 30 minutes" },
-  { feature: "Pricing", manychat: "Per contact, scales with every DM", clinchd: "Flat $97/mo (1,500 qualified conversations) or $197 unlimited" },
-  { feature: "AI quality", manychat: "Rule-based flows", clinchd: "True AI conversations" },
-  { feature: "Instagram-native", manychat: "Adapted from Messenger", clinchd: "Built for Instagram" },
-  { feature: "Designed for coaches", manychat: "Generic platform", clinchd: "100% coach-focused" },
+  { feature: "Cost", setter: "$2,000 to $4,000 / month", clinchd: "$97 / month" },
+  { feature: "Hours", setter: "Sleeps, eats, takes days off", clinchd: "Answers every hour" },
+  { feature: "Ramp time", setter: "2 to 3 weeks to hit KPI", clinchd: "Live in minutes" },
+  { feature: "Consistency", setter: "Good days and off days", clinchd: "Same quality every reply" },
+  { feature: "Your voice", setter: "Approximates it", clinchd: "Trained on your tone and offer" },
+  { feature: "Conversations at once", setter: "One", clinchd: "As many as come in" },
 ];
 
 export default function ComparisonCallout() {
@@ -15,20 +16,19 @@ export default function ComparisonCallout() {
       <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="text-center mb-16 reveal-up">
           <h2 className="text-4xl md:text-5xl font-black tracking-tight text-stone-900 mb-6">
-            Why coaches switch from ManyChat to Clinchd
+            The math on a human setter
           </h2>
           <p className="text-stone-500 text-lg font-medium max-w-2xl mx-auto">
-            ManyChat is built for everyone. Clinchd is built for you.
+            You keep the relationship, the account, and the control. Clinchd just
+            makes sure nobody waits.
           </p>
         </div>
 
         <div className="bg-white rounded-[2rem] border border-stone-100 overflow-hidden soft-shadow reveal-up">
           <div className="grid grid-cols-3 text-center border-b border-stone-100">
-            <div className="py-5 px-4 text-sm font-bold text-stone-400 uppercase tracking-wider">
-              Feature
-            </div>
+            <div className="py-5 px-4 text-sm font-bold text-stone-400 uppercase tracking-wider" />
             <div className="py-5 px-4 text-sm font-bold text-stone-400 uppercase tracking-wider border-x border-stone-100">
-              ManyChat
+              Human setter
             </div>
             <div className="py-5 px-4 text-sm font-bold text-[#ff7e67] uppercase tracking-wider bg-[#fff5f2]">
               Clinchd
@@ -46,7 +46,7 @@ export default function ComparisonCallout() {
                 {row.feature}
               </div>
               <div className="py-4 px-4 text-sm text-stone-400 border-x border-stone-50">
-                {row.manychat}
+                {row.setter}
               </div>
               <div className="py-4 px-4 text-sm font-semibold text-stone-900 bg-[#fff5f2]/30">
                 {row.clinchd}
@@ -55,12 +55,19 @@ export default function ComparisonCallout() {
           ))}
         </div>
 
+        <div className="mt-10 max-w-3xl mx-auto reveal-up">
+          <p className="text-center text-stone-500 font-medium leading-relaxed">
+            Clinchd handles qualifying and booking. You still close the call.
+            That&apos;s the part only you can do.
+          </p>
+        </div>
+
         <div className="text-center mt-10 reveal-up">
           <Link
-            href="/compare/vs-manychat"
+            href="/signup"
             className="inline-flex items-center gap-2 text-[#ff7e67] font-bold text-lg hover:gap-3 transition-all group"
           >
-            See the full comparison
+            See it on your own offer
             <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
           </Link>
         </div>

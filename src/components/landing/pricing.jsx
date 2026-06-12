@@ -21,15 +21,16 @@ const basePlan = {
 const unlimitedPlan = {
   name: "Unlimited",
   price: "$197",
-  description: "For high-volume coaches scaling past $50K/mo.",
+  description: "For coaches who want their real voice on the replies that fit.",
   features: [
-    "Unlimited DMs / month",
+    "Unlimited conversations / month",
     ...(process.env.NEXT_PUBLIC_COMMENT_TO_DM_VISIBLE === "true"
       ? [
           "Comment-to-DM with AI intent grading. Only high-intent commenters reach your inbox",
         ]
       : []),
     "Everything in Base",
+    "Voice replies in your own recorded audio",
     "Advanced analytics",
     "Priority support",
     "Custom AI personality tuning",
@@ -62,10 +63,10 @@ export default function Pricing() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="text-center mb-24 reveal-up">
           <h2 className="text-4xl md:text-6xl font-black mb-6 tracking-tight text-stone-900">
-            A $5K setter or $97/mo.
+            A $3,000 setter, or $97/mo.
           </h2>
           <p className="text-stone-500 text-xl font-medium">
-            Same result. Fraction of the cost. Choose the plan that fits your coaching business.
+            The price is on this page because you shouldn&apos;t have to book a call to learn it.
           </p>
         </div>
 
@@ -151,37 +152,37 @@ export default function Pricing() {
           </div>
         </div>
 
-        {/* Flat-rate wedge */}
+        {/* Transparent, flat-rate wedge — anchored to the setter cost, no competitor names */}
         <div className="mt-20 max-w-4xl mx-auto reveal-up">
           <div className="rounded-[2rem] bg-stone-900 text-white p-10 md:p-14 relative overflow-hidden">
             <div className="absolute -right-20 -top-20 w-72 h-72 bg-[#ff7e67]/20 rounded-full blur-3xl" />
             <div className="relative">
               <div className="text-[11px] font-bold uppercase tracking-widest text-[#ff7e67] mb-4">
-                Why flat beats per-contact
+                What it costs. Really.
               </div>
               <h3 className="text-2xl md:text-4xl font-black mb-6 leading-tight tracking-tight">
-                Your viral Reel shouldn&apos;t be a billing event.
+                You shouldn&apos;t need a sales call to learn the price.
               </h3>
               <p className="text-white/80 text-lg font-medium leading-relaxed mb-8 max-w-2xl">
-                Tools like ManyChat and Inro charge per activated contact. At 2,000 DMs/month
-                (entirely normal after a Reel pops), those bills climb fast and the real
-                discounts only unlock with annual lock-in.
+                A human setter runs $2,000 to $4,000 a month. The done-for-you build
+                teams hide their number behind an application and a call. Clinchd
+                puts it right here, and your viral Reel never becomes a billing event.
               </p>
 
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <div className="bg-white/5 rounded-2xl p-5 border border-white/10">
                   <div className="text-[10px] font-bold uppercase tracking-widest text-white/50 mb-2">
-                    ManyChat at 10K contacts
+                    A human setter
                   </div>
-                  <div className="text-2xl font-black mb-1">$115/mo</div>
-                  <div className="text-xs text-white/60">+ scales with every new contact</div>
+                  <div className="text-2xl font-black mb-1">$2k to $4k/mo</div>
+                  <div className="text-xs text-white/60">+ sleeps, ramps, has off days</div>
                 </div>
                 <div className="bg-white/5 rounded-2xl p-5 border border-white/10">
                   <div className="text-[10px] font-bold uppercase tracking-widest text-white/50 mb-2">
-                    Inro at 2,000 DMs/mo
+                    Done-for-you build teams
                   </div>
-                  <div className="text-2xl font-black mb-1">Well past €12.99</div>
-                  <div className="text-xs text-white/60">+ annual lock-in for real discounts</div>
+                  <div className="text-2xl font-black mb-1">Price on a call</div>
+                  <div className="text-xs text-white/60">+ application and a 72 hour build</div>
                 </div>
                 <div className="bg-[#ff7e67] rounded-2xl p-5 border border-[#ff7e67]">
                   <div className="text-[10px] font-bold uppercase tracking-widest text-white/80 mb-2">
