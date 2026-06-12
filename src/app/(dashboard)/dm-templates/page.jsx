@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import { canUseCommentToDM } from "@/lib/comment-to-dm-gate";
 import TemplateEditor from "./TemplateEditor";
+import PublicReplySection from "./PublicReplySection";
 
 export const metadata = {
   title: "DM templates · Clinchd",
@@ -22,7 +23,7 @@ export default async function DmTemplatesPage() {
 
   const { data: profile } = await supabase
     .from("users")
-    .select("plan, email, calendly_url")
+    .select("plan, email, calendly_url, comment_public_reply_enabled")
     .eq("id", user.id)
     .maybeSingle();
 
@@ -57,8 +58,9 @@ export default async function DmTemplatesPage() {
 
   const admin = getSupabaseAdmin();
 
-  // Parallel: templates, active offer, most-recent comment for preview seed.
-  const [templatesRes, offerRes, latestCommentRes] = await Promise.all([
+  // Parallel: templates, active offer, most-recent comment for preview seed,
+  // plus the public comment-reply pool.
+  const [templatesRes, offerRes, latestCommentRes, replyTemplatesRes] = await Promise.all([
     admin
       .from("dm_templates")
       .select("intent_class, template")
@@ -78,6 +80,11 @@ export default async function DmTemplatesPage() {
       .order("created_at", { ascending: false })
       .limit(1)
       .maybeSingle(),
+    admin
+      .from("comment_reply_templates")
+      .select("id, reply_text, is_active, created_at")
+      .eq("user_id", user.id)
+      .order("created_at", { ascending: true }),
   ]);
 
   const templates = {};
@@ -102,9 +109,17 @@ export default async function DmTemplatesPage() {
   };
 
   return (
-    <TemplateEditor
-      initialTemplates={templates}
-      placeholderValues={placeholderValues}
-    />
+    <>
+      <TemplateEditor
+        initialTemplates={templates}
+        placeholderValues={placeholderValues}
+      />
+      <div className="max-w-3xl mx-auto px-6 md:px-10 pb-10">
+        <PublicReplySection
+          initialEnabled={profile?.comment_public_reply_enabled === true}
+          initialTemplates={replyTemplatesRes.data || []}
+        />
+      </div>
+    </>
   );
 }
