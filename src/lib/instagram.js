@@ -314,6 +314,56 @@ export async function sendPrivateReplyToComment(igAccountId, commentId, text, pa
 }
 
 /**
+ * Posts a PUBLIC reply under an Instagram comment.
+ *
+ * Endpoint: POST /{ig-comment-id}/replies with message={text}. This is the
+ * public half of instagram_business_manage_comments — the reply appears as
+ * a visible child comment under the trigger comment, unlike
+ * sendPrivateReplyToComment which lands in the commenter's DMs.
+ *
+ * Returns the same result-object shape as sendPrivateReplyToComment so
+ * callers can log outcomes without try/catch around the transport. Never
+ * throws.
+ *
+ * @param {string} commentId      - The comment to reply under
+ * @param {string} text           - Public reply text
+ * @param {string} pageAccessToken - Decrypted Page Access Token
+ * @returns {Promise<{success: boolean, replyId?: string, error?: string, retryable?: boolean}>}
+ */
+export async function postPublicCommentReply(commentId, text, pageAccessToken) {
+  const url = `https://graph.instagram.com/${GRAPH_API_VERSION}/${commentId}/replies`;
+  let data;
+  try {
+    const res = await fetch(url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${pageAccessToken}`,
+      },
+      body: JSON.stringify({ message: text }),
+    });
+    data = await res.json().catch(() => ({}));
+  } catch (err) {
+    return { success: false, error: `network_error:${err?.message || "unknown"}`, retryable: true };
+  }
+
+  if (data?.error) {
+    const code = data.error.code;
+    const subcode = data.error.error_subcode;
+    const message = data.error.message || "unknown_error";
+    console.error("Instagram public-reply error:", { code, subcode, message });
+
+    // Same rate-limit family as the private-reply path.
+    if (code === 4 || code === 17 || code === 32 || code === 613) {
+      return { success: false, error: "rate_limited", retryable: true };
+    }
+    return { success: false, error: message, retryable: false };
+  }
+
+  return { success: true, replyId: data?.id || null };
+}
+
+/**
  * Resolves a public IG business/creator username to its IGSID via
  * Business Discovery. Returns null when the target is private, not a
  * business/creator account, or otherwise not resolvable — the IG Graph

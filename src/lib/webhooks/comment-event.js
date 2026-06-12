@@ -5,6 +5,7 @@ import { decideAction } from "@/lib/comment-trigger-rules";
 import { sendPrivateReplyToComment } from "@/lib/instagram";
 import { decryptToken } from "@/lib/token-utils";
 import { canUseCommentToDM } from "@/lib/comment-to-dm-gate";
+import { maybePostPublicReply } from "@/lib/comment-public-reply";
 
 // Phase 2 of the comment-to-DM pipeline. Receives a single change object
 // from a Meta Instagram webhook payload (entry.changes[i] where
@@ -64,7 +65,9 @@ async function processCommentEvent(entry, change) {
   // email for the gate, plus the page access token we'll need at dispatch.
   const { data: ownerUser, error: ownerErr } = await admin
     .from("users")
-    .select("id, email, plan, meta_page_access_token, instagram_business_account_id")
+    .select(
+      "id, email, plan, meta_page_access_token, instagram_business_account_id, comment_public_reply_enabled"
+    )
     .eq("instagram_business_account_id", igbaId)
     .maybeSingle();
 
@@ -96,7 +99,7 @@ async function processCommentEvent(entry, change) {
   // coach has turned the post off OR hasn't opted-in yet.
   const { data: monitoringRow } = await admin
     .from("post_monitoring_settings")
-    .select("enabled, actions_per_class")
+    .select("enabled, actions_per_class, last_public_reply_text")
     .eq("creator_id", creatorId)
     .eq("post_id", postRow.id)
     .maybeSingle();
@@ -316,6 +319,20 @@ async function processCommentEvent(entry, change) {
       commentId,
       classificationId: persisted.id,
       messageId: result.messageId,
+    });
+
+    // Optional public reply under the trigger comment ("sent! check your
+    // dms 🙌"). Runs ONLY after a successful DM dispatch, is opt-in via
+    // users.comment_public_reply_enabled (default false), and never throws
+    // — a failed public reply must not disturb the DM that already went
+    // out. See src/lib/comment-public-reply.js.
+    await maybePostPublicReply({
+      admin,
+      ownerUser,
+      postId: postRow.id,
+      commentId,
+      lastReplyText: monitoringRow.last_public_reply_text || null,
+      pageToken,
     });
     return;
   }
