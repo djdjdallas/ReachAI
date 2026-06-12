@@ -174,6 +174,48 @@ async function markSkipForSender(supabase, user_id, sender_id, reason) {
   if (error) log.error("[webhook] markSkipForSender failed:", error.code);
 }
 
+// Map a do_not_send classification to a specific, debuggable pause reason.
+// Previously every do_not_send pause flattened to 'hostile_or_refund', which
+// mislabeled benign-but-suspicious flags. Concretely: the อัศวิน thread was a
+// coach who DM'd Dom and whose message echoed coach-outreach-script language;
+// the classifier correctly flagged it do_not_send with signals
+// ['echoes_coach_script', ...], but the DB recorded ai_pause_reason=
+// 'hostile_or_refund', implying hostility that wasn't there. We now preserve
+// the most specific signal so the dashboard reason chip is accurate. This is a
+// debuggability change only — it does NOT alter whether the AI pauses, and it
+// does NOT touch the classifier's signal definitions (see src/lib/dm-intent.js).
+//
+// Priority order matters: a message that is BOTH hostile and script-echoing is
+// hostility first. Prompt injection is the most severe and wins outright.
+const DO_NOT_SEND_REASON_RULES = [
+  { reason: "prompt_injection", signals: ["prompt_injection_attempt"] },
+  {
+    reason: "hostile_or_refund",
+    signals: [
+      "refund_demand", "chargeback_threat", "scam_accusation", "legal_threat",
+      "hate_speech", "hostile", "abuse", "abusive", "crisis_signal",
+      "self_harm", "suicide", "threat",
+    ],
+  },
+  {
+    reason: "flagged_coach_script",
+    signals: ["echoes_coach_script", "suspicious_pattern", "likely_test_or_probe"],
+  },
+];
+
+function pauseReasonForDoNotSend(signals) {
+  const sigs = Array.isArray(signals)
+    ? signals.map((s) => String(s).toLowerCase())
+    : [];
+  for (const rule of DO_NOT_SEND_REASON_RULES) {
+    if (rule.signals.some((s) => sigs.includes(s))) return rule.reason;
+  }
+  // No recognized signal — keep a generic do_not_send marker rather than
+  // overstating it as hostility. 'hostile_or_refund' is reserved for the
+  // hostility/refund signal set above.
+  return "flagged_do_not_send";
+}
+
 // v1 qualifying-loop detector. Heuristic, no embeddings:
 // looks at the last 3 agent + last 3 lead messages and returns true when
 //   - all 3 agent messages contain question marks, AND
@@ -316,15 +358,19 @@ async function attachNativeSendContext(supabase, {
     const row = Array.isArray(claimed) && claimed.length > 0 ? claimed[0] : null;
 
     if (!row) {
-      // Flag the conversation for backfill, but ONLY if origin is still
-      // 'clinchd_sent'. If the dashboard's opportunistic backfill or banner
-      // save raced ahead and already set origin='native_send', we must not
-      // overwrite their cleared flag.
+      // Flag the conversation for backfill, but ONLY on an outbound-initiated
+      // origin. Inbound-initiated threads (origin='inbound') must NEVER fire
+      // the orange "paste the DM you sent" banner — the lead messaged the
+      // coach first, so there is no missing outbound DM to backfill. Scoping
+      // the update to the outbound origins ('clinchd_sent','native_send')
+      // excludes inbound by construction and is the core fix for the
+      // inbound-DM misclassification bug. (See migration
+      // 20260604120000_conversation_origin_inbound for context.)
       const { data: flagged, error: flagError } = await supabase
         .from("conversations")
         .update({ missing_outbound_context: true })
         .eq("id", conversationId)
-        .eq("origin", "clinchd_sent")
+        .in("origin", ["clinchd_sent", "native_send"])
         .select("id");
       if (flagError) {
         log.error("[webhook] flag missing_outbound_context failed:", flagError.code);
@@ -461,6 +507,14 @@ async function processIncomingMessage({
         status: "qualifying",
         ai_paused: false,
         sender_name: senderName,
+        // This conversation is born from an inbound DM (the lead messaged the
+        // coach first), so it is inbound-initiated. Set origin explicitly
+        // instead of inheriting the 'clinchd_sent' column default — that
+        // default assumed every conversation was outbound and made genuine
+        // inbound threads (e.g. a coach DMing Dom after a follow) get flagged
+        // missing_outbound_context=true and fire the orange backfill banner.
+        // See migration 20260604120000_conversation_origin_inbound for context.
+        origin: "inbound",
       })
       .select()
       .single();
@@ -790,11 +844,15 @@ async function processIncomingMessage({
     dmIntent?.class === "do_not_send" &&
     dmIntent.confidence >= DO_NOT_SEND_PAUSE_THRESHOLD
   ) {
+    // Derive the pause reason from the classifier's signals instead of
+    // hardcoding 'hostile_or_refund'. A script-echo / probe flag is not
+    // hostility, and labeling it as such made paused threads undebuggable.
+    const pauseReason = pauseReasonForDoNotSend(dmIntent.signals);
     await supabase
       .from("conversations")
       .update({
         ai_paused: true,
-        ai_pause_reason: "hostile_or_refund",
+        ai_pause_reason: pauseReason,
         last_message_at: new Date().toISOString(),
       })
       .eq("id", conversation.id);
@@ -811,6 +869,7 @@ async function processIncomingMessage({
       event: "dm_paused_do_not_send",
       properties: {
         conversation_id: conversation.id,
+        pause_reason: pauseReason,
         signals: dmIntent.signals,
         reasoning: dmIntent.reasoning,
       },
@@ -836,12 +895,6 @@ async function processIncomingMessage({
       .limit(1)
       .maybeSingle();
     activeOffer = offerRow || null;
-    console.log(JSON.stringify({
-      event: "ai_prompt_missing_outbound_context",
-      conversation_id: conversation.id,
-      user_id: user.id,
-      has_offer: !!activeOffer?.offer_name,
-    }));
   }
 
   // Build prompt and generate reply

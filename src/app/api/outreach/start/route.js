@@ -136,6 +136,13 @@ export async function POST(request) {
           status: "qualifying",
           ai_paused: false,
           sender_name: resolvedName || resolvedUsername,
+          // "New outreach" is outbound-initiated by definition: the coach is
+          // sending the first DM from inside Clinchd. Set origin explicitly so
+          // this stays correct regardless of the column default. The webhook
+          // now writes origin='inbound' for lead-initiated threads, so the
+          // default is no longer a safe proxy for "outreach". See migration
+          // 20260604120000_conversation_origin_inbound for context.
+          origin: "clinchd_sent",
         })
         .select()
         .single();

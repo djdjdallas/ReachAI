@@ -96,3 +96,38 @@ audiences will get degraded triage quality.
 
 Mirrors `classifyComment` (`src/lib/classifier.js`) and the new
 `classifyDMIntent` (`src/lib/dm-intent.js`).
+
+---
+
+# Deferred from the inbound-DM-origin fix (2026-06-04)
+
+These were spotted during the inbound-DM-misclassification fix (origin
+defaulted to `clinchd_sent`, mislabeling inbound threads as outbound and
+firing the orange backfill banner). They are intentionally out of scope of
+that PR and tracked here.
+
+## 5. `intent_classification` only persisted when `provider_message_id` exists
+
+In `src/app/api/webhooks/instagram/route.js`, the DM-intent persistence write
+is gated on `dmIntent && providerMessageId`. Any inbound that arrives without
+a Meta `mid` never records its classification, so a message can *look* like
+"classifier never ran" in the DB even when it did. This complicates auditing
+paused threads.
+
+**Severity:** Low (Meta inbound DMs normally carry `mid`), but it makes the
+`intent_classification IS NULL` signal ambiguous.
+
+**Pattern to adopt:** fall back to selecting the just-inserted message row by
+`(conversation_id, role='user')` ordered by `created_at DESC` when
+`provider_message_id` is absent, and update that row's
+`intent_classification` instead of skipping the write.
+
+## 6. Duplicate `origin='native_send'` update sites
+
+`route.js` (the `attachNativeSendContext` match path) and
+`src/lib/native-send.js`'s `attachToConversation` both run the same
+`update({ origin: 'native_send', missing_outbound_context: false })`. Harmless
+today, but two write sites for one invariant invites drift.
+
+**Pattern to adopt:** consolidate the "mark a conversation as native-send
+matched" mutation into a single exported helper used by both call sites.
