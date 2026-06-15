@@ -19,6 +19,7 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import StatusBadge from "@/components/app/StatusBadge";
+import { parseTimestamp, relativeTime } from "@/lib/dates";
 
 function getInitials(name) {
   if (!name) return "?";
@@ -28,20 +29,6 @@ function getInitials(name) {
     .join("")
     .toUpperCase()
     .slice(0, 2);
-}
-
-function timeAgo(dateString) {
-  if (!dateString) return "";
-  const now = new Date();
-  const date = new Date(dateString);
-  const seconds = Math.floor((now - date) / 1000);
-  if (seconds < 60) return "just now";
-  const minutes = Math.floor(seconds / 60);
-  if (minutes < 60) return `${minutes}m ago`;
-  const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours}h ago`;
-  const days = Math.floor(hours / 24);
-  return `${days}d ago`;
 }
 
 function DashboardSkeleton() {
@@ -98,12 +85,12 @@ export default function DashboardPage() {
         .from("conversations")
         .select("*, messages(content, created_at, role)")
         .eq("user_id", uid)
-        .order("updated_at", { ascending: false })
+        .order("last_message_at", { ascending: false })
         .limit(20);
 
       const convList = (convos || []).map((convo) => {
         const sorted = (convo.messages || []).sort(
-          (a, b) => new Date(b.created_at) - new Date(a.created_at)
+          (a, b) => parseTimestamp(b.created_at) - parseTimestamp(a.created_at)
         );
         const lastMsg = sorted[0];
         return {
@@ -419,7 +406,7 @@ export default function DashboardPage() {
                         {convo.sender_name || "Unknown"}
                       </span>
                       <span className="ml-auto text-[11px] font-medium text-stone-400">
-                        {timeAgo(convo.updated_at)}
+                        {relativeTime(convo.last_message_at)}
                       </span>
                     </div>
                     <p className="text-sm text-stone-600 truncate">
