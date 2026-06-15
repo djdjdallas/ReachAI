@@ -314,10 +314,12 @@ async function insertMessageIfNew(supabase, { conversation_id, role, content, pr
   if (error) {
     log.error("[webhook] message insert failed:", { conversation_id, role, code: error.code });
   }
-  // Bump the conversation's updated_at so the inbox reorders/realtime fires
+  // Set last_message_at to this message's own created_at so the canonical
+  // recency field always equals the newest message (and the inbox reorders /
+  // realtime fires). Only bumped here, on a genuine message insert.
   const { error: bumpError } = await supabase
     .from("conversations")
-    .update({ last_message_at: new Date().toISOString() })
+    .update({ last_message_at: data?.created_at || new Date().toISOString() })
     .eq("id", conversation_id);
   if (bumpError) log.error("[webhook] conversation bump failed:", bumpError.code);
   return { data, error, duplicate: false };
@@ -670,7 +672,6 @@ async function processIncomingMessage({
         ai_paused: true,
         ai_pause_reason: "qualifying_loop_detected",
         last_skip_reason: "qualifying_loop_detected",
-        last_message_at: new Date().toISOString(),
       })
       .eq("id", conversation.id);
     getPostHogClient().capture({
@@ -698,7 +699,6 @@ async function processIncomingMessage({
           .update({
             ai_paused: true,
             ai_pause_reason: "complex_objection",
-            last_message_at: new Date().toISOString(),
           })
           .eq("id", conversation.id);
         getPostHogClient().capture({
@@ -853,7 +853,6 @@ async function processIncomingMessage({
       .update({
         ai_paused: true,
         ai_pause_reason: pauseReason,
-        last_message_at: new Date().toISOString(),
       })
       .eq("id", conversation.id);
     await logVoiceSend({
