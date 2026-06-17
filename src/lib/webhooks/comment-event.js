@@ -6,6 +6,7 @@ import { sendPrivateReplyToComment } from "@/lib/instagram";
 import { decryptToken } from "@/lib/token-utils";
 import { canUseCommentToDM } from "@/lib/comment-to-dm-gate";
 import { maybePostPublicReply } from "@/lib/comment-public-reply";
+import { persistCommentDmConversation } from "@/lib/comment-dm-conversation";
 
 // Phase 2 of the comment-to-DM pipeline. Receives a single change object
 // from a Meta Instagram webhook payload (entry.changes[i] where
@@ -41,6 +42,11 @@ async function processCommentEvent(entry, change) {
   const commentId = value.id || null;
   const mediaId = value.media?.id || value.media_id || null;
   const fromUsername = value.from?.username || null;
+  // The commenter's Instagram-scoped id. This is the SAME id the inbound
+  // messaging webhook sees as event.sender.id, so it's the key we persist on
+  // the conversation row to make the lead's reply match (see
+  // src/lib/comment-dm-conversation.js).
+  const fromId = value.from?.id || null;
   const commentText = typeof value.text === "string" ? value.text : "";
   const parentId = value.parent_id || null;
   const igbaId = entry?.id || null;
@@ -321,6 +327,18 @@ async function processCommentEvent(entry, change) {
       messageId: result.messageId,
     });
 
+    // Persist the DM into the conversation system so the lead's reply matches
+    // an existing thread (AI gets the opening DM as history) and the send is
+    // traceable in the inbox. Never throws — the DM has already gone out.
+    await persistCommentDmConversation({
+      admin,
+      userId: creatorId,
+      recipientIgsid: fromId,
+      senderName: fromUsername,
+      renderedDm: decision.rendered,
+      providerMessageId: result.messageId || null,
+    });
+
     // Optional public reply under the trigger comment ("sent! check your
     // dms 🙌"). Runs ONLY after a successful DM dispatch, is opt-in via
     // users.comment_public_reply_enabled (default false), and never throws
@@ -331,6 +349,8 @@ async function processCommentEvent(entry, change) {
       ownerUser,
       postId: postRow.id,
       commentId,
+      commentClassificationId: persisted.id,
+      commenterUsername: fromUsername,
       lastReplyText: monitoringRow.last_public_reply_text || null,
       pageToken,
     });
