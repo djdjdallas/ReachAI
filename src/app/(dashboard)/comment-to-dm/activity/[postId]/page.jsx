@@ -47,6 +47,13 @@ async function getPostAndActivity(supabase, userId, postId) {
         dispatched_message_id,
         dispatch_error,
         dispatch_retryable
+      ),
+      comment_public_reply_log (
+        dispatch_status,
+        reply_text,
+        ig_reply_comment_id,
+        error_message,
+        created_at
       )
     `
     )
