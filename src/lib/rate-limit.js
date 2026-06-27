@@ -53,29 +53,3 @@ export async function enforceAiRateLimit(supabaseAdmin, userId, endpoint, maxPer
 export function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
-
-/**
- * Check if user has exceeded their monthly conversation limit.
- */
-export async function checkDmLimit(supabase, userId, plan = "base") {
-  const now = new Date();
-  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-
-  const { count } = await supabase
-    .from("messages")
-    .select("*", { count: "exact", head: true })
-    .eq("role", "assistant")
-    .gte("created_at", startOfMonth.toISOString())
-    .eq("conversation_id.user_id", userId);
-
-  const limits = {
-    base: 1500,
-    unlimited: Infinity,
-  };
-
-  return {
-    used: count || 0,
-    limit: limits[plan] || 1500,
-    exceeded: (count || 0) >= (limits[plan] || 1500),
-  };
-}

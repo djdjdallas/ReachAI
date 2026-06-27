@@ -50,7 +50,6 @@ export default getAnthropic;
 // Remove unpaired surrogates that break JSON serialization
 function sanitize(str) {
   if (typeof str !== "string") return str;
-  // eslint-disable-next-line no-control-regex
   return str.replace(/[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/g, "");
 }
 

@@ -10,7 +10,6 @@
 const isProd = process.env.NODE_ENV === "production";
 
 function forward(level, args) {
-  // eslint-disable-next-line no-console
   console[level](...args);
 }
 
