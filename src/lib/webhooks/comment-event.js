@@ -136,7 +136,7 @@ async function processCommentEvent(entry, change) {
   }
 
   // 8. Build/reuse the context bundle for this post, then classify.
-  const { bundle } = await buildContextBundle({
+  const { bundle, offerSnapshot } = await buildContextBundle({
     postId: postRow.id,
     creatorId,
     caption: postRow.caption || "",
@@ -145,7 +145,9 @@ async function processCommentEvent(entry, change) {
   const { classification, raw, latencyMs } = await classifyComment({
     commentText,
     postCaption: postRow.caption || "",
-    creatorOffer: null,
+    // Pass the resolved active offer so the gate can weigh HIGH_INTENT purchase
+    // questions instead of classifying blind on a hardcoded null.
+    creatorOffer: offerSnapshot,
   });
 
   // Honors the COMMENT_CLASSIFIER_ENABLED env kill switch.

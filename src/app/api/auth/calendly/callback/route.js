@@ -73,7 +73,10 @@ export async function GET(request) {
       .from("users")
       .update({
         calendly_access_token: encryptToken(tokens.access_token),
-        calendly_refresh_token: encryptToken(tokens.refresh_token),
+        // Don't null an existing refresh token if the provider omits one.
+        ...(tokens.refresh_token
+          ? { calendly_refresh_token: encryptToken(tokens.refresh_token) }
+          : {}),
         calendly_token_expires_at: expiresAt,
         calendly_user_uri: userUri,
         calendly_organization_uri: organizationUri,

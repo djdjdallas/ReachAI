@@ -51,7 +51,11 @@ export async function GET(request) {
       .from("users")
       .update({
         google_calendar_access_token: encryptToken(access_token),
-        google_calendar_refresh_token: encryptToken(refresh_token),
+        // Google only returns a refresh token on first consent; don't wipe the
+        // stored one on a re-auth that omits it.
+        ...(refresh_token
+          ? { google_calendar_refresh_token: encryptToken(refresh_token) }
+          : {}),
         google_calendar_token_expires_at: new Date(expiry_date).toISOString(),
       })
       .eq("id", user.id);
