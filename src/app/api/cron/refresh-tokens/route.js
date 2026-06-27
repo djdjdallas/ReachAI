@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import { refreshLongLivedToken } from "@/lib/instagram";
 import { encryptToken, decryptToken } from "@/lib/token-utils";
+import { assertCron } from "@/lib/auth/cron";
 
 /**
  * GET /api/cron/refresh-tokens
@@ -12,11 +13,8 @@ import { encryptToken, decryptToken } from "@/lib/token-utils";
  * Secured by CRON_SECRET header to prevent unauthorized access.
  */
 export async function GET(request) {
-  // Verify cron secret
-  const authHeader = request.headers.get("authorization");
-  if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  const denied = assertCron(request);
+  if (denied) return denied;
 
   const supabase = getSupabaseAdmin();
 
