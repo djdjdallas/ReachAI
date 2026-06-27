@@ -32,8 +32,8 @@ export default function WhoItsFor() {
             The wedge
           </div>
           <h2 className="text-4xl md:text-6xl font-black mb-6 tracking-tight text-stone-900 leading-[1.05]">
-            Built for the coach who{" "}
-            <span className="text-[#ff7e67]">actually needs this.</span>
+            Built for coaches selling{" "}
+            <span className="text-[#ff7e67]">1k+ offers.</span>
           </h2>
           <p className="text-stone-600 text-lg md:text-xl font-medium leading-relaxed">
             The big done-for-you tools have a minimum. Fill out the form, book the
