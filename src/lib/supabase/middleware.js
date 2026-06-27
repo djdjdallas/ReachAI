@@ -69,6 +69,11 @@ export async function updateSession(request) {
     pathname === "/forgot-password" ||
     pathname === "/update-password" ||
     pathname.startsWith("/api/webhooks") ||
+    // Cron + internal alert endpoints carry no session cookie; the page-auth
+    // redirect below would bounce them to /login (307) and they'd never run.
+    // Both enforce their own token auth (CRON_SECRET / ALERT_TOKEN).
+    pathname.startsWith("/api/cron") ||
+    pathname.startsWith("/api/alerts") ||
     pathname.startsWith("/compare") ||
     pathname.startsWith("/blog") ||
     pathname.startsWith("/for") ||
