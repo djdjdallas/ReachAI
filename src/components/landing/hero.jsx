@@ -87,7 +87,7 @@ export default function Hero() {
                 <span className="absolute -inset-1 rounded-full bg-[#ff7e67] opacity-40 animate-ping" />
               </span>
               <span className="text-[13px] font-bold text-[#ff7e67] tracking-tight">
-                The DM setter you don&apos;t have to apply for
+                Built for coaches selling 1k+ offers
               </span>
             </div>
 
@@ -101,10 +101,10 @@ export default function Hero() {
                 letterSpacing: "-0.035em",
               }}
             >
-              A DM setter that&apos;s live today.{" "}
+              Turn Instagram DMs into{" "}
               <span className="relative inline-block">
                 <span className="text-[#ff7e67] relative z-10">
-                  No application required.
+                  booked calls
                 </span>
                 <span className="absolute bottom-2 left-0 w-full h-[0.4em] bg-[#ff7e67]/12 -z-0" />
               </span>
@@ -115,10 +115,8 @@ export default function Hero() {
               ref={subtitleRef}
               className="text-stone-600 text-base md:text-lg lg:text-xl leading-relaxed font-medium mb-8 max-w-xl"
             >
-              Clinchd qualifies every conversation, handles the usual
-              objections, and books calls in your tone, 24/7. Pick a plan,
-              connect Instagram, go live in minutes. No $3,000 setter, no
-              qualifying call, no waiting on a build team.
+              Clinchd qualifies leads, handles objections in your voice, and
+              books discovery calls 24/7 for coaches selling 1k+ offers.
             </p>
 
             {/* CTAs */}

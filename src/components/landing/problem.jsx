@@ -28,7 +28,7 @@ export default function Problem() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="text-center max-w-3xl mx-auto mb-16 reveal-up">
           <h2 className="text-4xl md:text-5xl font-black tracking-tight text-stone-900 mb-6">
-            Your DMs are leaking revenue
+            Stop losing warm leads in your DMs
           </h2>
           <p className="text-stone-500 text-lg font-medium">
             Most coaches lose 30-50% of their warm leads because they can&apos;t
