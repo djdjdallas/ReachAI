@@ -5,12 +5,10 @@ import {
   CalendarPlus,
   LayoutDashboard,
   PenTool,
-  Sparkles,
   MessagesSquare,
   Mic,
 } from "lucide-react";
 import AgentStats from "@/components/landing/animations/AgentStats";
-import ComingSoonBadge from "@/components/landing/coming-soon-badge";
 
 const baseFeatures = [
   {
@@ -57,40 +55,24 @@ const baseFeatures = [
   },
 ];
 
-const commentToDmLive = process.env.NEXT_PUBLIC_COMMENT_TO_DM_VISIBLE === "true";
-
-const commentToDmComingSoon = {
+const commentToDm = {
   icon: MessagesSquare,
   title: "Comment-to-DM",
   description:
     "When prospects comment on your posts, Clinchd starts the DM conversation for you. AI-assisted qualification routes warm leads straight to your booking link.",
   bgClass: "bg-[#fff5f2]",
-  comingSoon: true,
 };
 
-const commentToDmLiveCard = {
-  icon: Sparkles,
-  title: "High-Intent Comment Routing",
-  description:
-    "AI grades every comment on your Reels for buyer intent. Only the high-intent ones get a personalized DM. The noise stays in the comments; the leads land in your inbox.",
-  bgClass: "bg-[#fff5f2]",
-};
-
-const voiceRepliesComingSoon = {
+const voiceReplies = {
   icon: Mic,
   title: "Voice Replies",
   description:
     "Reply with your own voice instead of text. Record short memos once and Clinchd sends the right one based on what your lead actually says.",
   bgClass: "bg-orange-50",
-  comingSoon: true,
   subTag: "Unlimited plan",
 };
 
-const features = [
-  ...baseFeatures,
-  commentToDmLive ? commentToDmLiveCard : commentToDmComingSoon,
-  voiceRepliesComingSoon,
-];
+const features = [...baseFeatures, commentToDm, voiceReplies];
 
 export default function Features() {
   return (
@@ -119,15 +101,10 @@ export default function Features() {
                   >
                     <Icon className="w-7 h-7 text-[#ff7e67]" />
                   </div>
-                  {feature.comingSoon && (
-                    <div className="flex flex-col items-end gap-1">
-                      <ComingSoonBadge />
-                      {feature.subTag && (
-                        <span className="text-xs text-[#a8a29e] font-medium">
-                          {feature.subTag}
-                        </span>
-                      )}
-                    </div>
+                  {feature.subTag && (
+                    <span className="text-xs text-[#a8a29e] font-medium">
+                      {feature.subTag}
+                    </span>
                   )}
                 </div>
                 <h4 className="font-extrabold text-xl mb-4 text-stone-900">
