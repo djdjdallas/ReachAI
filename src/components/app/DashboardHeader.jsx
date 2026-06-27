@@ -17,6 +17,12 @@ const PAGE_TITLES = {
   "/settings": "Settings",
   "/calendar": "Calendar",
   "/analytics": "Analytics",
+  "/comment-to-dm": "Comment to DM",
+  "/comment-triggers": "Comment Triggers",
+  "/dm-templates": "DM Templates",
+  "/drip-sequences": "Drip Sequences",
+  "/voice-replies": "Voice Replies",
+  "/native-send": "Native Send",
 };
 
 function getInitials(name) {
@@ -115,24 +121,32 @@ export default function DashboardHeader() {
   }, [notifOpen, fetchNotifications]);
 
   const markAllRead = async () => {
+    // Snapshot for rollback so the badge can't desync if the write fails.
+    const prevNotifications = notifications;
+    const prevUnread = unreadCount;
+    setNotifications((prev) =>
+      prev.map((n) => ({ ...n, read_at: n.read_at || new Date().toISOString() }))
+    );
+    setUnreadCount(0);
     try {
-      await fetch("/api/notifications", {
+      const res = await fetch("/api/notifications", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ all: true }),
       });
-      setNotifications((prev) =>
-        prev.map((n) => ({ ...n, read_at: n.read_at || new Date().toISOString() }))
-      );
-      setUnreadCount(0);
+      if (!res.ok) throw new Error(`mark all read failed (${res.status})`);
     } catch (e) {
       console.error("Failed to mark all read:", e);
+      setNotifications(prevNotifications);
+      setUnreadCount(prevUnread);
     }
   };
 
   const handleNotificationClick = async (notification) => {
-    // Mark read optimistically
+    // Mark read optimistically, reverting if the write doesn't land.
     if (!notification.read_at) {
+      const prevNotifications = notifications;
+      const prevUnread = unreadCount;
       setNotifications((prev) =>
         prev.map((n) =>
           n.id === notification.id ? { ...n, read_at: new Date().toISOString() } : n
@@ -143,7 +157,14 @@ export default function DashboardHeader() {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ ids: [notification.id] }),
-      }).catch(() => {});
+      })
+        .then((res) => {
+          if (!res.ok) throw new Error(`mark read failed (${res.status})`);
+        })
+        .catch(() => {
+          setNotifications(prevNotifications);
+          setUnreadCount(prevUnread);
+        });
     }
 
     setNotifOpen(false);
