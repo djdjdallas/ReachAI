@@ -32,16 +32,18 @@ export async function GET(request) {
   const [meta, cal, gcal] = await Promise.all([
     admin
       .from("users")
-      .select("id, meta_token_expires_at")
+      .select("id, meta_token_expires_at, meta_reconnect_required")
       .not("meta_user_access_token", "is", null),
     admin
       .from("users")
-      .select("id, calendly_token_expires_at, calendly_refresh_token")
+      .select(
+        "id, calendly_token_expires_at, calendly_refresh_token, calendly_reconnect_required"
+      )
       .not("calendly_access_token", "is", null),
     admin
       .from("users")
       .select(
-        "id, google_calendar_token_expires_at, google_calendar_refresh_token"
+        "id, google_calendar_token_expires_at, google_calendar_refresh_token, google_calendar_reconnect_required"
       )
       .not("google_calendar_access_token", "is", null),
   ]);
@@ -61,13 +63,14 @@ export async function GET(request) {
 
   const atRisk = [];
 
-  // Meta long-lived tokens are proactively refreshed within a 7-day window by
-  // /api/cron/refresh-tokens. Already-expired = the refresh is failing and the
-  // user must re-link; within the window but not yet refreshed = expiring soon.
+  // Meta: the refresh cron's persisted meta_reconnect_required flag is
+  // authoritative (set only on a definitive OAuthException). Fall back to
+  // expiry: already-expired = refresh is failing; within the window = expiring.
   for (const r of meta.data || []) {
     const dl = daysLeft(r.meta_token_expires_at);
     let state = "healthy";
-    if (dl !== null && dl < 0) state = "needs_reconnect";
+    if (r.meta_reconnect_required || (dl !== null && dl < 0))
+      state = "needs_reconnect";
     else if (dl !== null && dl <= META_EXPIRING_DAYS) state = "expiring";
     if (state !== "healthy")
       atRisk.push({
@@ -79,11 +82,10 @@ export async function GET(request) {
       });
   }
 
-  // Calendly & Google access tokens are short-lived but refresh lazily on use;
-  // the only unrecoverable state is a MISSING refresh token (revoked / never
-  // granted) — that requires a reconnect.
+  // Calendly & Google refresh lazily on use; unrecoverable only when the refresh
+  // token is revoked (cron sets *_reconnect_required) or missing entirely.
   for (const r of cal.data || []) {
-    if (!r.calendly_refresh_token)
+    if (r.calendly_reconnect_required || !r.calendly_refresh_token)
       atRisk.push({
         userId: r.id,
         provider: "calendly",
@@ -94,7 +96,7 @@ export async function GET(request) {
   }
 
   for (const r of gcal.data || []) {
-    if (!r.google_calendar_refresh_token)
+    if (r.google_calendar_reconnect_required || !r.google_calendar_refresh_token)
       atRisk.push({
         userId: r.id,
         provider: "google",
