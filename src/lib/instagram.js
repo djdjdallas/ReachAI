@@ -121,7 +121,15 @@ export async function refreshLongLivedToken(currentToken) {
   const data = await res.json();
 
   if (data.error) {
-    throw new Error(`Instagram token refresh failed: ${data.error.message}`);
+    // Surface Meta's structured error so callers can distinguish a genuinely
+    // dead token (OAuthException / code 190 — user revoked, switched to a
+    // personal account, or the 60-day token lapsed) from a transient hiccup
+    // (5xx, rate limit) that should simply be retried on the next cron tick.
+    const err = new Error(`Instagram token refresh failed: ${data.error.message}`);
+    err.metaCode = data.error.code;
+    err.metaType = data.error.type;
+    err.metaSubcode = data.error.error_subcode;
+    throw err;
   }
 
   return {

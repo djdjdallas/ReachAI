@@ -236,8 +236,12 @@ export default function DashboardPage() {
   const igTokenExpiresAt = profile?.meta_token_expires_at
     ? new Date(profile.meta_token_expires_at)
     : null;
+  // meta_reconnect_required is the authoritative signal (set by the refresh cron
+  // on a definitive OAuthException); fall back to raw expiry for older rows.
   const igTokenExpired =
-    igConnected && igTokenExpiresAt && igTokenExpiresAt < new Date();
+    igConnected &&
+    (profile?.meta_reconnect_required ||
+      (igTokenExpiresAt && igTokenExpiresAt < new Date()));
 
   const statCards = [
     {

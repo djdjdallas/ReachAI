@@ -497,8 +497,13 @@ export default function SettingsPage() {
   const igTokenExpiresAt = profile?.meta_token_expires_at
     ? new Date(profile.meta_token_expires_at)
     : null;
+  // meta_reconnect_required is the authoritative signal (set by the refresh cron
+  // on a definitive OAuthException, e.g. the coach revoked access); fall back to
+  // raw expiry for rows predating the flag.
   const igExpired =
-    isInstagramConnected && igTokenExpiresAt && igTokenExpiresAt < new Date();
+    isInstagramConnected &&
+    (profile?.meta_reconnect_required ||
+      (igTokenExpiresAt && igTokenExpiresAt < new Date()));
   const igDaysUntilExpiry =
     igTokenExpiresAt
       ? Math.floor((igTokenExpiresAt - new Date()) / (1000 * 60 * 60 * 24))
