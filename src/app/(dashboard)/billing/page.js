@@ -62,9 +62,7 @@ const PLANS = [
       "Advanced analytics & reporting",
       "Priority support",
       "Custom AI personality tuning",
-      ...(process.env.NEXT_PUBLIC_COMMENT_TO_DM_VISIBLE === "true"
-        ? ["Comment-to-DM with AI intent grading"]
-        : []),
+      "Comment-to-DM with AI intent grading",
     ],
     popular: true,
   },

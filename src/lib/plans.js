@@ -43,8 +43,7 @@ export function getDmLimit(plan) {
 
 /**
  * Returns true when the plan includes the comment-to-DM feature.
- * Currently bundled into Unlimited as a competitive moat — pending Meta
- * App Review for the instagram_manage_comments permission.
+ * Bundled into Unlimited as a competitive moat.
  *
  * @param {string} plan
  * @returns {boolean}
