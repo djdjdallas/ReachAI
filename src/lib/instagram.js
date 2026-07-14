@@ -371,34 +371,6 @@ export async function postPublicCommentReply(commentId, text, pageAccessToken) {
   return { success: true, replyId: data?.id || null };
 }
 
-/**
- * Resolves a public IG business/creator username to its IGSID via
- * Business Discovery. Returns null when the target is private, not a
- * business/creator account, or otherwise not resolvable — the IG Graph
- * API does not expose a general username→IGSID lookup for personal
- * accounts.
- *
- * @param {string} igAccountId - the founder's IG Business Account ID
- * @param {string} username - target username (with or without leading @)
- * @param {string} pageAccessToken - decrypted Page Access Token
- */
-export async function resolveUsernameToIgsid(igAccountId, username, pageAccessToken) {
-  const clean = String(username || "").replace(/^@/, "").trim();
-  if (!clean) return null;
-  const url =
-    `${GRAPH_BASE}/${igAccountId}` +
-    `?fields=business_discovery.username(${encodeURIComponent(clean)})` +
-    `{id,username,name}&access_token=${pageAccessToken}`;
-  const res = await fetch(url);
-  const data = await res.json();
-  if (data.error || !data.business_discovery?.id) return null;
-  return {
-    igsid: String(data.business_discovery.id),
-    username: data.business_discovery.username,
-    name: data.business_discovery.name || null,
-  };
-}
-
 // ── Webhook Verification ────────────────────────────────────────────────
 
 /**
