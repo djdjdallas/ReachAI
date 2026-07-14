@@ -7,6 +7,14 @@ const TAG_LENGTH = 16;
 function getKey() {
   const key = process.env.ENCRYPTION_KEY;
   if (!key) throw new Error("ENCRYPTION_KEY environment variable is required");
+  // Fail loudly at the call site instead of deep inside createCipheriv: a
+  // malformed key yields a wrong-length buffer that otherwise throws a cryptic
+  // error on every token op. aes-256-gcm needs exactly 32 bytes (64 hex chars).
+  if (!/^[0-9a-fA-F]{64}$/.test(key)) {
+    throw new Error(
+      "ENCRYPTION_KEY must be a 64-character hex string (32 bytes). Generate with: openssl rand -hex 32"
+    );
+  }
   return Buffer.from(key, "hex");
 }
 

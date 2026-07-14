@@ -19,6 +19,7 @@ import {
   CheckCircle2,
   AlertTriangle,
   Tag,
+  Link2,
 } from "lucide-react";
 
 const CORAL = "#ff7e67";
@@ -67,6 +68,92 @@ export default function OfferForm({ initialOffer }) {
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState(null);
+
+  const [importUrl, setImportUrl] = useState("");
+  const [importing, setImporting] = useState(false);
+  const [importError, setImportError] = useState(null);
+  const [imported, setImported] = useState(false);
+  // Extracted fields the offer form has no inputs for (creator_offers has no
+  // promise/FAQ columns) — shown read-only so the coach can copy anything
+  // useful into the fields above before saving.
+  const [importExtras, setImportExtras] = useState(null);
+
+  async function handleImport() {
+    const url = importUrl.trim();
+    if (!url || importing) return;
+
+    // Importing overwrites the fields below. If the coach has already typed
+    // anything, confirm before replacing it so we never silently lose input.
+    const hasExistingInput = [
+      offerName,
+      priceDollars,
+      idealCustomer,
+      objections,
+      questions,
+    ].some((v) => typeof v === "string" && v.trim());
+    if (
+      hasExistingInput &&
+      !window.confirm(
+        "This will replace what you've already entered below with details from the page. Continue?"
+      )
+    ) {
+      return;
+    }
+
+    setImporting(true);
+    setImportError(null);
+    setImported(false);
+    setImportExtras(null);
+
+    try {
+      const res = await fetch("/api/offers/import", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ url }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setImportError(data.message || data.error || "Import failed. Please try again.");
+        return;
+      }
+
+      const draft = data.draft || {};
+      // Prefill ONLY — nothing is saved until the coach clicks "Save offer".
+      if (draft.offer_name) setOfferName(draft.offer_name);
+      if (
+        typeof draft.price === "number" &&
+        (!draft.currency || draft.currency === "USD")
+      ) {
+        setPriceDollars(draft.price.toFixed(2));
+      }
+      setOfferUrl(data.source_url || url);
+      if (draft.target_audience) setIdealCustomer(draft.target_audience);
+      if (Array.isArray(draft.objections) && draft.objections.length > 0) {
+        setObjections(listToText(draft.objections));
+      }
+      if (
+        Array.isArray(draft.qualification_questions) &&
+        draft.qualification_questions.length > 0
+      ) {
+        setQuestions(listToText(draft.qualification_questions));
+      }
+
+      const faqs = Array.isArray(draft.faqs) ? draft.faqs : [];
+      if (draft.promise || draft.delivery_format || faqs.length > 0) {
+        setImportExtras({
+          promise: draft.promise || "",
+          deliveryFormat: draft.delivery_format || "",
+          faqs,
+        });
+      }
+      setImported(true);
+      setSaved(false);
+    } catch {
+      setImportError("Network error. Please try again.");
+    } finally {
+      setImporting(false);
+    }
+  }
 
   async function handleSave(e) {
     e?.preventDefault();
@@ -120,6 +207,100 @@ export default function OfferForm({ initialOffer }) {
           purchase signal versus general engagement. Keep it accurate.
         </p>
       </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-lg flex items-center gap-2">
+            <Link2 className="h-4 w-4" style={{ color: CORAL }} />
+            Import from URL
+          </CardTitle>
+          <CardDescription>
+            Paste the link to your sales or offer page and we&apos;ll prefill
+            the fields below for you to review.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <div className="flex flex-col sm:flex-row gap-2">
+            <Input
+              type="url"
+              value={importUrl}
+              onChange={(e) => setImportUrl(e.target.value)}
+              placeholder="https://yoursite.com/offer"
+              disabled={importing}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  handleImport();
+                }
+              }}
+            />
+            <Button
+              type="button"
+              variant="outline"
+              onClick={handleImport}
+              disabled={importing || !importUrl.trim()}
+              className="shrink-0"
+            >
+              {importing ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Importing…
+                </>
+              ) : (
+                <>
+                  <Link2 className="h-4 w-4 mr-2" />
+                  Import from URL
+                </>
+              )}
+            </Button>
+          </div>
+
+          {importError && (
+            <div className="flex items-center gap-2 text-sm text-red-600">
+              <AlertTriangle className="h-4 w-4 shrink-0" />
+              {importError}
+            </div>
+          )}
+          {imported && !importError && (
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <CheckCircle2 className="h-4 w-4 text-green-600 shrink-0" />
+              Imported — review before saving.
+            </div>
+          )}
+
+          {imported && importExtras && (
+            <div className="rounded-md border bg-muted/40 p-3 text-xs text-muted-foreground space-y-2">
+              <p className="font-medium text-foreground">
+                Also found on your page — copy anything useful into the fields
+                below (these aren&apos;t saved with your offer):
+              </p>
+              {importExtras.promise && (
+                <p>
+                  <span className="font-medium">Core promise:</span>{" "}
+                  {importExtras.promise}
+                </p>
+              )}
+              {importExtras.deliveryFormat && (
+                <p>
+                  <span className="font-medium">Delivery:</span>{" "}
+                  {importExtras.deliveryFormat}
+                </p>
+              )}
+              {importExtras.faqs.length > 0 && (
+                <div className="space-y-1">
+                  <p className="font-medium">FAQs:</p>
+                  {importExtras.faqs.map((faq, i) => (
+                    <p key={i}>
+                      <span className="font-medium">Q:</span> {faq.q}{" "}
+                      <span className="font-medium">A:</span> {faq.a}
+                    </p>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       <form onSubmit={handleSave}>
         <Card>

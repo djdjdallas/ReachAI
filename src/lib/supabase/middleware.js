@@ -69,6 +69,10 @@ export async function updateSession(request) {
     pathname === "/forgot-password" ||
     pathname === "/update-password" ||
     pathname.startsWith("/api/webhooks") ||
+    // Cron routes carry no session cookie, so the page-auth redirect below
+    // would bounce them to /login (307) and the job would never execute. They
+    // enforce their own auth via CRON_SECRET (assertCron), so let them through.
+    pathname.startsWith("/api/cron") ||
     pathname.startsWith("/compare") ||
     pathname.startsWith("/blog") ||
     pathname.startsWith("/for") ||

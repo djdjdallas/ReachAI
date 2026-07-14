@@ -150,7 +150,11 @@ export async function withFreshToken(user) {
     .from("users")
     .update({
       calendly_access_token: encryptToken(tokens.access_token),
-      calendly_refresh_token: encryptToken(tokens.refresh_token),
+      // Only overwrite the stored refresh token when the provider returns a new
+      // one — otherwise encryptToken(null) would null it out and brick refresh.
+      ...(tokens.refresh_token
+        ? { calendly_refresh_token: encryptToken(tokens.refresh_token) }
+        : {}),
       calendly_token_expires_at: newExpiresAt,
     })
     .eq("id", user.id);

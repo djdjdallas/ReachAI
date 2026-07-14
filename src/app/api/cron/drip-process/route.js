@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import { processDrip } from "@/lib/drip/processor";
+import { assertCron } from "@/lib/auth/cron";
 
 // In-window follow-up nudge dispatcher. Runs every 15 minutes (Vercel cron;
 // see vercel.json). Atomically claims up to 50 due drips via claim_due_drips
@@ -10,15 +11,9 @@ import { processDrip } from "@/lib/drip/processor";
 // Requires CRON_SECRET in the environment (set in Vercel). Same auth pattern
 // as /api/cron/drip and /api/cron/refresh-tokens.
 
-function isAuthorizedCron(req) {
-  const auth = req.headers.get("authorization");
-  return auth === `Bearer ${process.env.CRON_SECRET}`;
-}
-
 export async function GET(req) {
-  if (!isAuthorizedCron(req)) {
-    return NextResponse.json({ error: "unauthorized" }, { status: 401 });
-  }
+  const denied = assertCron(req);
+  if (denied) return denied;
 
   const admin = getSupabaseAdmin();
   const { data: claimed, error } = await admin.rpc("claim_due_drips", {

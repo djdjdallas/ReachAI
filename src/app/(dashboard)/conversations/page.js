@@ -464,10 +464,17 @@ function ConversationsPage() {
 
   const handleResumeAi = async () => {
     if (!selectedConvo) return;
-    await supabase
+    const { error } = await supabase
       .from("conversations")
       .update({ ai_paused: false, ai_pause_reason: null, status: "qualifying" })
       .eq("id", selectedConvo.id);
+    if (error) {
+      // Don't claim the AI is resumed when the write failed — it would show
+      // active while still paused server-side.
+      console.error("Failed to resume AI:", error);
+      alert("Couldn't resume the AI agent. Please try again.");
+      return;
+    }
     setSelectedConvo((prev) => ({
       ...prev,
       ai_paused: false,

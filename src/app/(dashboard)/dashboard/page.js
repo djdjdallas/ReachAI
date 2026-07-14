@@ -480,7 +480,7 @@ export default function DashboardPage() {
                       </p>
                       <p className="text-[11px] text-stone-500">Discovery Call</p>
                     </div>
-                    <ExternalLink className="ml-auto h-4 w-4 text-stone-300 hover:text-stone-600 cursor-pointer" />
+                    <ExternalLink className="ml-auto h-4 w-4 text-stone-300" />
                   </div>
                 ))}
               {conversations.filter((c) => c.status?.toLowerCase() === "booked").length === 0 && (
