@@ -149,13 +149,15 @@ export async function GET(request) {
       // `comments` requires the `instagram_business_manage_comments` permission to be approved.
       // Until that permission is approved, Meta will accept the subscription but only deliver
       // `messages` and `messaging_postbacks` events in production. Development mode accepts all.
+      // `message_echoes` delivers messages SENT BY the connected account — including DMs the
+      // coach types manually in the Instagram app — so the webhook can persist manual openers.
       const subRes = await fetch(
         `https://graph.instagram.com/v21.0/${igbaId}/subscribed_apps`,
         {
           method: "POST",
           headers: { "Content-Type": "application/x-www-form-urlencoded" },
           body: new URLSearchParams({
-            subscribed_fields: "messages,messaging_postbacks,comments",
+            subscribed_fields: "messages,messaging_postbacks,comments,message_echoes",
             access_token: accessToken,
           }),
         }

@@ -127,12 +127,14 @@ export async function POST(request) {
       // Manual reply — save and send directly
       replyContent = message;
     } else {
-      // AI-generated reply
-      const { data: messages, error: msgError } = await getSupabaseAdmin()
+      // AI-generated reply. Fetch the newest 20 messages and restore
+      // chronological order — ascending+limit returned the OLDEST 20 and
+      // dropped recent context on long threads.
+      const { data: messagesDesc, error: msgError } = await getSupabaseAdmin()
         .from("messages")
         .select("role, content")
         .eq("conversation_id", conversationId)
-        .order("created_at", { ascending: true })
+        .order("created_at", { ascending: false })
         .limit(20);
 
       if (msgError) {
@@ -141,6 +143,8 @@ export async function POST(request) {
           { status: 500 }
         );
       }
+
+      const messages = (messagesDesc || []).reverse();
 
       const systemPrompt = buildSystemPrompt(
         userProfile.script_config,
@@ -177,12 +181,21 @@ export async function POST(request) {
     }
 
     // Send via Meta Instagram API
-    await sendInstagramMessage(
+    const sendResult = await sendInstagramMessage(
       userProfile.instagram_business_account_id,
       conversation.instagram_sender_id,
       replyContent,
       decryptToken(userProfile.meta_page_access_token)
     );
+
+    // Stamp the Meta mid so the echo of this send dedups in the webhook.
+    if (savedMessage?.id && sendResult?.message_id) {
+      const { error: midError } = await getSupabaseAdmin()
+        .from("messages")
+        .update({ provider_message_id: sendResult.message_id })
+        .eq("id", savedMessage.id);
+      if (midError) console.error("[ai-reply] mid stamp failed:", midError.code);
+    }
 
     getPostHogClient().capture({
       distinctId: user.email || user.id,

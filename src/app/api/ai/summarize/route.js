@@ -44,13 +44,17 @@ export async function POST(request) {
       );
     }
 
-    // Fetch messages
-    const { data: messages, error: msgError } = await admin
+    // Fetch messages — newest 30, restored to chronological order.
+    // Ascending+limit returned the OLDEST 30, so long threads summarized
+    // stale context instead of the current state of the conversation.
+    const { data: messagesDesc, error: msgError } = await admin
       .from("messages")
       .select("role, content")
       .eq("conversation_id", conversationId)
-      .order("created_at", { ascending: true })
+      .order("created_at", { ascending: false })
       .limit(30);
+
+    const messages = (messagesDesc || []).reverse();
 
     if (msgError || !messages?.length) {
       return NextResponse.json(
