@@ -425,3 +425,31 @@ TWILIO_PHONE_NUMBER
   config. A TEMP `console.log` (`[webhook] echo received:`) is in
   `handleEchoEvent` to confirm via Vercel logs that manually-typed DMs
   produce echoes on the Instagram Login API — remove after confirming.
+
+## 2026-07-14 — Removed the API-initiated outreach composer (Meta Messaging API policy alignment)
+- **Removed:** the "New outreach" composer — `src/app/api/outreach/start/route.js`
+  (username/IGSID resolution + first-touch send from the connected business
+  account) and its dashboard surface in `src/app/(dashboard)/conversations/page.js`
+  (dialog, form state, `handleStartOutreach`, trigger button, dead imports).
+  Also removed `resolveUsernameToIgsid` from `src/lib/instagram.js` (Business
+  Discovery lookup; the deleted route was its only caller). Rationale: Meta's
+  Messaging API requires all conversations to be user-initiated within the
+  24-hour window, and Clinchd's App Review approval states all conversations
+  are user-initiated — an app-initiated first send contradicts both. After
+  this change the only way a first message leaves Clinchd's ecosystem is the
+  coach typing it in the Instagram app; the app's job starts when the
+  prospect replies.
+- **Retained (byte-identical):** manual-send context capture — Native Send
+  pre-log (`/api/native-send`, `/api/native-send/backfill`,
+  `native_send_outbound` table + `match_and_claim_native_send` RPC,
+  NATIVE_SEND_PREFIX, the /native-send page and BackfillBanner) and the
+  webhook echo-capture branch shipped 2026-07-13.
+- **Historical threads unaffected:** no schema changes — `'clinchd_sent'`
+  stays in the origin CHECK, and every read path keyed on it is untouched
+  (prompt block in `src/lib/prompts.js`, the webhook's missing-outbound logic
+  scoped to `["clinchd_sent","native_send"]`, activeOffer grounding, the
+  `missing_outbound_context` banner). Existing outreach-originated
+  conversations keep rendering and prompting exactly as before.
+- **Verified:** `npm run build` ✓ clean; `grep -rn "outreach/start" src`
+  returns zero hits; checksums on Native Send routes/lib/page, prompts.js,
+  webhook route, and the native_send migration match pre-change baselines.

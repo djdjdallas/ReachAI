@@ -20,7 +20,6 @@ import {
   Sparkles,
   Trash2,
   AlertCircle,
-  Plus,
   Smartphone,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -38,13 +37,6 @@ import {
 } from "@/components/ui/select";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-} from "@/components/ui/dialog";
 import StatusBadge from "@/components/app/StatusBadge";
 import { parseTimestamp, relativeTime, calendarLabel, localDayKey } from "@/lib/dates";
 
@@ -518,56 +510,6 @@ function ConversationsPage() {
   const [deleting, setDeleting] = useState(false);
   const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
 
-  const [outreachOpen, setOutreachOpen] = useState(false);
-  const [outreachUsername, setOutreachUsername] = useState("");
-  const [outreachMessage, setOutreachMessage] = useState("");
-  const [outreachSending, setOutreachSending] = useState(false);
-  const [outreachError, setOutreachError] = useState(null);
-
-  const handleStartOutreach = async (e) => {
-    e.preventDefault();
-    if (outreachSending) return;
-    const username = outreachUsername.trim();
-    const message = outreachMessage.trim();
-    if (!username || !message) return;
-
-    setOutreachSending(true);
-    setOutreachError(null);
-    try {
-      const res = await fetch("/api/outreach/start", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ username, message }),
-      });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        setOutreachError(data.error || "Failed to start outreach.");
-        posthog.capture("outreach_start_failed", {
-          status: res.status,
-          reason: data.reason || null,
-        });
-        return;
-      }
-      posthog.capture("outreach_started_client", {
-        conversation_id: data.conversationId,
-        delivery_ok: data.delivery_ok !== false,
-      });
-      setOutreachOpen(false);
-      setOutreachUsername("");
-      setOutreachMessage("");
-      await fetchConversations(user?.id);
-      if (data.conversationId) {
-        router.replace(`/conversations?thread=${data.conversationId}`, {
-          scroll: false,
-        });
-      }
-    } catch (err) {
-      setOutreachError(err.message || "Network error.");
-    } finally {
-      setOutreachSending(false);
-    }
-  };
-
   const handleDeleteConversation = async () => {
     if (!selectedConvo || deleting) return;
 
@@ -761,19 +703,6 @@ function ConversationsPage() {
               </TabsList>
             </Tabs>
           </div>
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={() => {
-              setOutreachError(null);
-              setOutreachOpen(true);
-            }}
-            className="w-full gap-1.5 border-stone-200 hover:bg-stone-50"
-          >
-            <Plus className="h-3.5 w-3.5" />
-            New outreach
-          </Button>
           {aiModeError && (
             <div className="flex items-start gap-2 px-3 py-2 rounded-lg bg-amber-50 border border-amber-200 text-amber-800 text-xs leading-relaxed">
               <AlertCircle className="h-3.5 w-3.5 mt-0.5 shrink-0" />
@@ -1283,83 +1212,6 @@ function ConversationsPage() {
         loading={deleting}
         onConfirm={handleDeleteConversation}
       />
-
-      <Dialog open={outreachOpen} onOpenChange={setOutreachOpen}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle>New outreach DM</DialogTitle>
-            <DialogDescription>
-              Sends from your connected Instagram business account and marks
-              the thread as outreach-initiated so the agent can take over the
-              reply once they respond.
-            </DialogDescription>
-          </DialogHeader>
-          <form onSubmit={handleStartOutreach} className="space-y-4">
-            <div className="space-y-1.5">
-              <label className="text-xs font-medium text-stone-600">
-                Instagram username
-              </label>
-              <Input
-                placeholder="@username or paste IGSID"
-                value={outreachUsername}
-                onChange={(e) => setOutreachUsername(e.target.value)}
-                disabled={outreachSending}
-                autoFocus
-              />
-              <p className="text-[11px] text-stone-400 leading-relaxed">
-                Username lookup uses Business Discovery and only resolves
-                public business or creator accounts. For personal accounts,
-                paste the recipient&apos;s IGSID.
-              </p>
-            </div>
-            <div className="space-y-1.5">
-              <label className="text-xs font-medium text-stone-600">
-                First message
-              </label>
-              <textarea
-                placeholder="Hey, saw your..."
-                value={outreachMessage}
-                onChange={(e) => setOutreachMessage(e.target.value)}
-                disabled={outreachSending}
-                rows={4}
-                className="w-full px-3 py-2 bg-stone-50 border border-stone-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#ff7e67]/20 focus:border-[#ff7e67] transition-all resize-none"
-              />
-            </div>
-            {outreachError && (
-              <div className="flex items-start gap-2 px-3 py-2 rounded-lg bg-amber-50 border border-amber-200 text-amber-800 text-xs leading-relaxed">
-                <AlertCircle className="h-3.5 w-3.5 mt-0.5 shrink-0" />
-                <span>{outreachError}</span>
-              </div>
-            )}
-            <div className="flex justify-end gap-2 pt-2">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => setOutreachOpen(false)}
-                disabled={outreachSending}
-              >
-                Cancel
-              </Button>
-              <Button
-                type="submit"
-                disabled={
-                  outreachSending ||
-                  !outreachUsername.trim() ||
-                  !outreachMessage.trim()
-                }
-                className="gap-1.5 bg-[#ff7e67] hover:bg-[#ff7e67]/90 text-white"
-              >
-                {outreachSending ? (
-                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                ) : (
-                  <Send className="h-3.5 w-3.5" />
-                )}
-                Send outreach
-              </Button>
-            </div>
-          </form>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }
