@@ -46,6 +46,7 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 import StatusBadge from "@/components/app/StatusBadge";
+import { parseTimestamp, relativeTime, calendarLabel, localDayKey } from "@/lib/dates";
 
 // Banner rendered at the top of a thread flagged missing_outbound_context —
 // surfaces a paste-the-original-DM CTA so the AI can be backfilled with full
@@ -139,20 +140,6 @@ function getInitials(name) {
     .slice(0, 2);
 }
 
-function timeAgo(dateString) {
-  if (!dateString) return "";
-  const now = new Date();
-  const date = new Date(dateString);
-  const seconds = Math.floor((now - date) / 1000);
-  if (seconds < 60) return "just now";
-  const minutes = Math.floor(seconds / 60);
-  if (minutes < 60) return `${minutes}m ago`;
-  const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours}h ago`;
-  const days = Math.floor(hours / 24);
-  return `${days}d ago`;
-}
-
 const STATUS_FILTERS = [
   { value: "all", label: "All" },
   { value: "needs_review", label: "Needs Review" },
@@ -229,11 +216,11 @@ function ConversationsPage() {
         .from("conversations")
         .select("*, messages(content, created_at)")
         .eq("user_id", uid)
-        .order("updated_at", { ascending: false });
+        .order("last_message_at", { ascending: false });
 
       const mapped = (convos || []).map((convo) => {
         const sorted = (convo.messages || []).sort(
-          (a, b) => new Date(b.created_at) - new Date(a.created_at)
+          (a, b) => parseTimestamp(b.created_at) - parseTimestamp(a.created_at)
         );
         return {
           ...convo,
@@ -286,11 +273,11 @@ function ConversationsPage() {
         .from("conversations")
         .select("*, messages(content, created_at)")
         .eq("user_id", authUser.id)
-        .order("updated_at", { ascending: false });
+        .order("last_message_at", { ascending: false });
 
       const convoList = (convos || []).map((convo) => {
         const sorted = (convo.messages || []).sort(
-          (a, b) => new Date(b.created_at) - new Date(a.created_at)
+          (a, b) => parseTimestamp(b.created_at) - parseTimestamp(a.created_at)
         );
         return {
           ...convo,
@@ -866,7 +853,7 @@ function ConversationsPage() {
                           {convo.sender_name || "Unknown"}
                         </span>
                         <span className="text-[11px] text-stone-400 whitespace-nowrap shrink-0">
-                          {timeAgo(convo.updated_at)}
+                          {relativeTime(convo.last_message_at)}
                         </span>
                       </div>
                       <div className="flex items-center gap-2 mt-1">
@@ -932,7 +919,7 @@ function ConversationsPage() {
                       <StatusBadge status={selectedConvo.status} />
                     </div>
                     <p className="text-[11px] font-medium text-stone-500">
-                      Activity: {timeAgo(selectedConvo.updated_at)}
+                      Activity: {relativeTime(selectedConvo.last_message_at)}
                     </p>
                     {scheduledDrip && scheduledDrip.status === "scheduled" && (
                       <div className="mt-1 inline-flex items-center gap-2">
@@ -1112,14 +1099,16 @@ function ConversationsPage() {
                 </div>
               ) : (
                 <div className="space-y-6">
-                  {/* Date divider */}
-                  <div className="flex justify-center">
-                    <span className="px-3 py-1 bg-stone-50 rounded-full text-[10px] font-bold text-stone-400 uppercase tracking-widest">
-                      Today
-                    </span>
-                  </div>
-
-                  {messages.map((msg) => {
+                  {(() => {
+                    // Track the local calendar day of the previous message so a
+                    // date separator is rendered only when the day changes. The
+                    // label reflects each message's own created_at — old
+                    // messages can no longer fall under a hardcoded "Today".
+                    let prevDayKey = null;
+                    return messages.map((msg) => {
+                    const dayKey = localDayKey(msg.created_at);
+                    const showDateDivider = dayKey !== prevDayKey;
+                    prevDayKey = dayKey;
                     const isOutbound = msg.role === "assistant";
                     // Resolve label: prefer the new `source` column. Fall back
                     // to `role` for legacy rows where `source` is null —
@@ -1142,7 +1131,14 @@ function ConversationsPage() {
                           ? Send
                           : Bot;
                     return (
-                      <div key={msg.id}>
+                      <div key={msg.id} className="space-y-6">
+                        {showDateDivider && (
+                          <div className="flex justify-center">
+                            <span className="px-3 py-1 bg-stone-50 rounded-full text-[10px] font-bold text-stone-400 uppercase tracking-widest">
+                              {calendarLabel(msg.created_at)}
+                            </span>
+                          </div>
+                        )}
                         {isOutbound ? (
                           <div className="flex items-end gap-3 justify-end ml-auto max-w-[80%]">
                             <div className="space-y-1 text-right">
@@ -1164,7 +1160,7 @@ function ConversationsPage() {
                                   {outboundLabel}
                                 </span>
                                 <span className="text-[10px] text-stone-400">
-                                  {timeAgo(msg.created_at)}
+                                  {relativeTime(msg.created_at)}
                                 </span>
                               </div>
                             </div>
@@ -1189,7 +1185,7 @@ function ConversationsPage() {
                                 </span>
                                 <span className="text-[10px] text-stone-400">·</span>
                                 <span className="text-[10px] text-stone-400">
-                                  {timeAgo(msg.created_at)}
+                                  {relativeTime(msg.created_at)}
                                 </span>
                               </div>
                             </div>
@@ -1197,7 +1193,8 @@ function ConversationsPage() {
                         )}
                       </div>
                     );
-                  })}
+                    });
+                  })()}
                   <div ref={messagesEndRef} />
                 </div>
               )}
