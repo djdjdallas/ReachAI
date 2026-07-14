@@ -187,12 +187,20 @@ export async function POST(request) {
     let deliveryOk = true;
     let deliveryError = null;
     try {
-      await sendInstagramMessage(
+      const sendResult = await sendInstagramMessage(
         userProfile.instagram_business_account_id,
         igsid,
         trimmedMessage,
         pageAccessToken
       );
+      // Stamp the Meta mid so the echo of this send dedups in the webhook.
+      if (savedMessage?.id && sendResult?.message_id) {
+        const { error: midError } = await admin
+          .from("messages")
+          .update({ provider_message_id: sendResult.message_id })
+          .eq("id", savedMessage.id);
+        if (midError) console.error("[outreach-start] mid stamp failed:", midError.code);
+      }
     } catch (err) {
       deliveryOk = false;
       deliveryError = err?.message || "send failed";

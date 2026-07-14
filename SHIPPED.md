@@ -387,3 +387,41 @@ TWILIO_PHONE_NUMBER
 - DEPLOY NOTE: requires CRON_SECRET env var in Vercel; */15 cron requires
   Vercel Pro. If on Hobby, move to Supabase pg_cron. (vercel.json already
   carries two daily crons — confirm the plan supports sub-daily schedules.)
+
+## 2026-07-13 — Manual DM echo capture + conversation history ordering fix
+- **Echo capture (manual openers visible to the AI):** the Instagram webhook
+  previously dropped all `is_echo` events, so DMs the coach typed manually in
+  the Instagram app were invisible and the AI started every coach-initiated
+  thread blind unless the DM was pre-logged via Native Send. Now:
+  - `message_echoes` added to `subscribed_fields` in the OAuth callback.
+  - New `handleEchoEvent` in the webhook persists text echoes as
+    `role='assistant'`, `source='manual'` with the Meta mid as
+    `provider_message_id` (dedup via the existing partial unique index).
+    Echo-created conversations get `origin='native_send'` so
+    NATIVE_SEND_PREFIX fires when the prospect replies. If the coach ALSO
+    pre-logged the DM, the echo branch claims the `native_send_outbound` row
+    (via the existing `match_and_claim_native_send` RPC) without inserting a
+    second opener. Hard invariant: the echo branch never reaches intent
+    classification, reply generation, or any send.
+  - All app send paths now record the Meta mid on their message row (webhook
+    text + voice replies, dashboard `/api/ai/reply`, `/api/outreach/start`)
+    so echoes of app-sent messages dedup to zero new rows. Drip nudges insert
+    with a null mid (processor untouched); the echo branch reconciles those by
+    stamping the mid onto the identical-content assistant row instead of
+    duplicating it.
+  - Native Send pre-log is now a fallback, not a requirement.
+- **History ordering fix:** conversation-history fetches used
+  `order(created_at, ascending).limit(N)`, which returns the OLDEST N rows —
+  threads longer than N excluded the newest inbound message from AI context.
+  Fixed to newest-N + reverse in the webhook reply path (limit 20),
+  `/api/ai/reply` (limit 20), and `/api/ai/summarize` (limit 30). The
+  earliest-message gate in `/api/outreach/start` (ascending, limit 1) is
+  intentional and unchanged.
+- No schema changes (role/source/provider_message_id/origin already existed).
+  No new deps, no new crons.
+- DEPLOY NOTE: existing connected accounts must re-subscribe to pick up
+  `message_echoes` (reconnect Instagram, or re-run `subscribed_apps`). Also
+  confirm `message_echoes` is enabled in the Meta App Dashboard webhook
+  config. A TEMP `console.log` (`[webhook] echo received:`) is in
+  `handleEchoEvent` to confirm via Vercel logs that manually-typed DMs
+  produce echoes on the Instagram Login API — remove after confirming.

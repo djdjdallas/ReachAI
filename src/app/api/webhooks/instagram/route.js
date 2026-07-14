@@ -104,8 +104,15 @@ async function handleMetaWebhook(body, rawBody, request) {
       // Only process text messages (not reads, reactions, etc.)
       if (!event.message?.text) continue;
 
-      // Ignore echo messages (messages we sent)
-      if (event.message?.is_echo) continue;
+      // Echo messages (sent BY the connected account — both API-sent replies
+      // and DMs the coach types manually in the Instagram app) are persisted
+      // for AI context, never processed. INVARIANT: the echo branch must
+      // never fall through into intent classification, reply generation, or
+      // any send path — otherwise the agent could react to its own messages.
+      if (event.message?.is_echo) {
+        await handleEchoEvent(event);
+        continue;
+      }
 
       const igAccountId = event.recipient?.id; // Our Instagram Business Account ID
       const senderId = event.sender?.id; // The person who DM'd us (IGSID)
@@ -321,6 +328,166 @@ async function insertMessageIfNew(supabase, { conversation_id, role, content, pr
     .eq("id", conversation_id);
   if (bumpError) log.error("[webhook] conversation bump failed:", bumpError.code);
   return { data, error, duplicate: false };
+}
+
+// ── Echo capture ────────────────────────────────────────────────────────
+// Echo events (message.is_echo) are messages SENT BY the connected business
+// account: replies this app sends via the API AND DMs the coach types
+// manually in the Instagram app. Persisting them makes manually-sent openers
+// visible to the AI automatically, so the Native Send pre-log becomes a
+// fallback instead of a requirement.
+//
+// INVARIANT: this handler only persists. It must never trigger intent
+// classification, reply generation, or any send — the loop-prevention
+// guarantee that keeps the agent from reacting to its own messages.
+// Defensive throughout: a malformed echo payload logs and returns, never
+// throws into the webhook loop.
+async function handleEchoEvent(event) {
+  try {
+    // For echoes the SENDER is the business account and the RECIPIENT is the
+    // prospect — inverted relative to inbound events.
+    const igAccountId = event.sender?.id;
+    const recipientId = event.recipient?.id;
+    const messageText = event.message?.text;
+    const mid = event.message?.mid || null;
+    if (!igAccountId || !recipientId || !messageText) return;
+
+    // TEMP: echo verification, remove after confirming manual echoes arrive
+    console.log("[webhook] echo received:", {
+      is_echo: true,
+      mid,
+      sender: igAccountId,
+      recipient: recipientId,
+    });
+
+    const supabase = getSupabaseAdmin();
+
+    const { data: user } = await supabase
+      .from("users")
+      .select("id, email, meta_page_access_token")
+      .eq("instagram_business_account_id", igAccountId)
+      .single();
+    if (!user) return;
+
+    // Find or create the conversation keyed on the prospect's IGSID — the
+    // same key the inbound path uses, so the thread lines up when the
+    // prospect replies.
+    let conversation;
+    let conversationWasJustCreated = false;
+
+    const { data: conv } = await supabase
+      .from("conversations")
+      .select("id")
+      .eq("user_id", user.id)
+      .eq("instagram_sender_id", recipientId)
+      .maybeSingle();
+    conversation = conv;
+
+    if (!conversation) {
+      // Outbound-first thread. Best-effort prospect name lookup, mirroring
+      // the inbound path.
+      let senderName = null;
+      if (user.meta_page_access_token) {
+        try {
+          const pageToken = decryptToken(user.meta_page_access_token);
+          const profile = await getParticipantProfile(recipientId, pageToken);
+          senderName = profile?.name || profile?.username || null;
+        } catch (err) {
+          log.warn("[webhook] echo profile lookup failed:", err?.message);
+        }
+      }
+
+      const { data: newConv, error: createError } = await supabase
+        .from("conversations")
+        .insert({
+          user_id: user.id,
+          instagram_sender_id: recipientId,
+          instagram_thread_id: recipientId,
+          status: "qualifying",
+          ai_paused: false,
+          sender_name: senderName,
+          // Born from a manually-sent DM — same semantics as the Native Send
+          // pre-log path, so NATIVE_SEND_PREFIX fires when the prospect
+          // replies (src/lib/prompts.js).
+          origin: "native_send",
+        })
+        .select()
+        .single();
+      if (createError) {
+        log.error("[webhook] echo create conversation failed:", createError.code);
+        return;
+      }
+      getPostHogClient().capture({
+        distinctId: user.email || user.id,
+        event: "conversation_created",
+        properties: {
+          conversation_id: newConv.id,
+          sender_name: senderName,
+          via: "echo",
+        },
+      });
+      conversation = newConv;
+      conversationWasJustCreated = true;
+    }
+
+    // Reconcile with a Native Send pre-log: if the coach ALSO pre-logged this
+    // DM, claim the row so it never sits orphaned and the inbound path can't
+    // inject a second opener later — but do NOT insert its dm_text; the echo
+    // below is the authoritative copy. Net effect when both paths fire:
+    // exactly one opener row, zero orphaned pre-log rows.
+    if (conversationWasJustCreated) {
+      const { error: matchError } = await supabase.rpc(
+        "match_and_claim_native_send",
+        {
+          p_user_id: user.id,
+          p_conversation_id: conversation.id,
+          p_recipient_ig_user_id: recipientId,
+          p_recipient_handle: null,
+        }
+      );
+      if (matchError) {
+        log.warn("[webhook] echo native_send claim failed:", matchError.code);
+      }
+    }
+
+    // Some app-sent rows don't carry a mid at echo time: drip nudges insert
+    // with a null mid (processor is out of scope to change), and API replies
+    // are stamped only after the send returns, so the echo can win that race.
+    // If a recent assistant row has identical content and no mid, stamp the
+    // echo's mid on it instead of inserting a duplicate.
+    if (mid) {
+      const { data: recentAssistant } = await supabase
+        .from("messages")
+        .select("id, content, provider_message_id")
+        .eq("conversation_id", conversation.id)
+        .eq("role", "assistant")
+        .order("created_at", { ascending: false })
+        .limit(5);
+      const appSentTwin = (recentAssistant || []).find(
+        (m) => !m.provider_message_id && m.content === messageText
+      );
+      if (appSentTwin) {
+        const { error: stampError } = await supabase
+          .from("messages")
+          .update({ provider_message_id: mid })
+          .eq("id", appSentTwin.id);
+        if (stampError) log.warn("[webhook] echo twin stamp failed:", stampError.code);
+        return;
+      }
+    }
+
+    // role MUST be 'assistant': drip's 24h-window math and
+    // detectQualifyingLoop both treat role='user' as "the lead spoke".
+    await insertMessageIfNew(supabase, {
+      conversation_id: conversation.id,
+      role: "assistant",
+      content: messageText,
+      provider_message_id: mid,
+      source: "manual",
+    });
+  } catch (err) {
+    console.error("Error processing echo event:", err?.message);
+  }
 }
 
 // Native Send bridge: when a conversation is first created from an inbound
@@ -647,18 +814,23 @@ async function processIncomingMessage({
   // Natural delay
   await new Promise((r) => setTimeout(r, 1000 + Math.random() * 2000));
 
-  // Fetch conversation history
-  const { data: messages, error: msgError } = await supabase
+  // Fetch conversation history — newest 20 rows, restored to chronological
+  // order. Ascending+limit returned the OLDEST 20, so threads longer than 20
+  // messages dropped the newest inbound from context (and violated
+  // detectQualifyingLoop's contract that the latest inbound is included).
+  const { data: messagesDesc, error: msgError } = await supabase
     .from("messages")
     .select("role, content")
     .eq("conversation_id", conversation.id)
-    .order("created_at", { ascending: true })
+    .order("created_at", { ascending: false })
     .limit(20);
 
   if (msgError) {
     log.error("fetch messages failed:", msgError.code);
     return;
   }
+
+  const messages = (messagesDesc || []).reverse();
 
   // Qualifying-loop guard. If the agent has already asked the same kind of
   // qualifying question 3 turns in a row and the lead has never given a
@@ -960,7 +1132,7 @@ async function processIncomingMessage({
       if (canSendVoice) {
         try {
           const audioUrl = await getSendableAudioUrl(voiceSnippet.storage_path);
-          await sendVoiceMessage({
+          const voiceSendResult = await sendVoiceMessage({
             igUserId: user.instagram_business_account_id,
             encryptedAccessToken: user.meta_page_access_token,
             recipientPsid: senderId,
@@ -974,6 +1146,8 @@ async function processIncomingMessage({
               role: "assistant",
               content: `[voice reply: ${voiceSnippet.label}]`,
               source: "agent",
+              // Meta mid so the echo of this send dedups in handleEchoEvent
+              provider_message_id: voiceSendResult?.message_id || null,
             });
 
           await supabase
@@ -1039,15 +1213,19 @@ async function processIncomingMessage({
     return;
   }
 
-  // Save AI reply
-  const { error: aiInsertError } = await supabase
+  // Save AI reply. The insert stays BEFORE the send (a rate-limited or failed
+  // send must still leave the reply in the DB); the Meta mid is stamped onto
+  // this row after a successful send so its echo dedups in handleEchoEvent.
+  const { data: savedReply, error: aiInsertError } = await supabase
     .from("messages")
     .insert({
       conversation_id: conversation.id,
       role: "assistant",
       content: aiReply,
       source: "agent",
-    });
+    })
+    .select("id")
+    .single();
   if (aiInsertError) log.error("[webhook] AI reply insert failed:", aiInsertError.code);
   await supabase
     .from("conversations")
@@ -1081,12 +1259,22 @@ async function processIncomingMessage({
   if (canSend) {
     // Send reply via Meta Instagram API
     try {
-      await sendInstagramMessage(
+      const sendResult = await sendInstagramMessage(
         user.instagram_business_account_id,
         senderId,
         aiReply,
         decryptToken(user.meta_page_access_token)
       );
+      // Stamp the Meta mid so the echo of this send dedups. If the echo
+      // webhook won the race, handleEchoEvent already stamped this same mid
+      // on this row (twin reconciliation) and this update is a no-op.
+      if (savedReply?.id && sendResult?.message_id) {
+        const { error: midError } = await supabase
+          .from("messages")
+          .update({ provider_message_id: sendResult.message_id })
+          .eq("id", savedReply.id);
+        if (midError) log.warn("[webhook] mid stamp failed:", midError.code);
+      }
       getPostHogClient().capture({
         distinctId: user.email || user.id,
         event: "ai_reply_sent",
