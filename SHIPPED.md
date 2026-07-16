@@ -38,6 +38,8 @@ This file is the source of truth for what's been built and is live in production
 | Encryption helper (AES-256-GCM) | LIVE | 2026-02-27 | [link](#encryption-helper-aes-256-gcm) |
 | Voice Replies + DM intent classifier | LIVE (Unlimited plan, kill-switch gated) | 2026-05-20 | [link](#voice-replies--dm-intent-classifier) |
 | Comment-to-DM launch gate removed | LIVE | 2026-07-13 | [link](#comment-to-dm-launch-gate-removed) |
+| Connected-account badge + webhook subscription verification | LIVE | 2026-07-15 | [link](#connected-account-badge--webhook-subscription-verification) |
+| Founder business-event alerts (signup / IG connect / subscription) | LIVE | 2026-07-16 | [link](#founder-business-event-alerts-signup--ig-connect--subscription) |
 
 ---
 
@@ -453,3 +455,100 @@ TWILIO_PHONE_NUMBER
 - **Verified:** `npm run build` ✓ clean; `grep -rn "outreach/start" src`
   returns zero hits; checksums on Native Send routes/lib/page, prompts.js,
   webhook route, and the native_send migration match pre-change baselines.
+
+### Connected-account badge + webhook subscription verification
+
+**Date:** 2026-07-15
+
+Visibility fixes from the July 14 identity incident: a reconnect that lands on
+the wrong Instagram account (or drops webhook fields) is now visible within
+one page load instead of days.
+
+- **Connected-account identity badge** — `src/components/app/ConnectedAccountBadge.jsx`,
+  rendered once in `src/components/app/DashboardHeader.jsx` adjacent to the
+  agent-status pill, so every route under `(dashboard)` shows WHICH Instagram
+  account the agent is wired to. Three states: connected (neutral ink pill,
+  `@handle`), reconnect needed (coral warning, links to settings, driven by
+  `meta_reconnect_required`), not connected (coral warning, links to
+  settings). Reads only the users row the header already fetches — no new
+  requests, no Meta calls.
+- **Canonical webhook field list** — `src/lib/instagram-webhook-fields.js`
+  (leaf module) exports `REQUIRED_WEBHOOK_FIELDS`
+  (`messages, messaging_postbacks, comments, message_echoes`) and
+  `missingWebhookFields()`. Consumed by the OAuth callback,
+  `subscribePageToWebhooks` in `src/lib/instagram.js`, the connection-health
+  endpoint, and settings; mirrored (with pointer comment) in
+  `scripts/resubscribe-instagram-webhooks.mjs`, whose stale copy was missing
+  `message_echoes` and is now corrected.
+- **Verify-after-subscribe** — the OAuth callback
+  (`src/app/api/auth/instagram/callback/route.js`) now reads the
+  subscription back from Meta after POSTing it, compares as a set against
+  the canonical list, retries the POST once on mismatch or read failure,
+  and on persistent failure logs a structured
+  `[ig-callback] webhook subscription incomplete` line, fires the
+  `webhook_subscription_incomplete` PostHog event, and sends the existing
+  ops digest (`sendOpsReconnectDigest`). Never fails the OAuth flow —
+  degraded webhooks beat no connection.
+- **Connection-health endpoint** — `GET /api/instagram/connection-health`
+  (session-scoped): decrypts the stored token, reads `subscribed_apps` from
+  Meta, returns `{ connected, username, igba, subscribed_fields,
+  missing_fields, healthy }`. Meta failures return
+  `error: "verification_failed"` with a 200; no token material or raw Meta
+  error bodies reach the client. Settings-only by design — the badge must
+  not call it.
+- **Settings health line** — the Instagram Connection card fetches
+  connection-health on mount and renders one line: `Webhooks active (4/4)`
+  (muted) when healthy, or a coral line listing missing fields with a
+  Reconnect link.
+- **No schema changes, no new deps, no new crons.** Webhook event processing
+  (`src/app/api/webhooks/instagram/route.js`) untouched.
+
+### Founder business-event alerts (signup / IG connect / subscription)
+
+**Date:** 2026-07-16
+
+Event-driven founder alerts for the four business events that were previously
+invisible (a June 27 signup→paid→churned customer went unnoticed for 18
+days). Email to the founder via the existing Resend plumbing; SMS via the
+existing Twilio helper for the two money events only.
+
+- **Shared helper** — `src/lib/alerts/business-events.js` exports
+  `sendBusinessEventAlert(event, payload)` for `signup`,
+  `instagram_connected`, `subscription_started`, `subscription_canceled`.
+  Composes subject + plaintext body, sends email to
+  `ALERT_EMAIL || ADMIN_EMAIL || dominickjerell@gmail.com` (existing
+  convention), and SMS to `ALERT_PHONE` (optional env, skipped when unset)
+  for the two subscription events. Never throws; every caller is
+  fire-and-forget with `.catch(console.error)`.
+- **Signup hook** — `src/app/(onboarding)/layout.js`. users rows are created
+  by the `handle_new_user()` DB trigger and email/password signups never
+  touch a server route, so /onboarding (which every new user passes through
+  exactly once, via the OAuth callback redirect or the middleware onboarding
+  guard) is the once-per-new-user app-level point. Exactly-once is enforced
+  by a `founder_signup_alerted` claim flag in Supabase auth `app_metadata`
+  (claimed BEFORE sending — a crash can drop one alert, never spam). Users
+  mid-onboarding at deploy time fire one late alert whose body shows the
+  real `created_at`.
+- **Instagram connect hook** — OAuth callback
+  (`src/app/api/auth/instagram/callback/route.js`): the existing pre-update
+  select now also reads the prior `instagram_business_account_id` +
+  `instagram_username`; after a successful update the alert distinguishes
+  first connect (`[clinchd] instagram connected: @user (email)`) from an
+  account swap (`[clinchd] ⚠️ instagram account CHANGED: @old → @new
+  (email)`) — the July 14 incident case. Alert only; no blocking or claim
+  flow (separate hardening build).
+- **Subscription hooks** — Stripe webhook
+  (`src/app/api/webhooks/stripe/route.js`): `checkout.session.completed`
+  fires `💳 new subscriber` (email, plan, amount, customer id);
+  `customer.subscription.deleted` fires `🔻 cancellation` including the
+  customer's lifetime conversation count (degrades to `unknown` on query
+  failure, never blocks the webhook) plus signup date.
+  `invoice.payment_succeeded` deliberately not hooked (fires on every
+  renewal). Stripe retries may duplicate an alert occasionally — accepted,
+  no dedupe table.
+- **Config** — no new email env (reuses ALERT_EMAIL/ADMIN_EMAIL fallback
+  chain). NEW optional env `ALERT_PHONE` (E.164) enables the SMS channel —
+  must be added in the Vercel dashboard manually to take effect.
+- **No schema changes, no new deps, no crons, no DB triggers.** Signature
+  verification, subscription-status logic, drip toggling, and Meta-facing
+  behavior untouched.

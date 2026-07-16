@@ -28,7 +28,11 @@
 import { createClient } from "@supabase/supabase-js";
 import crypto from "node:crypto";
 
-const SUBSCRIBED_FIELDS = "messages,messaging_postbacks,comments";
+// Mirrors REQUIRED_WEBHOOK_FIELDS in src/lib/instagram-webhook-fields.js —
+// that module is the source of truth; keep this string in sync. Mirrored
+// (not imported) because this standalone node script runs outside the
+// app's module resolution and the package is CommonJS.
+const SUBSCRIBED_FIELDS = "messages,messaging_postbacks,comments,message_echoes";
 const GRAPH_BASE = "https://graph.instagram.com/v21.0";
 
 const args = new Set(process.argv.slice(2));

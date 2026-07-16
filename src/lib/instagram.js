@@ -5,6 +5,8 @@
  * Instagram Login OAuth flow.
  */
 
+import { REQUIRED_WEBHOOK_FIELDS } from "@/lib/instagram-webhook-fields";
+
 const GRAPH_API_VERSION = "v21.0";
 const GRAPH_BASE = `https://graph.facebook.com/${GRAPH_API_VERSION}`;
 
@@ -163,14 +165,12 @@ export async function getUserPagesWithInstagram(userAccessToken) {
 
 /**
  * Subscribes a Facebook Page to receive webhook events (messages, etc.).
+ * Field list comes from the canonical constant in
+ * src/lib/instagram-webhook-fields.js.
  */
 export async function subscribePageToWebhooks(pageId, pageAccessToken) {
-  // IMPORTANT: This field list must match what's declared in the Meta App Dashboard.
-  // `comments` requires the `instagram_business_manage_comments` permission to be approved.
-  // Until that permission is approved, Meta will accept the subscription but only deliver
-  // `messages` and `messaging_postbacks` events in production. Development mode accepts all.
   const res = await fetch(
-    `${GRAPH_BASE}/${pageId}/subscribed_apps?subscribed_fields=messages,messaging_postbacks,comments&access_token=${pageAccessToken}`,
+    `${GRAPH_BASE}/${pageId}/subscribed_apps?subscribed_fields=${REQUIRED_WEBHOOK_FIELDS.join(",")}&access_token=${pageAccessToken}`,
     { method: "POST" }
   );
   const data = await res.json();

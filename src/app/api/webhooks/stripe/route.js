@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getStripe, PLANS } from "@/lib/stripe";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import { getPostHogClient } from "@/lib/posthog-server";
+import { sendBusinessEventAlert } from "@/lib/alerts/business-events";
 
 // Map a Stripe price ID to the plan key ("base" or "unlimited")
 function getPlanFromPriceId(priceId) {
@@ -58,7 +59,7 @@ export async function POST(request) {
           // status guard is needed. 'handoff' is intentionally preserved.
           const { data: currentUser } = await supabase
             .from("users")
-            .select("ai_mode")
+            .select("ai_mode, email")
             .eq("id", userId)
             .maybeSingle();
 
@@ -83,6 +84,18 @@ export async function POST(request) {
             event: "subscription_activated",
             properties: { plan },
           });
+
+          // Founder alert: new paid subscriber. Fire-and-forget — a Resend
+          // outage must be invisible to webhook processing.
+          sendBusinessEventAlert("subscription_started", {
+            email: currentUser?.email || null,
+            plan,
+            amountTotal:
+              typeof session.amount_total === "number"
+                ? session.amount_total
+                : null,
+            stripeCustomerId: session.customer,
+          }).catch(console.error);
 
           // Enroll new subscriber in drip campaign
           fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/drip/enroll`, {
@@ -241,7 +254,7 @@ export async function POST(request) {
 
         const { data: canceledUser } = await supabase
           .from("users")
-          .select("id")
+          .select("id, email, plan, created_at")
           .eq("stripe_customer_id", customerId)
           .single();
 
@@ -273,6 +286,33 @@ export async function POST(request) {
             distinctId: canceledUser.id,
             event: "subscription_canceled",
           });
+
+          // Founder alert with lifetime conversation count so severity is
+          // instantly readable (a 0-conversation trial lapse vs a
+          // 270-conversation churn are different emergencies). Count failure
+          // degrades to "unknown" — it never blocks the alert or the webhook.
+          let conversationCount = "unknown";
+          try {
+            const { count, error: countError } = await supabase
+              .from("conversations")
+              .select("id", { count: "exact", head: true })
+              .eq("user_id", canceledUser.id);
+            if (!countError && typeof count === "number") {
+              conversationCount = count;
+            }
+          } catch (err) {
+            console.error(
+              "cancellation conversation count failed:",
+              err?.message
+            );
+          }
+          sendBusinessEventAlert("subscription_canceled", {
+            email: canceledUser.email,
+            plan: canceledUser.plan,
+            conversationCount,
+            signupDate: canceledUser.created_at,
+            stripeCustomerId: customerId,
+          }).catch(console.error);
         }
         break;
       }
