@@ -50,6 +50,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { REQUIRED_WEBHOOK_FIELDS } from "@/lib/instagram-webhook-fields";
 
 export default function SettingsPage() {
   const router = useRouter();
@@ -79,6 +80,10 @@ export default function SettingsPage() {
   // OAuth error redirected here from the callback for already-onboarded
   // coaches (the callback now sends no_igba_id → /settings for them).
   const [igConnectError, setIgConnectError] = useState(null);
+  // Webhook subscription health — fetched once on mount when connected.
+  // { healthy, subscribed_fields, missing_fields, ... } from
+  // /api/instagram/connection-health, or null while loading / disconnected.
+  const [webhookHealth, setWebhookHealth] = useState(null);
 
   // Calendly status messages
   const [calendlyNotice, setCalendlyNotice] = useState(null);
@@ -116,6 +121,26 @@ export default function SettingsPage() {
       router.replace("/settings", { scroll: false });
     }
   }, [searchParams, router]);
+
+  // Verify webhook subscription health once the profile shows a connected
+  // account. Settings-only: this endpoint calls Meta, so nothing outside
+  // this page should fetch it.
+  useEffect(() => {
+    if (!profile?.instagram_business_account_id) {
+      setWebhookHealth(null);
+      return;
+    }
+    let cancelled = false;
+    fetch("/api/instagram/connection-health")
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (!cancelled && data?.connected) setWebhookHealth(data);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [profile?.instagram_business_account_id]);
 
   // Calendar integrations
   const [gcalConnected, setGcalConnected] = useState(false);
@@ -656,6 +681,27 @@ export default function SettingsPage() {
               </span>
             )}
           </div>
+          {isInstagramConnected && webhookHealth && (
+            webhookHealth.healthy ? (
+              <p className="text-xs text-muted-foreground">
+                Webhooks active ({REQUIRED_WEBHOOK_FIELDS.length}/
+                {REQUIRED_WEBHOOK_FIELDS.length})
+              </p>
+            ) : (
+              <p className="text-xs text-[#ff7e67]">
+                {Array.isArray(webhookHealth.missing_fields) &&
+                webhookHealth.missing_fields.length > 0
+                  ? `Webhook delivery incomplete — missing: ${webhookHealth.missing_fields.join(", ")}. `
+                  : "Couldn't verify webhook delivery. "}
+                <a
+                  href="/api/auth/instagram"
+                  className="underline font-medium"
+                >
+                  Reconnect
+                </a>
+              </p>
+            )
+          )}
           <div className="flex gap-2">
             <Button
               asChild

@@ -4,6 +4,12 @@ import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import { exchangeCodeForToken } from "@/lib/instagram";
 import { encryptToken } from "@/lib/token-utils";
 import { getPostHogClient } from "@/lib/posthog-server";
+import {
+  REQUIRED_WEBHOOK_FIELDS,
+  missingWebhookFields,
+} from "@/lib/instagram-webhook-fields";
+import { sendOpsReconnectDigest } from "@/lib/tokens/reconnect";
+import { sendBusinessEventAlert } from "@/lib/alerts/business-events";
 
 export async function GET(request) {
   const baseUrl = process.env.NEXT_PUBLIC_APP_URL;
@@ -67,9 +73,13 @@ export async function GET(request) {
 
     // Check whether the user has already completed onboarding so we can
     // route reconnections to /settings instead of back into the funnel.
+    // Also capture the PRIOR Instagram identity so the founder alert below
+    // can call out an account swap (the July 14 incident) loudly.
     const { data: profile } = await admin
       .from("users")
-      .select("onboarding_completed")
+      .select(
+        "onboarding_completed, instagram_business_account_id, instagram_username"
+      )
       .eq("id", user.id)
       .single();
     const successRedirect = profile?.onboarding_completed
@@ -130,7 +140,7 @@ export async function GET(request) {
     // Save Instagram connection details
     const expiresAt = new Date(Date.now() + expiresIn * 1000).toISOString();
 
-    await admin
+    const { error: igSaveError } = await admin
       .from("users")
       .update({
         instagram_business_account_id: igbaId,
@@ -141,37 +151,67 @@ export async function GET(request) {
       })
       .eq("id", user.id);
 
+    // Founder alert: first connect vs account CHANGED (old→new in the
+    // subject). Alert only — never blocks or rejects the change; the
+    // guard/claim flow is a separate build. Fire-and-forget.
+    if (!igSaveError) {
+      sendBusinessEventAlert("instagram_connected", {
+        email: user.email,
+        oldIgba: profile?.instagram_business_account_id || null,
+        oldUsername: profile?.instagram_username || null,
+        newIgba: igbaId,
+        newUsername: igUsername || null,
+      }).catch(console.error);
+    }
+
     // Subscribe this IG business account to our webhook so Meta starts
-    // firing incoming DM events. Non-blocking: log failures and continue to
-    // the redirect — the user can reconnect / re-subscribe later if needed.
+    // firing incoming DM events, then read the subscription back and verify
+    // Meta accepted every canonical field (see
+    // src/lib/instagram-webhook-fields.js for field semantics). One
+    // self-heal retry on mismatch. Non-blocking throughout: a degraded
+    // subscription logs + alerts but never fails the OAuth flow — the user
+    // is connected either way, and degraded webhooks beat no connection.
     try {
-      // IMPORTANT: This field list must match what's declared in the Meta App Dashboard.
-      // `comments` requires the `instagram_business_manage_comments` permission to be approved.
-      // Until that permission is approved, Meta will accept the subscription but only deliver
-      // `messages` and `messaging_postbacks` events in production. Development mode accepts all.
-      // `message_echoes` delivers messages SENT BY the connected account — including DMs the
-      // coach types manually in the Instagram app — so the webhook can persist manual openers.
-      const subRes = await fetch(
-        `https://graph.instagram.com/v21.0/${igbaId}/subscribed_apps`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/x-www-form-urlencoded" },
-          body: new URLSearchParams({
-            subscribed_fields: "messages,messaging_postbacks,comments,message_echoes",
-            access_token: accessToken,
-          }),
-        }
-      );
-      const subData = await subRes.json().catch(() => ({}));
-      if (!subRes.ok || subData?.error) {
+      await subscribeWebhookFields(igbaId, accessToken);
+      // null = the verification GET itself failed (couldn't read back).
+      let missing = await fetchMissingWebhookFields(igbaId, accessToken);
+      if (missing === null || missing.length > 0) {
+        await subscribeWebhookFields(igbaId, accessToken);
+        missing = await fetchMissingWebhookFields(igbaId, accessToken);
+      }
+      if (missing === null || missing.length > 0) {
+        const have =
+          missing === null
+            ? ["unknown"]
+            : REQUIRED_WEBHOOK_FIELDS.filter((f) => !missing.includes(f));
         console.error(
-          "[ig-callback] subscribe_apps failed:",
-          subRes.status,
-          subData?.error?.message
+          `[ig-callback] webhook subscription incomplete: have=[${have.join(",")}] want=[${REQUIRED_WEBHOOK_FIELDS.join(",")}] igba=${igbaId} user=${user.id}`
         );
+        getPostHogClient().capture({
+          distinctId: user.email || user.id,
+          event: "webhook_subscription_incomplete",
+          properties: {
+            igba: igbaId,
+            missing_fields: missing,
+            verified: missing !== null,
+          },
+        });
+        await sendOpsReconnectDigest([
+          {
+            label: user.email || user.id,
+            provider: "meta",
+            reason:
+              missing === null
+                ? "webhook subscription could not be verified after retry"
+                : `webhook subscription incomplete after retry: missing ${missing.join(", ")}`,
+          },
+        ]);
       }
     } catch (subErr) {
-      console.error("[ig-callback] subscribe_apps threw:", subErr?.message);
+      console.error(
+        "[ig-callback] webhook subscribe/verify threw:",
+        subErr?.message
+      );
     }
 
     // Fire-and-forget: kick off voice profile auto-import. Do NOT await.
@@ -210,5 +250,55 @@ export async function GET(request) {
     return NextResponse.redirect(
       `${baseUrl}/onboarding?step=1&error=callback_failed`
     );
+  }
+}
+
+// POST subscribed_apps with the canonical field list. Logs non-OK responses
+// but never throws — the caller verifies the outcome with a read-back.
+async function subscribeWebhookFields(igbaId, accessToken) {
+  const res = await fetch(
+    `https://graph.instagram.com/v21.0/${igbaId}/subscribed_apps`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({
+        subscribed_fields: REQUIRED_WEBHOOK_FIELDS.join(","),
+        access_token: accessToken,
+      }),
+    }
+  );
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok || data?.error) {
+    console.error(
+      "[ig-callback] subscribed_apps POST failed:",
+      res.status,
+      data?.error?.message
+    );
+  }
+}
+
+// Reads back the fields Meta actually holds for this account and returns
+// the missing ones ([] = fully subscribed). Returns null when the GET
+// itself failed, so the caller can distinguish "unverifiable" from
+// "verified incomplete".
+async function fetchMissingWebhookFields(igbaId, accessToken) {
+  try {
+    const res = await fetch(
+      `https://graph.instagram.com/v21.0/${igbaId}/subscribed_apps?access_token=${encodeURIComponent(accessToken)}`
+    );
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok || data?.error) {
+      console.error(
+        "[ig-callback] subscribed_apps GET failed:",
+        res.status,
+        data?.error?.message
+      );
+      return null;
+    }
+    const subscribed = data?.data?.[0]?.subscribed_fields || [];
+    return missingWebhookFields(subscribed);
+  } catch (err) {
+    console.error("[ig-callback] subscribed_apps GET threw:", err?.message);
+    return null;
   }
 }

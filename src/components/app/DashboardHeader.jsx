@@ -6,6 +6,7 @@ import { Bell, Zap, Flame, CalendarCheck, Check, Loader2 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { getOnboardingState } from "@/lib/onboarding";
+import ConnectedAccountBadge from "@/components/app/ConnectedAccountBadge";
 
 const PAGE_TITLES = {
   "/dashboard": "Inbox",
@@ -59,7 +60,7 @@ export default function DashboardHeader() {
         supabase
           .from("users")
           .select(
-            "full_name, ai_mode, instagram_business_account_id, script_config"
+            "full_name, ai_mode, instagram_business_account_id, instagram_username, meta_reconnect_required, script_config"
           )
           .eq("id", user.id)
           .single()
@@ -188,6 +189,7 @@ export default function DashboardHeader() {
             AGENT INACTIVE
           </div>
         )}
+        <ConnectedAccountBadge profile={profile} />
       </div>
 
       <div className="flex items-center gap-6">
