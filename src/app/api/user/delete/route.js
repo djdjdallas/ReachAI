@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import { getStripe } from "@/lib/stripe";
+import { decryptToken } from "@/lib/token-utils";
 
 export async function DELETE() {
   const supabase = await createClient();
@@ -83,18 +84,26 @@ export async function DELETE() {
       profile?.instagram_business_account_id
     ) {
       try {
-        const url = `https://graph.instagram.com/v21.0/${profile.instagram_business_account_id}/subscribed_apps?access_token=${encodeURIComponent(profile.meta_page_access_token)}`;
+        // Tokens are encrypted at rest — decrypt before calling Meta.
+        // Passing the ciphertext here made every unsubscribe fail
+        // silently, orphaning the webhook subscription: Meta kept firing
+        // events for the deleted account, which then hit "no user".
+        const token = decryptToken(profile.meta_page_access_token);
+        const url = `https://graph.instagram.com/v21.0/${profile.instagram_business_account_id}/subscribed_apps?access_token=${encodeURIComponent(token)}`;
         const res = await fetch(url, { method: "DELETE" });
         if (!res.ok) {
           const body = await res.text().catch(() => "");
-          console.warn(
-            "[delete-account] meta unsubscribe non-ok:",
+          console.error(
+            "[delete-account] meta unsubscribe FAILED — webhook subscription may be orphaned:",
             res.status,
-            body
+            body.slice(0, 200)
           );
         }
       } catch (err) {
-        console.warn("[delete-account] meta unsubscribe failed:", err?.message);
+        console.error(
+          "[delete-account] meta unsubscribe FAILED — webhook subscription may be orphaned:",
+          err?.message
+        );
       }
     }
 

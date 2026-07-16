@@ -94,6 +94,12 @@ function OnboardingPage() {
         "Instagram didn't return a successful response. Try reconnecting, or contact support@clinchd.io if it keeps failing.",
       auth_failed:
         "Authorization was denied. Click Connect Instagram to try again.",
+      ig_switch_blocked:
+        "That's a different Instagram account than the one already connected here. To switch accounts, finish setup first, then use Settings → Instagram Connection — or reconnect with the original account.",
+      ig_already_connected:
+        "This Instagram account is already connected to another Clinchd account. Disconnect it there first, or contact support@clinchd.io.",
+      ig_save_failed:
+        "Saving your Instagram connection failed. Try again, or contact support@clinchd.io if it keeps failing.",
     };
     const message =
       map[code] ||

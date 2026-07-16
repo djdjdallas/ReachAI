@@ -52,6 +52,13 @@ import {
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { REQUIRED_WEBHOOK_FIELDS } from "@/lib/instagram-webhook-fields";
 
+// The blocked-switch banner receives either an Instagram username or a raw
+// numeric account id from the callback redirect — format accordingly.
+function igHandleLabel(value) {
+  if (!value) return "your current account";
+  return /^\d+$/.test(value) ? `account ${value}` : `@${value}`;
+}
+
 export default function SettingsPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -80,6 +87,9 @@ export default function SettingsPage() {
   // OAuth error redirected here from the callback for already-onboarded
   // coaches (the callback now sends no_igba_id → /settings for them).
   const [igConnectError, setIgConnectError] = useState(null);
+  // Blocked account-switch prompt: { from, to } labels when the OAuth
+  // callback refused to swap the connected Instagram without confirmation.
+  const [igSwitchPrompt, setIgSwitchPrompt] = useState(null);
   // Webhook subscription health — fetched once on mount when connected.
   // { healthy, subscribed_fields, missing_fields, ... } from
   // /api/instagram/connection-health, or null while loading / disconnected.
@@ -106,7 +116,14 @@ export default function SettingsPage() {
       setCalendlyNotice({ kind: "error", error: err });
       router.replace("/settings", { scroll: false });
     }
-    if (err === "no_igba_id" || err === "invalid_state" || err === "callback_failed" || err === "auth_failed") {
+    if (
+      err === "no_igba_id" ||
+      err === "invalid_state" ||
+      err === "callback_failed" ||
+      err === "auth_failed" ||
+      err === "ig_already_connected" ||
+      err === "ig_save_failed"
+    ) {
       const map = {
         no_igba_id:
           "It looks like you connected a personal Instagram account. Clinchd needs an Instagram Business or Creator account. Switch your Instagram to a Business or Creator account and try again. Help: https://help.instagram.com/502981923235522",
@@ -116,8 +133,22 @@ export default function SettingsPage() {
           "Instagram didn't return a successful response. Try reconnecting, or contact support@clinchd.io if it keeps failing.",
         auth_failed:
           "Authorization was denied. Click Reconnect to try again.",
+        ig_already_connected:
+          "This Instagram account is already connected to another Clinchd account. Disconnect it there first, or contact support@clinchd.io.",
+        ig_save_failed:
+          "Saving your Instagram connection failed. Try reconnecting, or contact support@clinchd.io if it keeps failing.",
       };
       setIgConnectError({ code: err, message: map[err] });
+      router.replace("/settings", { scroll: false });
+    }
+    if (searchParams.get("ig_switch") === "blocked") {
+      setIgSwitchPrompt({
+        from: searchParams.get("from") || "",
+        to: searchParams.get("to") || "",
+        // The IGBA the confirm click authorizes — carried into the
+        // switch_to param so the ack cookie is bound to this account.
+        toIgba: searchParams.get("to_igba") || "",
+      });
       router.replace("/settings", { scroll: false });
     }
   }, [searchParams, router]);
@@ -629,6 +660,36 @@ export default function SettingsPage() {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
+          {igSwitchPrompt && (
+            <div className="rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900 dark:border-amber-900/40 dark:bg-amber-950/30 dark:text-amber-100">
+              <div className="flex items-start gap-3">
+                <AlertTriangle className="mt-0.5 h-5 w-5 flex-shrink-0" />
+                <p className="flex-1 leading-relaxed">
+                  You&apos;re about to change the connected Instagram from{" "}
+                  <strong>{igHandleLabel(igSwitchPrompt.from)}</strong> to{" "}
+                  <strong>{igHandleLabel(igSwitchPrompt.to)}</strong>. This
+                  will disconnect {igHandleLabel(igSwitchPrompt.from)} and
+                  route your agent to {igHandleLabel(igSwitchPrompt.to)}.
+                </p>
+              </div>
+              <div className="mt-3 flex gap-2 pl-8">
+                <Button asChild size="sm">
+                  <a
+                    href={`/api/auth/instagram?confirm_switch=1&switch_to=${encodeURIComponent(igSwitchPrompt.toIgba || "")}`}
+                  >
+                    Yes, switch account
+                  </a>
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => setIgSwitchPrompt(null)}
+                >
+                  Cancel
+                </Button>
+              </div>
+            </div>
+          )}
           {igConnectError && (
             <div className="flex items-start gap-3 rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-900 dark:border-red-900/40 dark:bg-red-950/30 dark:text-red-100">
               <AlertTriangle className="mt-0.5 h-5 w-5 flex-shrink-0" />

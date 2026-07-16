@@ -32,7 +32,7 @@ export async function POST() {
       try {
         const token = decryptToken(profile.meta_page_access_token);
         const res = await fetch(
-          `https://graph.instagram.com/v21.0/${profile.instagram_business_account_id}/subscribed_apps?access_token=${token}`,
+          `https://graph.instagram.com/v21.0/${profile.instagram_business_account_id}/subscribed_apps?access_token=${encodeURIComponent(token)}`,
           { method: "DELETE" }
         );
         if (!res.ok) {

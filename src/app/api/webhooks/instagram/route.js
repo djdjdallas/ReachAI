@@ -124,11 +124,20 @@ async function handleMetaWebhook(body, rawBody, request) {
         // Fetch sender's name from Instagram API
         // We need the user's access token — look up user first
         const supabaseForName = getSupabaseAdmin();
-        const { data: ownerUser } = await supabaseForName
-          .from("users")
-          .select("meta_page_access_token")
-          .eq("instagram_business_account_id", igAccountId)
-          .single();
+        // maybeSingle: zero rows → null (processIncomingMessage logs that
+        // case); 2+ rows → PGRST116 error, which must surface as an ERROR
+        // here, never be conflated with "no user".
+        const { data: ownerUser, error: ownerLookupError } =
+          await supabaseForName
+            .from("users")
+            .select("meta_page_access_token")
+            .eq("instagram_business_account_id", igAccountId)
+            .maybeSingle();
+        if (ownerLookupError) {
+          log.error(
+            `[resolver:inbound-name] lookup ERROR for igba=${igAccountId}: ${ownerLookupError.code} ${ownerLookupError.message}`
+          );
+        }
 
         let senderName = null;
         let senderUsername = null;
@@ -364,12 +373,25 @@ async function handleEchoEvent(event) {
 
     const supabase = getSupabaseAdmin();
 
-    const { data: user } = await supabase
+    // maybeSingle distinguishes the two failure shapes: zero rows → data
+    // null (genuinely no user); 2+ rows → PGRST116 error (duplicate
+    // identity rows). Conflating them hid the July duplicate-IGBA
+    // incidents — the error case must log as an ERROR, not "no user".
+    const { data: user, error: echoLookupError } = await supabase
       .from("users")
       .select("id, email, meta_page_access_token")
       .eq("instagram_business_account_id", igAccountId)
-      .single();
-    if (!user) return;
+      .maybeSingle();
+    if (echoLookupError) {
+      log.error(
+        `[resolver:echo] lookup ERROR for igba=${igAccountId}: ${echoLookupError.code} ${echoLookupError.message}`
+      );
+      return;
+    }
+    if (!user) {
+      log.warn(`[resolver:echo] no user for igba=${igAccountId}`);
+      return;
+    }
 
     // Find or create the conversation keyed on the prospect's IGSID — the
     // same key the inbound path uses, so the thread lines up when the
@@ -609,15 +631,25 @@ async function processIncomingMessage({
 }) {
   const supabase = getSupabaseAdmin();
 
-  // Look up user
+  // Look up user. maybeSingle distinguishes the two failure shapes: zero
+  // rows → data null (genuinely no user); 2+ rows → PGRST116 error
+  // (duplicate identity rows). The old .single() conflated both into one
+  // "no user" log line, which hid the July duplicate-IGBA incidents —
+  // duplicates must log as an ERROR, never as "no user".
   const { data: user, error: userError } = await supabase
     .from("users")
     .select("*")
     .eq(lookupField, lookupValue)
-    .single();
+    .maybeSingle();
 
-  if (userError || !user) {
-    log.warn(`[webhook] no user for ${lookupField}:`, lookupValue);
+  if (userError) {
+    log.error(
+      `[resolver:inbound] lookup ERROR for ${lookupField}=${lookupValue}: ${userError.code} ${userError.message}`
+    );
+    return;
+  }
+  if (!user) {
+    log.warn(`[resolver:inbound] no user for ${lookupField}=${lookupValue}`);
     return;
   }
 
