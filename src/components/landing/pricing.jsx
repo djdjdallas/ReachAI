@@ -24,11 +24,7 @@ const unlimitedPlan = {
   description: "For coaches who want their real voice on the replies that fit.",
   features: [
     "Unlimited conversations / month",
-    ...(process.env.NEXT_PUBLIC_COMMENT_TO_DM_VISIBLE === "true"
-      ? [
-          "Comment-to-DM with AI intent grading. Only high-intent commenters reach your inbox",
-        ]
-      : []),
+    "Comment-to-DM with AI intent grading. Only high-intent commenters reach your inbox",
     "Everything in Base",
     "Voice replies in your own recorded audio",
     "Advanced analytics",

@@ -35,9 +35,13 @@ export async function maybePostPublicReply({
   ownerUser,
   postId,
   commentId,
+  commentClassificationId,
+  commenterUsername,
   lastReplyText,
   pageToken,
 }) {
+  // Hoisted so the catch block can still record the attempted reply text.
+  let picked = null;
   try {
     // Kill switch — default state for every user. Anything but an explicit
     // true preserves pre-feature behavior exactly.
@@ -58,7 +62,7 @@ export async function maybePostPublicReply({
       return;
     }
 
-    const picked = pickReplyTemplate(templates, lastReplyText);
+    picked = pickReplyTemplate(templates, lastReplyText);
     // Feature on but zero usable templates → silently inert, by design.
     if (!picked) return;
 
@@ -69,6 +73,18 @@ export async function maybePostPublicReply({
         commentId,
         error: result.error,
         retryable: result.retryable,
+      });
+      await logPublicReply(admin, {
+        user_id: ownerUser.id,
+        comment_classification_id: commentClassificationId || null,
+        post_id: postId,
+        ig_comment_id: commentId,
+        ig_commenter_username: commenterUsername || null,
+        reply_text: picked.reply_text,
+        comment_reply_template_id: picked.id,
+        dispatch_status: "failed",
+        error_message: result.error || "unknown",
+        retryable: result.retryable === true,
       });
       getPostHogClient().capture({
         distinctId: ownerUser.email || ownerUser.id,
@@ -97,6 +113,18 @@ export async function maybePostPublicReply({
       });
     }
 
+    await logPublicReply(admin, {
+      user_id: ownerUser.id,
+      comment_classification_id: commentClassificationId || null,
+      post_id: postId,
+      ig_comment_id: commentId,
+      ig_commenter_username: commenterUsername || null,
+      reply_text: picked.reply_text,
+      comment_reply_template_id: picked.id,
+      ig_reply_comment_id: result.replyId || null,
+      dispatch_status: "sent",
+    });
+
     getPostHogClient().capture({
       distinctId: ownerUser.email || ownerUser.id,
       event: "comment_public_reply_posted",
@@ -109,6 +137,21 @@ export async function maybePostPublicReply({
     });
   } catch (err) {
     console.warn("[comment-public-reply] threw:", { commentId, error: err?.message });
+    // Only record an attempt if we got far enough to pick a reply (i.e. a
+    // dispatch was in flight). reply_text is NOT NULL, so guard on `picked`.
+    if (picked && ownerUser?.id) {
+      await logPublicReply(admin, {
+        user_id: ownerUser.id,
+        comment_classification_id: commentClassificationId || null,
+        post_id: postId,
+        ig_comment_id: commentId,
+        ig_commenter_username: commenterUsername || null,
+        reply_text: picked.reply_text,
+        comment_reply_template_id: picked.id,
+        dispatch_status: "failed",
+        error_message: err?.message || "unknown",
+      });
+    }
     try {
       getPostHogClient().capture({
         distinctId: ownerUser?.email || ownerUser?.id || "unknown",
@@ -122,5 +165,19 @@ export async function maybePostPublicReply({
     } catch {
       // PostHog itself failing must not surface into the webhook path.
     }
+  }
+}
+
+// Inserts one audit row into comment_public_reply_log. Best-effort: a logging
+// failure must never disturb the DM that already went out or re-throw into the
+// webhook path (the maybePostPublicReply contract). Service-role insert.
+async function logPublicReply(admin, fields) {
+  const { error } = await admin.from("comment_public_reply_log").insert(fields);
+  if (error) {
+    console.warn("[comment-public-reply] audit log insert failed:", {
+      ig_comment_id: fields?.ig_comment_id,
+      dispatch_status: fields?.dispatch_status,
+      error: error.message,
+    });
   }
 }

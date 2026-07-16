@@ -6,7 +6,6 @@ import {
   LayoutDashboard,
   PenTool,
   Sparkles,
-  MessagesSquare,
   Mic,
 } from "lucide-react";
 import AgentStats from "@/components/landing/animations/AgentStats";
@@ -57,18 +56,7 @@ const baseFeatures = [
   },
 ];
 
-const commentToDmLive = process.env.NEXT_PUBLIC_COMMENT_TO_DM_VISIBLE === "true";
-
-const commentToDmComingSoon = {
-  icon: MessagesSquare,
-  title: "Comment-to-DM",
-  description:
-    "When prospects comment on your posts, Clinchd starts the DM conversation for you. AI-assisted qualification routes warm leads straight to your booking link.",
-  bgClass: "bg-[#fff5f2]",
-  comingSoon: true,
-};
-
-const commentToDmLiveCard = {
+const commentToDmCard = {
   icon: Sparkles,
   title: "High-Intent Comment Routing",
   description:
@@ -88,7 +76,7 @@ const voiceRepliesComingSoon = {
 
 const features = [
   ...baseFeatures,
-  commentToDmLive ? commentToDmLiveCard : commentToDmComingSoon,
+  commentToDmCard,
   voiceRepliesComingSoon,
 ];
 

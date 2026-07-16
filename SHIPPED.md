@@ -37,12 +37,29 @@ This file is the source of truth for what's been built and is live in production
 | Token refresh cron | LIVE | 2026-03-27 | [link](#token-refresh-cron) |
 | Encryption helper (AES-256-GCM) | LIVE | 2026-02-27 | [link](#encryption-helper-aes-256-gcm) |
 | Voice Replies + DM intent classifier | LIVE (Unlimited plan, kill-switch gated) | 2026-05-20 | [link](#voice-replies--dm-intent-classifier) |
+| Comment-to-DM launch gate removed | LIVE | 2026-07-13 | [link](#comment-to-dm-launch-gate-removed) |
 | Connected-account badge + webhook subscription verification | LIVE | 2026-07-15 | [link](#connected-account-badge--webhook-subscription-verification) |
 | Founder business-event alerts (signup / IG connect / subscription) | LIVE | 2026-07-16 | [link](#founder-business-event-alerts-signup--ig-connect--subscription) |
 
 ---
 
 ## Detailed entries
+
+### Comment-to-DM launch gate removed
+
+**Date:** 2026-07-13
+
+Meta App Review approved `instagram_business_manage_comments`, so the
+pre-launch visibility gating for Comment-to-DM was removed. The
+`NEXT_PUBLIC_COMMENT_TO_DM_VISIBLE` env flag and all its references are
+deleted: the landing features grid now always shows the live
+"High-Intent Comment Routing" card (the "Comment-to-DM" coming-soon
+placeholder is gone), and the Comment-to-DM bullet is unconditional on
+the Unlimited plan card in both `src/components/landing/pricing.jsx`
+and `src/app/(dashboard)/billing/page.js`. Tier gating is untouched —
+the feature remains Unlimited-only via `hasCommentToDM` /
+`canUseCommentToDM`. The env var can be deleted from the Vercel
+dashboard; it no longer has any effect.
 
 ### Voice Replies + DM intent classifier
 
@@ -308,7 +325,6 @@ INSTAGRAM_APP_ID
 INSTAGRAM_APP_SECRET
 INSTAGRAM_WEBHOOK_VERIFY_TOKEN
 NEXT_PUBLIC_APP_URL
-NEXT_PUBLIC_COMMENT_TO_DM_VISIBLE
 NEXT_PUBLIC_POSTHOG_HOST
 NEXT_PUBLIC_POSTHOG_PROJECT_TOKEN
 NEXT_PUBLIC_SUPABASE_ANON_KEY
