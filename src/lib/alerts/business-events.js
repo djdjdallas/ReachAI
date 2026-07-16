@@ -66,16 +66,29 @@ function compose(event, p) {
       const changed = !!p.oldIgba && p.oldIgba !== p.newIgba;
       const oldLabel = igLabel(p.oldUsername, p.oldIgba);
       const newLabel = igLabel(p.newUsername, p.newIgba);
+      // Three shapes: a blocked swap ATTEMPT (guard refused it, user must
+      // confirm), a completed CHANGE, and a plain first/same connect. The
+      // founder must be able to tell from the subject alone whether the
+      // connection actually moved.
+      let subject;
+      if (changed && p.blocked) {
+        subject = `[clinchd] ⚠️ instagram account change BLOCKED (needs confirmation): ${oldLabel} → ${newLabel} (${p.email || "unknown email"})`;
+      } else if (changed) {
+        subject = `[clinchd] ⚠️ instagram account CHANGED: ${oldLabel} → ${newLabel} (${p.email || "unknown email"})`;
+      } else {
+        subject = `[clinchd] instagram connected: ${newLabel} (${p.email || "unknown email"})`;
+      }
       return {
-        subject: changed
-          ? `[clinchd] ⚠️ instagram account CHANGED: ${oldLabel} → ${newLabel} (${p.email || "unknown email"})`
-          : `[clinchd] instagram connected: ${newLabel} (${p.email || "unknown email"})`,
+        subject,
         body: [
           `email: ${p.email || "unknown"}`,
           p.oldIgba
             ? `old account: ${oldLabel} (IGBA ${p.oldIgba})`
             : "old account: none (first connect)",
           `new account: ${newLabel} (IGBA ${p.newIgba || "unknown"})`,
+          ...(changed && p.blocked
+            ? ["status: BLOCKED — connection unchanged, awaiting user confirmation"]
+            : []),
           `time: ${new Date().toISOString()}`,
         ].join("\n"),
       };

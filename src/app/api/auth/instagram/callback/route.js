@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import { exchangeCodeForToken } from "@/lib/instagram";
-import { encryptToken } from "@/lib/token-utils";
+import { encryptToken, decryptToken } from "@/lib/token-utils";
 import { getPostHogClient } from "@/lib/posthog-server";
 import {
   REQUIRED_WEBHOOK_FIELDS,
@@ -35,11 +35,9 @@ export async function GET(request) {
         event: "instagram_connection_failed",
         properties: { reason: "oauth_denied", error: error || "no_code" },
       });
-      const response = NextResponse.redirect(
+      return redirectClearingAuthCookies(
         `${baseUrl}/settings?instagram=denied`
       );
-      response.cookies.set("oauth_state", "", { maxAge: 0, path: "/" });
-      return response;
     }
 
     const state = searchParams.get("state");
@@ -53,7 +51,7 @@ export async function GET(request) {
         event: "instagram_connection_failed",
         properties: { reason: "invalid_state" },
       });
-      return NextResponse.redirect(
+      return redirectClearingAuthCookies(
         `${baseUrl}/onboarding?step=1&error=invalid_state`
       );
     }
@@ -66,7 +64,7 @@ export async function GET(request) {
     } = await supabase.auth.getUser();
 
     if (authError || !user) {
-      return NextResponse.redirect(`${baseUrl}/login?error=unauthorized`);
+      return redirectClearingAuthCookies(`${baseUrl}/login?error=unauthorized`);
     }
 
     const admin = getSupabaseAdmin();
@@ -78,7 +76,7 @@ export async function GET(request) {
     const { data: profile } = await admin
       .from("users")
       .select(
-        "onboarding_completed, instagram_business_account_id, instagram_username"
+        "onboarding_completed, instagram_business_account_id, instagram_username, meta_page_access_token"
       )
       .eq("id", user.id)
       .single();
@@ -134,7 +132,67 @@ export async function GET(request) {
       const errorRedirect = profile?.onboarding_completed
         ? `${baseUrl}/settings?error=no_igba_id`
         : `${baseUrl}/onboarding?step=1&error=no_igba_id`;
-      return NextResponse.redirect(errorRedirect);
+      return redirectClearingAuthCookies(errorRedirect);
+    }
+
+    // ── IGBA-change guard ────────────────────────────────────────────
+    // INVARIANT: the IGBA on an already-connected row can NEVER change
+    // without an explicit human confirmation, in the same session, for
+    // THIS SPECIFIC target account. On July 14 the browser's OAuth
+    // session held a DIFFERENT Instagram account than intended and the
+    // callback silently swapped the connection, producing a dark inbox
+    // for ~2 days. A swap requires the user to re-initiate the connect
+    // from the settings confirm banner, which sets the short-lived
+    // httpOnly ig_switch_ack cookie (via /api/auth/instagram
+    // ?confirm_switch=1&switch_to=<igba>) whose VALUE is the confirmed
+    // target IGBA — the guard only accepts a swap to exactly that
+    // account, so a leftover ack can never authorize a swap to some
+    // other account the browser's Meta session happens to hold. The
+    // cookie is single-use and cleared on every callback exit. No token
+    // is ever carried through the confirm flow — the OAuth exchange
+    // re-runs on the confirmed attempt. First connects (no prior IGBA)
+    // and same-account reconnects (token refresh) proceed unguarded.
+    const priorIgba = profile?.instagram_business_account_id || null;
+    const isSwap = !!priorIgba && priorIgba !== igbaId;
+    if (isSwap) {
+      const ackTarget = request.cookies.get("ig_switch_ack")?.value || null;
+      if (ackTarget !== igbaId) {
+        console.warn(
+          `[ig-callback] blocked IGBA swap without confirmation: ${priorIgba} -> ${igbaId} user=${user.id} ackTarget=${ackTarget || "none"}`
+        );
+        // Founder alert fires on the ATTEMPT, confirmed or not — marked
+        // blocked so it reads differently from a completed switch.
+        sendBusinessEventAlert("instagram_connected", {
+          email: user.email,
+          oldIgba: priorIgba,
+          oldUsername: profile?.instagram_username || null,
+          newIgba: igbaId,
+          newUsername: igUsername || null,
+          blocked: true,
+        }).catch(console.error);
+        getPostHogClient().capture({
+          distinctId: user.email || user.id,
+          event: "instagram_switch_blocked",
+          properties: { old_igba: priorIgba, new_igba: igbaId },
+        });
+        // Not-yet-onboarded users can't reach /settings (middleware
+        // bounces them to /onboarding), so route them to the onboarding
+        // error banner instead of a confirm banner they'd never see.
+        if (!profile?.onboarding_completed) {
+          return redirectClearingAuthCookies(
+            `${baseUrl}/onboarding?step=1&error=ig_switch_blocked`
+          );
+        }
+        const params = new URLSearchParams({
+          ig_switch: "blocked",
+          from: profile?.instagram_username || priorIgba,
+          to: igUsername || igbaId,
+          to_igba: igbaId,
+        });
+        return redirectClearingAuthCookies(
+          `${baseUrl}/settings?${params.toString()}`
+        );
+      }
     }
 
     // Save Instagram connection details
@@ -151,18 +209,66 @@ export async function GET(request) {
       })
       .eq("id", user.id);
 
-    // Founder alert: first connect vs account CHANGED (old→new in the
-    // subject). Alert only — never blocks or rejects the change; the
-    // guard/claim flow is a separate build. Fire-and-forget.
-    if (!igSaveError) {
-      sendBusinessEventAlert("instagram_connected", {
-        email: user.email,
-        oldIgba: profile?.instagram_business_account_id || null,
-        oldUsername: profile?.instagram_username || null,
-        newIgba: igbaId,
-        newUsername: igUsername || null,
-      }).catch(console.error);
+    if (igSaveError) {
+      console.error(
+        "[ig-callback] users update failed:",
+        igSaveError.code,
+        igSaveError.message
+      );
+      // 23505 = the partial unique index rejected an IGBA that already
+      // lives on ANOTHER user's row (same-user swaps are handled by the
+      // guard above). Friendly message, never an unhandled 500. Tokens
+      // were not saved, so skip webhook subscription and bail here.
+      const errParam =
+        igSaveError.code === "23505" ? "ig_already_connected" : "ig_save_failed";
+      getPostHogClient().capture({
+        distinctId: user.email || user.id,
+        event: "instagram_connection_failed",
+        properties: { reason: errParam, igba: igbaId },
+      });
+      const errorRedirect = profile?.onboarding_completed
+        ? `${baseUrl}/settings?error=${errParam}`
+        : `${baseUrl}/onboarding?step=1&error=${errParam}`;
+      return redirectClearingAuthCookies(errorRedirect);
     }
+
+    // Confirmed swap: best-effort unsubscribe of the OLD account's webhook
+    // subscription using the pre-swap token still in memory, so Meta stops
+    // firing events that would land as "[resolver:*] no user" forever —
+    // the confirm banner promises this disconnect. Failures log and never
+    // block the flow (the old token may already be revoked).
+    if (isSwap && profile?.meta_page_access_token) {
+      try {
+        const oldToken = decryptToken(profile.meta_page_access_token);
+        const unsubRes = await fetch(
+          `https://graph.instagram.com/v21.0/${priorIgba}/subscribed_apps?access_token=${encodeURIComponent(oldToken)}`,
+          { method: "DELETE" }
+        );
+        if (!unsubRes.ok) {
+          const body = await unsubRes.text().catch(() => "");
+          console.error(
+            "[ig-callback] old-account unsubscribe failed — its webhook subscription may be orphaned:",
+            unsubRes.status,
+            body.slice(0, 200)
+          );
+        }
+      } catch (err) {
+        console.error(
+          "[ig-callback] old-account unsubscribe threw — its webhook subscription may be orphaned:",
+          err?.message
+        );
+      }
+    }
+
+    // Founder alert: first connect vs account CHANGED (old→new in the
+    // subject). Fire-and-forget.
+    sendBusinessEventAlert("instagram_connected", {
+      email: user.email,
+      oldIgba: priorIgba,
+      oldUsername: profile?.instagram_username || null,
+      newIgba: igbaId,
+      newUsername: igUsername || null,
+    }).catch(console.error);
 
     // Subscribe this IG business account to our webhook so Meta starts
     // firing incoming DM events, then read the subscription back and verify
@@ -237,9 +343,9 @@ export async function GET(request) {
       );
     }
 
-    const response = NextResponse.redirect(successRedirect);
-    response.cookies.set("oauth_state", "", { maxAge: 0, path: "/" });
-    return response;
+    // Cookie clearing includes the single-use switch acknowledgment,
+    // whether or not this connect consumed it.
+    return redirectClearingAuthCookies(successRedirect);
   } catch (err) {
     console.error("Instagram callback error:", err);
     getPostHogClient().capture({
@@ -247,10 +353,22 @@ export async function GET(request) {
       event: "instagram_connection_failed",
       properties: { reason: "callback_error" },
     });
-    return NextResponse.redirect(
+    return redirectClearingAuthCookies(
       `${baseUrl}/onboarding?step=1&error=callback_failed`
     );
   }
+}
+
+// Every callback exit — success, error, denial, or block — clears both
+// flow cookies: oauth_state (the CSRF nonce) and ig_switch_ack (the
+// single-use, target-bound switch acknowledgment). A stale ack surviving
+// an aborted flow could otherwise linger for its 10-minute lifetime and
+// grease a later swap the user never finished confirming.
+function redirectClearingAuthCookies(url) {
+  const response = NextResponse.redirect(url);
+  response.cookies.set("oauth_state", "", { maxAge: 0, path: "/" });
+  response.cookies.set("ig_switch_ack", "", { maxAge: 0, path: "/" });
+  return response;
 }
 
 // POST subscribed_apps with the canonical field list. Logs non-OK responses

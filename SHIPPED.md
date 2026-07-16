@@ -40,6 +40,7 @@ This file is the source of truth for what's been built and is live in production
 | Comment-to-DM launch gate removed | LIVE | 2026-07-13 | [link](#comment-to-dm-launch-gate-removed) |
 | Connected-account badge + webhook subscription verification | LIVE | 2026-07-15 | [link](#connected-account-badge--webhook-subscription-verification) |
 | Founder business-event alerts (signup / IG connect / subscription) | LIVE | 2026-07-16 | [link](#founder-business-event-alerts-signup--ig-connect--subscription) |
+| Identity hardening (IGBA guard, resolver logging, delete fix, unique index) | LIVE (migration pending manual run) | 2026-07-16 | [link](#identity-hardening-igba-guard-resolver-logging-delete-fix-unique-index) |
 
 ---
 
@@ -552,3 +553,72 @@ existing Twilio helper for the two money events only.
 - **No schema changes, no new deps, no crons, no DB triggers.** Signature
   verification, subscription-status logic, drip toggling, and Meta-facing
   behavior untouched.
+
+### Identity hardening (IGBA guard, resolver logging, delete fix, unique index)
+
+**Date:** 2026-07-16
+
+Structurally closes the July 14 identity incidents: the one-to-one
+relationship between a users row and its `instagram_business_account_id`
+(IGBA) is now guarded at the write path, enforced at the DB level, legible
+in resolver logs, and cleaned up on account deletion.
+
+- **IGBA-change guard** — OAuth callback
+  (`src/app/api/auth/instagram/callback/route.js`). INVARIANT: the IGBA on
+  an already-connected row can never change without explicit human
+  confirmation in the same session. First connects and same-account
+  reconnects proceed unguarded; a different-account swap is BLOCKED, fires
+  the founder CHANGED alert on the attempt, and bounces to a settings
+  confirm banner ("You're about to change the connected Instagram from
+  @old to @new…") with explicit Confirm/Cancel. Confirm re-initiates the
+  connect via `/api/auth/instagram?confirm_switch=1`, which sets a
+  10-minute httpOnly single-use `ig_switch_ack` cookie; the OAuth exchange
+  re-runs on the confirmed attempt, so no token ever touches a URL or
+  client state. MVP interstitial per spec (banner + re-initiate, not an
+  in-flow confirm page).
+- **Cross-user 23505 handling** — same callback: a unique-violation on the
+  IGBA write (account already connected to ANOTHER Clinchd account)
+  redirects to settings with a friendly `ig_already_connected` message
+  instead of an unhandled 500; other save failures get `ig_save_failed`.
+  Failed saves no longer proceed to webhook subscription.
+- **Resolver logging** — webhook route inbound + echo + sender-name IGBA
+  lookups switched `.single()` → `.maybeSingle()` so zero rows (data null,
+  logs `[resolver:*] no user for igba=…`) is distinguishable from
+  duplicate rows (PGRST116, logs `[resolver:*] lookup ERROR …`). The old
+  code conflated both into "no user". Return shapes and fail-closed
+  behavior unchanged; comment-to-DM's owner lookup already distinguished
+  the cases and is untouched. No `.order().limit(1)` added anywhere —
+  no resolver used `.limit(1)`, and converting fail-closed `.single()`
+  semantics to deterministic-pick would trade loud drops for silent
+  misroutes.
+- **Delete-route decrypt fix** — `src/app/api/user/delete/route.js` now
+  calls `decryptToken` before Meta's `subscribed_apps` DELETE (it was
+  sending ciphertext, so every unsubscribe failed silently and the
+  webhook subscription was orphaned — deleted accounts kept firing
+  events that hit "no user"). Unsubscribe failures now log as errors.
+- **Unique index migration** —
+  `supabase/migrations/20260716120000_users_igba_unique.sql` (highest
+  timestamp, runs LAST): a DO-block guard counts duplicate IGBA groups and
+  raises (aborting the migration loudly) if any exist, then
+  `create unique index if not exists users_igba_unique on public.users
+  (instagram_business_account_id) where instagram_business_account_id is
+  not null`. Run manually AFTER the app deploy that ships the callback
+  guard + 23505 handler.
+- **No new deps, no crons, RLS untouched.** Badge, founder alerts,
+  verify-after-subscribe, echo capture, drip, and comment-to-DM behavior
+  unchanged.
+- **Post-audit cleanup (same day, fresh-session audit before merge):**
+  the `ig_switch_ack` cookie is now BOUND to the confirmed target IGBA
+  (value = the account id from the banner's `switch_to` param; the guard
+  accepts a swap only to exactly that account) and is cleared on EVERY
+  callback exit via `redirectClearingAuthCookies` — a confirm-then-cancel
+  can no longer leave a live ack that authorizes an unconfirmed swap.
+  Blocked not-yet-onboarded users now land on an onboarding error banner
+  (`ig_switch_blocked`) instead of a settings page middleware bounces
+  them off of; onboarding's error map also gained `ig_already_connected`
+  and `ig_save_failed`. The blocked-attempt founder alert is now marked
+  "BLOCKED (needs confirmation)" so it's distinguishable from a completed
+  change. A confirmed swap best-effort unsubscribes the OLD account's
+  Meta webhook subscription (using the pre-swap token) so its events
+  don't orphan into "[resolver] no user". Disconnect route now
+  URL-encodes the decrypted token like the delete route.
