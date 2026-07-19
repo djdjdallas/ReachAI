@@ -42,6 +42,7 @@ function timeAgo(dateString) {
 
 const STATUS_TABS = [
   { value: "all", label: "All" },
+  { value: "new", label: "New" },
   { value: "qualifying", label: "Qualifying" },
   { value: "interested", label: "Interested" },
   { value: "booked", label: "Booked" },
@@ -358,7 +359,7 @@ function LeadsPage() {
                           View Chat
                         </a>
                         <Select
-                          value={lead.status || "qualifying"}
+                          value={lead.status || "new"}
                           onValueChange={(newStatus) =>
                             handleStatusChange(lead.id, newStatus)
                           }
@@ -367,6 +368,7 @@ function LeadsPage() {
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
+                            <SelectItem value="new">New</SelectItem>
                             <SelectItem value="qualifying">
                               Qualifying
                             </SelectItem>

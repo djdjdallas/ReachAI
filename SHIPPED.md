@@ -41,6 +41,7 @@ This file is the source of truth for what's been built and is live in production
 | Connected-account badge + webhook subscription verification | LIVE | 2026-07-15 | [link](#connected-account-badge--webhook-subscription-verification) |
 | Founder business-event alerts (signup / IG connect / subscription) | LIVE | 2026-07-16 | [link](#founder-business-event-alerts-signup--ig-connect--subscription) |
 | Identity hardening (IGBA guard, resolver logging, delete fix, unique index) | LIVE (migration pending manual run) | 2026-07-16 | [link](#identity-hardening-igba-guard-resolver-logging-delete-fix-unique-index) |
+| Neutral 'new' status + classifier-driven triage labels + Human Takeover reply gate | BUILT (migration pending manual run) | 2026-07-18 | [link](#neutral-new-status--classifier-driven-triage-labels--human-takeover-reply-gate) |
 
 ---
 
@@ -622,3 +623,61 @@ in resolver logs, and cleaned up on account deletion.
   Meta webhook subscription (using the pre-swap token) so its events
   don't orphan into "[resolver] no user". Disconnect route now
   URL-encodes the decrypted token like the delete route.
+
+### Neutral 'new' status + classifier-driven triage labels + Human Takeover reply gate
+
+**Date:** 2026-07-18
+
+Fixes "every thread reads WARM LEAD": conversations were born
+`status='qualifying'` (rendered as WARM LEAD) and nothing ever moved noise
+threads to a colder or neutral state — the DM intent classifier's judgment
+was written to `messages.intent_classification` and ignored for triage.
+Conversations are now born `'new'` (NEW badge) and the first-message intent
+promotes the label.
+
+- **Migration (run manually BEFORE this code deploys)** —
+  `supabase/migrations/20260718120000_conversation_status_new.sql`: DO-block
+  guard aborts loudly if any status value sits outside the new CHECK set
+  (legacy `'not a fit'` with a space may exist — normalize, then retry),
+  then widens `conversations_status_check` to include `'new'` and sets the
+  column default to `'new'`. Old code writing `'qualifying'` explicitly
+  still satisfies the widened CHECK, so migration-before-code is safe.
+- **Leaf mapping module** — `src/lib/intent-status.js` (no imports, safe
+  for client + server, same pattern as `src/lib/voice/intent-classes.js`):
+  `INTENT_TO_STATUS` (warm_intent→qualifying, booking_cta→interested,
+  objection_*→qualifying, follow_up→new, do_not_send→not_a_fit),
+  `STATUS_PROMOTION_THRESHOLD` (0.5; below it a thread stays 'new'),
+  `DO_NOT_SEND_COLD_THRESHOLD` (0.7, keep in sync with
+  `DO_NOT_SEND_PAUSE_THRESHOLD`), and `statusForIntent(class, confidence)`.
+  Invariant: the mapping never demotes an engaged prospect — worst case for
+  a real lead is 'new' until their next message.
+- **Write path** — all three conversation inserts now write `status: "new"`
+  (`src/app/api/webhooks/instagram/route.js` inbound + echo paths,
+  `src/lib/comment-dm-conversation.js`). After the intent persist step, a
+  new step 2b promotes any thread still at 'new' (covers just-created
+  threads AND outbound-first threads whose first inbound reply lands
+  later): guarded `.eq("status","new")` so it never clobbers a manual
+  change, fire-and-forget so it never blocks the reply path, and the local
+  conversation object is patched so drip enqueue + status detection see
+  the promoted status in the same request. The keyword ratchet still
+  escalates from 'new' unmodified (`indexOf('new') === -1`, escalations
+  test `indexOf(target) > currentIdx`).
+- **Human Takeover now actually stops the AI** — the reply gate previously
+  checked only `user.ai_mode` (global) and `conversation.ai_paused`, so a
+  thread set to "Human Takeover" kept getting AI replies. The gate now also
+  treats `conversation.status === 'manual'` like handoff: the inbound
+  message is saved for the dashboard, the AI reply is skipped. Gated set is
+  `'manual'` only ('human_takeover' is a badge-only legacy alias with no
+  writer; 'not_a_fit' deliberately does not gate).
+- **UI** — `StatusBadge` gains an explicit stone-neutral `new: NEW` entry;
+  the conversations page gains a "New" filter tab, its status dropdown
+  gains a New option with fallback `|| "new"`, and the Resume button no
+  longer rewrites status to 'qualifying' (it only unpauses). The leads page
+  (same badge + status controls) gets the matching New tab, New dropdown
+  option, and fallback.
+- **Backfill is a separate founder-run step** (preview + guarded UPDATE
+  provided in the build report; nothing executed). No new deps, no crons,
+  RLS untouched; classifier internals, voice replies, echo capture,
+  identity guard, and alert plumbing unchanged. Analytics' "warm" count
+  (`status === 'qualifying'`) now means classifier- or founder-confirmed
+  warm rather than "every thread".
