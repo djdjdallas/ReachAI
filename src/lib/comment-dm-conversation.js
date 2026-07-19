@@ -126,7 +126,9 @@ async function findOrCreateConversation(admin, { userId, recipientIgsid, senderN
       // instagram_thread_id to the IGSID exactly as the canonical outbound
       // path (outreach/start) does. Do NOT invent a thread id.
       instagram_thread_id: recipientIgsid,
-      status: "qualifying",
+      // Born 'new' (untriaged) like every conversation; the DM intent
+      // classifier promotes the status when the lead's first reply lands.
+      status: "new",
       ai_paused: false,
       sender_name: senderName,
       origin: "clinchd_sent",

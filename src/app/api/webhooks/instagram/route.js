@@ -14,6 +14,7 @@ import {
   DO_NOT_SEND_PAUSE_THRESHOLD,
   VOICE_ROUTING_THRESHOLD,
 } from "@/lib/dm-intent";
+import { statusForIntent } from "@/lib/intent-status";
 import { findVoiceSnippetForIntent, getSendableAudioUrl } from "@/lib/voice/matcher";
 import { sendVoiceMessage, logVoiceSend } from "@/lib/voice/sender";
 
@@ -427,7 +428,7 @@ async function handleEchoEvent(event) {
           user_id: user.id,
           instagram_sender_id: recipientId,
           instagram_thread_id: recipientId,
-          status: "qualifying",
+          status: "new",
           ai_paused: false,
           sender_name: senderName,
           // Born from a manually-sent DM — same semantics as the Native Send
@@ -705,7 +706,7 @@ async function processIncomingMessage({
         user_id: user.id,
         instagram_sender_id: senderId,
         instagram_thread_id: senderId,
-        status: "qualifying",
+        status: "new",
         ai_paused: false,
         sender_name: senderName,
         // This conversation is born from an inbound DM (the lead messaged the
@@ -760,7 +761,18 @@ async function processIncomingMessage({
   // 'active'  → full processing (may still be paused per-conversation)
   if (user.ai_mode === "off") return;
 
-  if (user.ai_mode === "handoff" || conversation.ai_paused) {
+  // Per-thread gates get the handoff treatment (save the inbound message,
+  // skip the AI reply): ai_paused, and status='manual' — the "Human
+  // Takeover" dropdown, which previously changed the badge without
+  // stopping AI replies. Gated set is 'manual' only: 'human_takeover' is
+  // a badge-only legacy alias (no writer, not allowed by the status CHECK)
+  // and 'not_a_fit' deliberately does NOT gate — a cold label must not
+  // silently stop replies unless the founder chooses takeover.
+  if (
+    user.ai_mode === "handoff" ||
+    conversation.ai_paused ||
+    conversation.status === "manual"
+  ) {
     await insertMessageIfNew(supabase, {
       conversation_id: conversation.id,
       role: "user",
@@ -960,6 +972,36 @@ async function processIncomingMessage({
         .eq("provider_message_id", providerMessageId);
     } catch (err) {
       log.warn("[webhook] failed to persist intent_classification:", err?.message);
+    }
+  }
+
+  // 2b) Promote the conversation label from the classified intent.
+  //     Only threads still at 'new' are promoted — that covers the thread
+  //     just created above AND outbound-first threads (native-send echo,
+  //     comment-to-DM) whose first inbound reply lands after creation. The
+  //     DB write is guarded to status='new' so it can never clobber a
+  //     manual change or lose a race. Fire-and-forget — a labeling write
+  //     must never block or delay the reply path. Messages that classify
+  //     as follow_up (the noise catch-all AND the classifier's error
+  //     fallback) or below the promotion threshold leave the thread 'new'.
+  if (dmIntent && conversation.status === "new") {
+    const promotedStatus = statusForIntent(dmIntent.class, dmIntent.confidence);
+    if (promotedStatus !== "new") {
+      // Patch the local object so downstream consumers in this request
+      // (drip enqueue, status detection) see the promoted status without
+      // a refetch — same pattern as the origin patch above.
+      conversation.status = promotedStatus;
+      Promise.resolve(
+        supabase
+          .from("conversations")
+          .update({ status: promotedStatus })
+          .eq("id", conversation.id)
+          .eq("status", "new")
+      )
+        .then(({ error }) => {
+          if (error) log.warn("[webhook] status promotion failed:", error.code);
+        })
+        .catch((err) => log.warn("[webhook] status promotion failed:", err?.message));
     }
   }
 

@@ -1,4 +1,5 @@
 const STATUS_CONFIG = {
+  new: { label: "NEW", className: "bg-stone-100 text-stone-500 ring-1 ring-stone-200" },
   qualifying: { label: "WARM LEAD", className: "bg-orange-50 text-orange-600 ring-1 ring-orange-100" },
   interested: { label: "HOT LEAD", className: "bg-red-50 text-red-600 ring-1 ring-red-100" },
   booked: { label: "BOOKED", className: "bg-green-50 text-green-600 ring-1 ring-green-100" },

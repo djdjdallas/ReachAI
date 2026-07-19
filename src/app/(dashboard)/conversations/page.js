@@ -135,6 +135,7 @@ function getInitials(name) {
 const STATUS_FILTERS = [
   { value: "all", label: "All" },
   { value: "needs_review", label: "Needs Review" },
+  { value: "new", label: "New" },
   { value: "qualifying", label: "Qualifying" },
   { value: "interested", label: "Interested" },
   { value: "booked", label: "Booked" },
@@ -456,20 +457,21 @@ function ConversationsPage() {
 
   const handleResumeAi = async () => {
     if (!selectedConvo) return;
+    // Resume only unpauses — it must not rewrite status, or resuming a
+    // paused noise thread would re-mint it as a WARM LEAD.
     await supabase
       .from("conversations")
-      .update({ ai_paused: false, ai_pause_reason: null, status: "qualifying" })
+      .update({ ai_paused: false, ai_pause_reason: null })
       .eq("id", selectedConvo.id);
     setSelectedConvo((prev) => ({
       ...prev,
       ai_paused: false,
       ai_pause_reason: null,
-      status: "qualifying",
     }));
     setConversations((prev) =>
       prev.map((c) =>
         c.id === selectedConvo.id
-          ? { ...c, ai_paused: false, ai_pause_reason: null, status: "qualifying" }
+          ? { ...c, ai_paused: false, ai_pause_reason: null }
           : c
       )
     );
@@ -893,13 +895,14 @@ function ConversationsPage() {
                   </Button>
                 )}
                 <Select
-                  value={selectedConvo.status || "qualifying"}
+                  value={selectedConvo.status || "new"}
                   onValueChange={handleStatusChange}
                 >
                   <SelectTrigger className="h-8 text-xs w-auto border-stone-200">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
+                    <SelectItem value="new">New</SelectItem>
                     <SelectItem value="qualifying">Qualifying</SelectItem>
                     <SelectItem value="interested">Interested</SelectItem>
                     <SelectItem value="booked">Booked</SelectItem>
