@@ -1,6 +1,11 @@
+import { timingSafeEqual } from "crypto";
 import { NextResponse } from "next/server";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import { processDrip } from "@/lib/drip/processor";
+
+// Nudges without a coach-authored template are composed via generateReply at
+// send time, so a full batch can take longer than the platform default.
+export const maxDuration = 60;
 
 // In-window follow-up nudge dispatcher. Runs every 15 minutes (Vercel cron;
 // see vercel.json). Atomically claims up to 50 due drips via claim_due_drips
@@ -11,8 +16,10 @@ import { processDrip } from "@/lib/drip/processor";
 // as /api/cron/drip and /api/cron/refresh-tokens.
 
 function isAuthorizedCron(req) {
-  const auth = req.headers.get("authorization");
-  return auth === `Bearer ${process.env.CRON_SECRET}`;
+  if (!process.env.CRON_SECRET) return false;
+  const auth = Buffer.from(req.headers.get("authorization") || "");
+  const expected = Buffer.from(`Bearer ${process.env.CRON_SECRET}`);
+  return auth.length === expected.length && timingSafeEqual(auth, expected);
 }
 
 export async function GET(req) {
