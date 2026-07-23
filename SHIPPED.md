@@ -681,3 +681,59 @@ promotes the label.
   identity guard, and alert plumbing unchanged. Analytics' "warm" count
   (`status === 'qualifying'`) now means classifier- or founder-confirmed
   warm rather than "every thread".
+
+## 2026-07-23 — Follow-up nudges v1 completion + human-handoff owner email
+- **Context:** returning customer (60-day evaluation starting Monday) required
+  (a) one follow-up nudge when a lead goes quiet, inside Meta's 24-hour
+  window, and (b) an email to the ACCOUNT OWNER when the AI hands them a
+  conversation. Inventory showed Drip Sequences v1 (2026-05-27) already covers
+  ~90% of (a); only the gaps below were built — no parallel system, no schema
+  changes, no new migration.
+- **Drip gap fixes** (`src/lib/drip/processor.js`):
+  - Condition 1 now also re-verifies `ai_mode === 'active'` at fire time
+    (skip_reason `ai_mode_not_active`) — a coach who turned the AI off after a
+    nudge was scheduled gets total silence.
+  - Window safety margin widened from 30 to 60 minutes (fire-time check now
+    refuses at ≥23h since the last lead message; `drip_delay_hours` CHECK 6-22
+    unchanged).
+  - Nudge content no longer requires a coach-authored template: an active
+    template still wins, but when none exists the nudge is composed at send
+    time through the same reply pipeline the webhook uses
+    (`buildSystemPrompt` + `generateReply`) with a FOLLOW-UP NUDGE MODE block
+    (1-2 sentences, warm, low-pressure, never guilts the lead or manufactures
+    urgency). Compose failure → skip (`nudge_compose_failed`), never a canned
+    fallback text. PostHog `drip_fired` gains `content_source`
+    ('template'|'generated'); `template_id` may now be null.
+- **Cron hardening** (`src/app/api/cron/drip-process/route.js`): CRON_SECRET
+  now compared with `crypto.timingSafeEqual`; `maxDuration = 60` added because
+  composed nudges pay generation latency at send time.
+- **Human-handoff owner email** (new `src/lib/alerts/handoff-email.js` +
+  `src/app/api/webhooks/instagram/route.js`): when a thread is paused for
+  `complex_objection` or `qualifying_loop_detected`, the account owner
+  (users.email — customer-facing, deliberately NOT business-events.js) gets a
+  plaintext email: subject `A conversation needs you: {sender_name}`, last
+  lead message truncated to 200 chars, plain-language reason, direct
+  `/conversations?thread={id}` link. Both pause UPDATEs are now guarded
+  `.eq("ai_paused", false).select("id")` so only the actual false→true
+  transition emails — webhook retries update zero rows and stay silent. The
+  do-not-send pause and manual takeover intentionally do NOT email.
+  Fire-and-forget with `.catch(console.error)`; helper never throws.
+- **Deliberate deviations:** `drip_delay_hours` DB default stays 18 (existing
+  documented decision; spec draft suggested 8 — one-line
+  `ALTER COLUMN SET DEFAULT` if ever wanted). Plan gating stays
+  Unlimited-only (drip was designed plan-gated).
+- **Verified:** `npm run build` ✓. No new deps, no migration to run, RLS
+  untouched. Identity guard, echo capture, status/labeling, founder alerts,
+  classifier internals unchanged.
+- **DEPLOY NOTE:** CRON_SECRET must remain set in Vercel (already required by
+  existing crons). No vercel.json change — the */15 drip-process cron has been
+  live since 2026-05-27.
+- **Audit follow-up (same day):** (1) cron route now reclaims rows stranded in
+  'processing' for >30 min back to 'scheduled' before claiming (a crashed or
+  timed-out run can no longer permanently block a conversation's nudge slot;
+  no RPC change, no SQL to run); (2) Condition 4 also skips when the newest
+  assistant message has source 'manual'/'native_send'
+  (`manual_reply_since_schedule`) so a nudge never lands on top of the coach's
+  own hand-typed reply; (3) window check negated to `!(hoursElapsed < 23)` so
+  an unparseable timestamp fails closed; (4) composed nudges over 900 chars
+  are skipped (`nudge_compose_failed`) instead of truncated mid-URL.

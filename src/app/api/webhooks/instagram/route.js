@@ -5,6 +5,7 @@ import { buildSystemPrompt } from "@/lib/prompts";
 import { sendInstagramMessage, verifyWebhookSignature, getParticipantProfile } from "@/lib/instagram";
 import { decryptToken } from "@/lib/token-utils";
 import { sendHotLeadAlert, sendBookingAlert } from "@/lib/notifications";
+import { sendHandoffEmail } from "@/lib/alerts/handoff-email";
 import { getPostHogClient } from "@/lib/posthog-server";
 import { log } from "@/lib/logger";
 import { handleCommentEvent } from "@/lib/webhooks/comment-event";
@@ -882,14 +883,27 @@ async function processIncomingMessage({
   // qualifying question 3 turns in a row and the lead has never given a
   // substantive answer, pause the conversation rather than fire a 4th attempt.
   if (detectQualifyingLoop(messages)) {
-    await supabase
+    // Guarded to ai_paused=false so only the actual false→true transition
+    // fires the owner's handoff email — a retried delivery finds the thread
+    // already paused, updates zero rows, and stays silent.
+    const { data: pausedRows } = await supabase
       .from("conversations")
       .update({
         ai_paused: true,
         ai_pause_reason: "qualifying_loop_detected",
         last_skip_reason: "qualifying_loop_detected",
       })
-      .eq("id", conversation.id);
+      .eq("id", conversation.id)
+      .eq("ai_paused", false)
+      .select("id");
+    if (pausedRows?.length) {
+      sendHandoffEmail({
+        user,
+        conversation,
+        reason: "qualifying_loop_detected",
+        leadMessage: messageText,
+      }).catch(console.error);
+    }
     getPostHogClient().capture({
       distinctId: user.email || user.id,
       event: "qualifying_loop_detected",
@@ -910,13 +924,25 @@ async function processIncomingMessage({
         sc
       );
       if (classification.needs_human) {
-        await supabase
+        // Same false→true transition guard as the qualifying-loop pause: the
+        // owner is emailed exactly once per handoff, never on a retry.
+        const { data: pausedRows } = await supabase
           .from("conversations")
           .update({
             ai_paused: true,
             ai_pause_reason: "complex_objection",
           })
-          .eq("id", conversation.id);
+          .eq("id", conversation.id)
+          .eq("ai_paused", false)
+          .select("id");
+        if (pausedRows?.length) {
+          sendHandoffEmail({
+            user,
+            conversation,
+            reason: "complex_objection",
+            leadMessage: messageText,
+          }).catch(console.error);
+        }
         getPostHogClient().capture({
           distinctId: user.email || user.id,
           event: "human_in_loop_triggered",
