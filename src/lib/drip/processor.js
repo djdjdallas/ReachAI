@@ -109,6 +109,13 @@ export async function processDrip(dripRow) {
       skipReason: "lead_replied_since_schedule",
     });
   }
+  if (["manual", "native_send"].includes(mostRecent.source)) {
+    // The coach hand-typed the latest message (echo-captured as assistant).
+    // A human is actively working this thread — never stack a nudge on top.
+    return markDripStatus(dripRow.id, "skipped", {
+      skipReason: "manual_reply_since_schedule",
+    });
+  }
 
   const lastLeadMessage = recentMessages.find((m) => m.role === "user");
   if (!lastLeadMessage) {
@@ -122,7 +129,9 @@ export async function processDrip(dripRow) {
   // absorbs cron lag, generation latency, and clock skew.
   const hoursElapsed =
     (Date.now() - new Date(lastLeadMessage.created_at).getTime()) / (1000 * 60 * 60);
-  if (hoursElapsed >= 23) {
+  // Negated form so an unparseable timestamp (NaN) fails CLOSED — only a
+  // provably-open window may proceed past this line.
+  if (!(hoursElapsed < 23)) {
     return markDripStatus(dripRow.id, "expired", { skipReason: "window_closing" });
   }
 
@@ -174,11 +183,13 @@ export async function processDrip(dripRow) {
         content:
           "[Internal note, not from the lead: they have gone quiet since your last message. Write your single follow-up nudge now, per FOLLOW-UP NUDGE MODE.]",
       });
-      nudgeText = (await generateReply(systemPrompt, history))?.trim().slice(0, 900);
+      nudgeText = (await generateReply(systemPrompt, history))?.trim();
     } catch (err) {
       console.error("[drip/processor] nudge compose failed:", err?.message);
     }
-    if (!nudgeText) {
+    // A 900+ char "1-2 sentence nudge" is a failed generation, and truncating
+    // could sever a booking link mid-URL — skip rather than send a mangled DM.
+    if (!nudgeText || nudgeText.length > 900) {
       return markDripStatus(dripRow.id, "skipped", {
         skipReason: "nudge_compose_failed",
       });

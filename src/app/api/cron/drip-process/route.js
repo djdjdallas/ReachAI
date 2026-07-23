@@ -28,6 +28,27 @@ export async function GET(req) {
   }
 
   const admin = getSupabaseAdmin();
+
+  // Reclaim rows stranded in 'processing' by a crashed or timed-out earlier
+  // run (a kill between claim and terminal status would otherwise strand the
+  // row forever — and the one-active-per-conversation index with it). A live
+  // worker can't hold a row anywhere near 30 minutes (maxDuration is 60s), so
+  // the cutoff is unambiguous. Safe to re-run: the processor re-verifies every
+  // condition, including the 24h window, before any send.
+  const staleCutoff = new Date(Date.now() - 30 * 60 * 1000).toISOString();
+  const { data: reclaimed, error: reclaimError } = await admin
+    .from("dm_drip_queue")
+    .update({ status: "scheduled" })
+    .eq("status", "processing")
+    .lt("updated_at", staleCutoff)
+    .select("id");
+  if (reclaimError) {
+    console.error(
+      "[cron/drip-process] stale-row reclaim failed:",
+      reclaimError.message
+    );
+  }
+
   const { data: claimed, error } = await admin.rpc("claim_due_drips", {
     batch_size: 50,
   });
@@ -37,7 +58,11 @@ export async function GET(req) {
   }
 
   if (!claimed || claimed.length === 0) {
-    return NextResponse.json({ processed: 0, claimed: 0 });
+    return NextResponse.json({
+      processed: 0,
+      claimed: 0,
+      reclaimed: reclaimed?.length || 0,
+    });
   }
 
   // Process with a concurrency limit of 5 so we don't hammer the IG API.
@@ -63,6 +88,7 @@ export async function GET(req) {
   return NextResponse.json({
     processed: results.length,
     claimed: claimed.length,
+    reclaimed: reclaimed?.length || 0,
     results,
   });
 }

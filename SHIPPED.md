@@ -684,7 +684,7 @@ promotes the label.
 
 ## 2026-07-23 — Follow-up nudges v1 completion + human-handoff owner email
 - **Context:** returning customer (60-day evaluation starting Monday) required
-  (a) one automatic follow-up when a lead goes quiet, inside Meta's 24-hour
+  (a) one follow-up nudge when a lead goes quiet, inside Meta's 24-hour
   window, and (b) an email to the ACCOUNT OWNER when the AI hands them a
   conversation. Inventory showed Drip Sequences v1 (2026-05-27) already covers
   ~90% of (a); only the gaps below were built — no parallel system, no schema
@@ -728,3 +728,12 @@ promotes the label.
 - **DEPLOY NOTE:** CRON_SECRET must remain set in Vercel (already required by
   existing crons). No vercel.json change — the */15 drip-process cron has been
   live since 2026-05-27.
+- **Audit follow-up (same day):** (1) cron route now reclaims rows stranded in
+  'processing' for >30 min back to 'scheduled' before claiming (a crashed or
+  timed-out run can no longer permanently block a conversation's nudge slot;
+  no RPC change, no SQL to run); (2) Condition 4 also skips when the newest
+  assistant message has source 'manual'/'native_send'
+  (`manual_reply_since_schedule`) so a nudge never lands on top of the coach's
+  own hand-typed reply; (3) window check negated to `!(hoursElapsed < 23)` so
+  an unparseable timestamp fails closed; (4) composed nudges over 900 chars
+  are skipped (`nudge_compose_failed`) instead of truncated mid-URL.
