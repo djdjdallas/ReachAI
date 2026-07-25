@@ -36,7 +36,11 @@ export async function POST(request) {
     switch (event.type) {
       case "checkout.session.completed": {
         const session = event.data.object;
-        const userId = session.metadata?.userId;
+        // In-app checkout carries metadata.userId; a dashboard Payment Link
+        // can't set per-session metadata, so those links pass the user id via
+        // ?client_reference_id={userId} instead. Either source activates.
+        const userId =
+          session.metadata?.userId || session.client_reference_id || null;
 
         if (userId) {
           // Fix 6: Retrieve line items to determine which plan was purchased
@@ -74,10 +78,23 @@ export async function POST(request) {
             updateData.ai_mode = "active";
           }
 
-          await supabase
+          const { data: activatedRows, error: activateError } = await supabase
             .from("users")
             .update(updateData)
-            .eq("id", userId);
+            .eq("id", userId)
+            .select("id");
+          if (activateError || !activatedRows?.length) {
+            // The update no-ops on zero rows, but a checkout whose userId
+            // matches no users row is a stranded paying customer — make it
+            // findable in Vercel logs.
+            console.error(
+              "[stripe-webhook] checkout activation matched no users row.",
+              "userId:", userId,
+              "session:", session.id,
+              "customer:", session.customer,
+              "error:", activateError?.message || null
+            );
+          }
 
           getPostHogClient().capture({
             distinctId: userId,
@@ -107,6 +124,17 @@ export async function POST(request) {
             body: JSON.stringify({ userId }),
           }).catch((err) =>
             console.error("Drip enrollment failed:", err.message)
+          );
+        } else {
+          // Neither metadata.userId nor client_reference_id — this checkout
+          // cannot be linked to a users row, so NOTHING activates and every
+          // future event for this Stripe customer will match zero rows. Log
+          // loudly (session + customer ids make it recoverable by hand) but
+          // still return 200 so Stripe doesn't retry-storm.
+          console.error(
+            "[stripe-webhook] checkout.session.completed with NO user identifier — activation skipped.",
+            "session:", session.id,
+            "customer:", session.customer
           );
         }
         break;
