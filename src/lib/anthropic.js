@@ -63,17 +63,24 @@ function sanitize(str) {
  * @returns {Promise<string>}
  */
 export async function generateReply(systemPrompt, messages) {
-  const response = await getAnthropic().messages.create({
-    model: "claude-sonnet-4-6",
-    max_tokens: 500,
-    // 0.7 gives natural variation without going off-script
-    temperature: 0.7,
-    system: sanitize(systemPrompt),
-    messages: messages.map((m) => ({
-      role: m.role === "assistant" ? "assistant" : "user",
-      content: sanitize(m.content),
-    })),
-  });
+  const response = await getAnthropic().messages.create(
+    {
+      model: "claude-sonnet-4-6",
+      max_tokens: 500,
+      // 0.7 gives natural variation without going off-script
+      temperature: 0.7,
+      system: sanitize(systemPrompt),
+      messages: messages.map((m) => ({
+        role: m.role === "assistant" ? "assistant" : "user",
+        content: sanitize(m.content),
+      })),
+    },
+    // Webhook-path call: the SDK defaults (10-min timeout, 2 retries) let a
+    // provider incident outlive the function's maxDuration, which ghosts the
+    // lead via redelivery dedupe. 30s + 1 retry keeps the worst case inside
+    // the webhook's budget.
+    { timeout: 30_000, maxRetries: 1 }
+  );
 
   return response.content[0].text;
 }
@@ -452,7 +459,8 @@ NEW INCOMING MESSAGE: ${incomingMessage}
 Classify this message.`,
       },
     ],
-  });
+    // Webhook-path call — same 30s/1-retry budget rationale as generateReply.
+  }, { timeout: 30_000, maxRetries: 1 });
 
   const latencyMs = Date.now() - startedAt;
   const usage = response?.usage || {};
