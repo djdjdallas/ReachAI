@@ -5,6 +5,8 @@ import { generateReply } from "@/lib/anthropic";
 import { buildSystemPrompt } from "@/lib/prompts";
 import { enforceAiRateLimit } from "@/lib/rate-limit";
 
+export const maxDuration = 60;
+
 /**
  * POST /api/ai/playground
  *
@@ -42,7 +44,7 @@ export async function POST(request) {
       getSupabaseAdmin(),
       user.id,
       "playground",
-      30
+      100
     );
     if (rl) return rl;
 
@@ -86,8 +88,18 @@ export async function POST(request) {
       voiceProfile: userProfile.voice_profile,
     });
 
-    // Cap at 20 messages — same as production webhook
+    // Cap at 20 messages — same as production webhook. The Anthropic API
+    // rejects a history whose first message is an assistant turn, so drop
+    // any leading assistant messages the trim left behind; if that somehow
+    // empties the array, fall back to just the latest user message.
     const cappedMessages = messages.slice(-20);
+    while (cappedMessages[0]?.role === "assistant") cappedMessages.shift();
+    if (cappedMessages.length === 0) {
+      const latestUser = [...messages]
+        .reverse()
+        .find((m) => m.role === "user");
+      if (latestUser) cappedMessages.push(latestUser);
+    }
 
     const reply = await generateReply(systemPrompt, cappedMessages);
 

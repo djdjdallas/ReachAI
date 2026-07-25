@@ -877,7 +877,18 @@ async function processIncomingMessage({
     return;
   }
 
+  // Capture the newest user row before reverse() mutates messagesDesc in
+  // place — it's the fallback if the assistant-first guard empties the array.
+  const latestUserRow = (messagesDesc || []).find((m) => m.role === "user");
+
   const messages = (messagesDesc || []).reverse();
+
+  // The Anthropic API rejects a history whose first message is an assistant
+  // turn, so drop any leading assistant rows the newest-20 trim left behind.
+  while (messages[0]?.role === "assistant") messages.shift();
+  if (messages.length === 0 && latestUserRow) {
+    messages.push(latestUserRow);
+  }
 
   // Qualifying-loop guard. If the agent has already asked the same kind of
   // qualifying question 3 turns in a row and the lead has never given a

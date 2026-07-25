@@ -132,6 +132,7 @@ export default function PlaygroundPage() {
   const [input, setInput] = useState("");
   const [isThinking, setIsThinking] = useState(false);
   const [error, setError] = useState(null);
+  const [rateLimitMessage, setRateLimitMessage] = useState(null);
 
   const [sessionStats, setSessionStats] = useState({
     messageCount: 0,
@@ -174,6 +175,42 @@ export default function PlaygroundPage() {
     init();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // The API route refetches script_config per request, so replies always use
+  // the latest saved script — but the side panel and the hasScript gate were
+  // frozen at mount. Refetch on tab focus so mid-session edits made in the
+  // Script Builder show up without a full reload.
+  const refreshProfile = useCallback(async () => {
+    const {
+      data: { user: authUser },
+    } = await supabase.auth.getUser();
+    if (!authUser) return;
+
+    const { data: userProfile } = await supabase
+      .from("users")
+      .select("script_config, calendly_url, ai_mode")
+      .eq("id", authUser.id)
+      .single();
+
+    if (userProfile) {
+      setProfile(userProfile);
+      setScriptConfig(userProfile.script_config || null);
+      const sc = userProfile.script_config || {};
+      setHasScript(!!sc.greeting || !!sc.offer);
+    }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    const handleFocus = () => {
+      if (document.visibilityState === "visible") refreshProfile();
+    };
+    window.addEventListener("focus", handleFocus);
+    document.addEventListener("visibilitychange", handleFocus);
+    return () => {
+      window.removeEventListener("focus", handleFocus);
+      document.removeEventListener("visibilitychange", handleFocus);
+    };
+  }, [refreshProfile]);
+
   useEffect(() => {
     scrollToBottom();
   }, [messages, isThinking, scrollToBottom]);
@@ -213,10 +250,17 @@ export default function PlaygroundPage() {
         if (!res.ok) {
           if (data.error === "no_script") {
             setError("no_script");
+          } else if (data.error === "rate_limited") {
+            setRateLimitMessage(
+              data.message || "Hourly limit reached. Try again later."
+            );
+            setError("rate_limited");
           } else {
             setError("generation_failed");
           }
           setMessages(messages);
+          // Restore the failed message so retry is one click, not a retype
+          setInput(trimmed);
           return;
         }
 
@@ -237,6 +281,8 @@ export default function PlaygroundPage() {
         console.error("Playground send error:", err);
         setError("generation_failed");
         setMessages(messages);
+        // Restore the failed message so retry is one click, not a retype
+        setInput(trimmed);
       } finally {
         setIsThinking(false);
         setTimeout(() => inputRef.current?.focus(), 100);
@@ -250,6 +296,7 @@ export default function PlaygroundPage() {
   const resetConversation = () => {
     setMessages([]);
     setError(null);
+    setRateLimitMessage(null);
     setSessionStats({ messageCount: 0, bookingLinkSent: false });
     setConfirmResetOpen(false);
     setTimeout(() => inputRef.current?.focus(), 100);
@@ -427,7 +474,9 @@ export default function PlaygroundPage() {
                 <AlertTriangle className="h-3 w-3" />
                 {error === "no_script"
                   ? "No script found. Please save your script in Script Builder first."
-                  : "Something went wrong generating a response. Try again."}
+                  : error === "rate_limited"
+                    ? rateLimitMessage
+                    : "Something went wrong generating a response. Try again."}
               </p>
             </div>
           )}
