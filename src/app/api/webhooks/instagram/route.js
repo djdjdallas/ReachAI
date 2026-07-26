@@ -19,6 +19,7 @@ import {
   DM_INTENT_VERSION,
   DO_NOT_SEND_PAUSE_THRESHOLD,
   VOICE_ROUTING_THRESHOLD,
+  withTimeout,
 } from "@/lib/dm-intent";
 import { statusForIntent } from "@/lib/intent-status";
 import { findVoiceSnippetForIntent, getSendableAudioUrl } from "@/lib/voice/matcher";
@@ -975,6 +976,8 @@ async function processIncomingMessage({
     .limit(20);
 
   if (msgError) {
+    // No reply will be sent this turn — clear the typing indicator.
+    fireSenderAction(user, senderId, "typing_off");
     log.error("fetch messages failed:", msgError.code);
     return;
   }
@@ -1022,10 +1025,13 @@ async function processIncomingMessage({
   // we prefer a pass-through reply over a blocked conversation.
   if (sc.human_in_loop) {
     try {
-      const classification = await classifyIncomingMessage(
-        messageText,
-        messages,
-        sc
+      // Same 8s race as classifyDMIntent: the webhook waits at most 8s for
+      // the escalation verdict; on timeout the catch below falls through
+      // with no escalation flagged.
+      const classification = await withTimeout(
+        classifyIncomingMessage(messageText, messages, sc),
+        8000,
+        "classifyIncomingMessage"
       );
       if (classification.needs_human) {
         // No reply will be sent this turn — clear the typing indicator.
@@ -1057,7 +1063,11 @@ async function processIncomingMessage({
         return;
       }
     } catch (err) {
-      log.warn("[webhook] classifier failed, falling through:", err?.message);
+      console.warn(
+        "[webhook] classifier failed, falling through for conversation:",
+        conversation.id,
+        err?.message
+      );
     }
   }
 
@@ -1422,7 +1432,14 @@ async function processIncomingMessage({
 
   let aiReply;
   try {
-    aiReply = await generateReply(systemPrompt, messages);
+    // 20s + 1 retry: worst case ~41s, which leaves room inside maxDuration=60
+    // for the 8s classifier cap, the insert, the outbound RPC, and the
+    // 10s-capped Meta send — the 30s default could blow the budget after the
+    // reply insert but before the send (orphaned assistant row).
+    aiReply = await generateReply(systemPrompt, messages, {
+      timeout: 20_000,
+      maxRetries: 1,
+    });
   } catch (err) {
     console.error("generateReply failed for conversation:", conversation.id, err.message);
     fireSenderAction(user, senderId, "typing_off");

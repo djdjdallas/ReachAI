@@ -239,8 +239,9 @@ function buildContextBlock({ scriptConfig, offer, recentMessages }) {
 
 // Promise.race-based timeout. If the Anthropic call hangs, throw so the
 // webhook caller's try/catch can fall through to the text reply path
-// instead of blocking the entire DM pipeline.
-function withTimeout(promise, ms, label) {
+// instead of blocking the entire DM pipeline. Exported so the webhook can
+// put the same 8s race on classifyIncomingMessage.
+export function withTimeout(promise, ms, label) {
   return new Promise((resolve, reject) => {
     const timer = setTimeout(
       () => reject(new Error(`${label} timed out after ${ms}ms`)),

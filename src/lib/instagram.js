@@ -204,6 +204,9 @@ export async function sendInstagramMessage(igAccountId, recipientId, text, pageA
       recipient: { id: recipientId },
       message: { text },
     }),
+    // A hung Meta call must not eat the webhook's remaining maxDuration
+    // budget — throws TimeoutError, which callers treat as a send failure.
+    signal: AbortSignal.timeout(10_000),
   });
 
   const data = await res.json();

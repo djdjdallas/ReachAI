@@ -62,7 +62,7 @@ function sanitize(str) {
  * @param {Array}  messages     - Array of { role, content } objects (conversation history)
  * @returns {Promise<string>}
  */
-export async function generateReply(systemPrompt, messages) {
+export async function generateReply(systemPrompt, messages, requestOptions = {}) {
   const response = await getAnthropic().messages.create(
     {
       model: "claude-sonnet-4-6",
@@ -75,11 +75,11 @@ export async function generateReply(systemPrompt, messages) {
         content: sanitize(m.content),
       })),
     },
-    // Webhook-path call: the SDK defaults (10-min timeout, 2 retries) let a
-    // provider incident outlive the function's maxDuration, which ghosts the
-    // lead via redelivery dedupe. 30s + 1 retry keeps the worst case inside
-    // the webhook's budget.
-    { timeout: 30_000, maxRetries: 1 }
+    // Default 30s + 1 retry (vs the SDK's 10-min timeout × 2 retries) so a
+    // provider incident can't outlive a serverless caller's maxDuration.
+    // Callers on a tighter wall-clock budget (the webhook) pass their own
+    // requestOptions override.
+    { timeout: 30_000, maxRetries: 1, ...requestOptions }
   );
 
   return response.content[0].text;
