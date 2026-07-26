@@ -77,7 +77,7 @@ export default function SettingsPage() {
   const [aiMode, setAiMode] = useState("active");
   const [togglingAi, setTogglingAi] = useState(false);
   const [aiModeError, setAiModeError] = useState(null);
-  const [responseDelay, setResponseDelay] = useState(2);
+  const [responseDelay, setResponseDelay] = useState(3);
   const [savingAi, setSavingAi] = useState(false);
   const [aiSaved, setAiSaved] = useState(false);
 
@@ -263,7 +263,12 @@ export default function SettingsPage() {
         setProfile(userProfile);
         setFullName(userProfile.full_name || "");
         setAiMode(userProfile.ai_mode || "active");
-        setResponseDelay(userProfile.response_delay || 2);
+        // Display clamped to the enforced 3–20s range — a legacy stored value
+        // outside it (e.g. 90 from the old 1–120 UI) shows as what actually
+        // applies, and re-saving persists the clamped value.
+        setResponseDelay(
+          Math.min(Math.max(Number(userProfile.response_delay) || 3, 3), 20)
+        );
         setGcalConnected(!!userProfile.google_calendar_refresh_token);
         setCalendlyConnected(!!userProfile.calendly_refresh_token);
         setCalendlyUrl(userProfile.calendly_url || "");
@@ -361,7 +366,7 @@ export default function SettingsPage() {
   const handleSaveAiSettings = async () => {
     setSavingAi(true);
     try {
-      const clampedDelay = Math.min(Math.max(Number(responseDelay) || 1, 1), 120);
+      const clampedDelay = Math.min(Math.max(Number(responseDelay) || 3, 3), 20);
       setResponseDelay(clampedDelay);
 
       await supabase
@@ -1264,16 +1269,16 @@ export default function SettingsPage() {
             <Input
               id="responseDelay"
               type="number"
-              min={1}
-              max={120}
+              min={3}
+              max={20}
               step={1}
               value={responseDelay}
               onChange={(e) => setResponseDelay(e.target.value)}
               className="w-32"
             />
             <p className="text-xs text-muted-foreground">
-              Add a delay (1–120 seconds) before the agent responds to feel more
-              natural and comply with platform guidelines.
+              Adds a natural delay (3–20 seconds) before the AI replies, so
+              responses don&apos;t land instantly. Longer delays coming soon.
             </p>
           </div>
         </CardContent>

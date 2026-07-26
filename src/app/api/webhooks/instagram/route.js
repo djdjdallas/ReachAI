@@ -2,7 +2,12 @@ import { NextResponse } from "next/server";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import { generateReply, classifyIncomingMessage } from "@/lib/anthropic";
 import { buildSystemPrompt } from "@/lib/prompts";
-import { sendInstagramMessage, verifyWebhookSignature, getParticipantProfile } from "@/lib/instagram";
+import {
+  sendInstagramMessage,
+  sendSenderAction,
+  verifyWebhookSignature,
+  getParticipantProfile,
+} from "@/lib/instagram";
 import { decryptToken } from "@/lib/token-utils";
 import { sendHotLeadAlert, sendBookingAlert } from "@/lib/notifications";
 import { sendHandoffEmail } from "@/lib/alerts/handoff-email";
@@ -14,10 +19,18 @@ import {
   DM_INTENT_VERSION,
   DO_NOT_SEND_PAUSE_THRESHOLD,
   VOICE_ROUTING_THRESHOLD,
+  withTimeout,
 } from "@/lib/dm-intent";
 import { statusForIntent } from "@/lib/intent-status";
 import { findVoiceSnippetForIntent, getSendableAudioUrl } from "@/lib/voice/matcher";
 import { sendVoiceMessage, logVoiceSend } from "@/lib/voice/sender";
+
+// Hard wall-clock budget for the whole inbound chain. The 20s delay cap
+// (+15% jitter ≈ 23s) plus the 30s-capped model calls and the Meta send must
+// finish inside this, or the platform default kills the function mid-chain
+// and Meta's redelivery hits the message dedupe — the lead is then ghosted
+// (see docs/reply-latency-audit-2026-07-25.md, HIGH finding 2).
+export const maxDuration = 60;
 
 // ── GET: Meta webhook verification ──────────────────────────────────────
 
@@ -122,6 +135,11 @@ async function handleMetaWebhook(body, rawBody, request) {
 
       if (!igAccountId || !senderId || !messageText) continue;
 
+      // Anchor for the total-latency floor: the response_delay target is
+      // measured from here (webhook receipt of this event), so processing
+      // time counts against the configured delay instead of adding to it.
+      const receivedAtMs = Date.now();
+
       try {
         // Fetch sender's name from Instagram API
         // We need the user's access token — look up user first
@@ -158,6 +176,7 @@ async function handleMetaWebhook(body, rawBody, request) {
           senderName,
           senderUsername,
           providerMessageId: event.message?.mid || null,
+          receivedAtMs,
         });
       } catch (err) {
         console.error("Error processing Meta message:", err);
@@ -169,6 +188,26 @@ async function handleMetaWebhook(body, rawBody, request) {
 }
 
 // ── Helpers ─────────────────────────────────────────────────────────────
+
+// Fire-and-forget sender action (mark_seen / typing_on / typing_off). An
+// indicator failure must never block or fail the reply path, so this never
+// awaits the network call and swallows every error after a warn.
+function fireSenderAction(user, recipientId, action) {
+  try {
+    if (!user?.meta_page_access_token || !user?.instagram_business_account_id) return;
+    const pageToken = decryptToken(user.meta_page_access_token);
+    sendSenderAction(
+      user.instagram_business_account_id,
+      recipientId,
+      action,
+      pageToken
+    ).catch((err) =>
+      log.warn(`[webhook] sender_action ${action} failed:`, err?.message)
+    );
+  } catch (err) {
+    log.warn(`[webhook] sender_action ${action} failed:`, err?.message);
+  }
+}
 
 // Mark a conversation's `last_skip_reason` so the dashboard can explain why
 // the agent didn't reply on a given turn. Cleared by the success path.
@@ -630,6 +669,7 @@ async function processIncomingMessage({
   senderName,
   senderUsername,
   providerMessageId,
+  receivedAtMs = Date.now(),
 }) {
   const supabase = getSupabaseAdmin();
 
@@ -829,6 +869,15 @@ async function processIncomingMessage({
   });
   if (insertResult.duplicate) return;
 
+  // Typing indicator: the lead sees "seen" then "typing…" while the models
+  // run, instead of a silent gap followed by a full paragraph. Fires only
+  // past every receipt-time gate above (echoes, inactive subscription,
+  // pause/handoff, no-script, DM limit, duplicate), so skipped paths never
+  // flash an indicator. Fire-and-forget — never blocks the reply. Paths
+  // below that bail without sending are responsible for typing_off.
+  fireSenderAction(user, senderId, "mark_seen");
+  fireSenderAction(user, senderId, "typing_on");
+
   // Drip cancel (Insertion D)
   // A genuine new inbound from the lead → cancel any scheduled follow-up
   // nudge for this conversation. Runs here (after dedupe, BEFORE the intent
@@ -858,8 +907,62 @@ async function processIncomingMessage({
     properties: { conversation_id: conversation.id, message_length: messageText.length },
   });
 
-  // Natural delay
-  await new Promise((r) => setTimeout(r, 1000 + Math.random() * 2000));
+  // Total-latency floor (replaces the old fixed 1–3s pre-generation sleep).
+  // Target = users.response_delay clamped to 3–20s with ±15% jitter, measured
+  // from webhook receipt — a configured 15s means the lead sees the reply
+  // ~15s after sending, not 15s + processing. The wait runs just before the
+  // send (after reply generation), sleeps only the remainder, then re-checks
+  // the pause gates: a coach who pauses or takes over during the delay
+  // window must win over an in-flight reply. Recheck fails OPEN on query
+  // errors — the receipt-time gates already passed, and a transient DB blip
+  // must not ghost the lead.
+  const delaySeconds = Math.min(Math.max(Number(user.response_delay) || 3, 3), 20);
+  const targetDelayMs = delaySeconds * 1000 * (0.85 + Math.random() * 0.3);
+  async function waitDelayFloorAndRecheckGates() {
+    const remainderMs = Math.max(0, targetDelayMs - (Date.now() - receivedAtMs));
+    if (remainderMs > 0) {
+      await new Promise((r) => setTimeout(r, remainderMs));
+    }
+    try {
+      const [convRes, userRes] = await Promise.all([
+        supabase
+          .from("conversations")
+          .select("ai_paused, status")
+          .eq("id", conversation.id)
+          .maybeSingle(),
+        supabase
+          .from("users")
+          .select("ai_mode")
+          .eq("id", user.id)
+          .maybeSingle(),
+      ]);
+      if (convRes.error || userRes.error) {
+        log.warn(
+          "[webhook] post-delay gate recheck failed, proceeding:",
+          convRes.error?.code || userRes.error?.code
+        );
+        return { blocked: false };
+      }
+      // Mirror the receipt-time gate set exactly (ai_mode off/handoff,
+      // ai_paused, status='manual') — see the per-thread gates above.
+      if (userRes.data?.ai_mode === "off") {
+        return { blocked: true, reason: "ai_mode_off_during_delay" };
+      }
+      if (userRes.data?.ai_mode === "handoff") {
+        return { blocked: true, reason: "handoff_during_delay" };
+      }
+      if (convRes.data?.ai_paused) {
+        return { blocked: true, reason: "paused_during_delay" };
+      }
+      if (convRes.data?.status === "manual") {
+        return { blocked: true, reason: "manual_takeover_during_delay" };
+      }
+      return { blocked: false };
+    } catch (err) {
+      log.warn("[webhook] post-delay gate recheck threw, proceeding:", err?.message);
+      return { blocked: false };
+    }
+  }
 
   // Fetch conversation history — newest 20 rows, restored to chronological
   // order. Ascending+limit returned the OLDEST 20, so threads longer than 20
@@ -873,6 +976,8 @@ async function processIncomingMessage({
     .limit(20);
 
   if (msgError) {
+    // No reply will be sent this turn — clear the typing indicator.
+    fireSenderAction(user, senderId, "typing_off");
     log.error("fetch messages failed:", msgError.code);
     return;
   }
@@ -883,6 +988,8 @@ async function processIncomingMessage({
   // qualifying question 3 turns in a row and the lead has never given a
   // substantive answer, pause the conversation rather than fire a 4th attempt.
   if (detectQualifyingLoop(messages)) {
+    // No reply will be sent this turn — clear the typing indicator.
+    fireSenderAction(user, senderId, "typing_off");
     // Guarded to ai_paused=false so only the actual false→true transition
     // fires the owner's handoff email — a retried delivery finds the thread
     // already paused, updates zero rows, and stays silent.
@@ -918,12 +1025,17 @@ async function processIncomingMessage({
   // we prefer a pass-through reply over a blocked conversation.
   if (sc.human_in_loop) {
     try {
-      const classification = await classifyIncomingMessage(
-        messageText,
-        messages,
-        sc
+      // Same 8s race as classifyDMIntent: the webhook waits at most 8s for
+      // the escalation verdict; on timeout the catch below falls through
+      // with no escalation flagged.
+      const classification = await withTimeout(
+        classifyIncomingMessage(messageText, messages, sc),
+        8000,
+        "classifyIncomingMessage"
       );
       if (classification.needs_human) {
+        // No reply will be sent this turn — clear the typing indicator.
+        fireSenderAction(user, senderId, "typing_off");
         // Same false→true transition guard as the qualifying-loop pause: the
         // owner is emailed exactly once per handoff, never on a retry.
         const { data: pausedRows } = await supabase
@@ -951,7 +1063,11 @@ async function processIncomingMessage({
         return;
       }
     } catch (err) {
-      log.warn("[webhook] classifier failed, falling through:", err?.message);
+      console.warn(
+        "[webhook] classifier failed, falling through for conversation:",
+        conversation.id,
+        err?.message
+      );
     }
   }
 
@@ -1116,6 +1232,8 @@ async function processIncomingMessage({
     dmIntent?.class === "do_not_send" &&
     dmIntent.confidence >= DO_NOT_SEND_PAUSE_THRESHOLD
   ) {
+    // No reply will be sent this turn — clear the typing indicator.
+    fireSenderAction(user, senderId, "typing_off");
     // Derive the pause reason from the classifier's signals instead of
     // hardcoding 'hostile_or_refund'. A script-echo / probe flag is not
     // hostility, and labeling it as such made paused threads undebuggable.
@@ -1202,6 +1320,19 @@ async function processIncomingMessage({
     }
 
     if (voiceSnippet) {
+      // Delay floor + pause re-check before the voice send. The voice path
+      // skips generateReply, so without this voice replies would land
+      // near-instantly and ignore a pause during the delay window. Runs
+      // before the rate-limit reservation so a blocked turn never burns a
+      // 200/hr slot.
+      const voiceGate = await waitDelayFloorAndRecheckGates();
+      if (voiceGate.blocked) {
+        fireSenderAction(user, senderId, "typing_off");
+        await markSkip(supabase, conversation.id, voiceGate.reason);
+        log.warn("[webhook] voice reply skipped after delay:", voiceGate.reason);
+        return;
+      }
+
       // Voice replies count toward Meta's 200/hr outbound DM cap. Reserve
       // the slot first so we don't double-send if generateReply fires later.
       let canSendVoice = true;
@@ -1301,14 +1432,36 @@ async function processIncomingMessage({
 
   let aiReply;
   try {
-    aiReply = await generateReply(systemPrompt, messages);
+    // 20s + 1 retry: worst case ~41s, which leaves room inside maxDuration=60
+    // for the 8s classifier cap, the insert, the outbound RPC, and the
+    // 10s-capped Meta send — the 30s default could blow the budget after the
+    // reply insert but before the send (orphaned assistant row).
+    aiReply = await generateReply(systemPrompt, messages, {
+      timeout: 20_000,
+      maxRetries: 1,
+    });
   } catch (err) {
     console.error("generateReply failed for conversation:", conversation.id, err.message);
+    fireSenderAction(user, senderId, "typing_off");
     getPostHogClient().capture({
       distinctId: user.email || user.id,
       event: "ai_reply_failed",
       properties: { conversation_id: conversation.id, error: err.message },
     });
+    return;
+  }
+
+  // Delay floor + pause re-check before the text send. Sits after generation
+  // (so the sleep is only the remainder of the target) and BEFORE the reply
+  // insert, so a turn blocked by a mid-delay pause leaves no unsent
+  // assistant row in the thread. If the voice path already waited and fell
+  // back to text, the remainder here is ~0 and this is just a fresh gate
+  // check.
+  const textGate = await waitDelayFloorAndRecheckGates();
+  if (textGate.blocked) {
+    fireSenderAction(user, senderId, "typing_off");
+    await markSkip(supabase, conversation.id, textGate.reason);
+    log.warn("[webhook] text reply skipped after delay:", textGate.reason);
     return;
   }
 
@@ -1344,6 +1497,7 @@ async function processIncomingMessage({
       console.error("outbound rate-limit RPC failed:", rlErr);
     } else if (allowed === false) {
       canSend = false;
+      fireSenderAction(user, senderId, "typing_off");
       console.warn("[webhook] outbound rate-limit hit for user:", user.id);
       getPostHogClient().capture({
         distinctId: user.email || user.id,
@@ -1381,6 +1535,7 @@ async function processIncomingMessage({
       });
     } catch (err) {
       console.error("sendInstagramMessage failed for conversation:", conversation.id, err.message);
+      fireSenderAction(user, senderId, "typing_off");
       getPostHogClient().capture({
         distinctId: user.email || user.id,
         event: "message_delivery_failed",

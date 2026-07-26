@@ -204,6 +204,9 @@ export async function sendInstagramMessage(igAccountId, recipientId, text, pageA
       recipient: { id: recipientId },
       message: { text },
     }),
+    // A hung Meta call must not eat the webhook's remaining maxDuration
+    // budget — throws TimeoutError, which callers treat as a send failure.
+    signal: AbortSignal.timeout(10_000),
   });
 
   const data = await res.json();
@@ -211,6 +214,41 @@ export async function sendInstagramMessage(igAccountId, recipientId, text, pageA
   if (data.error) {
     console.error("Instagram send message error:", data.error);
     throw new Error(`Failed to send Instagram message: ${data.error.message}`);
+  }
+
+  return data;
+}
+
+/**
+ * Sends a sender action (mark_seen / typing_on / typing_off) via the
+ * Instagram Messaging API. Same endpoint and token path as
+ * sendInstagramMessage. Throws on Meta errors so callers can log, but the
+ * reply path must treat this as fire-and-forget UX polish — never await it
+ * on the critical path and never let a failure block a reply.
+ *
+ * @param {string} igAccountId - The Instagram Business Account ID (acts as sender)
+ * @param {string} recipientId - The Instagram-scoped user ID (IGSID) of the recipient
+ * @param {"mark_seen"|"typing_on"|"typing_off"} action
+ * @param {string} pageAccessToken - The decrypted Page Access Token
+ */
+export async function sendSenderAction(igAccountId, recipientId, action, pageAccessToken) {
+  const url = `https://graph.instagram.com/${GRAPH_API_VERSION}/${igAccountId}/messages`;
+  const res = await fetch(url, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "Authorization": `Bearer ${pageAccessToken}`,
+    },
+    body: JSON.stringify({
+      recipient: { id: recipientId },
+      sender_action: action,
+    }),
+  });
+
+  const data = await res.json();
+
+  if (data.error) {
+    throw new Error(`Failed to send sender action ${action}: ${data.error.message}`);
   }
 
   return data;

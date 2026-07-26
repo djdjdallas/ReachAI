@@ -62,18 +62,25 @@ function sanitize(str) {
  * @param {Array}  messages     - Array of { role, content } objects (conversation history)
  * @returns {Promise<string>}
  */
-export async function generateReply(systemPrompt, messages) {
-  const response = await getAnthropic().messages.create({
-    model: "claude-sonnet-4-6",
-    max_tokens: 500,
-    // 0.7 gives natural variation without going off-script
-    temperature: 0.7,
-    system: sanitize(systemPrompt),
-    messages: messages.map((m) => ({
-      role: m.role === "assistant" ? "assistant" : "user",
-      content: sanitize(m.content),
-    })),
-  });
+export async function generateReply(systemPrompt, messages, requestOptions = {}) {
+  const response = await getAnthropic().messages.create(
+    {
+      model: "claude-sonnet-4-6",
+      max_tokens: 500,
+      // 0.7 gives natural variation without going off-script
+      temperature: 0.7,
+      system: sanitize(systemPrompt),
+      messages: messages.map((m) => ({
+        role: m.role === "assistant" ? "assistant" : "user",
+        content: sanitize(m.content),
+      })),
+    },
+    // Default 30s + 1 retry (vs the SDK's 10-min timeout × 2 retries) so a
+    // provider incident can't outlive a serverless caller's maxDuration.
+    // Callers on a tighter wall-clock budget (the webhook) pass their own
+    // requestOptions override.
+    { timeout: 30_000, maxRetries: 1, ...requestOptions }
+  );
 
   return response.content[0].text;
 }
@@ -452,7 +459,8 @@ NEW INCOMING MESSAGE: ${incomingMessage}
 Classify this message.`,
       },
     ],
-  });
+    // Webhook-path call — same 30s/1-retry budget rationale as generateReply.
+  }, { timeout: 30_000, maxRetries: 1 });
 
   const latencyMs = Date.now() - startedAt;
   const usage = response?.usage || {};

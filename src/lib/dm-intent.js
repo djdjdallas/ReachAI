@@ -239,8 +239,9 @@ function buildContextBlock({ scriptConfig, offer, recentMessages }) {
 
 // Promise.race-based timeout. If the Anthropic call hangs, throw so the
 // webhook caller's try/catch can fall through to the text reply path
-// instead of blocking the entire DM pipeline.
-function withTimeout(promise, ms, label) {
+// instead of blocking the entire DM pipeline. Exported so the webhook can
+// put the same 8s race on classifyIncomingMessage.
+export function withTimeout(promise, ms, label) {
   return new Promise((resolve, reject) => {
     const timer = setTimeout(
       () => reject(new Error(`${label} timed out after ${ms}ms`)),
@@ -367,7 +368,10 @@ export async function classifyDMIntent({
           },
         ],
         messages: [{ role: "user", content: userContent }],
-      }),
+        // The 8s race below governs how long the webhook WAITS; these options
+        // cap how long the underlying request can keep running (and retrying)
+        // after the race is lost. SDK defaults are 10 min × 2 retries.
+      }, { timeout: 30_000, maxRetries: 1 }),
       8000,
       "classifyDMIntent"
     );
