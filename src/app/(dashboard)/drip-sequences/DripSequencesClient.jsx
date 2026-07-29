@@ -137,14 +137,6 @@ export default function DripSequencesClient({ initialSettings, initialTemplates 
 
   return (
     <div className="max-w-5xl mx-auto p-6 md:p-10">
-      {/* Deploy-dark preview banner (TEMPORARY — remove once comment-to-DM
-          Meta App Review completes). */}
-      <div className="mb-6 rounded-[1.5rem] border border-[#ff7e67]/30 bg-[#fff5f2] px-5 py-4 text-sm text-stone-700">
-        <span className="font-semibold">Follow-up nudges are in preview.</span>{" "}
-        Comment-to-DM Meta App Review must complete before this feature is
-        publicly available.
-      </div>
-
       {/* Header + master toggle */}
       <div className="flex items-start justify-between gap-4 flex-wrap">
         <div>
