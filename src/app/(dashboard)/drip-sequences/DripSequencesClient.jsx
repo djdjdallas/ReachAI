@@ -255,7 +255,7 @@ export default function DripSequencesClient({ initialSettings, initialTemplates 
             {coverage} / {INTENT_CLASSES.length} intents covered
           </span>
         </div>
-        <div className="mt-4 grid grid-cols-2 md:grid-cols-3 gap-3">
+        <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
           {INTENT_CLASSES.map((c) => {
             const covered = !!activeByClass[c.key];
             return (

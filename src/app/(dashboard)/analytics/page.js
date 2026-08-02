@@ -169,7 +169,7 @@ export default function AnalyticsPage() {
       : "lg:grid-cols-2";
 
   return (
-    <div className="p-8 space-y-8">
+    <div className="p-4 md:p-8 space-y-6 md:space-y-8">
       {/* Title & Time Period */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>

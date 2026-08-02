@@ -247,8 +247,8 @@ function LeadsPage() {
           </p>
         </div>
       ) : (
-        <div className="px-6 pb-6 overflow-x-auto flex-1">
-          <div className="bg-white rounded-3xl border border-stone-100 soft-shadow overflow-hidden">
+        <div className="px-4 md:px-6 pb-6 flex-1">
+          <div className="bg-white rounded-3xl border border-stone-100 soft-shadow overflow-x-auto">
             <table className="w-full">
               <thead className="sticky top-0 bg-white z-10 border-b border-stone-100">
                 <tr>
@@ -348,7 +348,7 @@ function LeadsPage() {
                     {/* Actions */}
                     <td className="px-5 py-3 text-right">
                       <div
-                        className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity"
+                        className="flex items-center justify-end gap-2 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity"
                         onClick={(e) => e.stopPropagation()}
                       >
                         <a

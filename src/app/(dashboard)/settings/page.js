@@ -740,7 +740,7 @@ export default function SettingsPage() {
               )}
             </div>
             {isInstagramConnected && (
-              <span className="text-xs text-muted-foreground">
+              <span className="text-xs text-muted-foreground min-w-0 truncate">
                 {profile?.instagram_username
                   ? `@${profile.instagram_username}`
                   : `Account: ${profile?.instagram_business_account_id}`}
@@ -998,7 +998,7 @@ export default function SettingsPage() {
               )}
             </div>
           </div>
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             <Button
               asChild
               variant={gcalConnected ? "outline" : "default"}
@@ -1129,7 +1129,7 @@ export default function SettingsPage() {
                 value={phoneNumber}
                 onChange={(e) => setPhoneNumber(e.target.value)}
                 placeholder="+1 (555) 000-0000"
-                className="w-56"
+                className="w-full sm:w-56"
               />
               <Button
                 onClick={handleSavePhone}
@@ -1208,7 +1208,7 @@ export default function SettingsPage() {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-5">
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <p className="text-sm font-medium">Agent Mode</p>
               <p className="text-xs text-muted-foreground">
