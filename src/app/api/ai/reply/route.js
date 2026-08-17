@@ -130,9 +130,13 @@ export async function POST(request) {
       // AI-generated reply. Fetch the newest 20 messages and restore
       // chronological order — ascending+limit returned the OLDEST 20 and
       // dropped recent context on long threads.
+      // `source` is required, not decorative: role='assistant' covers both the
+      // AI's replies and messages the owner typed by hand, and source is the
+      // only field that separates them. Without it generateReply cannot label
+      // speakers and the model can misread the owner's words as the lead's.
       const { data: messagesDesc, error: msgError } = await getSupabaseAdmin()
         .from("messages")
-        .select("role, content")
+        .select("role, content, source")
         .eq("conversation_id", conversationId)
         .order("created_at", { ascending: false })
         .limit(20);
@@ -178,6 +182,32 @@ export async function POST(request) {
         { error: "Failed to save message" },
         { status: 500 }
       );
+    }
+
+    // Human takeover. A human typed this, so the AI stops in this thread until
+    // a human resumes it from the inbox. Only for manual sends — pausing on
+    // the AI's own replies (`manual` false, source='agent') would disable the
+    // product on the first reply.
+    //
+    // Guarded on ai_paused=false so a stronger existing reason
+    // (flagged_do_not_send, hostile_or_refund, complex_objection) is never
+    // downgraded to 'human_took_over'.
+    //
+    // Awaited, not fire-and-forget: stopping the AI is the whole point of this
+    // block, and a floating promise can be frozen when the response returns.
+    // The supabase client surfaces failures as a returned error rather than a
+    // throw, and the try/catch below is the backstop, so awaiting cannot fail
+    // the send. Uses the same admin client as the insert above, so this adds
+    // no service-role usage the route didn't already have.
+    if (manual) {
+      const { error: pauseError } = await getSupabaseAdmin()
+        .from("conversations")
+        .update({ ai_paused: true, ai_pause_reason: "human_took_over" })
+        .eq("id", conversationId)
+        .eq("ai_paused", false);
+      if (pauseError) {
+        console.error("[ai-reply] human-takeover pause failed:", pauseError.code);
+      }
     }
 
     // Send via Meta Instagram API

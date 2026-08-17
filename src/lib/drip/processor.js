@@ -173,9 +173,14 @@ export async function processDrip(dripRow) {
           voiceProfile: user.voice_profile,
           conversation: conv,
         }) + DRIP_NUDGE_MODE;
+      // `source` must survive this map. It is already selected above, and
+      // generateReply uses it to label who actually typed each message —
+      // role='assistant' covers both the AI's replies and ones the coach typed
+      // by hand. Dropping it here would let the nudge misread the coach's own
+      // words as the lead's, the same defect fixed in the reply path.
       const history = [...recentMessages]
         .reverse()
-        .map((m) => ({ role: m.role, content: m.content || "" }));
+        .map((m) => ({ role: m.role, content: m.content || "", source: m.source }));
       // The trailing cue keeps the API call from reading as a continuation of
       // our own last message. It is never persisted or shown to anyone.
       history.push({

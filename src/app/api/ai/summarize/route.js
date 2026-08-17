@@ -49,7 +49,10 @@ export async function POST(request) {
     // stale context instead of the current state of the conversation.
     const { data: messagesDesc, error: msgError } = await admin
       .from("messages")
-      .select("role, content")
+      // `source` feeds speakerLabel() in summarizeConversation — without it
+      // the coach's own manual messages get summarized back to them as AI
+      // output.
+      .select("role, content, source")
       .eq("conversation_id", conversationId)
       .order("created_at", { ascending: false })
       .limit(30);
