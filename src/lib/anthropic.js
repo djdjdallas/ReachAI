@@ -54,15 +54,109 @@ function sanitize(str) {
   return str.replace(/[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/g, "");
 }
 
+// ── Speaker attribution ─────────────────────────────────────────────────────
+//
+// `role` says which SIDE of the thread a message is on. It does NOT say who
+// typed it. role='assistant' covers BOTH the AI's own replies AND messages the
+// account owner typed by hand — in the Instagram app (source='manual', captured
+// by the webhook's echo handler) or from the Clinchd dashboard. `source` is the
+// only field that tells them apart.
+//
+// Losing that distinction is what caused the 2026-08-10 incident: the owner
+// manually sent "my ai assistant tries to answer everyone", the lead replied
+// with an emoji, and the model — seeing an unattributed assistant turn it had
+// no memory of writing — decided the assistant must belong to the LEAD and
+// replied "sounds like your assistant is doing its job a little too well".
+// See docs/audit-2026-08-15-reply-path.md.
+//
+// Callers MUST select `source` alongside `role, content` for this to do
+// anything. A row with no `source` (legacy rows, or a caller that forgot)
+// falls through unmarked — the old behaviour, never a crash.
+// Exported so prompts.js can quote the exact marker strings in the system
+// prompt. If these ever drift apart the model is told to look for a prefix
+// that never appears, so they must come from one place.
+export const OWNER_MANUAL_MARK = "[sent by the account owner directly, not by you]";
+export const DRIP_MARK = "[automated follow-up you sent earlier]";
+
+// Owner-typed sources. 'native_send' is the coach's own cold DM, typed by hand
+// in the Instagram app and either pre-logged or recovered by backfill — same
+// speaker as 'manual'.
+const OWNER_TYPED_SOURCES = ["manual", "native_send"];
+
+/**
+ * Renders one history row's content with an origin marker so the model can
+ * never confuse a human-typed owner message with its own output or with the
+ * lead's words.
+ *
+ * @param {{role?: string, content?: string, source?: string}} m
+ * @returns {string}
+ */
+export function labelMessageContent(m) {
+  const content = sanitize(m?.content ?? "");
+  // The lead's own messages are never marked — role='user' is unambiguous.
+  if (m?.role !== "assistant") return content;
+  if (OWNER_TYPED_SOURCES.includes(m?.source)) return `${OWNER_MANUAL_MARK} ${content}`;
+  if (m?.source === "drip") return `${DRIP_MARK} ${content}`;
+  // 'agent' and unknown/legacy sources: the AI's own voice, left as-is.
+  return content;
+}
+
+/**
+ * Renders one history row for the flat-text history blocks the classifiers and
+ * the summarizer build. Same role-vs-source problem as above: labelling every
+ * assistant row "AI" told the classifiers that the owner's manual messages were
+ * machine-generated.
+ *
+ * @param {{role?: string, content?: string, source?: string}} m
+ * @returns {string} e.g. "Owner (typed manually): ..." | "AI: ..." | "Lead: ..."
+ */
+export function speakerLabel(m) {
+  if (m?.role !== "assistant") return "Lead";
+  if (OWNER_TYPED_SOURCES.includes(m?.source)) return "Owner (typed manually)";
+  if (m?.source === "drip") return "AI (automated follow-up)";
+  return "AI";
+}
+
+/**
+ * The Anthropic Messages API requires the first turn to use the `user` role.
+ * A thread can legitimately open on an assistant turn:
+ *   - echo-created conversations, where the owner's manual DM is the first row
+ *   - native-send injection, deliberately back-dated before the lead's reply
+ *   - any 20-message window that happens to open on an assistant turn
+ * There was no guard anywhere in the codebase for this; these threads were
+ * relying on the window happening to open on a lead turn.
+ *
+ * Drop leading assistant turns. If that empties the array (an all-outbound
+ * thread that should never have reached generation), fall back to one synthetic
+ * user turn so the call degrades instead of 400-ing.
+ */
+function ensureUserFirst(mapped) {
+  let i = 0;
+  while (i < mapped.length && mapped[i].role === "assistant") i++;
+  const trimmed = mapped.slice(i);
+  if (trimmed.length > 0) return trimmed;
+  return [{ role: "user", content: "(no messages from the lead yet)" }];
+}
+
 /**
  * Generates a single AI reply for a DM conversation.
  * Used by the webhook, dashboard reply route, and playground.
  *
  * @param {string} systemPrompt - Built by buildSystemPrompt() from prompts.js
- * @param {Array}  messages     - Array of { role, content } objects (conversation history)
+ * @param {Array}  messages     - Conversation history. Each item is
+ *                                { role, content, source? }. Pass `source` —
+ *                                without it the model cannot tell a message the
+ *                                owner typed by hand from one the AI wrote.
  * @returns {Promise<string>}
  */
 export async function generateReply(systemPrompt, messages, requestOptions = {}) {
+  const mapped = (messages || []).map((m) => ({
+    // role = which side of the thread. source = who actually typed it.
+    // labelMessageContent() carries the second one into the prompt.
+    role: m.role === "assistant" ? "assistant" : "user",
+    content: labelMessageContent(m),
+  }));
+
   const response = await getAnthropic().messages.create(
     {
       model: "claude-sonnet-4-6",
@@ -70,10 +164,7 @@ export async function generateReply(systemPrompt, messages, requestOptions = {})
       // 0.7 gives natural variation without going off-script
       temperature: 0.7,
       system: sanitize(systemPrompt),
-      messages: messages.map((m) => ({
-        role: m.role === "assistant" ? "assistant" : "user",
-        content: sanitize(m.content),
-      })),
+      messages: ensureUserFirst(mapped),
     },
     // Default 30s + 1 retry (vs the SDK's 10-min timeout × 2 retries) so a
     // provider incident can't outlive a serverless caller's maxDuration.
@@ -210,7 +301,10 @@ Example: {"summary": "Prospect runs a fitness coaching business doing $8k/month 
     messages: [
       {
         role: "user",
-        content: `Analyze this DM conversation:\n\n${messages.map((m) => `${m.role === "assistant" ? "AI" : "Lead"}: ${m.content}`).join("\n")}`,
+        // Same role-vs-source distinction as the reply path: ai_summary is
+        // shown to the coach in the inbox, so labelling their own manual
+        // messages "AI" misreported their own thread back to them.
+        content: `Analyze this DM conversation:\n\n${messages.map((m) => `${speakerLabel(m)}: ${m.content}`).join("\n")}`,
       },
     ],
   });
@@ -411,9 +505,12 @@ export async function classifyIncomingMessage(incomingMessage, recentMessages = 
   const targetCustomer =
     scriptConfig.targetCustomer || scriptConfig.target_customer || "Not specified";
 
+  // speakerLabel, not a bare role check: an owner-typed manual message labelled
+  // "AI" here told the escalation classifier the coach's own words were machine
+  // output, which is the same misattribution the reply path had.
   const historyBlock = recentMessages
     .slice(-8)
-    .map((m) => `${m.role === "assistant" ? "AI" : "Lead"}: ${m.content}`)
+    .map((m) => `${speakerLabel(m)}: ${m.content}`)
     .join("\n");
 
   const model = CLASSIFY_INCOMING_MODEL;

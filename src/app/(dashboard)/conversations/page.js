@@ -436,6 +436,22 @@ function ConversationsPage() {
       });
       if (!res.ok) throw new Error("Failed to send message");
       await fetchMessages(selectedConvo.id);
+      // The send endpoint auto-pauses the AI for this thread (human takeover).
+      // Reflect it immediately so the banner appears with the message rather
+      // than after the next refetch. Only when nothing stronger already holds
+      // the pause — mirrors the server-side ai_paused=false guard.
+      setSelectedConvo((prev) =>
+        prev && !prev.ai_paused
+          ? { ...prev, ai_paused: true, ai_pause_reason: "human_took_over" }
+          : prev
+      );
+      setConversations((prev) =>
+        prev.map((c) =>
+          c.id === selectedConvo.id && !c.ai_paused
+            ? { ...c, ai_paused: true, ai_pause_reason: "human_took_over" }
+            : c
+        )
+      );
       posthog.capture("manual_message_sent", {
         conversation_id: selectedConvo.id,
         message_length: messageText.length,
@@ -805,6 +821,12 @@ function ConversationsPage() {
                               Paused — Loop
                             </span>
                           )}
+                        {convo.ai_paused &&
+                          convo.ai_pause_reason === "human_took_over" && (
+                            <span className="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase bg-stone-100 text-stone-600 border border-stone-200">
+                              You Replied
+                            </span>
+                          )}
                         {convo.lead_temperature && tempColors[convo.lead_temperature] && (
                           <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold uppercase ${tempColors[convo.lead_temperature].bg} ${tempColors[convo.lead_temperature].text}`}>
                             {tempColors[convo.lead_temperature].label}
@@ -960,6 +982,36 @@ function ConversationsPage() {
                       conversation wasn&apos;t progressing. Take over manually
                       to redirect.
                     </p>
+                  </div>
+                </div>
+              )}
+
+            {/* Human-takeover banner. Set whenever a message is saved with
+                source='manual' — whether typed here or in the Instagram app,
+                which the webhook picks up as an echo. Sticky by design: it
+                clears only when the user clicks Resume AI. */}
+            {selectedConvo.ai_paused &&
+              selectedConvo.ai_pause_reason === "human_took_over" && (
+                <div className="px-3 md:px-6 py-3 border-b border-stone-100 bg-stone-50">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex items-start gap-3">
+                      <Bot className="w-4 h-4 text-stone-500 mt-0.5 shrink-0" />
+                      <p className="text-xs text-stone-600 leading-relaxed">
+                        <span className="font-bold">AI paused — you replied
+                        here.</span>{" "}
+                        The AI stopped so it can&apos;t talk over you. It stays
+                        off in this conversation until you turn it back on.
+                      </p>
+                    </div>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={handleResumeAi}
+                      className="gap-1.5 border-stone-200 bg-white hover:bg-stone-50 shrink-0"
+                    >
+                      <Bot className="h-3.5 w-3.5" />
+                      Resume AI replies
+                    </Button>
                   </div>
                 </div>
               )}
