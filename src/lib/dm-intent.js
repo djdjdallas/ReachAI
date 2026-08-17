@@ -1,4 +1,4 @@
-import getAnthropic from "./anthropic";
+import getAnthropic, { speakerLabel } from "./anthropic";
 import {
   DM_INTENT_CLASSES,
   VOICE_ELIGIBLE_CLASSES,
@@ -208,10 +208,14 @@ function formatRecentMessages(messages) {
   if (!Array.isArray(messages) || messages.length === 0) {
     return "(no prior messages — this is the first message from the lead)";
   }
+  // speakerLabel reads `source`, not just `role`: role='assistant' is the
+  // owner's side of the thread whether the AI or the coach typed it, and the
+  // classifier was being told the coach's manual messages were AI output.
+  // Rendering only — this does not touch any classification signal.
   return messages
     .slice(-8)
     .map((m) =>
-      `${m.role === "assistant" ? "AI" : "Lead"}: ${String(m.content || "").slice(0, 800)}`
+      `${speakerLabel(m)}: ${String(m.content || "").slice(0, 800)}`
     )
     .join("\n");
 }

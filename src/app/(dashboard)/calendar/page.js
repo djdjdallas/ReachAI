@@ -244,7 +244,7 @@ export default function CalendarPage() {
   }
 
   return (
-    <div className="p-8">
+    <div className="p-4 md:p-8">
       <div className="max-w-7xl mx-auto">
         {/* Header */}
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
@@ -285,6 +285,8 @@ export default function CalendarPage() {
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
           {/* Calendar Grid */}
           <div className="lg:col-span-8 bg-white rounded-3xl border border-stone-200 overflow-hidden soft-shadow">
+           <div className="overflow-x-auto">
+            <div className="min-w-[560px]">
             {/* Day headers */}
             <div className="grid grid-cols-7 border-b border-stone-100">
               {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((d) => (
@@ -379,6 +381,8 @@ export default function CalendarPage() {
                 })}
               </div>
             )}
+            </div>
+           </div>
           </div>
 
           {/* Right Panel */}

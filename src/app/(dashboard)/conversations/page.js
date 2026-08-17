@@ -79,7 +79,7 @@ function BackfillBanner({ conversation }) {
   }
 
   return (
-    <div className="px-6 py-3 border-b border-stone-100 bg-amber-50">
+    <div className="px-3 md:px-6 py-3 border-b border-stone-100 bg-amber-50">
       <div className="flex items-start gap-3">
         <AlertCircle className="w-4 h-4 text-amber-600 mt-0.5 shrink-0" />
         <div className="flex-1 space-y-2">
@@ -436,6 +436,22 @@ function ConversationsPage() {
       });
       if (!res.ok) throw new Error("Failed to send message");
       await fetchMessages(selectedConvo.id);
+      // The send endpoint auto-pauses the AI for this thread (human takeover).
+      // Reflect it immediately so the banner appears with the message rather
+      // than after the next refetch. Only when nothing stronger already holds
+      // the pause — mirrors the server-side ai_paused=false guard.
+      setSelectedConvo((prev) =>
+        prev && !prev.ai_paused
+          ? { ...prev, ai_paused: true, ai_pause_reason: "human_took_over" }
+          : prev
+      );
+      setConversations((prev) =>
+        prev.map((c) =>
+          c.id === selectedConvo.id && !c.ai_paused
+            ? { ...c, ai_paused: true, ai_pause_reason: "human_took_over" }
+            : c
+        )
+      );
       posthog.capture("manual_message_sent", {
         conversation_id: selectedConvo.id,
         message_length: messageText.length,
@@ -677,8 +693,12 @@ function ConversationsPage() {
 
   return (
     <div className="flex h-full overflow-hidden">
-      {/* Left Panel: Conversation List */}
-      <div className="w-full md:w-[380px] border-r border-stone-200 flex flex-col bg-white">
+      {/* Left Panel: Conversation List — hidden on mobile while a thread is open */}
+      <div
+        className={`w-full md:w-[380px] border-r border-stone-200 flex-col bg-white ${
+          selectedConvo ? "hidden md:flex" : "flex"
+        }`}
+      >
         <div className="px-5 pt-5 pb-4 space-y-4">
           <div className="flex items-center justify-between">
             <h2 className="font-semibold text-xl tracking-tight">Conversations</h2>
@@ -801,6 +821,12 @@ function ConversationsPage() {
                               Paused — Loop
                             </span>
                           )}
+                        {convo.ai_paused &&
+                          convo.ai_pause_reason === "human_took_over" && (
+                            <span className="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase bg-stone-100 text-stone-600 border border-stone-200">
+                              You Replied
+                            </span>
+                          )}
                         {convo.lead_temperature && tempColors[convo.lead_temperature] && (
                           <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold uppercase ${tempColors[convo.lead_temperature].bg} ${tempColors[convo.lead_temperature].text}`}>
                             {tempColors[convo.lead_temperature].label}
@@ -824,27 +850,30 @@ function ConversationsPage() {
       </div>
 
       {/* Right Panel: Message Thread */}
-      <div className={`flex-1 flex flex-col bg-white ${selectedConvo ? "" : "hidden md:flex"}`}>
+      <div className={`flex-1 min-w-0 flex-col bg-white ${selectedConvo ? "flex" : "hidden md:flex"}`}>
         {selectedConvo ? (
           <>
-            {/* Chat Header */}
-            <div className="h-16 px-6 border-b border-stone-100 flex items-center justify-between">
-              <div className="flex items-center gap-4">
+            {/* Chat Header — stacks on mobile; actions scroll horizontally */}
+            <div className="px-3 py-2 md:h-16 md:px-6 md:py-0 border-b border-stone-100 flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+              <div className="flex items-center gap-2 md:gap-4 min-w-0">
                 <button
-                  className="md:hidden w-10 h-10 flex items-center justify-center text-stone-400 hover:text-stone-900"
-                  onClick={() => setSelectedConvo(null)}
+                  className="md:hidden w-9 h-9 -ml-1 flex items-center justify-center text-stone-400 hover:text-stone-900 shrink-0"
+                  onClick={() => {
+                    setSelectedConvo(null);
+                    router.replace("/conversations", { scroll: false });
+                  }}
                 >
                   <ChevronLeft className="h-6 w-6" />
                 </button>
-                <div className="flex items-center gap-3">
-                  <Avatar className="h-10 w-10 rounded-full border border-stone-100">
+                <div className="flex items-center gap-3 min-w-0">
+                  <Avatar className="h-10 w-10 rounded-full border border-stone-100 shrink-0">
                     <AvatarFallback className="bg-stone-100 text-stone-600 text-sm">
                       {getInitials(selectedConvo.sender_name)}
                     </AvatarFallback>
                   </Avatar>
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <h2 className="text-sm font-bold">
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <h2 className="text-sm font-bold truncate">
                         {selectedConvo.sender_name || "Unknown"}
                       </h2>
                       <StatusBadge status={selectedConvo.status} />
@@ -871,13 +900,13 @@ function ConversationsPage() {
                   </div>
                 </div>
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 overflow-x-auto scrollbar-none -mx-3 px-3 md:mx-0 md:px-0 md:overflow-visible">
                 {selectedConvo.status !== "booked" && (
                   <Button
                     variant="outline"
                     size="sm"
                     onClick={() => handleStatusChange("booked")}
-                    className="gap-1.5 border-stone-200 hover:bg-stone-50"
+                    className="gap-1.5 border-stone-200 hover:bg-stone-50 shrink-0"
                   >
                     <CheckCircle className="h-3.5 w-3.5" />
                     Mark Booked
@@ -888,7 +917,7 @@ function ConversationsPage() {
                     variant="outline"
                     size="sm"
                     onClick={handleResumeAi}
-                    className="gap-1.5 border-stone-200 hover:bg-stone-50"
+                    className="gap-1.5 border-stone-200 hover:bg-stone-50 shrink-0"
                   >
                     <Bot className="h-3.5 w-3.5" />
                     Resume AI
@@ -898,7 +927,7 @@ function ConversationsPage() {
                   value={selectedConvo.status || "new"}
                   onValueChange={handleStatusChange}
                 >
-                  <SelectTrigger className="h-8 text-xs w-auto border-stone-200">
+                  <SelectTrigger className="h-8 text-xs w-auto border-stone-200 shrink-0">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -915,7 +944,7 @@ function ConversationsPage() {
                   size="sm"
                   onClick={() => setConfirmDeleteOpen(true)}
                   disabled={deleting}
-                  className="gap-1.5 text-red-500 border-red-200 hover:bg-red-50 hover:text-red-600"
+                  className="gap-1.5 text-red-500 border-red-200 hover:bg-red-50 hover:text-red-600 shrink-0"
                 >
                   {deleting ? (
                     <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -930,7 +959,7 @@ function ConversationsPage() {
             {/* Complex-objection (human-in-loop) banner */}
             {selectedConvo.ai_paused &&
               selectedConvo.ai_pause_reason === "complex_objection" && (
-                <div className="px-6 py-3 border-b border-stone-100 bg-red-50">
+                <div className="px-3 md:px-6 py-3 border-b border-stone-100 bg-red-50">
                   <div className="flex items-start gap-3">
                     <AlertCircle className="w-4 h-4 text-red-600 mt-0.5 shrink-0" />
                     <p className="text-xs text-red-700 leading-relaxed">
@@ -945,7 +974,7 @@ function ConversationsPage() {
             {/* Qualifying-loop banner */}
             {selectedConvo.ai_paused &&
               selectedConvo.ai_pause_reason === "qualifying_loop_detected" && (
-                <div className="px-6 py-3 border-b border-stone-100 bg-amber-50">
+                <div className="px-3 md:px-6 py-3 border-b border-stone-100 bg-amber-50">
                   <div className="flex items-start gap-3">
                     <AlertCircle className="w-4 h-4 text-amber-600 mt-0.5 shrink-0" />
                     <p className="text-xs text-amber-700 leading-relaxed">
@@ -957,13 +986,43 @@ function ConversationsPage() {
                 </div>
               )}
 
+            {/* Human-takeover banner. Set whenever a message is saved with
+                source='manual' — whether typed here or in the Instagram app,
+                which the webhook picks up as an echo. Sticky by design: it
+                clears only when the user clicks Resume AI. */}
+            {selectedConvo.ai_paused &&
+              selectedConvo.ai_pause_reason === "human_took_over" && (
+                <div className="px-3 md:px-6 py-3 border-b border-stone-100 bg-stone-50">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex items-start gap-3">
+                      <Bot className="w-4 h-4 text-stone-500 mt-0.5 shrink-0" />
+                      <p className="text-xs text-stone-600 leading-relaxed">
+                        <span className="font-bold">AI paused — you replied
+                        here.</span>{" "}
+                        The AI stopped so it can&apos;t talk over you. It stays
+                        off in this conversation until you turn it back on.
+                      </p>
+                    </div>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={handleResumeAi}
+                      className="gap-1.5 border-stone-200 bg-white hover:bg-stone-50 shrink-0"
+                    >
+                      <Bot className="h-3.5 w-3.5" />
+                      Resume AI replies
+                    </Button>
+                  </div>
+                </div>
+              )}
+
             {/* Native-send backfill banner */}
             {selectedConvo.missing_outbound_context && (
               <BackfillBanner conversation={selectedConvo} />
             )}
 
             {/* Summary Panel */}
-            <div className="px-6 py-3 border-b border-stone-100 flex items-center gap-3">
+            <div className="px-3 md:px-6 py-3 border-b border-stone-100 flex items-center gap-3">
               {selectedConvo.lead_temperature && tempColors[selectedConvo.lead_temperature] ? (
                 <div className={`flex-1 flex items-start gap-3 p-3 rounded-xl ${tempColors[selectedConvo.lead_temperature].bg} border ${tempColors[selectedConvo.lead_temperature].border}`}>
                   <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase shrink-0 ${tempColors[selectedConvo.lead_temperature].text} bg-white/80`}>
@@ -1005,7 +1064,7 @@ function ConversationsPage() {
             </div>
 
             {/* Messages Area */}
-            <ScrollArea className="flex-1 px-6 py-4">
+            <ScrollArea className="flex-1 px-3 md:px-6 py-4">
               {messagesLoading ? (
                 <div className="space-y-4">
                   {[...Array(4)].map((_, i) => (
@@ -1072,7 +1131,7 @@ function ConversationsPage() {
                           </div>
                         )}
                         {isOutbound ? (
-                          <div className="flex items-end gap-3 justify-end ml-auto max-w-[80%]">
+                          <div className="flex items-end gap-3 justify-end ml-auto max-w-[85%] md:max-w-[80%]">
                             <div className="space-y-1 text-right">
                               <div
                                 className={`px-4 py-3 text-sm leading-relaxed ${
@@ -1098,7 +1157,7 @@ function ConversationsPage() {
                             </div>
                           </div>
                         ) : (
-                          <div className="flex items-end gap-3 max-w-[80%]">
+                          <div className="flex items-end gap-2 md:gap-3 max-w-[85%] md:max-w-[80%]">
                             <Avatar className="h-8 w-8 rounded-full mb-1 shrink-0">
                               <AvatarFallback className="text-[10px] bg-stone-100 text-stone-600">
                                 {getInitials(selectedConvo.sender_name)}
@@ -1132,15 +1191,15 @@ function ConversationsPage() {
               )}
             </ScrollArea>
 
-            {/* AI Smart Replies */}
-            <div className="px-6 py-4 border-t border-stone-100 bg-[#fafaf9]/50">
-              <div className="flex items-center gap-2 mb-3">
+            {/* AI Smart Replies — horizontal swipe row on mobile, grid on desktop */}
+            <div className="px-3 md:px-6 py-3 md:py-4 border-t border-stone-100 bg-[#fafaf9]/50">
+              <div className="flex items-center gap-2 mb-2 md:mb-3">
                 <Sparkles className="h-4 w-4 text-[#ff7e67]" />
                 <span className="text-[11px] font-black uppercase tracking-widest text-stone-400">
                   AI Smart Replies
                 </span>
               </div>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+              <div className="flex gap-3 overflow-x-auto snap-x scrollbar-none -mx-3 px-3 md:mx-0 md:px-0 md:grid md:grid-cols-3 md:overflow-visible">
                 {SMART_REPLIES.map((reply) => (
                   <button
                     key={reply.type}
@@ -1151,7 +1210,7 @@ function ConversationsPage() {
                         conversation_id: selectedConvo?.id,
                       });
                     }}
-                    className="group p-3 bg-white border border-stone-200 rounded-xl text-left hover:border-[#ff7e67] hover:shadow-sm transition-all"
+                    className="group p-3 bg-white border border-stone-200 rounded-xl text-left hover:border-[#ff7e67] hover:shadow-sm transition-all w-[240px] shrink-0 snap-start md:w-auto md:shrink"
                   >
                     <div className="text-[10px] font-bold text-stone-400 mb-1 group-hover:text-[#ff7e67]">
                       {reply.label}
@@ -1164,17 +1223,17 @@ function ConversationsPage() {
               </div>
             </div>
 
-            {/* Message Input */}
-            <div className="p-6 border-t border-stone-100 flex items-center gap-4">
+            {/* Message Input — text-base on mobile so iOS doesn't zoom on focus */}
+            <div className="p-3 md:p-6 border-t border-stone-100 flex items-center gap-4">
               <div className="flex-1 relative">
-                <form onSubmit={handleSendMessage} className="flex items-center gap-4">
+                <form onSubmit={handleSendMessage} className="flex items-center gap-2 md:gap-4">
                   <input
                     type="text"
                     placeholder="Type a message or use AI suggestions..."
                     value={newMessage}
                     onChange={(e) => setNewMessage(e.target.value)}
                     disabled={sending}
-                    className="w-full px-5 py-3 bg-stone-50 border border-stone-200 rounded-2xl text-sm focus:outline-none focus:ring-2 focus:ring-[#ff7e67]/20 focus:border-[#ff7e67] transition-all"
+                    className="w-full min-w-0 px-4 md:px-5 py-3 bg-stone-50 border border-stone-200 rounded-2xl text-base md:text-sm focus:outline-none focus:ring-2 focus:ring-[#ff7e67]/20 focus:border-[#ff7e67] transition-all"
                   />
                   <button
                     type="submit"

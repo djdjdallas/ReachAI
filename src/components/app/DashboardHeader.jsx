@@ -168,31 +168,33 @@ export default function DashboardHeader() {
   const showInactive = profile && !operationallyActive && aiMode !== "handoff";
 
   return (
-    <header className="h-16 bg-white border-b border-stone-200 px-6 flex items-center justify-between flex-shrink-0">
-      <div className="flex items-center gap-4">
-        <h1 className="text-2xl font-extrabold">{title}</h1>
+    <header className="h-16 bg-white border-b border-stone-200 px-4 md:px-6 flex items-center justify-between gap-3 flex-shrink-0">
+      <div className="flex items-center gap-4 min-w-0">
+        <h1 className="text-lg md:text-2xl font-extrabold truncate">{title}</h1>
         {operationallyActive && (
-          <div className="flex items-center gap-1.5 px-3 py-1 bg-green-50 text-green-600 rounded-full text-xs font-bold">
+          <div className="hidden md:flex items-center gap-1.5 px-3 py-1 bg-green-50 text-green-600 rounded-full text-xs font-bold">
             <span className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse" />
             AGENT ACTIVE
           </div>
         )}
         {aiMode === "handoff" && onboarding.complete && (
-          <div className="flex items-center gap-1.5 px-3 py-1 bg-amber-50 text-amber-600 rounded-full text-xs font-bold">
+          <div className="hidden md:flex items-center gap-1.5 px-3 py-1 bg-amber-50 text-amber-600 rounded-full text-xs font-bold">
             <span className="w-1.5 h-1.5 bg-amber-500 rounded-full" />
             HANDOFF MODE
           </div>
         )}
         {showInactive && (
-          <div className="flex items-center gap-1.5 px-3 py-1 bg-stone-100 text-stone-500 rounded-full text-xs font-bold">
+          <div className="hidden md:flex items-center gap-1.5 px-3 py-1 bg-stone-100 text-stone-500 rounded-full text-xs font-bold">
             <span className="w-1.5 h-1.5 bg-red-500 rounded-full" />
             AGENT INACTIVE
           </div>
         )}
-        <ConnectedAccountBadge profile={profile} />
+        <div className="hidden md:block">
+          <ConnectedAccountBadge profile={profile} />
+        </div>
       </div>
 
-      <div className="flex items-center gap-6">
+      <div className="flex items-center gap-3 md:gap-6 shrink-0">
         {/* Bell + Notification Dropdown */}
         <div className="relative">
           <button
@@ -209,7 +211,7 @@ export default function DashboardHeader() {
           {notifOpen && (
             <div
               ref={dropdownRef}
-              className="absolute right-0 top-full mt-2 w-96 bg-white rounded-2xl border border-stone-200 shadow-lg z-50 overflow-hidden"
+              className="fixed left-4 right-4 top-[8rem] sm:absolute sm:left-auto sm:right-0 sm:top-full sm:mt-2 sm:w-96 bg-white rounded-2xl border border-stone-200 shadow-lg z-50 overflow-hidden"
             >
               {/* Header */}
               <div className="flex items-center justify-between px-4 py-3 border-b border-stone-100">

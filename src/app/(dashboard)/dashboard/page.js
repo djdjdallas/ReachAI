@@ -33,7 +33,7 @@ function getInitials(name) {
 
 function DashboardSkeleton() {
   return (
-    <div className="space-y-8 p-8">
+    <div className="space-y-6 md:space-y-8 p-4 md:p-8">
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
         {[...Array(4)].map((_, i) => (
           <div key={i} className="bg-white p-6 rounded-3xl soft-shadow border border-stone-100">
@@ -261,7 +261,7 @@ export default function DashboardPage() {
   ];
 
   return (
-    <div className="space-y-8 p-8">
+    <div className="space-y-6 md:space-y-8 p-4 md:p-8">
       {/* Warning banners */}
       {igTokenExpired && (
         <div className="flex items-center gap-3 p-4 rounded-2xl border border-red-200 bg-red-50">
@@ -426,7 +426,7 @@ export default function DashboardPage() {
                   </div>
                   <div className="flex flex-col items-end gap-2">
                     <StatusBadge status={convo.status} />
-                    <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <div className="flex gap-2 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
                       <span className="w-8 h-8 rounded-lg bg-white border border-stone-200 flex items-center justify-center text-stone-500 hover:text-[#ff7e67] shadow-sm">
                         <Eye className="h-4 w-4" />
                       </span>

@@ -209,6 +209,35 @@ function fireSenderAction(user, recipientId, action) {
   }
 }
 
+// ── Skip-reason vocabulary ──────────────────────────────────────────────
+// Short, stable snake_case tokens so suppressions can be grouped in SQL
+// (`select last_skip_reason, count(*) ... group by 1`). Never prose — a
+// free-text reason is unqueryable, which is how we ended up unable to answer
+// "why didn't the AI reply here?" from data at all.
+//
+// CLASSIFIER_TIMEOUT and NO_REPLY_NEEDED are declared but not currently
+// reachable: the classifiers fail OPEN (route replies anyway, see
+// docs/audit-2026-08-15-reply-path.md Q4) and there is no "nothing to say"
+// branch. Both are recorded in messages.intent_classification instead. They
+// are listed here so the vocabulary is complete if that ever changes —
+// deliberately NOT wired up, because changing fail-open semantics was
+// explicitly out of scope for this change.
+const SKIP = {
+  AI_INACTIVE: "ai_inactive",
+  AI_PAUSED: "ai_paused",
+  HUMAN_TAKEOVER: "human_takeover",
+  DO_NOT_SEND: "do_not_send",
+  CLASSIFIER_TIMEOUT: "classifier_timeout",
+  NO_REPLY_NEEDED: "no_reply_needed",
+  RATE_LIMITED: "rate_limited",
+  DUPLICATE_MESSAGE: "duplicate_message",
+  NO_GREETING: "no_greeting",
+  DM_LIMIT: "dm_limit",
+  HISTORY_FETCH_FAILED: "history_fetch_failed",
+  GENERATION_FAILED: "generation_failed",
+  SEND_FAILED: "send_failed",
+};
+
 // Mark a conversation's `last_skip_reason` so the dashboard can explain why
 // the agent didn't reply on a given turn. Cleared by the success path.
 async function markSkip(supabase, conversation_id, reason) {
@@ -217,6 +246,86 @@ async function markSkip(supabase, conversation_id, reason) {
     .update({ last_skip_reason: reason })
     .eq("id", conversation_id);
   if (error) log.error("[webhook] markSkip failed:", error.code);
+}
+
+// Persist the classifier outcome onto the INBOUND lead message row.
+//
+// A NULL intent_classification is indistinguishable from "the classifier never
+// ran", which made every reply decision unauditable after the fact. So every
+// inbound message that reaches this pipeline gets a row here — a real
+// classification when we have one, a sentinel when we don't.
+//
+// Targets by message id rather than provider_message_id: the previous write
+// keyed on the Meta mid, so any inbound without one silently persisted
+// nothing.
+//
+// Returns a promise that NEVER rejects — every failure is caught and logged,
+// so `await`ing this can't break a reply. Callers on a branch that returns
+// straight afterwards MUST await it: this runs on serverless, and a
+// floating promise fired immediately before `return` can be frozen before the
+// write lands, which would silently reintroduce the NULLs this exists to
+// eliminate.
+function recordClassification(supabase, messageId, payload) {
+  if (!messageId || !payload) return Promise.resolve();
+  return Promise.resolve(
+    supabase
+      .from("messages")
+      .update({ intent_classification: payload })
+      .eq("id", messageId)
+  )
+    .then(({ error }) => {
+      if (error) log.warn("[webhook] intent_classification write failed:", error.code);
+    })
+    .catch((err) =>
+      log.warn("[webhook] intent_classification write threw:", err?.message)
+    );
+}
+
+// Sentinel written when the classifier does not return a usable result.
+// `failed_open: true` records that we replied anyway despite having no
+// classification — the pipeline's existing behaviour, preserved as-is here and
+// merely made visible.
+function classificationSentinel(status, reason, failedOpen) {
+  return {
+    status,
+    reason,
+    failed_open: failedOpen,
+    at: new Date().toISOString(),
+  };
+}
+
+// ── Human takeover ──────────────────────────────────────────────────────
+// When a human types in a thread, the AI stops until a human explicitly
+// resumes it from the dashboard. There is no time-based auto-resume: a
+// surprise resume is the same bug with a delay.
+//
+// Guarded on `ai_paused = false`, which does the whole job in one statement:
+//   - unpaused thread  -> pauses it, stamps 'human_took_over'
+//   - already paused   -> matches 0 rows, so a stronger existing reason
+//                         (flagged_do_not_send, hostile_or_refund,
+//                         complex_objection, qualifying_loop_detected) is
+//                         never downgraded
+//   - already paused for human_took_over -> 0 rows, already correct
+//
+// Only ever called for source='manual'. NEVER call this for 'agent' or 'drip'
+// — those are the AI's own messages and pausing on them would disable the
+// product on the first reply.
+async function pauseForHumanTakeover(supabase, conversation_id) {
+  const { data, error } = await supabase
+    .from("conversations")
+    .update({ ai_paused: true, ai_pause_reason: "human_took_over" })
+    .eq("id", conversation_id)
+    .eq("ai_paused", false)
+    .select("id");
+  if (error) {
+    log.error("[webhook] human-takeover pause failed:", error.code);
+    return false;
+  }
+  if (data?.length) {
+    log.info("[webhook] AI paused — human took over conversation:", conversation_id);
+    return true;
+  }
+  return false;
 }
 
 // User-level gates fire before we look up/create a conversation. If a row
@@ -543,13 +652,28 @@ async function handleEchoEvent(event) {
 
     // role MUST be 'assistant': drip's 24h-window math and
     // detectQualifyingLoop both treat role='user' as "the lead spoke".
-    await insertMessageIfNew(supabase, {
+    // source='manual' is what marks this as HUMAN-typed rather than
+    // AI-generated — the two are indistinguishable by `role` alone.
+    const echoInsert = await insertMessageIfNew(supabase, {
       conversation_id: conversation.id,
       role: "assistant",
       content: messageText,
       provider_message_id: mid,
       source: "manual",
     });
+
+    // Human takeover. This is the path that matters: the coach types most
+    // replies in the native Instagram app, and Meta delivers those to us as
+    // echoes. Before this, a manual reply left ai_paused untouched and the AI
+    // would talk over the coach on the lead's next message — 17 hours later,
+    // in the 2026-08-10 incident.
+    //
+    // Only on a genuine insert. A duplicate means we already saw this mid, and
+    // the twin-stamp branch above returns before reaching here, so an
+    // API-sent reply echoing back can never trip this.
+    if (!echoInsert.duplicate && !echoInsert.error) {
+      await pauseForHumanTakeover(supabase, conversation.id);
+    }
   } catch (err) {
     console.error("Error processing echo event:", err?.message);
   }
@@ -800,7 +924,12 @@ async function processIncomingMessage({
   // 'off'     → complete silence: return without saving anything
   // 'handoff' → save inbound message for dashboard, but skip AI reply
   // 'active'  → full processing (may still be paused per-conversation)
-  if (user.ai_mode === "off") return;
+  if (user.ai_mode === "off") {
+    // Still records WHY. 'off' saves no message, but the conversation row is
+    // the only place a suppressed turn can leave a trace.
+    await markSkip(supabase, conversation.id, SKIP.AI_INACTIVE);
+    return;
+  }
 
   // Per-thread gates get the handoff treatment (save the inbound message,
   // skip the AI reply): ai_paused, and status='manual' — the "Human
@@ -814,27 +943,52 @@ async function processIncomingMessage({
     conversation.ai_paused ||
     conversation.status === "manual"
   ) {
-    await insertMessageIfNew(supabase, {
+    const gatedInsert = await insertMessageIfNew(supabase, {
       conversation_id: conversation.id,
       role: "user",
       content: messageText,
       provider_message_id: providerMessageId,
       source: "lead",
     });
+
+    // Name the specific gate rather than a generic "skipped". These three
+    // suppress for very different reasons and the dashboard needs to tell
+    // them apart.
+    const gateReason = conversation.ai_paused
+      ? SKIP.AI_PAUSED
+      : conversation.status === "manual"
+        ? SKIP.HUMAN_TAKEOVER
+        : SKIP.AI_INACTIVE;
+    await markSkip(supabase, conversation.id, gateReason);
+
+    // This gate returns before the classifier runs, which is why paused and
+    // manual threads had ~0% intent_classification coverage while active ones
+    // sat near 85% (see docs/audit-2026-08-15-reply-path.md Q7). Record a
+    // 'skipped' sentinel so the NULL no longer means "unknown".
+    await recordClassification(
+      supabase,
+      gatedInsert.data?.id,
+      classificationSentinel("skipped", `gated before classification: ${gateReason}`, false)
+    );
     return;
   }
 
   // Skip if no script configured
   const sc = user.script_config || {};
   if (!sc.greeting) {
-    await insertMessageIfNew(supabase, {
+    const noScriptInsert = await insertMessageIfNew(supabase, {
       conversation_id: conversation.id,
       role: "user",
       content: messageText,
       provider_message_id: providerMessageId,
       source: "lead",
     });
-    await markSkip(supabase, conversation.id, "no_greeting");
+    await markSkip(supabase, conversation.id, SKIP.NO_GREETING);
+    await recordClassification(
+      supabase,
+      noScriptInsert.data?.id,
+      classificationSentinel("skipped", "gated before classification: no_greeting", false)
+    );
     return;
   }
 
@@ -847,14 +1001,19 @@ async function processIncomingMessage({
       return;
     }
     if (newCount > dmLimit) {
-      await insertMessageIfNew(supabase, {
+      const cappedInsert = await insertMessageIfNew(supabase, {
         conversation_id: conversation.id,
         role: "user",
         content: messageText,
         provider_message_id: providerMessageId,
         source: "lead",
       });
-      await markSkip(supabase, conversation.id, "dm_limit");
+      await markSkip(supabase, conversation.id, SKIP.DM_LIMIT);
+      await recordClassification(
+        supabase,
+        cappedInsert.data?.id,
+        classificationSentinel("skipped", "gated before classification: dm_limit", false)
+      );
       return;
     }
   }
@@ -867,7 +1026,15 @@ async function processIncomingMessage({
     provider_message_id: providerMessageId,
     source: "lead",
   });
-  if (insertResult.duplicate) return;
+  if (insertResult.duplicate) {
+    await markSkip(supabase, conversation.id, SKIP.DUPLICATE_MESSAGE);
+    return;
+  }
+
+  // Id of the INBOUND lead row. Every classifier outcome below is written
+  // here, by id — the previous write keyed on the Meta mid, so any inbound
+  // without one persisted nothing at all.
+  const inboundMessageId = insertResult.data?.id || null;
 
   // Typing indicator: the lead sees "seen" then "typing…" while the models
   // run, instead of a silent gap followed by a full paragraph. Fires only
@@ -968,9 +1135,15 @@ async function processIncomingMessage({
   // order. Ascending+limit returned the OLDEST 20, so threads longer than 20
   // messages dropped the newest inbound from context (and violated
   // detectQualifyingLoop's contract that the latest inbound is included).
+  //
+  // `source` is selected alongside role/content and is NOT optional. role
+  // tells you which side of the thread a message is on; source is the only
+  // field that says whether a human or the AI produced it. Dropping it here is
+  // what let the model read the coach's own manual message as something the
+  // lead had said (see docs/audit-2026-08-15-reply-path.md, root cause).
   const { data: messagesDesc, error: msgError } = await supabase
     .from("messages")
-    .select("role, content")
+    .select("role, content, source")
     .eq("conversation_id", conversation.id)
     .order("created_at", { ascending: false })
     .limit(20);
@@ -979,6 +1152,12 @@ async function processIncomingMessage({
     // No reply will be sent this turn — clear the typing indicator.
     fireSenderAction(user, senderId, "typing_off");
     log.error("fetch messages failed:", msgError.code);
+    await markSkip(supabase, conversation.id, SKIP.HISTORY_FETCH_FAILED);
+    await recordClassification(
+      supabase,
+      inboundMessageId,
+      classificationSentinel("skipped", "history fetch failed before classification", false)
+    );
     return;
   }
 
@@ -1023,6 +1202,11 @@ async function processIncomingMessage({
   // classifier flags it as a complex/novel objection, pause the AI and mark
   // the conversation so the dashboard surfaces it. Fail-open on any error —
   // we prefer a pass-through reply over a blocked conversation.
+  //
+  // Outcome of this escalation check, folded into the intent_classification
+  // payload below. It does NOT own that column (classifyDMIntent does), so it
+  // is recorded as a sub-object rather than overwriting a real classification.
+  let escalationOutcome = null;
   if (sc.human_in_loop) {
     try {
       // Same 8s race as classifyDMIntent: the webhook waits at most 8s for
@@ -1033,6 +1217,11 @@ async function processIncomingMessage({
         8000,
         "classifyIncomingMessage"
       );
+      escalationOutcome = {
+        status: "ok",
+        needs_human: classification.needs_human === true,
+        reason: classification.reason || "",
+      };
       if (classification.needs_human) {
         // No reply will be sent this turn — clear the typing indicator.
         fireSenderAction(user, senderId, "typing_off");
@@ -1068,6 +1257,20 @@ async function processIncomingMessage({
         conversation.id,
         err?.message
       );
+      // Record the failure instead of losing it. withTimeout REJECTS on
+      // timeout (it does not resolve a sentinel), so a timeout and a genuine
+      // API error both land here and are told apart by the message shape.
+      // failed_open: true — we go on to reply anyway. That is the existing
+      // behaviour and is deliberately left unchanged; this only makes it
+      // visible after the fact.
+      const timedOut = /timed out after/i.test(err?.message || "");
+      escalationOutcome = {
+        status: timedOut ? "timeout" : "error",
+        reason: timedOut
+          ? "classifier exceeded 8000ms"
+          : err?.message || "classifyIncomingMessage failed",
+        failed_open: true,
+      };
     }
   }
 
@@ -1082,6 +1285,7 @@ async function processIncomingMessage({
   // 1) Classify. The critical call. If this throws, dmIntent stays null
   //    and voice routing short-circuits below.
   let dmIntent = null;
+  let dmIntentError = null;
   try {
     dmIntent = await classifyDMIntent({
       messageText,
@@ -1091,30 +1295,38 @@ async function processIncomingMessage({
     });
   } catch (err) {
     log.warn("[webhook] dm intent classifier failed, falling through:", err?.message);
+    dmIntentError = err;
   }
 
-  // 2) Persist. Best-effort write to messages.intent_classification.
-  //    A failure here (row not yet committed, provider_message_id absent)
-  //    does NOT block the PostHog capture below or downstream routing.
-  if (dmIntent && providerMessageId) {
-    try {
-      await supabase
-        .from("messages")
-        .update({
-          intent_classification: {
-            class: dmIntent.class,
-            confidence: dmIntent.confidence,
-            language: dmIntent.language,
-            reasoning: dmIntent.reasoning,
-            signals: dmIntent.signals,
-            version: DM_INTENT_VERSION,
-          },
-        })
-        .eq("conversation_id", conversation.id)
-        .eq("provider_message_id", providerMessageId);
-    } catch (err) {
-      log.warn("[webhook] failed to persist intent_classification:", err?.message);
-    }
+  // 2) Persist. Best-effort write to messages.intent_classification, on the
+  //    INBOUND lead row.
+  //
+  //    Unconditional now. It used to be `if (dmIntent && providerMessageId)`,
+  //    which left NULL on every classifier failure — and NULL is
+  //    indistinguishable from "the classifier never ran", so no reply decision
+  //    could be audited after the fact. A failure now writes a sentinel
+  //    recording that we replied anyway (failed_open), which is the existing
+  //    fail-open behaviour, unchanged.
+  {
+    const payload = dmIntent
+      ? {
+          class: dmIntent.class,
+          confidence: dmIntent.confidence,
+          language: dmIntent.language,
+          reasoning: dmIntent.reasoning,
+          signals: dmIntent.signals,
+          version: DM_INTENT_VERSION,
+          status: "ok",
+        }
+      : classificationSentinel(
+          /timed out after/i.test(dmIntentError?.message || "") ? "timeout" : "error",
+          dmIntentError?.message || "classifyDMIntent returned no result",
+          true
+        );
+    // The escalation check is a separate classifier that does not own this
+    // column — carried alongside so its timeouts are recorded too.
+    if (escalationOutcome) payload.escalation = escalationOutcome;
+    await recordClassification(supabase, inboundMessageId, payload);
   }
 
   // 2b) Promote the conversation label from the classified intent.
@@ -1243,6 +1455,9 @@ async function processIncomingMessage({
       .update({
         ai_paused: true,
         ai_pause_reason: pauseReason,
+        // Which gate suppressed THIS turn. Distinct axis from
+        // ai_pause_reason, which says why the thread is paused going forward.
+        last_skip_reason: SKIP.DO_NOT_SEND,
       })
       .eq("id", conversation.id);
     await logVoiceSend({
@@ -1443,6 +1658,7 @@ async function processIncomingMessage({
   } catch (err) {
     console.error("generateReply failed for conversation:", conversation.id, err.message);
     fireSenderAction(user, senderId, "typing_off");
+    await markSkip(supabase, conversation.id, SKIP.GENERATION_FAILED);
     getPostHogClient().capture({
       distinctId: user.email || user.id,
       event: "ai_reply_failed",
@@ -1499,6 +1715,10 @@ async function processIncomingMessage({
       canSend = false;
       fireSenderAction(user, senderId, "typing_off");
       console.warn("[webhook] outbound rate-limit hit for user:", user.id);
+      // Runs after the success path cleared last_skip_reason above, so this
+      // re-marks the turn as suppressed. The reply row stays in the DB for
+      // the owner to send by hand.
+      await markSkip(supabase, conversation.id, SKIP.RATE_LIMITED);
       getPostHogClient().capture({
         distinctId: user.email || user.id,
         event: "ai_reply_rate_limited",
@@ -1536,6 +1756,10 @@ async function processIncomingMessage({
     } catch (err) {
       console.error("sendInstagramMessage failed for conversation:", conversation.id, err.message);
       fireSenderAction(user, senderId, "typing_off");
+      // last_skip_reason was cleared optimistically before the send; the send
+      // failed, so restore a suppression marker rather than leaving NULL
+      // (which reads as "delivered fine").
+      await markSkip(supabase, conversation.id, SKIP.SEND_FAILED);
       getPostHogClient().capture({
         distinctId: user.email || user.id,
         event: "message_delivery_failed",
