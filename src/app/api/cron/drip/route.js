@@ -1,14 +1,13 @@
 import { NextResponse } from "next/server";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
+import { isAuthorizedCron } from "@/lib/cron-auth";
 import { sendEmail } from "@/lib/notifications";
 import { DRIP_SEQUENCE } from "@/lib/drip-emails";
 
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL || "https://clinchd.io";
 
 export async function GET(request) {
-  // Verify cron secret (same pattern as /api/cron/refresh-tokens)
-  const authHeader = request.headers.get("authorization");
-  if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+  if (!isAuthorizedCron(request)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 

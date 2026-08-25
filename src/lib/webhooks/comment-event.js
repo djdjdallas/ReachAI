@@ -309,6 +309,32 @@ async function processCommentEvent(entry, change) {
     return;
   }
 
+  // Reserve a Meta 200/hr outbound slot before sending — the DM/voice paths
+  // reserve-first, but comment DMs used to bypass the budget entirely: the
+  // exact repetitive-send pattern that previously earned a 30-day Meta
+  // restriction. RPC failure fails open (matches the other paths).
+  const { data: outboundAllowed, error: outboundErr } = await admin.rpc(
+    "check_and_record_outbound",
+    { uid: creatorId }
+  );
+  if (outboundErr) {
+    console.warn("[comment-event] outbound rate RPC failed:", outboundErr.message);
+  } else if (outboundAllowed === false) {
+    await logDecision(
+      admin,
+      {
+        ...logFields,
+        decided_action: "dm_rate_limited",
+        dispatched: false,
+        dispatch_error: "outbound_rate_limited",
+        dispatch_retryable: true,
+      },
+      { commentId }
+    );
+    console.warn("[comment-event] dispatch skipped — 200/hr outbound cap", { commentId });
+    return;
+  }
+
   const result = await sendPrivateReplyToComment(
     ownerUser.instagram_business_account_id,
     commentId,

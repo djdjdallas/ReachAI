@@ -203,41 +203,76 @@ export async function processDrip(dripRow) {
 
   // ── ALL 8 CONDITIONS PASSED — send the nudge ──────────────────────────
   try {
-    const decryptedToken = decryptToken(user.meta_page_access_token);
-    await sendInstagramMessage(
-      user.instagram_business_account_id,
-      dripRow.recipient_psid,
-      nudgeText,
-      decryptedToken
-    );
+    // Mark fired BEFORE sending, guarded on 'processing'. A run killed
+    // between send and a later fired-update used to leave the row for the
+    // 30-min reclaim, which re-sent the same nudge. Zero rows updated means
+    // the reclaim already handed this row to another run — do not send.
+    // Failing the safe way (marked fired, send below errors) reverts to
+    // 'skipped' in the catch.
+    const { data: fireMark, error: fireMarkErr } = await admin
+      .from("dm_drip_queue")
+      .update({ status: "fired", fired_at: new Date().toISOString() })
+      .eq("id", dripRow.id)
+      .eq("status", "processing")
+      .select("id");
+    if (fireMarkErr || !fireMark?.length) {
+      return { status: "skipped", reason: "lost_claim" };
+    }
 
-    // Save a visible row so the inbox shows the nudge. source='drip'
-    // distinguishes it from a regular AI reply ('agent').
-    await admin.from("messages").insert({
-      conversation_id: dripRow.conversation_id,
-      role: "assistant",
-      content: nudgeText,
-      source: "drip",
-    });
+    // Reserve the Meta 200/hr outbound slot BEFORE sending (webhook paths
+    // reserve-first; recording after the send could push a user over cap).
+    const { data: outboundAllowed, error: outboundErr } = await admin.rpc(
+      "check_and_record_outbound",
+      { uid: user.id }
+    );
+    if (outboundErr) {
+      console.warn("[drip/processor] outbound rate RPC failed:", outboundErr.message);
+    } else if (outboundAllowed === false) {
+      return markDripStatus(dripRow.id, "skipped", {
+        skipReason: "rate_limited",
+      });
+    }
+
+    // Save the visible row BEFORE sending so the echo webhook's twin-match
+    // finds it — a sub-second echo arriving before this insert used to be
+    // captured as a human takeover and permanently pause the AI on its own
+    // nudge. source='drip' distinguishes it from a regular AI reply.
+    const { data: nudgeRow } = await admin
+      .from("messages")
+      .insert({
+        conversation_id: dripRow.conversation_id,
+        role: "assistant",
+        content: nudgeText,
+        source: "drip",
+      })
+      .select("id")
+      .single();
+
+    const decryptedToken = decryptToken(user.meta_page_access_token);
+    try {
+      await sendInstagramMessage(
+        user.instagram_business_account_id,
+        dripRow.recipient_psid,
+        nudgeText,
+        decryptedToken
+      );
+    } catch (sendErr) {
+      // Undo the optimistic row so the inbox doesn't show an unsent nudge.
+      if (nudgeRow?.id) {
+        await admin.from("messages").delete().eq("id", nudgeRow.id);
+      }
+      throw sendErr;
+    }
 
     await admin
       .from("conversations")
       .update({ last_message_at: new Date().toISOString() })
       .eq("id", dripRow.conversation_id);
 
-    // Count toward Meta's 200/hr outbound DM cap.
-    await admin.rpc("check_and_record_outbound", { uid: user.id });
-
     // Increment the template's send_count (composed nudges have no template).
     if (template) {
       await admin.rpc("increment_drip_send_count", { template_id: template.id });
     }
-
-    // Mark fired.
-    await admin
-      .from("dm_drip_queue")
-      .update({ status: "fired", fired_at: new Date().toISOString() })
-      .eq("id", dripRow.id);
 
     const { getPostHogClient } = await import("@/lib/posthog-server");
     getPostHogClient().capture({

@@ -51,7 +51,13 @@ export async function POST(request) {
     // Subscription / trial / DM-cap gate — mirrors the webhook AI path at
     // src/app/api/webhooks/instagram/route.js:409-552 so manual dashboard
     // sends can't bypass the same enforcement inbound replies get.
-    if (!["active", "trialing"].includes(userProfile.subscription_status)) {
+    // past_due allowed: grace window while Stripe smart-retries the failed
+    // invoice — mirrors the webhook gate. Access ends at 'canceled'.
+    if (
+      !["active", "trialing", "past_due"].includes(
+        userProfile.subscription_status
+      )
+    ) {
       return NextResponse.json(
         { error: "subscription_inactive" },
         { status: 402 }
@@ -76,28 +82,6 @@ export async function POST(request) {
       }
     }
 
-    // Atomic DM cap — non-unlimited plans only. Reserved BEFORE generation so
-    // we don't burn LLM cycles when over cap. If the downstream send fails,
-    // we accept the count (same trade-off as the webhook path).
-    const dmLimit = userProfile.plan === "unlimited" ? Infinity : 1500;
-    if (dmLimit !== Infinity) {
-      const { data: newCount, error: rpcError } = await getSupabaseAdmin()
-        .rpc("increment_dm_count", { uid: user.id });
-      if (rpcError) {
-        console.error("[ai-reply] increment_dm_count failed:", rpcError.code);
-        return NextResponse.json(
-          { error: "dm_count_failed" },
-          { status: 500 }
-        );
-      }
-      if (newCount > dmLimit) {
-        return NextResponse.json(
-          { error: "dm_cap_reached" },
-          { status: 402 }
-        );
-      }
-    }
-
     // Fetch conversation
     const { data: conversation, error: convError } = await getSupabaseAdmin()
       .from("conversations")
@@ -111,6 +95,43 @@ export async function POST(request) {
         { error: "Conversation not found" },
         { status: 404 }
       );
+    }
+
+    // DM cap — meters CONVERSATIONS, not sends: a conversation counts once
+    // per calendar month (conversations.dm_counted_at), mirroring the
+    // webhook path. Reserved BEFORE generation so we don't burn LLM cycles
+    // when over cap.
+    const dmLimit = userProfile.plan === "unlimited" ? Infinity : 1500;
+    if (dmLimit !== Infinity) {
+      const capNow = new Date();
+      const countedAt = conversation.dm_counted_at
+        ? new Date(conversation.dm_counted_at)
+        : null;
+      const alreadyCountedThisMonth =
+        countedAt &&
+        countedAt.getMonth() === capNow.getMonth() &&
+        countedAt.getFullYear() === capNow.getFullYear();
+      if (!alreadyCountedThisMonth) {
+        const { data: newCount, error: rpcError } = await getSupabaseAdmin()
+          .rpc("increment_dm_count", { uid: user.id });
+        if (rpcError) {
+          console.error("[ai-reply] increment_dm_count failed:", rpcError.code);
+          return NextResponse.json(
+            { error: "dm_count_failed" },
+            { status: 500 }
+          );
+        }
+        if (newCount > dmLimit) {
+          return NextResponse.json(
+            { error: "dm_cap_reached" },
+            { status: 402 }
+          );
+        }
+        await getSupabaseAdmin()
+          .from("conversations")
+          .update({ dm_counted_at: capNow.toISOString() })
+          .eq("id", conversation.id);
+      }
     }
 
     // Verify we have a valid messaging channel

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
+import { isAuthorizedCron } from "@/lib/cron-auth";
 import { refreshLongLivedToken } from "@/lib/instagram";
 import { refreshAccessToken as refreshCalendlyToken } from "@/lib/calendly";
 import { refreshGoogleToken } from "@/lib/google-calendar";
@@ -34,8 +35,7 @@ const DAY_MS = 24 * HOUR_MS;
  * Secured by CRON_SECRET header.
  */
 export async function GET(request) {
-  const authHeader = request.headers.get("authorization");
-  if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+  if (!isAuthorizedCron(request)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 

@@ -3,6 +3,7 @@ import { getStripe, PLANS } from "@/lib/stripe";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import { getPostHogClient } from "@/lib/posthog-server";
 import { sendBusinessEventAlert } from "@/lib/alerts/business-events";
+import { sendEmail } from "@/lib/notifications";
 
 // Map a Stripe price ID to the plan key ("base" or "unlimited")
 function getPlanFromPriceId(priceId) {
@@ -144,13 +145,20 @@ export async function POST(request) {
         // Runs on trial → paid conversion and every subsequent renewal.
         // Make sure the user is `active` (Stripe may fire this before the
         // customer.subscription.updated event in trial-end flows).
+        //
+        // Guards: only subscription invoices, and never resurrect a canceled
+        // user — Stripe delivery is at-least-once and unordered, so a
+        // late-retried payment_succeeded (e.g. the final invoice) can arrive
+        // AFTER customer.subscription.deleted; without the .neq it flipped
+        // that user back to active permanently.
         const invoice = event.data.object;
         const customerId = invoice.customer;
-        if (customerId) {
+        if (customerId && invoice.subscription) {
           await supabase
             .from("users")
             .update({ subscription_status: "active" })
-            .eq("stripe_customer_id", customerId);
+            .eq("stripe_customer_id", customerId)
+            .neq("subscription_status", "canceled");
         }
         break;
       }
@@ -357,6 +365,29 @@ export async function POST(request) {
           .from("users")
           .update({ subscription_status: "past_due" })
           .eq("stripe_customer_id", customerId);
+
+        // Dunning: past_due used to be silent — the coach found out from
+        // lost leads. AI replies keep running through the grace window (the
+        // DM gate allows past_due), but the coach needs to fix the card
+        // before Stripe gives up and cancels.
+        const { data: pastDueUser } = await supabase
+          .from("users")
+          .select("email, full_name")
+          .eq("stripe_customer_id", customerId)
+          .maybeSingle();
+        if (pastDueUser?.email) {
+          const billingUrl = `${process.env.NEXT_PUBLIC_APP_URL}/billing`;
+          sendEmail({
+            to: pastDueUser.email,
+            subject: "Your Clinchd payment didn't go through",
+            html: `<p>Hi${pastDueUser.full_name ? ` ${pastDueUser.full_name}` : ""},</p>
+<p>Your latest Clinchd payment failed — usually an expired or declined card. Your AI agent is still replying to leads for now, and Stripe will retry the charge automatically over the next few days.</p>
+<p>To avoid any interruption, update your payment method here: <a href="${billingUrl}">${billingUrl}</a></p>
+<p>— Clinchd</p>`,
+          }).catch((err) =>
+            console.error("[stripe-webhook] dunning email failed:", err?.message)
+          );
+        }
         break;
       }
 

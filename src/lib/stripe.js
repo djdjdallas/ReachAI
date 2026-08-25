@@ -35,8 +35,12 @@ export async function createCheckoutSession(customerId, priceId, userId) {
     // Affiliate attribution: promoters get a per-promoter promotion code;
     // payouts are read off the code's customers in the Stripe dashboard.
     allow_promotion_codes: true,
+    // No trial_period_days here: the 7-day trial is granted once at signup by
+    // the DB trigger (008_trial_on_signup). Granting another at checkout
+    // stacked ~14 free days, delayed first revenue a week on every
+    // conversion, and let a cancel inside that week collect $0 while the DB
+    // already said active.
     subscription_data: {
-      trial_period_days: 7,
       metadata: { userId },
     },
     success_url: `${process.env.NEXT_PUBLIC_APP_URL}/dashboard`,
