@@ -549,12 +549,18 @@ async function handleEchoEvent(event) {
     let conversation;
     let conversationWasJustCreated = false;
 
-    const { data: conv } = await supabase
+    const { data: conv, error: echoConvLookupError } = await supabase
       .from("conversations")
       .select("id")
       .eq("user_id", user.id)
       .eq("instagram_sender_id", recipientId)
       .maybeSingle();
+    if (echoConvLookupError) {
+      // Never treat a failed lookup as "no conversation" — that path mints
+      // duplicate threads. Drop this echo instead.
+      log.error("[webhook] echo conversation lookup failed:", echoConvLookupError.code);
+      return;
+    }
     conversation = conv;
 
     if (!conversation) {
@@ -587,21 +593,37 @@ async function handleEchoEvent(event) {
         })
         .select()
         .single();
-      if (createError) {
+      if (createError?.code === "23505") {
+        // conversations_user_sender_unique: the inbound path (or another echo)
+        // created the row between our select and insert. Re-select and treat
+        // as an existing conversation.
+        const { data: raced, error: racedError } = await supabase
+          .from("conversations")
+          .select("id")
+          .eq("user_id", user.id)
+          .eq("instagram_sender_id", recipientId)
+          .maybeSingle();
+        if (racedError || !raced) {
+          log.error("[webhook] echo conversation race re-select failed:", racedError?.code);
+          return;
+        }
+        conversation = raced;
+      } else if (createError) {
         log.error("[webhook] echo create conversation failed:", createError.code);
         return;
+      } else {
+        getPostHogClient().capture({
+          distinctId: user.email || user.id,
+          event: "conversation_created",
+          properties: {
+            conversation_id: newConv.id,
+            sender_name: senderName,
+            via: "echo",
+          },
+        });
+        conversation = newConv;
+        conversationWasJustCreated = true;
       }
-      getPostHogClient().capture({
-        distinctId: user.email || user.id,
-        event: "conversation_created",
-        properties: {
-          conversation_id: newConv.id,
-          sender_name: senderName,
-          via: "echo",
-        },
-      });
-      conversation = newConv;
-      conversationWasJustCreated = true;
     }
 
     // Reconcile with a Native Send pre-log: if the coach ALSO pre-logged this
@@ -671,8 +693,25 @@ async function handleEchoEvent(event) {
     // Only on a genuine insert. A duplicate means we already saw this mid, and
     // the twin-stamp branch above returns before reaching here, so an
     // API-sent reply echoing back can never trip this.
+    //
+    // A manual echo is a takeover only if the lead has spoken. Outbound-first
+    // openers (including multi-message openers sent before any reply) are the
+    // Native Send motion — the coach opens, the AI answers the lead's reply.
+    // Pausing on the opener made every outbound-first thread born paused and
+    // the AI never engaged (regression in 6d536d8).
     if (!echoInsert.duplicate && !echoInsert.error) {
-      await pauseForHumanTakeover(supabase, conversation.id);
+      let leadHasSpoken = false;
+      if (!conversationWasJustCreated) {
+        const { count } = await supabase
+          .from("messages")
+          .select("id", { count: "exact", head: true })
+          .eq("conversation_id", conversation.id)
+          .eq("role", "user");
+        leadHasSpoken = (count || 0) > 0;
+      }
+      if (leadHasSpoken) {
+        await pauseForHumanTakeover(supabase, conversation.id);
+      }
     }
   } catch (err) {
     console.error("Error processing echo event:", err?.message);
@@ -856,12 +895,19 @@ async function processIncomingMessage({
   let conversation;
   let conversationWasJustCreated = false;
 
-  const { data: conv } = await supabase
+  const { data: conv, error: convLookupError } = await supabase
     .from("conversations")
     .select("*")
     .eq("user_id", user.id)
     .eq("instagram_sender_id", senderId)
     .maybeSingle();
+  if (convLookupError) {
+    // Abort rather than fall through to insert: treating a failed lookup as
+    // "no conversation" is what turned transient errors into duplicate
+    // threads that re-greeted the lead on every message.
+    log.error("[webhook] conversation lookup failed:", convLookupError.code);
+    return;
+  }
   conversation = conv;
 
   if (!conversation) {
@@ -886,17 +932,33 @@ async function processIncomingMessage({
       .select()
       .single();
 
-    if (createError) {
+    if (createError?.code === "23505") {
+      // conversations_user_sender_unique: a concurrent invocation (double-text
+      // or racing echo) created the row between our select and insert.
+      // Re-select and continue on the winner's row.
+      const { data: raced, error: racedError } = await supabase
+        .from("conversations")
+        .select("*")
+        .eq("user_id", user.id)
+        .eq("instagram_sender_id", senderId)
+        .maybeSingle();
+      if (racedError || !raced) {
+        log.error("[webhook] conversation race re-select failed:", racedError?.code);
+        return;
+      }
+      conversation = raced;
+    } else if (createError) {
       log.error("[webhook] create conversation failed:", createError.code);
       return;
+    } else {
+      getPostHogClient().capture({
+        distinctId: user.email || user.id,
+        event: "conversation_created",
+        properties: { conversation_id: newConv.id, sender_name: senderName },
+      });
+      conversation = newConv;
+      conversationWasJustCreated = true;
     }
-    getPostHogClient().capture({
-      distinctId: user.email || user.id,
-      event: "conversation_created",
-      properties: { conversation_id: newConv.id, sender_name: senderName },
-    });
-    conversation = newConv;
-    conversationWasJustCreated = true;
   }
 
   // Native Send context bridge — runs once, on conversation creation. Sets

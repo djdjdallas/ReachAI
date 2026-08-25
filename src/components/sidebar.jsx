@@ -20,6 +20,7 @@ import {
   Mic,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
+import { signOutAndClearState } from "@/lib/sign-out";
 import { Button } from "@/components/ui/button";
 import {
   Sheet,
@@ -224,8 +225,7 @@ export default function Sidebar() {
   }, []);
 
   const handleSignOut = async () => {
-    const supabase = createClient();
-    await supabase.auth.signOut();
+    await signOutAndClearState();
     window.location.href = "/login";
   };
 

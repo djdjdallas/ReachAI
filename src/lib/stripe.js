@@ -32,6 +32,9 @@ export async function createCheckoutSession(customerId, priceId, userId) {
     payment_method_types: ["card"],
     line_items: [{ price: priceId, quantity: 1 }],
     mode: "subscription",
+    // Affiliate attribution: promoters get a per-promoter promotion code;
+    // payouts are read off the code's customers in the Stripe dashboard.
+    allow_promotion_codes: true,
     subscription_data: {
       trial_period_days: 7,
       metadata: { userId },
