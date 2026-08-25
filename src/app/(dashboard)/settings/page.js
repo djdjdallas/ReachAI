@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { signOutAndClearState } from "@/lib/sign-out";
 import posthog from "posthog-js";
 import {
   Loader2,
@@ -232,7 +233,7 @@ export default function SettingsPage() {
       }
       posthog.capture("account_deleted");
       posthog.reset();
-      await supabase.auth.signOut();
+      await signOutAndClearState();
       window.location.href = "/login?deleted=true";
     } catch (err) {
       setDeleteError("An unexpected error occurred. Please try again.");

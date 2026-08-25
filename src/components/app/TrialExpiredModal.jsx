@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { Lock, ArrowRight, Loader2 } from "lucide-react";
 import posthog from "posthog-js";
-import { createClient } from "@/lib/supabase/client";
+import { signOutAndClearState } from "@/lib/sign-out";
 import {
   Dialog,
   DialogContent,
@@ -45,8 +45,7 @@ export default function TrialExpiredModal() {
   };
 
   const handleSignOut = async () => {
-    const supabase = createClient();
-    await supabase.auth.signOut();
+    await signOutAndClearState();
     window.location.href = "/login";
   };
 
