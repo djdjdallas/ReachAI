@@ -1,7 +1,13 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
-import { createCheckoutSession, createCustomer, PLANS } from "@/lib/stripe";
+import {
+  createCheckoutSession,
+  createCustomer,
+  createCustomerPortalSession,
+  getStripe,
+  PLANS,
+} from "@/lib/stripe";
 
 export async function POST(request) {
   try {
@@ -58,6 +64,25 @@ export async function POST(request) {
         .from("users")
         .update({ stripe_customer_id: customerId })
         .eq("id", user.id);
+    }
+
+    // Never start a second subscription: an active customer clicking
+    // Subscribe/Upgrade used to get a brand-new concurrent subscription
+    // (double-billed, plus webhook last-event-wins flapping the plan column).
+    // Stripe is the source of truth here — DB status can lag webhook delivery.
+    const existing = await getStripe().subscriptions.list({
+      customer: customerId,
+      status: "all",
+      limit: 10,
+    });
+    const hasLiveSubscription = existing.data.some(
+      (s) => !["canceled", "incomplete_expired"].includes(s.status)
+    );
+    if (hasLiveSubscription) {
+      // Same response shape the client already handles: send them to the
+      // billing portal, where plan changes modify the existing subscription.
+      const portal = await createCustomerPortalSession(customerId);
+      return NextResponse.json({ url: portal.url }, { status: 200 });
     }
 
     // Create checkout session
