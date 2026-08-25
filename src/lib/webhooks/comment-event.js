@@ -72,7 +72,7 @@ async function processCommentEvent(entry, change) {
   const { data: ownerUser, error: ownerErr } = await admin
     .from("users")
     .select(
-      "id, email, plan, meta_page_access_token, instagram_business_account_id, comment_public_reply_enabled"
+      "id, email, plan, subscription_status, meta_page_access_token, instagram_business_account_id, comment_public_reply_enabled"
     )
     .eq("instagram_business_account_id", igbaId)
     .maybeSingle();
@@ -89,7 +89,13 @@ async function processCommentEvent(entry, change) {
 
   // 4. Gate: skip classifier spend on coaches whose plan doesn't include
   // the feature. Founder bypass kept so Dom can dogfood on his account.
-  if (!canUseCommentToDM({ plan: ownerUser.plan, email: ownerUser.email })) {
+  if (
+    !canUseCommentToDM({
+      plan: ownerUser.plan,
+      email: ownerUser.email,
+      subscription_status: ownerUser.subscription_status,
+    })
+  ) {
     console.log("[comment-event] gate denied — skipping", { commentId, creatorId });
     return;
   }

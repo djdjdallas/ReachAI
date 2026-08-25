@@ -290,6 +290,10 @@ export async function POST(request) {
           .from("users")
           .update({
             subscription_status: "canceled",
+            // Reset the plan tier too: gates that key on plan alone (e.g.
+            // comment-to-DM) otherwise keep running for canceled Unlimited
+            // users forever — classifier spend + DM dispatch, free.
+            plan: "base",
             ai_mode: "off",
             voice_replies_enabled: false,
             drip_enabled: false,
