@@ -858,7 +858,11 @@ async function processIncomingMessage({
     return;
   }
 
-  if (!["active", "trialing"].includes(user.subscription_status)) {
+  // past_due gets a grace window: it means one invoice failed and Stripe's
+  // smart retries are still running (often a transient card decline). Cutting
+  // replies here silently ghosted a paying coach's leads for days. Access
+  // truly ends at customer.subscription.deleted → status 'canceled'.
+  if (!["active", "trialing", "past_due"].includes(user.subscription_status)) {
     await markSkipForSender(supabase, user.id, senderId, "subscription_inactive");
     return;
   }
@@ -1054,33 +1058,9 @@ async function processIncomingMessage({
     return;
   }
 
-  // Atomic DM limit check — increment first, then verify
-  const dmLimit = user.plan === "unlimited" ? Infinity : 1500;
-  if (dmLimit !== Infinity) {
-    const { data: newCount, error: rpcError } = await supabase.rpc("increment_dm_count", { uid: user.id });
-    if (rpcError) {
-      log.error("increment_dm_count failed:", rpcError.code);
-      return;
-    }
-    if (newCount > dmLimit) {
-      const cappedInsert = await insertMessageIfNew(supabase, {
-        conversation_id: conversation.id,
-        role: "user",
-        content: messageText,
-        provider_message_id: providerMessageId,
-        source: "lead",
-      });
-      await markSkip(supabase, conversation.id, SKIP.DM_LIMIT);
-      await recordClassification(
-        supabase,
-        cappedInsert.data?.id,
-        classificationSentinel("skipped", "gated before classification: dm_limit", false)
-      );
-      return;
-    }
-  }
-
-  // Save incoming message (with deduplication)
+  // Save incoming message (with deduplication) BEFORE any metering, so a
+  // Meta redelivery can neither burn quota nor overwrite last_skip_reason on
+  // a turn that was actually delivered.
   const insertResult = await insertMessageIfNew(supabase, {
     conversation_id: conversation.id,
     role: "user",
@@ -1089,8 +1069,43 @@ async function processIncomingMessage({
     source: "lead",
   });
   if (insertResult.duplicate) {
-    await markSkip(supabase, conversation.id, SKIP.DUPLICATE_MESSAGE);
     return;
+  }
+
+  // DM cap — meters CONVERSATIONS, not messages. The plan sells "1,500
+  // qualified conversations per month"; incrementing per message burned a
+  // normal 20-message thread's worth of slots on one real conversation. A
+  // conversation counts once per calendar month (conversations.dm_counted_at).
+  const dmLimit = user.plan === "unlimited" ? Infinity : 1500;
+  if (dmLimit !== Infinity) {
+    const countedAt = conversation.dm_counted_at
+      ? new Date(conversation.dm_counted_at)
+      : null;
+    const alreadyCountedThisMonth =
+      countedAt &&
+      countedAt.getMonth() === now.getMonth() &&
+      countedAt.getFullYear() === now.getFullYear();
+    if (!alreadyCountedThisMonth) {
+      const { data: newCount, error: rpcError } = await supabase.rpc("increment_dm_count", { uid: user.id });
+      if (rpcError) {
+        log.error("increment_dm_count failed:", rpcError.code);
+        return;
+      }
+      if (newCount > dmLimit) {
+        await markSkip(supabase, conversation.id, SKIP.DM_LIMIT);
+        await recordClassification(
+          supabase,
+          insertResult.data?.id,
+          classificationSentinel("skipped", "gated before classification: dm_limit", false)
+        );
+        return;
+      }
+      await supabase
+        .from("conversations")
+        .update({ dm_counted_at: now.toISOString() })
+        .eq("id", conversation.id);
+      conversation.dm_counted_at = now.toISOString();
+    }
   }
 
   // Id of the INBOUND lead row. Every classifier outcome below is written
