@@ -656,15 +656,20 @@ function OnboardingPage() {
   };
 
   // Step 5 — finalize onboarding and route to dashboard. ai_mode is read from
-  // the in-page toggle: ON → active, OFF → handoff (safer default).
-  const handleFinalizeAndGo = async () => {
+  // the in-page toggle: ON → active, OFF → handoff (safer default). Pass
+  // { activate: true } to arm the AI regardless of the toggle (the "Go Live
+  // Now" CTA). Every dashboard-bound exit from step 5 MUST go through here —
+  // a bare router.push("/dashboard") leaves onboarding_completed false and
+  // middleware bounces the user straight back to step 2.
+  const handleFinalizeAndGo = async ({ activate } = {}) => {
+    const goLive = activate === undefined ? aiActive : activate;
     setAiError(null);
     setActivating(true);
     try {
       const { error: dbErr } = await supabase
         .from("users")
         .update({
-          ai_mode: aiActive ? "active" : "handoff",
+          ai_mode: goLive ? "active" : "handoff",
           onboarding_completed: true,
         })
         .eq("id", user.id);
@@ -673,7 +678,7 @@ function OnboardingPage() {
       document.cookie =
         "onboarding_completed=true; path=/; max-age=31536000; samesite=lax";
 
-      if (aiActive) posthog.capture("ai_agent_activated");
+      if (goLive) posthog.capture("ai_agent_activated");
       router.push("/dashboard");
     } catch (err) {
       console.error("Error finalizing onboarding:", err);
@@ -851,8 +856,13 @@ function OnboardingPage() {
           scriptReady={scriptReady}
           instagramConnected={instagramConnected}
           onGoLive={handleGoLive}
-          onGoToDashboard={() => router.push("/dashboard")}
-          onFinalize={handleFinalizeAndGo}
+          // "Go Live Now" (toggle off, script ready) arms the AI; "Go to
+          // Dashboard" (toggle on) keeps it armed. Either way onboarding is
+          // persisted as complete before navigating.
+          onGoToDashboard={() =>
+            handleFinalizeAndGo({ activate: aiActive || scriptReady })
+          }
+          onFinalize={() => handleFinalizeAndGo()}
           onBack={() => setStep(4)}
         />
       )}
