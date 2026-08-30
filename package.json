@@ -6,7 +6,8 @@
     "dev": "NODE_OPTIONS='--max-http-header-size=32768' next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "test": "vitest run"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.39.0",
@@ -37,6 +38,7 @@
     "@tailwindcss/postcss": "^4",
     "eslint": "^9",
     "eslint-config-next": "16.1.6",
-    "tailwindcss": "^4"
+    "tailwindcss": "^4",
+    "vitest": "^3.2.7"
   }
 }

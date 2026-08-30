@@ -60,6 +60,8 @@ export async function POST() {
         meta_page_access_token: null,
         meta_user_access_token: null,
         meta_token_expires_at: null,
+        meta_reconnect_required: false,
+        meta_reconnect_notified_at: null,
       })
       .eq("id", user.id);
 

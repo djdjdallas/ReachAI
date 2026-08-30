@@ -9,6 +9,7 @@ import {
   getParticipantProfile,
 } from "@/lib/instagram";
 import { decryptToken } from "@/lib/token-utils";
+import { isMetaTokenRevoked, flagMetaReconnect } from "@/lib/tokens/reconnect";
 import { sendHotLeadAlert, sendBookingAlert } from "@/lib/notifications";
 import { sendHandoffEmail } from "@/lib/alerts/handoff-email";
 import { getPostHogClient } from "@/lib/posthog-server";
@@ -150,7 +151,7 @@ async function handleMetaWebhook(body, rawBody, request) {
         const { data: ownerUser, error: ownerLookupError } =
           await supabaseForName
             .from("users")
-            .select("meta_page_access_token")
+            .select("id, meta_page_access_token, meta_reconnect_required")
             .eq("instagram_business_account_id", igAccountId)
             .maybeSingle();
         if (ownerLookupError) {
@@ -161,11 +162,26 @@ async function handleMetaWebhook(body, rawBody, request) {
 
         let senderName = null;
         let senderUsername = null;
-        if (ownerUser?.meta_page_access_token) {
-          const pageToken = decryptToken(ownerUser.meta_page_access_token);
-          const profile = await getParticipantProfile(senderId, pageToken);
-          senderName = profile?.name || profile?.username || null;
-          senderUsername = profile?.username || null;
+        // Skip the lookup entirely on a known-dead token: it would fail the
+        // same way on every inbound DM. processIncomingMessage still saves
+        // the message and records the skip.
+        if (ownerUser?.meta_page_access_token && !ownerUser.meta_reconnect_required) {
+          try {
+            const pageToken = decryptToken(ownerUser.meta_page_access_token);
+            const profile = await getParticipantProfile(senderId, pageToken);
+            senderName = profile?.name || profile?.username || null;
+            senderUsername = profile?.username || null;
+          } catch (profileErr) {
+            // getParticipantProfile only throws on OAuth code 190. Flag the
+            // account only on the strict dead-token rule (first failure emails
+            // the coach) and carry on nameless either way so the inbound
+            // message is still persisted below.
+            if (isMetaTokenRevoked(profileErr)) {
+              await flagMetaReconnect(supabaseForName, ownerUser.id, profileErr, "webhook:profile");
+            } else {
+              log.warn("[webhook] profile lookup failed:", profileErr?.message);
+            }
+          }
         }
 
         await processIncomingMessage({
@@ -236,6 +252,7 @@ const SKIP = {
   HISTORY_FETCH_FAILED: "history_fetch_failed",
   GENERATION_FAILED: "generation_failed",
   SEND_FAILED: "send_failed",
+  RECONNECT_REQUIRED: "reconnect_required",
 };
 
 // Mark a conversation's `last_skip_reason` so the dashboard can explain why
@@ -573,7 +590,11 @@ async function handleEchoEvent(event) {
           const profile = await getParticipantProfile(recipientId, pageToken);
           senderName = profile?.name || profile?.username || null;
         } catch (err) {
-          log.warn("[webhook] echo profile lookup failed:", err?.message);
+          if (isMetaTokenRevoked(err)) {
+            await flagMetaReconnect(supabase, user.id, err, "webhook:echo-profile");
+          } else {
+            log.warn("[webhook] echo profile lookup failed:", err?.message);
+          }
         }
       }
 
@@ -994,6 +1015,26 @@ async function processIncomingMessage({
     // Still records WHY. 'off' saves no message, but the conversation row is
     // the only place a suppressed turn can leave a trace.
     await markSkip(supabase, conversation.id, SKIP.AI_INACTIVE);
+    return;
+  }
+
+  // ── Dead-token gate ─────────────────────────────────────────────────
+  // The coach's Instagram connection needs a reconnect (set by the refresh
+  // cron or by a live Graph failure above). Runs after the ai_mode 'off'
+  // gate so 'off' keeps its complete-silence contract. Every Meta call below
+  // would be rejected, so save the inbound message for the dashboard, record why the
+  // reply was skipped, and stop before spending typing indicators, a model
+  // call, and a doomed send on it.
+  if (user.meta_reconnect_required) {
+    await insertMessageIfNew(supabase, {
+      conversation_id: conversation.id,
+      role: "user",
+      content: messageText,
+      provider_message_id: providerMessageId,
+      source: "lead",
+    });
+    await markSkip(supabase, conversation.id, SKIP.RECONNECT_REQUIRED);
+    log.warn(`[webhook] skip reconnect_required user=${user.id} conversation=${conversation.id}`);
     return;
   }
 
@@ -1837,6 +1878,14 @@ async function processIncomingMessage({
       // failed, so restore a suppression marker rather than leaving NULL
       // (which reads as "delivered fine").
       await markSkip(supabase, conversation.id, SKIP.SEND_FAILED);
+      // A dead token (OAuth 190 + dead-session subcode/message) is not a
+      // transient send failure: flag the account so the coach is told to
+      // reconnect and later inbound DMs short-circuit at the dead-token gate.
+      // Strict rule on purpose — a 551 (lead blocked the coach) or a 10
+      // (outside the 24h window) is also an OAuthException and must NOT flag.
+      if (isMetaTokenRevoked(err)) {
+        await flagMetaReconnect(supabase, user.id, err, "webhook:send");
+      }
       getPostHogClient().capture({
         distinctId: user.email || user.id,
         event: "message_delivery_failed",
