@@ -206,6 +206,14 @@ export async function GET(request) {
         meta_page_access_token: encryptToken(accessToken),
         meta_user_access_token: encryptToken(accessToken),
         meta_token_expires_at: expiresAt,
+        // A fresh connect supersedes any earlier dead-token flag. Without
+        // this the refresh cron (which selects on the flag being false)
+        // never touches the new token and the "reconnect needed" badge
+        // stays lit after the coach has already reconnected.
+        // meta_token_refreshed_at is left alone on purpose: the cron does not
+        // select on it, and it is the only record of a past successful refresh.
+        meta_reconnect_required: false,
+        meta_reconnect_notified_at: null,
       })
       .eq("id", user.id);
 

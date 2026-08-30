@@ -111,6 +111,34 @@ export async function exchangeCodeForToken(code) {
 }
 
 /**
+ * Builds an Error from a Graph API error payload, carrying Meta's structured
+ * fields (type / code / error_subcode) so callers can tell a definitively dead
+ * token (OAuthException, code 190) from a transient failure without parsing
+ * the message text. Every Graph call in this module throws through here.
+ */
+export function metaApiError(prefix, error) {
+  const err = new Error(`${prefix}: ${error?.message || "unknown error"}`);
+  err.metaCode = error?.code;
+  err.metaType = error?.type;
+  err.metaSubcode = error?.error_subcode;
+  err.fbtraceId = error?.fbtrace_id;
+  return err;
+}
+
+/**
+ * True when a Graph error payload / metaApiError carries OAuth code 190 — the
+ * only code under which a token can be dead. Coarse on purpose: this decides
+ * whether getParticipantProfile rethrows; the caller applies the strict
+ * isMetaTokenRevoked (subcode / message) rule before flagging anything.
+ * Type "OAuthException" alone is NOT enough — Meta uses it for rate limits,
+ * 24h-window and recipient-unavailable errors too.
+ */
+export function isMetaTokenDead(errOrPayload) {
+  if (!errOrPayload) return false;
+  return Number(errOrPayload.metaCode ?? errOrPayload.code) === 190;
+}
+
+/**
  * Refreshes a long-lived Instagram user access token before it expires.
  */
 export async function refreshLongLivedToken(currentToken) {
@@ -127,11 +155,7 @@ export async function refreshLongLivedToken(currentToken) {
     // dead token (OAuthException / code 190 — user revoked, switched to a
     // personal account, or the 60-day token lapsed) from a transient hiccup
     // (5xx, rate limit) that should simply be retried on the next cron tick.
-    const err = new Error(`Instagram token refresh failed: ${data.error.message}`);
-    err.metaCode = data.error.code;
-    err.metaType = data.error.type;
-    err.metaSubcode = data.error.error_subcode;
-    throw err;
+    throw metaApiError("Instagram token refresh failed", data.error);
   }
 
   return {
@@ -213,7 +237,7 @@ export async function sendInstagramMessage(igAccountId, recipientId, text, pageA
 
   if (data.error) {
     console.error("Instagram send message error:", data.error);
-    throw new Error(`Failed to send Instagram message: ${data.error.message}`);
+    throw metaApiError("Failed to send Instagram message", data.error);
   }
 
   return data;
@@ -248,7 +272,7 @@ export async function sendSenderAction(igAccountId, recipientId, action, pageAcc
   const data = await res.json();
 
   if (data.error) {
-    throw new Error(`Failed to send sender action ${action}: ${data.error.message}`);
+    throw metaApiError(`Failed to send sender action ${action}`, data.error);
   }
 
   return data;
@@ -440,17 +464,26 @@ export function verifyWebhookSignature(rawBody, signatureHeader) {
  * Fetches a participant's profile (name, profile pic) for display in the dashboard.
  */
 export async function getParticipantProfile(userId, accessToken) {
+  // Best-effort: any ordinary failure returns null and the caller carries on
+  // without a name. A dead token (OAuthException / 190) is the one failure
+  // that must NOT be swallowed here — it is the earliest signal on the inbound
+  // path that the coach's connection needs a reconnect, so it is rethrown
+  // with Meta's structured fields for the caller to flag.
+  let data;
   try {
     const url = `https://graph.instagram.com/${GRAPH_API_VERSION}/${userId}?fields=name,username,profile_pic&access_token=${accessToken}`;
     const res = await fetch(url);
-    const data = await res.json();
-    if (data.error) {
-      console.error("Failed to fetch participant profile:", data.error.message);
-      return null;
-    }
-    return data;
+    data = await res.json();
   } catch (err) {
     console.error("getParticipantProfile error:", err.message);
     return null;
   }
+  if (data.error) {
+    console.error("Failed to fetch participant profile:", data.error.message);
+    if (isMetaTokenDead(data.error)) {
+      throw metaApiError("Failed to fetch participant profile", data.error);
+    }
+    return null;
+  }
+  return data;
 }

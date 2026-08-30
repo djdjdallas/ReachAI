@@ -10,6 +10,8 @@ import {
   META_REFRESH_WINDOW_DAYS,
   MIN_TOKEN_AGE_HOURS,
   OAUTH_REFRESH_WINDOW_HOURS,
+  classifyMetaAuthFailure,
+  describeMetaAuthFailure,
   isMetaAuthError,
   isRefreshTokenDead,
   providerMeta,
@@ -43,7 +45,7 @@ export async function GET(request) {
   const nowMs = Date.now();
   const nowIso = new Date(nowMs).toISOString();
 
-  // Accounts flagged for reconnect this run: { userId, provider, reason }.
+  // Accounts flagged for reconnect this run: { userId, provider, reason, cause }.
   const reconnectEntries = [];
 
   const meta = await refreshMeta(supabase, nowMs, reconnectEntries);
@@ -60,7 +62,7 @@ export async function GET(request) {
     const opsEntries = [];
     for (const entry of reconnectEntries) {
       const identity = idMap[entry.userId];
-      const sent = await sendCoachReconnectEmail(identity, entry.provider);
+      const sent = await sendCoachReconnectEmail(identity, entry.provider, entry.cause);
       if (sent) {
         notified++;
         await supabase
@@ -150,7 +152,12 @@ async function refreshMeta(supabase, nowMs, reconnectEntries) {
           .from("users")
           .update({ meta_reconnect_required: true })
           .eq("id", u.id);
-        reconnectEntries.push({ userId: u.id, provider: "meta", reason: err.message });
+        reconnectEntries.push({
+          userId: u.id,
+          provider: "meta",
+          reason: describeMetaAuthFailure(err),
+          cause: classifyMetaAuthFailure(err),
+        });
         stats.needs_reconnect++;
       } else {
         stats.transient++;
