@@ -14,8 +14,10 @@
 //   INSTAGRAM_APP_SECRET         (informational only)
 //
 // Usage:
-//   node scripts/resubscribe-instagram-webhooks.mjs            # live
-//   node scripts/resubscribe-instagram-webhooks.mjs --dry-run  # prints actions, no API calls
+//   node scripts/resubscribe-instagram-webhooks.mjs                    # live, all accounts
+//   node scripts/resubscribe-instagram-webhooks.mjs --dry-run          # prints actions, no API calls
+//   node scripts/resubscribe-instagram-webhooks.mjs --igba=17841400000000000
+//       # live, ONLY the account with that Instagram Business Account ID
 //
 // Notes:
 //  - This script decrypts `meta_page_access_token` the same way the runtime
@@ -32,11 +34,14 @@ import crypto from "node:crypto";
 // that module is the source of truth; keep this string in sync. Mirrored
 // (not imported) because this standalone node script runs outside the
 // app's module resolution and the package is CommonJS.
-const SUBSCRIBED_FIELDS = "messages,messaging_postbacks,comments,message_echoes";
+// `message_echoes` is deliberately absent: echoes arrive under `messages`
+// with is_echo, and Meta 400s the whole POST on unknown fields (2026-09-07).
+const SUBSCRIBED_FIELDS = "messages,messaging_postbacks,comments";
 const GRAPH_BASE = "https://graph.instagram.com/v21.0";
 
 const args = new Set(process.argv.slice(2));
 const DRY_RUN = args.has("--dry-run");
+const ONLY_IGBA = [...args].find((a) => a.startsWith("--igba="))?.slice(7) || null;
 
 function requireEnv(name) {
   const v = process.env[name];
@@ -96,10 +101,12 @@ async function main() {
     auth: { autoRefreshToken: false, persistSession: false },
   });
 
-  const { data: rows, error } = await supabase
+  let query = supabase
     .from("users")
     .select("id, email, instagram_business_account_id, meta_page_access_token")
     .not("instagram_business_account_id", "is", null);
+  if (ONLY_IGBA) query = query.eq("instagram_business_account_id", ONLY_IGBA);
+  const { data: rows, error } = await query;
 
   if (error) {
     console.error("Failed to query users:", error.message);

@@ -373,25 +373,41 @@ function redirectClearingAuthCookies(url) {
 
 // POST subscribed_apps with the canonical field list. Logs non-OK responses
 // but never throws — the caller verifies the outcome with a read-back.
+//
+// Meta validates subscribed_fields atomically: one field it doesn't recognize
+// 400s the WHOLE request and the account ends up subscribed to nothing (this
+// silently broke every new connect when `message_echoes` left the enum,
+// 2026-09-07). When the 400 names the rejected field — the error reads
+// `... - got "field_name"` — drop that field and retry, so a future enum
+// change degrades to a partial subscription instead of an empty one.
 async function subscribeWebhookFields(igbaId, accessToken) {
-  const res = await fetch(
-    `https://graph.instagram.com/v21.0/${igbaId}/subscribed_apps`,
-    {
-      method: "POST",
-      headers: { "Content-Type": "application/x-www-form-urlencoded" },
-      body: new URLSearchParams({
-        subscribed_fields: REQUIRED_WEBHOOK_FIELDS.join(","),
-        access_token: accessToken,
-      }),
-    }
-  );
-  const data = await res.json().catch(() => ({}));
-  if (!res.ok || data?.error) {
+  let fields = [...REQUIRED_WEBHOOK_FIELDS];
+  while (fields.length > 0) {
+    const res = await fetch(
+      `https://graph.instagram.com/v21.0/${igbaId}/subscribed_apps`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: new URLSearchParams({
+          subscribed_fields: fields.join(","),
+          access_token: accessToken,
+        }),
+      }
+    );
+    const data = await res.json().catch(() => ({}));
+    if (res.ok && !data?.error) return;
+
     console.error(
       "[ig-callback] subscribed_apps POST failed:",
       res.status,
       data?.error?.message
     );
+    const rejected = data?.error?.message?.match(/got "([a-z_]+)"/i)?.[1];
+    if (!rejected || !fields.includes(rejected)) return; // not a field rejection — give up, read-back verifies
+    console.error(
+      `[ig-callback] Meta rejected webhook field "${rejected}" — retrying without it (igba=${igbaId})`
+    );
+    fields = fields.filter((f) => f !== rejected);
   }
 }
 
