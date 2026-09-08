@@ -127,16 +127,20 @@ function compose(event, p) {
 /**
  * @param {"signup"|"instagram_connected"|"subscription_started"|"subscription_canceled"} event
  * @param {object} payload - event-specific fields, see compose()
+ * @returns {Promise<boolean>} true when the founder EMAIL was accepted by
+ *   Resend. Still never throws; the boolean lets a caller with a retryable
+ *   claim (the signup alert) release it on failure. SMS outcome does not
+ *   affect the return value.
  */
 export async function sendBusinessEventAlert(event, payload = {}) {
   try {
     const composed = compose(event, payload);
     if (!composed) {
       console.error("[business-alert] unknown event:", event);
-      return;
+      return false;
     }
 
-    await sendEmail({
+    const emailRes = await sendEmail({
       to: FOUNDER_EMAIL,
       subject: composed.subject,
       html: `<pre>${escapeHtml(composed.body)}</pre>`,
@@ -145,7 +149,9 @@ export async function sendBusinessEventAlert(event, payload = {}) {
     if (FOUNDER_PHONE && SMS_EVENTS.has(event)) {
       await sendSms({ to: FOUNDER_PHONE, body: composed.subject });
     }
+    return !!emailRes?.success;
   } catch (err) {
     console.error("[business-alert] send failed:", event, err?.message);
+    return false;
   }
 }
