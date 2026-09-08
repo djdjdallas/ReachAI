@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { NextResponse, after } from "next/server";
 import { getStripe, PLANS } from "@/lib/stripe";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import { getPostHogClient } from "@/lib/posthog-server";
@@ -103,28 +103,35 @@ export async function POST(request) {
             properties: { plan },
           });
 
-          // Founder alert: new paid subscriber. Fire-and-forget — a Resend
-          // outage must be invisible to webhook processing.
-          sendBusinessEventAlert("subscription_started", {
-            email: currentUser?.email || null,
-            plan,
-            amountTotal:
-              typeof session.amount_total === "number"
-                ? session.amount_total
-                : null,
-            stripeCustomerId: session.customer,
-          }).catch(console.error);
+          // Founder alert: new paid subscriber. Deferred via after() — a
+          // Resend outage stays invisible to webhook processing, and the
+          // send survives the 200 going out (an un-awaited promise dies
+          // when the function freezes after the response).
+          after(() =>
+            sendBusinessEventAlert("subscription_started", {
+              email: currentUser?.email || null,
+              plan,
+              amountTotal:
+                typeof session.amount_total === "number"
+                  ? session.amount_total
+                  : null,
+              stripeCustomerId: session.customer,
+            }).catch(console.error)
+          );
 
-          // Enroll new subscriber in drip campaign
-          fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/drip/enroll`, {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              "x-internal-secret": process.env.CRON_SECRET || "",
-            },
-            body: JSON.stringify({ userId }),
-          }).catch((err) =>
-            console.error("Drip enrollment failed:", err.message)
+          // Enroll new subscriber in drip campaign. Same after() treatment:
+          // a frozen invocation must not silently skip enrollment.
+          after(() =>
+            fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/drip/enroll`, {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                "x-internal-secret": process.env.CRON_SECRET || "",
+              },
+              body: JSON.stringify({ userId }),
+            }).catch((err) =>
+              console.error("Drip enrollment failed:", err.message)
+            )
           );
         } else {
           // Neither metadata.userId nor client_reference_id — this checkout
@@ -346,13 +353,15 @@ export async function POST(request) {
               err?.message
             );
           }
-          sendBusinessEventAlert("subscription_canceled", {
-            email: canceledUser.email,
-            plan: canceledUser.plan,
-            conversationCount,
-            signupDate: canceledUser.created_at,
-            stripeCustomerId: customerId,
-          }).catch(console.error);
+          after(() =>
+            sendBusinessEventAlert("subscription_canceled", {
+              email: canceledUser.email,
+              plan: canceledUser.plan,
+              conversationCount,
+              signupDate: canceledUser.created_at,
+              stripeCustomerId: customerId,
+            }).catch(console.error)
+          );
         }
         break;
       }
@@ -377,15 +386,17 @@ export async function POST(request) {
           .maybeSingle();
         if (pastDueUser?.email) {
           const billingUrl = `${process.env.NEXT_PUBLIC_APP_URL}/billing`;
-          sendEmail({
-            to: pastDueUser.email,
-            subject: "Your Clinchd payment didn't go through",
+          after(() =>
+            sendEmail({
+              to: pastDueUser.email,
+              subject: "Your Clinchd payment didn't go through",
             html: `<p>Hi${pastDueUser.full_name ? ` ${pastDueUser.full_name}` : ""},</p>
 <p>Your latest Clinchd payment failed — usually an expired or declined card. Your AI agent is still replying to leads for now, and Stripe will retry the charge automatically over the next few days.</p>
 <p>To avoid any interruption, update your payment method here: <a href="${billingUrl}">${billingUrl}</a></p>
 <p>— Clinchd</p>`,
-          }).catch((err) =>
-            console.error("[stripe-webhook] dunning email failed:", err?.message)
+            }).catch((err) =>
+              console.error("[stripe-webhook] dunning email failed:", err?.message)
+            )
           );
         }
         break;

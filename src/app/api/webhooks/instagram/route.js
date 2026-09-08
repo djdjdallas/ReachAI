@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { NextResponse, after } from "next/server";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import { generateReply, classifyIncomingMessage } from "@/lib/anthropic";
 import { buildSystemPrompt } from "@/lib/prompts";
@@ -1941,12 +1941,14 @@ async function processIncomingMessage({
       },
     });
 
-    // Fire-and-forget notification alerts
+    // Coach notifications, deferred via after() so they survive the 200
+    // going out — these are value delivery to the coach, and an un-awaited
+    // promise dies when the function freezes after the response.
     if (newStatus === "interested") {
-      sendHotLeadAlert(user, conversation).catch(console.error);
+      after(() => sendHotLeadAlert(user, conversation).catch(console.error));
     }
     if (newStatus === "booked") {
-      sendBookingAlert(user, conversation).catch(console.error);
+      after(() => sendBookingAlert(user, conversation).catch(console.error));
     }
   }
 

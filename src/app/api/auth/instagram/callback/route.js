@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { NextResponse, after } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import { exchangeCodeForToken } from "@/lib/instagram";
@@ -162,14 +162,16 @@ export async function GET(request) {
         );
         // Founder alert fires on the ATTEMPT, confirmed or not — marked
         // blocked so it reads differently from a completed switch.
-        sendBusinessEventAlert("instagram_connected", {
-          email: user.email,
-          oldIgba: priorIgba,
-          oldUsername: profile?.instagram_username || null,
-          newIgba: igbaId,
-          newUsername: igUsername || null,
-          blocked: true,
-        }).catch(console.error);
+        after(() =>
+          sendBusinessEventAlert("instagram_connected", {
+            email: user.email,
+            oldIgba: priorIgba,
+            oldUsername: profile?.instagram_username || null,
+            newIgba: igbaId,
+            newUsername: igUsername || null,
+            blocked: true,
+          }).catch(console.error)
+        );
         getPostHogClient().capture({
           distinctId: user.email || user.id,
           event: "instagram_switch_blocked",
@@ -269,14 +271,18 @@ export async function GET(request) {
     }
 
     // Founder alert: first connect vs account CHANGED (old→new in the
-    // subject). Fire-and-forget.
-    sendBusinessEventAlert("instagram_connected", {
-      email: user.email,
-      oldIgba: priorIgba,
-      oldUsername: profile?.instagram_username || null,
-      newIgba: igbaId,
-      newUsername: igUsername || null,
-    }).catch(console.error);
+    // subject). Deferred via after() so the send survives the redirect
+    // going out (an un-awaited promise dies when the function freezes
+    // after the response — the mechanism that lost the 09-02 signup alert).
+    after(() =>
+      sendBusinessEventAlert("instagram_connected", {
+        email: user.email,
+        oldIgba: priorIgba,
+        oldUsername: profile?.instagram_username || null,
+        newIgba: igbaId,
+        newUsername: igUsername || null,
+      }).catch(console.error)
+    );
 
     // Subscribe this IG business account to our webhook so Meta starts
     // firing incoming DM events, then read the subscription back and verify
@@ -328,28 +334,31 @@ export async function GET(request) {
       );
     }
 
-    // Fire-and-forget: kick off voice profile auto-import. Do NOT await.
-    // We want the user redirected immediately to onboarding; the import
-    // runs in the background and the onboarding page polls for it.
-    try {
-      fetch(`${baseUrl}/api/instagram/auto-profile`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Cookie: request.headers.get("cookie") || "",
-        },
-      }).catch((err) => {
+    // Voice-profile auto-import kickoff, deferred via after(). The user is
+    // redirected immediately (the response is not held); the import runs in
+    // its own invocation and the onboarding page polls for it. after() is
+    // load-bearing here: the attempt flag is single-shot, so if the
+    // function froze before this request ever left, that account
+    // permanently lost its voice import, script, and generated greeting.
+    // Awaiting the fetch keeps this invocation alive until the kickoff has
+    // actually been dispatched and answered.
+    const cookieHeader = request.headers.get("cookie") || "";
+    after(async () => {
+      try {
+        await fetch(`${baseUrl}/api/instagram/auto-profile`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Cookie: cookieHeader,
+          },
+        });
+      } catch (kickErr) {
         console.error(
           "[ig-callback] auto-profile kickoff failed:",
-          err?.message
+          kickErr?.message
         );
-      });
-    } catch (kickErr) {
-      console.error(
-        "[ig-callback] auto-profile kickoff threw synchronously:",
-        kickErr?.message
-      );
-    }
+      }
+    });
 
     // Cookie clearing includes the single-use switch acknowledgment,
     // whether or not this connect consumed it.
