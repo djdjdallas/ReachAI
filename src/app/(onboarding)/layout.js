@@ -1,3 +1,4 @@
+import { after } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import { sendBusinessEventAlert } from "@/lib/alerts/business-events";
@@ -41,13 +42,21 @@ async function maybeSendSignupAlert() {
       .eq("id", user.id)
       .single();
 
-    sendBusinessEventAlert("signup", {
-      email: row?.email || user.email,
-      provider: user.app_metadata?.provider || null,
-      plan: row?.plan,
-      subscriptionStatus: row?.subscription_status,
-      createdAt: row?.created_at,
-    }).catch(console.error);
+    // Deferred via after(): a bare fire-and-forget promise dies when the
+    // Vercel function freezes right after the response goes out, which is
+    // exactly how the 2026-09-02 signup alert was silently lost (flag
+    // claimed, email never sent, nothing logged). after() keeps the
+    // invocation alive until the awaited send settles, and onboarding's
+    // first paint still pays no Resend round-trip.
+    after(async () => {
+      await sendBusinessEventAlert("signup", {
+        email: row?.email || user.email,
+        provider: user.app_metadata?.provider || null,
+        plan: row?.plan,
+        subscriptionStatus: row?.subscription_status,
+        createdAt: row?.created_at,
+      });
+    });
   } catch (err) {
     console.error("[onboarding-layout] signup alert failed:", err?.message);
   }
