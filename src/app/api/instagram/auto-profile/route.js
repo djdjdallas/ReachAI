@@ -202,6 +202,16 @@ export async function POST() {
       newSc.objections = positioning.objections.trim();
       scChanged = true;
     }
+    // Greeting: the reply pipeline holds every inbound lead until
+    // script_config.greeting exists (the webhook's greeting gate), and a
+    // coach who skips the onboarding modal otherwise has no path that sets
+    // it — their account looks live but can never reply. Same never-
+    // overwrite rule as the fields above: only fill when currently empty,
+    // and the coach can rewrite it any time in Script Builder.
+    if (isEmpty(currentSc.greeting) && !isEmpty(positioning.greeting)) {
+      newSc.greeting = positioning.greeting.trim();
+      scChanged = true;
+    }
 
     if (scChanged) {
       update.script_config = newSc;

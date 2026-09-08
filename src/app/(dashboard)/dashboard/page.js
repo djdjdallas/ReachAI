@@ -75,6 +75,7 @@ export default function DashboardPage() {
     activeConversations: 0,
   });
   const [conversations, setConversations] = useState([]);
+  const [heldForGreeting, setHeldForGreeting] = useState(0);
 
   const fetchData = useCallback(
     async (userId) => {
@@ -87,6 +88,16 @@ export default function DashboardPage() {
         .eq("user_id", uid)
         .order("last_message_at", { ascending: false })
         .limit(20);
+
+      // Conversations the AI is holding because no opening line is saved
+      // (the webhook's greeting gate). Counted server-side — the list
+      // above is capped at 20 and would under-count.
+      const { count: heldCount } = await supabase
+        .from("conversations")
+        .select("id", { count: "exact", head: true })
+        .eq("user_id", uid)
+        .eq("last_skip_reason", "greeting_not_configured");
+      setHeldForGreeting(heldCount || 0);
 
       const convList = (convos || []).map((convo) => {
         const sorted = (convo.messages || []).sort(
@@ -277,6 +288,25 @@ export default function DashboardPage() {
           </div>
           <Button size="sm" variant="outline" asChild>
             <Link href="/settings">Reconnect</Link>
+          </Button>
+        </div>
+      )}
+      {igConnected && !profile?.script_config?.greeting && (
+        <div className="flex items-center gap-3 p-4 rounded-2xl border border-amber-200 bg-amber-50">
+          <AlertTriangle className="h-5 w-5 text-amber-600 shrink-0" />
+          <div className="flex-1">
+            <p className="text-sm font-medium text-amber-700">
+              Opening line needed
+            </p>
+            <p className="text-xs text-amber-600/80">
+              {heldForGreeting > 0
+                ? `Your AI is holding ${heldForGreeting} conversation${heldForGreeting === 1 ? "" : "s"} until you save an opening line.`
+                : "Your AI can't reply to new leads until you save an opening line."}{" "}
+              It takes about a minute.
+            </p>
+          </div>
+          <Button size="sm" variant="outline" asChild>
+            <Link href="/script-builder">Open Script Builder</Link>
           </Button>
         </div>
       )}

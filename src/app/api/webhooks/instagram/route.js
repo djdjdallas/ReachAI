@@ -247,7 +247,11 @@ const SKIP = {
   NO_REPLY_NEEDED: "no_reply_needed",
   RATE_LIMITED: "rate_limited",
   DUPLICATE_MESSAGE: "duplicate_message",
-  NO_GREETING: "no_greeting",
+  // The COACH has no opening line saved (script_config.greeting) — says
+  // nothing about the lead's message. Renamed from 'no_greeting', which
+  // read as "the lead didn't say hello" and misled two readers in one day;
+  // migration 20260908120000 backfilled existing rows.
+  GREETING_NOT_CONFIGURED: "greeting_not_configured",
   DM_LIMIT: "dm_limit",
   HISTORY_FETCH_FAILED: "history_fetch_failed",
   GENERATION_FAILED: "generation_failed",
@@ -1090,11 +1094,11 @@ async function processIncomingMessage({
       provider_message_id: providerMessageId,
       source: "lead",
     });
-    await markSkip(supabase, conversation.id, SKIP.NO_GREETING);
+    await markSkip(supabase, conversation.id, SKIP.GREETING_NOT_CONFIGURED);
     await recordClassification(
       supabase,
       noScriptInsert.data?.id,
-      classificationSentinel("skipped", "gated before classification: no_greeting", false)
+      classificationSentinel("skipped", "gated before classification: greeting_not_configured", false)
     );
     return;
   }

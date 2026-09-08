@@ -2,8 +2,10 @@
  * analyze-instagram-voice.js
  *
  * Sends a coach's Instagram bio + recent captions to Claude and returns
- * both a starter voice profile and starter sales positioning. Used by
- * the post-OAuth voice-profile auto-import pipeline.
+ * a starter voice profile, starter sales positioning, and a starter
+ * greeting (the opening line the reply pipeline requires before it will
+ * answer any lead — see the webhook's greeting gate). Used by the
+ * post-OAuth voice-profile auto-import pipeline.
  *
  * Defensive scans the caller relies on:
  *   - AI-identity-denial scan (banned strings: "human", "real person",
@@ -68,9 +70,21 @@ The JSON must have exactly this shape:
   "starter_positioning": {
     "offer": "string or null — what they sell, in their voice",
     "target_customer": "string or null — who they sell to",
-    "objections": "string or null — likely objections from their avatar"
+    "objections": "string or null — likely objections from their avatar",
+    "greeting": "string — see GREETING RULES"
   }
-}`;
+}
+
+GREETING RULES — the greeting is the coach's first reply when a new lead
+DMs them, written in the coach's own captured voice:
+- 1–2 short sentences: a warm acknowledgment plus ONE open question that
+  invites the lead to share what brought them here.
+- Match the detected tone, formality and emoji usage. No links, no
+  prices, and no program names unless they appear in the input.
+- Say nothing about who or what is replying.
+- Unlike other fields, the greeting must never be null: it makes no
+  factual claims, so thin signal is not fabrication — when signal is
+  thin, write a simple warm opener in a neutral tone.`;
 
 function buildUserMessage({ bio, name, captions }) {
   const captionTags = (captions || [])
