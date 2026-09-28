@@ -4,6 +4,8 @@ import { sendInstagramMessage } from "@/lib/instagram";
 import { markDripStatus } from "@/lib/drip/queue";
 import { buildSystemPrompt } from "@/lib/prompts";
 import { generateReply } from "@/lib/anthropic";
+import { getActiveOffer, ownerFromUser } from "@/lib/active-offer";
+import { lintReply } from "@/lib/reply-lint";
 
 // The core engine. Re-verifies ALL 8 conditions at FIRE time (state changes
 // constantly between schedule and fire) and only then sends. Every skip path
@@ -25,7 +27,7 @@ const DRIP_NUDGE_MODE = `
 ---
 
 FOLLOW-UP NUDGE MODE (this generation only):
-The lead has gone quiet since your last message. Write ONE short, warm, low-pressure check-in that picks the thread back up naturally — reference what you were talking about.
+The lead has gone quiet since your last message. Write ONE short, warm, low-pressure check-in that picks the thread back up naturally. Reference what you were talking about.
 - 1-2 sentences maximum.
 - Never guilt the lead and never manufacture urgency. No pressure tactics, no "did you see my message", no countdown language.
 - Do not repeat your last message word-for-word and do not re-ask an ignored question the same way; come at it lightly from a fresh angle or simply leave the door open.
@@ -45,7 +47,7 @@ export async function processDrip(dripRow) {
   const { data: user } = await admin
     .from("users")
     .select(
-      "id, email, plan, subscription_status, drip_enabled, ai_mode, script_config, voice_profile, calendly_url, meta_page_access_token, instagram_business_account_id"
+      "id, email, plan, subscription_status, drip_enabled, ai_mode, script_config, voice_profile, calendly_url, meta_page_access_token, instagram_business_account_id, full_name, instagram_username"
     )
     .eq("id", dripRow.user_id)
     .single();
@@ -172,6 +174,8 @@ export async function processDrip(dripRow) {
         buildSystemPrompt(user.script_config || {}, user.calendly_url, {
           voiceProfile: user.voice_profile,
           conversation: conv,
+          activeOffer: await getActiveOffer(admin, user.id),
+          owner: ownerFromUser(user),
         }) + DRIP_NUDGE_MODE;
       // `source` must survive this map. It is already selected above, and
       // generateReply uses it to label who actually typed each message —
@@ -188,7 +192,12 @@ export async function processDrip(dripRow) {
         content:
           "[Internal note, not from the lead: they have gone quiet since your last message. Write your single follow-up nudge now, per FOLLOW-UP NUDGE MODE.]",
       });
-      nudgeText = (await generateReply(systemPrompt, history))?.trim();
+      // Same pre-send filter as the live reply paths. Only generated nudges
+      // are filtered; a coach-authored template is sent as written.
+      const lint = lintReply(await generateReply(systemPrompt, history), {
+        bookingLink: user.calendly_url || "",
+      });
+      nudgeText = lint.blocked ? null : lint.text;
     } catch (err) {
       console.error("[drip/processor] nudge compose failed:", err?.message);
     }

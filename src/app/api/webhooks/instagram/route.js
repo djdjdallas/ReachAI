@@ -23,6 +23,8 @@ import {
 } from "@/lib/dm-intent";
 import { statusForIntent } from "@/lib/intent-status";
 import { decideIntentGate } from "@/lib/dm-intent-gate";
+import { getActiveOffer, ownerFromUser } from "@/lib/active-offer";
+import { lintReply } from "@/lib/reply-lint";
 import { findVoiceSnippetForIntent, getSendableAudioUrl } from "@/lib/voice/matcher";
 import { sendVoiceMessage, logVoiceSend } from "@/lib/voice/sender";
 
@@ -248,6 +250,9 @@ const SKIP = {
   DO_NOT_SEND_HELD: "do_not_send_held",
   // Classifier says personal / off-topic (not_a_lead): no reply, no pause.
   NOT_A_LEAD: "not_a_lead",
+  // The generated reply still contained a {{placeholder}} after the
+  // pre-send filter, so it was not sent.
+  REPLY_BLOCKED: "reply_blocked",
   CLASSIFIER_TIMEOUT: "classifier_timeout",
   NO_REPLY_NEEDED: "no_reply_needed",
   RATE_LIMITED: "rate_limited",
@@ -1594,31 +1599,22 @@ async function processIncomingMessage({
     return;
   }
 
-  // If the conversation was started by a cold DM the coach sent natively but
-  // we never saw the outbound text, fetch the active creator_offers row so the
-  // prompt builder can ground the reply in the offer instead of falling back
-  // to a generic inbound greeting.
-  let activeOffer = null;
-  if (
-    conversation.origin === "clinchd_sent" &&
-    conversation.missing_outbound_context === true
-  ) {
-    const { data: offerRow } = await supabase
-      .from("creator_offers")
-      .select("offer_name, ideal_customer, objections")
-      .eq("creator_id", user.id)
-      .is("deprecated_at", null)
-      .order("updated_at", { ascending: false })
-      .limit(1)
-      .maybeSingle();
-    activeOffer = offerRow || null;
-  }
+  // Active offer grounds prices and links for every thread (and the
+  // missing-outbound-context block). Best-effort: null on any failure.
+  const activeOffer = await getActiveOffer(supabase, user.id);
 
   // Build prompt and generate reply
   const systemPrompt = buildSystemPrompt(sc, user.calendly_url, {
     voiceProfile: user.voice_profile,
     conversation,
     activeOffer,
+    owner: ownerFromUser(user),
+    // Only a confident booking moment changes the prompt; see
+    // buildSystemPrompt's bookingNowBlock.
+    intentHint:
+      dmIntent?.class === "booking_cta" && dmIntent.confidence >= 0.7
+        ? "booking_cta"
+        : null,
   });
 
   // ── Voice routing ──────────────────────────────────────────────────
@@ -1780,6 +1776,23 @@ async function processIncomingMessage({
     return;
   }
 
+  // Pre-send filter: rewrites mechanical AI tells (dashes, semicolons,
+  // markdown, filler openers) and blocks leftover {{placeholders}}. See
+  // src/lib/reply-lint.js.
+  const lint = lintReply(aiReply, { bookingLink: user.calendly_url || "" });
+  if (lint.blocked) {
+    fireSenderAction(user, senderId, "typing_off");
+    await markSkip(supabase, conversation.id, SKIP.REPLY_BLOCKED);
+    log.warn("[webhook] reply blocked by lint (placeholder) for conversation:", conversation.id);
+    getPostHogClient().capture({
+      distinctId: user.email || user.id,
+      event: "ai_reply_blocked",
+      properties: { conversation_id: conversation.id, reason: "placeholder" },
+    });
+    return;
+  }
+  aiReply = lint.text;
+
   // Delay floor + pause re-check before the text send. Sits after generation
   // (so the sleep is only the remainder of the target) and BEFORE the reply
   // insert, so a turn blocked by a mid-delay pause leaves no unsent
@@ -1864,7 +1877,12 @@ async function processIncomingMessage({
       getPostHogClient().capture({
         distinctId: user.email || user.id,
         event: "ai_reply_sent",
-        properties: { conversation_id: conversation.id, reply_length: aiReply.length },
+        properties: {
+          conversation_id: conversation.id,
+          reply_length: aiReply.length,
+          lint_fixes: lint.fixes,
+          lint_flags: lint.flags,
+        },
       });
     } catch (err) {
       console.error("sendInstagramMessage failed for conversation:", conversation.id, err.message);
