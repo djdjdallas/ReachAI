@@ -232,3 +232,19 @@ PR A success bar: 0 critical misses on both sets under `--strict`, with prod acc
 - **Dom's rule (2026-09-28):** replies must never carry em dashes or other AI tells. This is enforced in code, not just the prompt. `src/lib/reply-lint.js` runs on every AI reply path (webhook, dashboard reply, playground, drip). It rewrites dashes, semicolons, "…", markdown and filler openers; blocks leftover `{{placeholders}}`; and logs stock phrases to PostHog as `lint_flags` on `ai_reply_sent`.
 - Identity: a single framing (one named person's inbox, owner name + IG handle). Rule 7 covers "is this [name]?", the "team" example is gone, and the owner is never gendered.
 - Grounding: the active `creator_offers` price and URL reach every reply path, with an ONLY STATE FACTS rule. At time of writing only 3 of 6 coaches have an offer row, and one (a test account) has a price that doesn't match its script offer.
+
+---
+
+## 12. PR C result (escalation wiring, 2026-09-28)
+
+- **Parallel:** the escalation check and the DM intent classifier now run concurrently, so the webhook waits max(8s, 8s) instead of 8s + 8s (P2-18).
+- **One decision point:** `decideIntentGate(dmIntent, escalation)` applies do_not_send → not_a_lead → escalation → reply. A hostile message is always a do_not_send pause (never `complex_objection`), whatever the HIL setting (P2-17). If the intent classifier fails and escalation says yes, the thread still escalates.
+- **Always persisted:** escalated turns now get their intent record, with the escalation outcome (including `category`) alongside (P1-15). New skip reason `escalated`.
+- **Prompt:** forced tool use (`record_escalation`) with a category (`wants_human`, `owner_decision`, `medical_or_safety`, `financial_distress`, `multi_part`). Removed the cases other gates own, and the "escalate off-topic" vs "when in doubt don't" contradiction (P2-16).
+
+`scripts/replay-escalation.mjs` runs 19 cases × 2 samples:
+
+| | Should escalate, caught | False escalations |
+|---|---|---|
+| Before | 14/16 (missed "50% off if I refer 3 friends") | 0/18 |
+| After | 16/16 | 0/18 |

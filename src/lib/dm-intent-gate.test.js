@@ -52,4 +52,37 @@ describe("decideIntentGate", () => {
       action: "reply",
     });
   });
+
+  describe("with a human-in-loop escalation", () => {
+    const esc = { needs_human: true };
+    const escPause = { action: "pause", pauseReason: "complex_objection", emailOwner: true };
+
+    it("escalates a lead message", () => {
+      expect(decideIntentGate(intent("objection_price", 0.9), esc)).toEqual(escPause);
+    });
+
+    it("escalates when the intent classifier failed", () => {
+      expect(decideIntentGate(null, esc)).toEqual(escPause);
+    });
+
+    it("lets a confident do_not_send win (hostility is never 'complex_objection')", () => {
+      expect(decideIntentGate(intent("do_not_send", 0.95, ["refund_demand"]), esc)).toEqual({
+        action: "pause",
+        pauseReason: "hostile_or_refund",
+        emailOwner: true,
+      });
+    });
+
+    it("lets a low-confidence do_not_send hold rather than escalate", () => {
+      expect(decideIntentGate(intent("do_not_send", 0.5), esc)).toEqual({ action: "hold" });
+    });
+
+    it("lets not_a_lead skip rather than escalate", () => {
+      expect(decideIntentGate(intent("not_a_lead", 0.9), esc)).toEqual({ action: "skip_not_a_lead" });
+    });
+
+    it("replies when escalation says no", () => {
+      expect(decideIntentGate(intent("follow_up", 0.9), { needs_human: false })).toEqual({ action: "reply" });
+    });
+  });
 });

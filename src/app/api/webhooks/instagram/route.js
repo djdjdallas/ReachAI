@@ -253,6 +253,8 @@ const SKIP = {
   // The generated reply still contained a {{placeholder}} after the
   // pre-send filter, so it was not sent.
   REPLY_BLOCKED: "reply_blocked",
+  // Human-in-loop escalation paused the thread for the owner.
+  ESCALATED: "escalated",
   CLASSIFIER_TIMEOUT: "classifier_timeout",
   NO_REPLY_NEEDED: "no_reply_needed",
   RATE_LIMITED: "rate_limited",
@@ -369,6 +371,39 @@ async function markSkipForSender(supabase, user_id, sender_id, reason) {
     .eq("user_id", user_id)
     .eq("instagram_sender_id", sender_id);
   if (error) log.error("[webhook] markSkipForSender failed:", error.code);
+}
+
+// Human-in-loop escalation check. Never throws: resolves to an outcome object
+// that is persisted on the inbound row's intent_classification.escalation and
+// passed to decideIntentGate. A timeout or error resolves to failed_open, so
+// the turn proceeds as if no escalation was needed (the existing behavior,
+// now recorded).
+async function checkEscalation(messageText, messages, sc) {
+  try {
+    const r = await withTimeout(
+      classifyIncomingMessage(messageText, messages, sc),
+      8000,
+      "classifyIncomingMessage"
+    );
+    return {
+      status: "ok",
+      needs_human: r.needs_human === true,
+      category: r.category || "none",
+      reason: r.reason || "",
+    };
+  } catch (err) {
+    // withTimeout REJECTS on timeout, so a timeout and an API error both land
+    // here and are told apart by the message shape.
+    const timedOut = /timed out after/i.test(err?.message || "");
+    log.warn("[webhook] escalation check failed, falling through:", err?.message);
+    return {
+      status: timedOut ? "timeout" : "error",
+      reason: timedOut
+        ? "classifier exceeded 8000ms"
+        : err?.message || "classifyIncomingMessage failed",
+      failed_open: true,
+    };
+  }
 }
 
 // v1 qualifying-loop detector. Heuristic, no embeddings:
@@ -1288,107 +1323,35 @@ async function processIncomingMessage({
     return;
   }
 
-  // Human-in-loop: when enabled, classify the incoming message. If the
-  // classifier flags it as a complex/novel objection, pause the AI and mark
-  // the conversation so the dashboard surfaces it. Fail-open on any error —
-  // we prefer a pass-through reply over a blocked conversation.
+  // ── Classifiers (parallel) ──────────────────────────────────────────
+  // The DM intent classifier always runs. The human-in-loop escalation check
+  // runs only when the coach enabled it. They don't depend on each other, so
+  // they run concurrently: the webhook waits max(8s, 8s), not 8s + 8s. Both
+  // fail open. What their outputs do to this turn is decided in one place,
+  // decideIntentGate (src/lib/dm-intent-gate.js), below.
   //
-  // Outcome of this escalation check, folded into the intent_classification
-  // payload below. It does NOT own that column (classifyDMIntent does), so it
-  // is recorded as a sub-object rather than overwriting a real classification.
-  let escalationOutcome = null;
-  if (sc.human_in_loop) {
-    try {
-      // Same 8s race as classifyDMIntent: the webhook waits at most 8s for
-      // the escalation verdict; on timeout the catch below falls through
-      // with no escalation flagged.
-      const classification = await withTimeout(
-        classifyIncomingMessage(messageText, messages, sc),
-        8000,
-        "classifyIncomingMessage"
-      );
-      escalationOutcome = {
-        status: "ok",
-        needs_human: classification.needs_human === true,
-        reason: classification.reason || "",
-      };
-      if (classification.needs_human) {
-        // No reply will be sent this turn — clear the typing indicator.
-        fireSenderAction(user, senderId, "typing_off");
-        // Same false→true transition guard as the qualifying-loop pause: the
-        // owner is emailed exactly once per handoff, never on a retry.
-        const { data: pausedRows } = await supabase
-          .from("conversations")
-          .update({
-            ai_paused: true,
-            ai_pause_reason: "complex_objection",
-          })
-          .eq("id", conversation.id)
-          .eq("ai_paused", false)
-          .select("id");
-        if (pausedRows?.length) {
-          sendHandoffEmail({
-            user,
-            conversation,
-            reason: "complex_objection",
-            leadMessage: messageText,
-          }).catch(console.error);
-        }
-        getPostHogClient().capture({
-          distinctId: user.email || user.id,
-          event: "human_in_loop_triggered",
-          properties: { conversation_id: conversation.id, reason: classification.reason },
-        });
-        return;
-      }
-    } catch (err) {
-      console.warn(
-        "[webhook] classifier failed, falling through for conversation:",
-        conversation.id,
-        err?.message
-      );
-      // Record the failure instead of losing it. withTimeout REJECTS on
-      // timeout (it does not resolve a sentinel), so a timeout and a genuine
-      // API error both land here and are told apart by the message shape.
-      // failed_open: true — we go on to reply anyway. That is the existing
-      // behaviour and is deliberately left unchanged; this only makes it
-      // visible after the fact.
-      const timedOut = /timed out after/i.test(err?.message || "");
-      escalationOutcome = {
-        status: timedOut ? "timeout" : "error",
-        reason: timedOut
-          ? "classifier exceeded 8000ms"
-          : err?.message || "classifyIncomingMessage failed",
-        failed_open: true,
-      };
-    }
-  }
-
-  // ── DM intent classifier (always-on) ────────────────────────────────
-  // Runs regardless of human_in_loop. Used for voice routing below and
-  // for persisting an intent label on the messages row (powers the
-  // future Inbox Insights view). Split into three independent try blocks
-  // so a failure in persistence or telemetry doesn't kill the others.
-  // Fail-open across the board — the existing text reply path is the
-  // safety net.
-
-  // 1) Classify. The critical call. If this throws, dmIntent stays null
-  //    and voice routing short-circuits below.
-  let dmIntent = null;
-  let dmIntentError = null;
-  try {
-    dmIntent = await classifyDMIntent({
+  // Previously the escalation check ran first and returned on needs_human
+  // before intent was classified or persisted, so escalated turns had no
+  // intent record and a hostile message was paused as 'complex_objection'.
+  const [escalationOutcome, intentResult] = await Promise.all([
+    sc.human_in_loop ? checkEscalation(messageText, messages, sc) : null,
+    classifyDMIntent({
       messageText,
       recentMessages: messages,
       scriptConfig: sc,
       offer: sc.offer,
-    });
-  } catch (err) {
-    log.warn("[webhook] dm intent classifier failed, falling through:", err?.message);
-    dmIntentError = err;
+    }).then(
+      (value) => ({ value }),
+      (error) => ({ error })
+    ),
+  ]);
+  const dmIntent = intentResult.value || null;
+  const dmIntentError = intentResult.error || null;
+  if (dmIntentError) {
+    log.warn("[webhook] dm intent classifier failed, falling through:", dmIntentError?.message);
   }
 
-  // 2) Persist. Best-effort write to messages.intent_classification, on the
+  // Persist. Best-effort write to messages.intent_classification, on the
   //    INBOUND lead row.
   //
   //    Unconditional now. It used to be `if (dmIntent && providerMessageId)`,
@@ -1419,7 +1382,7 @@ async function processIncomingMessage({
     await recordClassification(supabase, inboundMessageId, payload);
   }
 
-  // 2b) Promote the conversation label from the classified intent.
+  // Promote the conversation label from the classified intent.
   //     Only threads still at 'new' are promoted — that covers the thread
   //     just created above AND outbound-first threads (native-send echo,
   //     comment-to-DM) whose first inbound reply lands after creation. The
@@ -1449,7 +1412,7 @@ async function processIncomingMessage({
     }
   }
 
-  // 3) Telemetry. Best-effort PostHog capture. Independent so a transient
+  // Telemetry. Best-effort PostHog capture. Independent so a transient
   //    PostHog failure doesn't lose the classification or block routing.
   if (dmIntent) {
     try {
@@ -1527,13 +1490,16 @@ async function processIncomingMessage({
     }
   }
 
-  // Intent gate — decides reply / hold / pause / skip before any generation.
+  // Intent gate: decides reply / hold / pause / skip before any generation.
   // Rules live in src/lib/dm-intent-gate.js (unit-tested). A null dmIntent
-  // (classifier timeout/error) replies: fail-open is deliberate.
-  const gate = decideIntentGate(dmIntent);
+  // (classifier timeout/error) replies unless the escalation check says a
+  // human is needed: fail-open is deliberate.
+  const gate = decideIntentGate(dmIntent, escalationOutcome);
 
   if (gate.action === "pause") {
-    // Confident do_not_send → pause the thread, no reply.
+    // Two sources: a confident do_not_send, or a human-in-loop escalation
+    // (pauseReason 'complex_objection'). Either way, no reply this turn.
+    const escalated = gate.pauseReason === "complex_objection";
     fireSenderAction(user, senderId, "typing_off");
     // Guarded to ai_paused=false so only the actual false→true transition
     // emails the owner — a retried delivery updates zero rows and stays silent.
@@ -1544,12 +1510,13 @@ async function processIncomingMessage({
         ai_pause_reason: gate.pauseReason,
         // Which gate suppressed THIS turn. Distinct axis from
         // ai_pause_reason, which says why the thread is paused going forward.
-        last_skip_reason: SKIP.DO_NOT_SEND,
+        last_skip_reason: escalated ? SKIP.ESCALATED : SKIP.DO_NOT_SEND,
       })
       .eq("id", conversation.id)
       .eq("ai_paused", false)
       .select("id");
-    if (gate.emailOwner && pausedRows?.length) {
+    const ownerEmailed = gate.emailOwner && Boolean(pausedRows?.length);
+    if (ownerEmailed) {
       sendHandoffEmail({
         user,
         conversation,
@@ -1557,25 +1524,38 @@ async function processIncomingMessage({
         leadMessage: messageText,
       }).catch(console.error);
     }
-    await logVoiceSend({
-      userId: user.id,
-      voiceSnippetId: null,
-      conversationId: conversation.id,
-      recipientPsid: senderId,
-      intentClass: dmIntent.class,
-      status: "skipped_do_not_send",
-    });
-    getPostHogClient().capture({
-      distinctId: user.email || user.id,
-      event: "dm_paused_do_not_send",
-      properties: {
-        conversation_id: conversation.id,
-        pause_reason: gate.pauseReason,
-        owner_emailed: gate.emailOwner && Boolean(pausedRows?.length),
-        signals: dmIntent.signals,
-        reasoning: dmIntent.reasoning,
-      },
-    });
+    if (escalated) {
+      getPostHogClient().capture({
+        distinctId: user.email || user.id,
+        event: "human_in_loop_triggered",
+        properties: {
+          conversation_id: conversation.id,
+          reason: escalationOutcome?.reason,
+          category: escalationOutcome?.category,
+          intent_class: dmIntent?.class ?? null,
+        },
+      });
+    } else {
+      await logVoiceSend({
+        userId: user.id,
+        voiceSnippetId: null,
+        conversationId: conversation.id,
+        recipientPsid: senderId,
+        intentClass: dmIntent.class,
+        status: "skipped_do_not_send",
+      });
+      getPostHogClient().capture({
+        distinctId: user.email || user.id,
+        event: "dm_paused_do_not_send",
+        properties: {
+          conversation_id: conversation.id,
+          pause_reason: gate.pauseReason,
+          owner_emailed: ownerEmailed,
+          signals: dmIntent.signals,
+          reasoning: dmIntent.reasoning,
+        },
+      });
+    }
     return;
   }
 
