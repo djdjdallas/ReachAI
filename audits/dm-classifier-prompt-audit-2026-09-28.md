@@ -213,3 +213,22 @@ PR A success bar: 0 critical misses on both sets under `--strict`, with prod acc
 - **Remediation:** `scripts/review-dns-paused-threads.mjs` found 19 threads paused for a do_not_send reason.
   - 3 are v1.0 misfires and are proposed for UNPAUSE: Dom's test thread, the Venice chat, and the political thread.
   - 16 have no messages left (deleted), are on other coaches' accounts, and are left untouched.
+
+---
+
+## 11. PR B result (reply prompt, 2026-09-28)
+
+`node --env-file=.env.local --import ./scripts/_ext-loader.mjs scripts/replay-reply-prompt.mjs` runs 10 scenarios × 3 samples on Sonnet 4.6 and checks the raw output, before the filter.
+
+| Check | Before | After |
+|---|---|---|
+| No em/en dash | 20/30 | 30/30 |
+| No semicolon, ellipsis char, markdown, filler opener, stock phrase, "team" | (not measured) | 30/30 each |
+| AI disclosed in first 2 sentences ("is this Dom?" etc.) | 12/12 | 12/12 |
+| Quotes a listed price | 0/3 (never received it) | 3/3 |
+| Invents no unlisted price, stats or client stories | 6/6 | 6/6 |
+| No guessed pronoun for the owner | (not measured) | 30/30 |
+
+- **Dom's rule (2026-09-28):** replies must never carry em dashes or other AI tells. This is enforced in code, not just the prompt. `src/lib/reply-lint.js` runs on every AI reply path (webhook, dashboard reply, playground, drip). It rewrites dashes, semicolons, "…", markdown and filler openers; blocks leftover `{{placeholders}}`; and logs stock phrases to PostHog as `lint_flags` on `ai_reply_sent`.
+- Identity: a single framing (one named person's inbox, owner name + IG handle). Rule 7 covers "is this [name]?", the "team" example is gone, and the owner is never gendered.
+- Grounding: the active `creator_offers` price and URL reach every reply path, with an ONLY STATE FACTS rule. At time of writing only 3 of 6 coaches have an offer row, and one (a test account) has a price that doesn't match its script offer.

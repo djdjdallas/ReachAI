@@ -3,6 +3,8 @@ import { createClient } from "@/lib/supabase/server";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import { generateReply } from "@/lib/anthropic";
 import { buildSystemPrompt } from "@/lib/prompts";
+import { getActiveOffer, ownerFromUser } from "@/lib/active-offer";
+import { lintReply } from "@/lib/reply-lint";
 import { enforceAiRateLimit } from "@/lib/rate-limit";
 
 /**
@@ -57,7 +59,7 @@ export async function POST(request) {
 
     const { data: userProfile, error: profileError } = await getSupabaseAdmin()
       .from("users")
-      .select("script_config, calendly_url, voice_profile")
+      .select("id, script_config, calendly_url, voice_profile, full_name, instagram_username")
       .eq("id", user.id)
       .single();
 
@@ -84,12 +86,19 @@ export async function POST(request) {
     const systemPrompt = buildSystemPrompt(scriptConfig, calendlyUrl, {
       isPlayground: true,
       voiceProfile: userProfile.voice_profile,
+      activeOffer: await getActiveOffer(getSupabaseAdmin(), userProfile.id),
+      owner: ownerFromUser(userProfile),
     });
 
     // Cap at 20 messages — same as production webhook
     const cappedMessages = messages.slice(-20);
 
-    const reply = await generateReply(systemPrompt, cappedMessages);
+    // Same pre-send filter as the live reply paths, so the owner tests
+    // exactly what a lead would receive.
+    const lint = lintReply(await generateReply(systemPrompt, cappedMessages), {
+      bookingLink: calendlyUrl,
+    });
+    const reply = lint.text;
 
     const hasBookingLink = calendlyUrl
       ? reply.includes(calendlyUrl)

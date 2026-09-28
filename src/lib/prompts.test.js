@@ -65,45 +65,74 @@ describe("buildSystemPrompt: current behavior (keep)", () => {
   });
 });
 
-// Known defects from audits/dm-classifier-prompt-audit-2026-09-28.md.
-// it.fails passes while the defect exists. When PR B fixes one, its test
-// starts failing here: flip it to a plain `it` in the same change.
-describe("buildSystemPrompt: audit findings (flip to `it` when fixed)", () => {
-  it.fails("[P1-10] template adds no em dashes (generic writing rules)", () => {
-    expect(buildSystemPrompt(sc, LINK)).not.toContain("—");
+// Fixed in PR B (audits/dm-classifier-prompt-audit-2026-09-28.md). These were
+// it.fails tripwires in PR 0; they now guard against regressions.
+describe("buildSystemPrompt: audit fixes", () => {
+  it("[P1-10] template adds no long dashes (generic writing rules)", () => {
+    expect(buildSystemPrompt(sc, LINK)).not.toMatch(/[\u2014\u2013]/);
   });
 
-  it.fails("[P1-10] template adds no em dashes (voice-profile writing rules)", () => {
-    expect(buildSystemPrompt(sc, LINK, { voiceProfile })).not.toContain("—");
+  it("[P1-10] template adds no long dashes (voice profile, every origin and mode)", () => {
+    for (const origin of ["inbound", "native_send", "clinchd_sent"]) {
+      for (const script_mode of ["guided", "strict", "freestyle"]) {
+        const p = buildSystemPrompt({ ...sc, script_mode }, LINK, {
+          voiceProfile,
+          conversation: { origin, missing_outbound_context: true },
+          activeOffer: { offer_name: "Strong Parent" },
+          isPlayground: true,
+          intentHint: "booking_cta",
+        });
+        expect(p, `${origin}/${script_mode}`).not.toMatch(/[\u2014\u2013]/);
+      }
+    }
   });
 
-  it.fails("[P1-10] voice-profile branch still bans em dashes", () => {
-    expect(buildSystemPrompt(sc, LINK, { voiceProfile })).toMatch(/NO em dashes/);
+  it("[P1-10] voice-profile branch still bans long dashes", () => {
+    expect(buildSystemPrompt(sc, LINK, { voiceProfile })).toMatch(/NO long dashes of any kind/);
   });
 
-  it.fails("[P0-8] AI-disclosure example does not invent a team", () => {
+  it("[P0-8] AI-disclosure example does not invent a team", () => {
     expect(buildSystemPrompt(sc, LINK)).not.toMatch(/loop in the team/i);
   });
 
-  it.fails("[P0-8] names the account owner when known", () => {
-    expect(buildSystemPrompt(sc, LINK, { ownerName: "Dom" })).toMatch(/\bDom\b/);
+  it("[P0-8] names the account owner and their handle when known", () => {
+    const p = buildSystemPrompt(sc, LINK, { owner: { name: "Dominick Hill", igHandle: "@dominickjerell" } });
+    expect(p).toContain("Account owner: Dominick Hill / Instagram @dominickjerell");
+    expect(p).toMatch(/whether they are talking to Dominick Hill personally/);
   });
 
-  it.fails("[P0-9] grounds on the active offer's price for every thread", () => {
+  it("[P0-8] falls back to 'the account owner' with no name", () => {
+    const p = buildSystemPrompt(sc, LINK);
+    expect(p).toContain("one person: the account owner");
+    expect(p).not.toContain("Account owner:");
+  });
+
+  it("[P0-9] grounds on the active offer's price for every thread", () => {
     const p = buildSystemPrompt(sc, LINK, {
       conversation: { origin: "inbound" },
       activeOffer: { offer_name: "Strong Parent", offer_price_cents: 49700 },
     });
-    expect(p).toContain("$497");
+    expect(p).toContain("- Price: $497");
+    expect(buildSystemPrompt(sc, LINK, { activeOffer: { offer_price_cents: 9799 } })).toContain("- Price: $97.99");
   });
 
-  it.fails("[P2-12] substitutes {{BOOKING_LINK}} inside the coach's booking message", () => {
+  it("[P0-9] forbids stating facts that weren't provided", () => {
+    expect(buildSystemPrompt(sc, LINK)).toMatch(/ONLY STATE FACTS YOU'VE BEEN GIVEN/);
+  });
+
+  it("[P2-12] substitutes {{BOOKING_LINK}} inside the coach's booking message", () => {
     expect(buildSystemPrompt(sc, LINK)).toContain(`here's the link: ${LINK}`);
+    expect(buildSystemPrompt({ ...sc, script_mode: "strict" }, LINK)).toContain(`here's the link: ${LINK}`);
   });
 
-  it.fails("[P1-11] a 'long' length preference replaces the 2-3 sentence cap", () => {
-    expect(buildSystemPrompt({ ...sc, response_length: "long" }, LINK)).not.toMatch(
-      /2-3 sentences per message MAX/
-    );
+  it("[P1-11] a 'long' length preference replaces the 2-3 sentence cap", () => {
+    const p = buildSystemPrompt({ ...sc, response_length: "long" }, LINK);
+    expect(p).not.toMatch(/2-3 sentences per message MAX/);
+    expect(p).toMatch(/Up to 4-6 sentences/);
+  });
+
+  it("adds the share-the-link instruction only on a booking_cta turn", () => {
+    expect(buildSystemPrompt(sc, LINK, { intentHint: "booking_cta" })).toMatch(/THIS TURN: .*Share the booking link now/);
+    expect(buildSystemPrompt(sc, LINK, { intentHint: "follow_up" })).not.toContain("THIS TURN:");
   });
 });

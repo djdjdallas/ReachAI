@@ -3,6 +3,8 @@ import { createClient } from "@/lib/supabase/server";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import { generateReply } from "@/lib/anthropic";
 import { buildSystemPrompt } from "@/lib/prompts";
+import { getActiveOffer, ownerFromUser } from "@/lib/active-offer";
+import { lintReply } from "@/lib/reply-lint";
 import { sendInstagramMessage } from "@/lib/instagram";
 import { decryptToken } from "@/lib/token-utils";
 import { getPostHogClient } from "@/lib/posthog-server";
@@ -174,7 +176,12 @@ export async function POST(request) {
       const systemPrompt = buildSystemPrompt(
         userProfile.script_config,
         userProfile.calendly_url,
-        { voiceProfile: userProfile.voice_profile, conversation }
+        {
+          voiceProfile: userProfile.voice_profile,
+          conversation,
+          activeOffer: await getActiveOffer(getSupabaseAdmin(), userProfile.id),
+          owner: ownerFromUser(userProfile),
+        }
       );
 
       // Add the new user message to the history for AI context
@@ -183,7 +190,17 @@ export async function POST(request) {
         { role: "user", content: message },
       ];
 
-      replyContent = await generateReply(systemPrompt, allMessages);
+      // Same pre-send filter as the webhook (src/lib/reply-lint.js).
+      const lint = lintReply(await generateReply(systemPrompt, allMessages), {
+        bookingLink: userProfile.calendly_url || "",
+      });
+      if (lint.blocked) {
+        return NextResponse.json(
+          { error: "The AI reply contained an unfilled placeholder. Try again." },
+          { status: 502 }
+        );
+      }
+      replyContent = lint.text;
     }
 
     // Save message to database
