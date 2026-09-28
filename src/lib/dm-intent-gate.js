@@ -13,6 +13,11 @@
 //     refund/legal, crisis). Injection and spam pauses stay silent.
 //   - A missing classification (timeout/error) still replies: fail-open is
 //     deliberate.
+//
+// Precedence (PR C): do_not_send → not_a_lead → human-in-loop escalation →
+// reply. The escalation check runs in parallel with the intent classifier
+// and only decides when neither intent rule applies, so a hostile message
+// is always handled as do_not_send, whatever the coach's HIL setting.
 
 import { DO_NOT_SEND_PAUSE_THRESHOLD } from "./dm-intent";
 import { pauseReasonForDoNotSend } from "./dm-pause-reason";
@@ -29,13 +34,20 @@ export const OWNER_ALERT_PAUSE_REASONS = ["hostile_or_refund", "crisis_signal"];
 
 /**
  * @param {{class: string, confidence: number, signals?: string[]}|null} dmIntent
+ * @param {{needs_human?: boolean}|null} [escalation] - human-in-loop outcome;
+ *   null when HIL is off or the check failed
  * @returns {{action: "reply"}
  *   | {action: "skip_not_a_lead"}
  *   | {action: "hold"}
  *   | {action: "pause", pauseReason: string, emailOwner: boolean}}
  */
-export function decideIntentGate(dmIntent) {
-  if (!dmIntent) return { action: "reply" };
+export function decideIntentGate(dmIntent, escalation = null) {
+  const escalate = escalation?.needs_human === true;
+  if (!dmIntent) {
+    return escalate
+      ? { action: "pause", pauseReason: "complex_objection", emailOwner: true }
+      : { action: "reply" };
+  }
   const conf = typeof dmIntent.confidence === "number" ? dmIntent.confidence : 0;
 
   if (dmIntent.class === "do_not_send") {
@@ -50,6 +62,10 @@ export function decideIntentGate(dmIntent) {
 
   if (dmIntent.class === "not_a_lead" && conf >= NOT_A_LEAD_SKIP_THRESHOLD) {
     return { action: "skip_not_a_lead" };
+  }
+
+  if (escalate) {
+    return { action: "pause", pauseReason: "complex_objection", emailOwner: true };
   }
 
   return { action: "reply" };
