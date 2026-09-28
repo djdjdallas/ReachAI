@@ -18,12 +18,11 @@ import { handleCommentEvent } from "@/lib/webhooks/comment-event";
 import {
   classifyDMIntent,
   DM_INTENT_VERSION,
-  DO_NOT_SEND_PAUSE_THRESHOLD,
   VOICE_ROUTING_THRESHOLD,
   withTimeout,
 } from "@/lib/dm-intent";
 import { statusForIntent } from "@/lib/intent-status";
-import { pauseReasonForDoNotSend } from "@/lib/dm-pause-reason";
+import { decideIntentGate } from "@/lib/dm-intent-gate";
 import { findVoiceSnippetForIntent, getSendableAudioUrl } from "@/lib/voice/matcher";
 import { sendVoiceMessage, logVoiceSend } from "@/lib/voice/sender";
 
@@ -244,6 +243,11 @@ const SKIP = {
   AI_PAUSED: "ai_paused",
   HUMAN_TAKEOVER: "human_takeover",
   DO_NOT_SEND: "do_not_send",
+  // do_not_send below the pause threshold: this turn gets no reply, but the
+  // thread is not paused.
+  DO_NOT_SEND_HELD: "do_not_send_held",
+  // Classifier says personal / off-topic (not_a_lead): no reply, no pause.
+  NOT_A_LEAD: "not_a_lead",
   CLASSIFIER_TIMEOUT: "classifier_timeout",
   NO_REPLY_NEEDED: "no_reply_needed",
   RATE_LIMITED: "rate_limited",
@@ -1518,29 +1522,36 @@ async function processIncomingMessage({
     }
   }
 
-  // do_not_send → pause the conversation, exit cleanly. Mirrors the
-  // human_in_loop pause pattern but with a distinct reason code so the
-  // dashboard can render a different reason chip.
-  if (
-    dmIntent?.class === "do_not_send" &&
-    dmIntent.confidence >= DO_NOT_SEND_PAUSE_THRESHOLD
-  ) {
-    // No reply will be sent this turn — clear the typing indicator.
+  // Intent gate — decides reply / hold / pause / skip before any generation.
+  // Rules live in src/lib/dm-intent-gate.js (unit-tested). A null dmIntent
+  // (classifier timeout/error) replies: fail-open is deliberate.
+  const gate = decideIntentGate(dmIntent);
+
+  if (gate.action === "pause") {
+    // Confident do_not_send → pause the thread, no reply.
     fireSenderAction(user, senderId, "typing_off");
-    // Derive the pause reason from the classifier's signals instead of
-    // hardcoding 'hostile_or_refund'. A script-echo / probe flag is not
-    // hostility, and labeling it as such made paused threads undebuggable.
-    const pauseReason = pauseReasonForDoNotSend(dmIntent.signals);
-    await supabase
+    // Guarded to ai_paused=false so only the actual false→true transition
+    // emails the owner — a retried delivery updates zero rows and stays silent.
+    const { data: pausedRows } = await supabase
       .from("conversations")
       .update({
         ai_paused: true,
-        ai_pause_reason: pauseReason,
+        ai_pause_reason: gate.pauseReason,
         // Which gate suppressed THIS turn. Distinct axis from
         // ai_pause_reason, which says why the thread is paused going forward.
         last_skip_reason: SKIP.DO_NOT_SEND,
       })
-      .eq("id", conversation.id);
+      .eq("id", conversation.id)
+      .eq("ai_paused", false)
+      .select("id");
+    if (gate.emailOwner && pausedRows?.length) {
+      sendHandoffEmail({
+        user,
+        conversation,
+        reason: gate.pauseReason,
+        leadMessage: messageText,
+      }).catch(console.error);
+    }
     await logVoiceSend({
       userId: user.id,
       voiceSnippetId: null,
@@ -1554,9 +1565,30 @@ async function processIncomingMessage({
       event: "dm_paused_do_not_send",
       properties: {
         conversation_id: conversation.id,
-        pause_reason: pauseReason,
+        pause_reason: gate.pauseReason,
+        owner_emailed: gate.emailOwner && Boolean(pausedRows?.length),
         signals: dmIntent.signals,
         reasoning: dmIntent.reasoning,
+      },
+    });
+    return;
+  }
+
+  if (gate.action === "hold" || gate.action === "skip_not_a_lead") {
+    // hold: low-confidence do_not_send — no reply this turn, thread stays
+    // live. skip_not_a_lead: personal / off-topic — no reply, no pause, so the
+    // next on-topic message is still answered.
+    fireSenderAction(user, senderId, "typing_off");
+    const skipReason =
+      gate.action === "hold" ? SKIP.DO_NOT_SEND_HELD : SKIP.NOT_A_LEAD;
+    await markSkip(supabase, conversation.id, skipReason);
+    getPostHogClient().capture({
+      distinctId: user.email || user.id,
+      event: gate.action === "hold" ? "dm_held_do_not_send" : "dm_skipped_not_a_lead",
+      properties: {
+        conversation_id: conversation.id,
+        confidence: dmIntent.confidence,
+        signals: dmIntent.signals,
       },
     });
     return;

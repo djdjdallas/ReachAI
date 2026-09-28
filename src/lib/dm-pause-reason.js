@@ -15,14 +15,19 @@
 //
 // Priority order matters: a message that is BOTH hostile and script-echoing is
 // hostility first. Prompt injection is the most severe and wins outright.
+// Crisis is split out from hostility so the owner alert and the dashboard say
+// "check on this person", not "this person is hostile".
+//
+// The classifier prompt (src/lib/dm-intent.js) tells the model to tag
+// do_not_send with exactly these signal names — keep the two in sync.
 export const DO_NOT_SEND_REASON_RULES = [
   { reason: "prompt_injection", signals: ["prompt_injection_attempt"] },
+  { reason: "crisis_signal", signals: ["crisis_signal", "self_harm", "suicide"] },
   {
     reason: "hostile_or_refund",
     signals: [
       "refund_demand", "chargeback_threat", "scam_accusation", "legal_threat",
-      "hate_speech", "hostile", "abuse", "abusive", "crisis_signal",
-      "self_harm", "suicide", "threat",
+      "hate_speech", "hostile", "abuse", "abusive", "threat",
     ],
   },
   {

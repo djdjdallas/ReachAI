@@ -18,13 +18,14 @@ export const DM_INTENT_CLASSES = [
   "objection_trust",
   "booking_cta",
   "follow_up",
+  "not_a_lead",
   "do_not_send",
 ];
 
 /**
  * The 6 intent classes a coach can upload voice memos for. Same as
  * DM_INTENT_CLASSES minus 'do_not_send' (we never voice-reply to
- * hostile messages). Single source of truth for API validation + UI
+ * hostile messages) and 'not_a_lead' (no reply at all). Single source of truth for API validation + UI
  * dropdowns.
  */
 export const VOICE_ELIGIBLE_CLASSES = [

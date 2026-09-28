@@ -20,7 +20,7 @@ const BUCKET = "voice-snippets";
  * classes yet).
  *
  * @param {string} userId
- * @param {string} intentClass - one of the seven DM_INTENT_CLASSES
+ * @param {string} intentClass - one of DM_INTENT_CLASSES
  * @returns {Promise<{snippet: object|null, reason: string|null}>}
  */
 export async function findVoiceSnippetForIntent(userId, intentClass) {

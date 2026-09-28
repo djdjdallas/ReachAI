@@ -161,6 +161,41 @@ const SMART_REPLIES = [
   },
 ];
 
+// do_not_send pause reasons (src/lib/dm-pause-reason.js). Before these, a
+// thread paused by the DM classifier showed no chip or banner at all.
+const FLAGGED_PAUSES = {
+  crisis_signal: {
+    chip: "Check In",
+    chipClass: "bg-red-50 text-red-600 border-red-200",
+    banner:
+      "this message may be from someone going through something hard. We emailed you. Please reply personally.",
+  },
+  hostile_or_refund: {
+    chip: "Flagged",
+    chipClass: "bg-red-50 text-red-600 border-red-200",
+    banner:
+      "this message looked hostile or mentioned a refund, chargeback, or legal issue. We emailed you. Handle it personally.",
+  },
+  prompt_injection: {
+    chip: "Flagged",
+    chipClass: "bg-stone-100 text-stone-600 border-stone-200",
+    banner: "this message tried to manipulate the AI, so it stopped replying.",
+  },
+  flagged_coach_script: {
+    chip: "Flagged",
+    chipClass: "bg-stone-100 text-stone-600 border-stone-200",
+    banner: "this message looked like a script or a test, so the AI stopped replying.",
+  },
+  flagged_do_not_send: {
+    chip: "Flagged",
+    chipClass: "bg-stone-100 text-stone-600 border-stone-200",
+    banner: "the AI flagged this message and stopped replying.",
+  },
+};
+
+// Pauses a human has to act on — shown under the "Needs Review" filter.
+const NEEDS_REVIEW_PAUSES = ["complex_objection", "hostile_or_refund", "crisis_signal"];
+
 export default function ConversationsPageWrapper() {
   return (
     <Suspense
@@ -660,7 +695,8 @@ function ConversationsPage() {
       matchesStatus = true;
     } else if (statusFilter === "needs_review") {
       matchesStatus =
-        convo.ai_paused === true && convo.ai_pause_reason === "complex_objection";
+        convo.ai_paused === true &&
+        NEEDS_REVIEW_PAUSES.includes(convo.ai_pause_reason);
     } else {
       matchesStatus = convo.status?.toLowerCase() === statusFilter;
     }
@@ -827,6 +863,18 @@ function ConversationsPage() {
                               You Replied
                             </span>
                           )}
+                        {convo.ai_paused && FLAGGED_PAUSES[convo.ai_pause_reason] && (
+                          <span
+                            className={`px-1.5 py-0.5 rounded text-[9px] font-bold uppercase border ${FLAGGED_PAUSES[convo.ai_pause_reason].chipClass}`}
+                          >
+                            {FLAGGED_PAUSES[convo.ai_pause_reason].chip}
+                          </span>
+                        )}
+                        {!convo.ai_paused && convo.last_skip_reason === "not_a_lead" && (
+                          <span className="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase bg-stone-100 text-stone-500 border border-stone-200">
+                            Personal
+                          </span>
+                        )}
                         {convo.lead_temperature && tempColors[convo.lead_temperature] && (
                           <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold uppercase ${tempColors[convo.lead_temperature].bg} ${tempColors[convo.lead_temperature].text}`}>
                             {tempColors[convo.lead_temperature].label}
@@ -1012,6 +1060,46 @@ function ConversationsPage() {
                       <Bot className="h-3.5 w-3.5" />
                       Resume AI replies
                     </Button>
+                  </div>
+                </div>
+              )}
+
+            {/* do_not_send pause banner */}
+            {selectedConvo.ai_paused &&
+              FLAGGED_PAUSES[selectedConvo.ai_pause_reason] && (
+                <div className="px-3 md:px-6 py-3 border-b border-stone-100 bg-stone-50">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex items-start gap-3">
+                      <AlertCircle className="w-4 h-4 text-red-600 mt-0.5 shrink-0" />
+                      <p className="text-xs text-stone-700 leading-relaxed">
+                        <span className="font-bold">AI paused:</span>{" "}
+                        {FLAGGED_PAUSES[selectedConvo.ai_pause_reason].banner}
+                      </p>
+                    </div>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={handleResumeAi}
+                      className="gap-1.5 border-stone-200 bg-white hover:bg-stone-50 shrink-0"
+                    >
+                      <Bot className="h-3.5 w-3.5" />
+                      Resume AI replies
+                    </Button>
+                  </div>
+                </div>
+              )}
+
+            {/* not_a_lead skip: AI stayed quiet on a personal message */}
+            {!selectedConvo.ai_paused &&
+              selectedConvo.last_skip_reason === "not_a_lead" && (
+                <div className="px-3 md:px-6 py-3 border-b border-stone-100 bg-stone-50">
+                  <div className="flex items-start gap-3">
+                    <Bot className="w-4 h-4 text-stone-500 mt-0.5 shrink-0" />
+                    <p className="text-xs text-stone-600 leading-relaxed">
+                      <span className="font-bold">AI stayed quiet:</span> the
+                      last message looked personal, not like a lead. The AI will
+                      reply again if they ask about your offer.
+                    </p>
                   </div>
                 </div>
               )}

@@ -197,3 +197,19 @@ Order: 0 → A → B → C → D. A and B can run in parallel once 0 exists. One
 - Personal contacts are the largest error class: 29 rows with gold `not_a_lead` were predicted 17 × `follow_up`, 8 × `warm_intent` and 4 × `do_not_send`.
 
 PR A success bar: 0 critical misses on both sets under `--strict`, with prod accuracy not below 71%.
+
+---
+
+## 10. PR A result (classifier v1.1, 2026-09-28)
+
+| Set | v1.0 baseline | v1.1 |
+|---|---|---|
+| prod (75) | 53 correct, 17 critical | 71 correct, **0 critical** |
+| synthetic (20) | 14 correct, 4 critical | 20 correct, **0 critical** |
+
+- Remaining prod misses are harmless: 2 openers labeled `follow_up` rather than `warm_intent`, "Broo" labeled `warm_intent`, and 1 transient 8s timeout during the concurrent replay.
+- "Dispensary shop" is now `follow_up`. It first came back `not_a_lead`; fixed by stating that `not_a_lead` is about who is writing, not fit.
+- The prompt grew to ~4,750 tokens, which crosses Haiku's 4,096 cache minimum. Caching now fires: 4,748 cache-read tokens per call after the first.
+- **Remediation:** `scripts/review-dns-paused-threads.mjs` found 19 threads paused for a do_not_send reason.
+  - 3 are v1.0 misfires and are proposed for UNPAUSE: Dom's test thread, the Venice chat, and the political thread.
+  - 16 have no messages left (deleted), are on other coaches' accounts, and are left untouched.
