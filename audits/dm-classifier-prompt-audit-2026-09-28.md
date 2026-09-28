@@ -248,3 +248,16 @@ PR A success bar: 0 critical misses on both sets under `--strict`, with prod acc
 |---|---|---|
 | Before | 14/16 (missed "50% off if I refer 3 friends") | 0/18 |
 | After | 16/16 | 0/18 |
+
+---
+
+## 13. PR D result (comment classifier, 2026-09-28)
+
+- **Offer grounding (P1-19):** `comment-event.js` now passes the context bundle's `offerSnapshot`; it was hard-wired to `null`.
+  - `scripts/replay-comment-classifier.mjs` (14 cases, with vs without the offer): **without 10–11/14 → with 14/14**.
+  - Without the offer, the post's own CTA keyword ("comment STRONG") came back LOW_SIGNAL, and price questions ("how much?", "cuánto cuesta?") came back UNCERTAIN 0.55. Comment-to-DM would never have fired on its core use case.
+- **Confidence floor (P1-20):** `decideAction` sends a DM only at confidence ≥ `DM_MIN_CONFIDENCE` (0.8). Anything lower is queued for review (`low_confidence:<class>`). The floor applies to any class a coach routes to DM. Confident HIGH_INTENT scores 0.88+.
+- **Wording (P2-22):** "six buckets" → seven; the bare "reply with" injection trigger is gone; the cache comment is corrected (4,096 minimum); version `v1.0-shadow` → `v1.1`.
+- **No AI tells:** the dm-templates editor's pre-filled default and placeholders no longer contain em dashes. `scripts/fix-dm-template-dash-2026-09-28.sql` fixes the one saved template that has one.
+- New `comment-trigger-rules.test.js`; `decideAction` had no tests.
+- **Open (not a code bug in this PR):** 2 posts have monitoring enabled, but `comment_classifications` has 0 rows ever, so comment events do not appear to reach the pipeline. Check the Meta webhook `comments` subscription and permissions.

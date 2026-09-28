@@ -29,6 +29,13 @@ export const DEFAULT_ACTIONS_PER_CLASS = Object.freeze({
 
 const VALID_ACTIONS = new Set(Object.values(ACTIONS));
 
+// Minimum classifier confidence to auto-send a DM. Below it, a class that
+// would DM is queued for review instead: a wrong DM from a comment is public
+// and can't be taken back. Clear HIGH_INTENT comments score 0.88+ in
+// scripts/replay-comment-classifier.mjs; UNCERTAIN is capped at 0.6 by the
+// prompt.
+export const DM_MIN_CONFIDENCE = 0.8;
+
 function snippet(text, max = 50) {
   if (typeof text !== "string" || !text) return "";
   const trimmed = text.trim().replace(/\s+/g, " ");
@@ -122,7 +129,18 @@ export function decideAction(
     };
   }
 
-  // action === DM — need a template; otherwise downgrade to review.
+  // action === DM — the classifier must be confident; otherwise review.
+  const confidence =
+    typeof classification.confidence === "number" ? classification.confidence : 0;
+  if (confidence < DM_MIN_CONFIDENCE) {
+    return {
+      action: ACTIONS.QUEUE_REVIEW,
+      rendered: null,
+      reason: `low_confidence:${intentClass}`,
+    };
+  }
+
+  // Need a template; otherwise downgrade to review.
   const template =
     templates && typeof templates === "object" ? templates[intentClass] : null;
 

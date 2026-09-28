@@ -37,22 +37,22 @@ const CLASS_META = [
   {
     cls: "HIGH_INTENT",
     label: "High intent",
-    description: "Clear buy signal — price questions, link requests, 'sign me up'.",
+    description: "Clear buy signal: price questions, link requests, 'sign me up'.",
     sendByDefault: true,
     placeholder:
-      "hey {{COMMENTER_NAME}} — appreciate the comment! grab a quick call and i'll walk you through {{OFFER_NAME}}: {{BOOKING_LINK}}",
+      "hey {{COMMENTER_NAME}}, appreciate the comment! grab a quick call and i'll walk you through {{OFFER_NAME}}: {{BOOKING_LINK}}",
     // Pre-filled into the textarea when no saved row exists, so new coaches
     // land on demo-ready copy and can save with one blur.
     defaultBody:
-      "hey {{COMMENTER_NAME}} — appreciate the comment! grab a quick call and i'll walk you through {{OFFER_NAME}}: {{BOOKING_LINK}}",
+      "hey {{COMMENTER_NAME}}, appreciate the comment! grab a quick call and i'll walk you through {{OFFER_NAME}}: {{BOOKING_LINK}}",
   },
   {
     cls: "ENGAGED_NOT_BUYING",
     label: "Engaged (not buying)",
-    description: "Warm audience — praise, fire emojis, encouragement.",
+    description: "Warm audience: praise, fire emojis, encouragement.",
     sendByDefault: false,
     placeholder:
-      "hey {{COMMENTER_NAME}} — appreciate the love on the post! drop me a dm anytime if you want to chat about {{OFFER_NAME}}.",
+      "hey {{COMMENTER_NAME}}, appreciate the love on the post! drop me a dm anytime if you want to chat about {{OFFER_NAME}}.",
   },
   {
     cls: "UNCERTAIN",
@@ -60,7 +60,7 @@ const CLASS_META = [
     description: "Plausibly interested but evidence too thin to label confidently.",
     sendByDefault: false,
     placeholder:
-      "hey {{COMMENTER_NAME}} — curious what you meant by your comment on {{POST_CAPTION_SNIPPET}}? happy to help.",
+      "hey {{COMMENTER_NAME}}, curious what you meant by your comment on {{POST_CAPTION_SNIPPET}}? happy to help.",
   },
   {
     cls: "LOW_SIGNAL",
@@ -79,7 +79,7 @@ const CLASS_META = [
   {
     cls: "NOT_A_LEAD",
     label: "Not a lead",
-    description: "Personal / intimate message — relational, not about the offer.",
+    description: "Personal / intimate message: relational, not about the offer.",
     sendByDefault: false,
     placeholder: "",
   },
@@ -405,7 +405,7 @@ function TemplateCard({ meta, initialBody, onSave, renderCtx }) {
             value={body}
             onChange={(e) => setBody(e.target.value)}
             onBlur={handleBlur}
-            placeholder={meta.placeholder || "(leave blank — no DM will be sent)"}
+            placeholder={meta.placeholder || "(leave blank and no DM will be sent)"}
             rows={4}
             className="w-full rounded-2xl border border-stone-200 bg-white px-3 py-2 text-sm font-normal text-stone-800 placeholder:text-stone-400 focus:outline-none focus:ring-2"
             style={{ "--tw-ring-color": CORAL }}
