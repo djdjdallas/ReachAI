@@ -1,0 +1,576 @@
+{
+  "_about": "Hand-labeled gold for prod DM intent rows (see audits/dm-classifier-prompt-audit-2026-09-28.md). IDs only; message text stays in the DB. 'accept' = labels counted correct under the target taxonomy (with not_a_lead). null accept = excluded (owner test messages). Labeled 2026-09-28.",
+  "rows": [
+    {
+      "id": "4a95a28c-c8f6-4dd8-b7ae-47adcab63d6b",
+      "accept": [
+        "not_a_lead"
+      ],
+      "note": "friend check-in opener"
+    },
+    {
+      "id": "f9fbf3ab-db5b-49f3-9fdd-49cb0a5c7cdf",
+      "accept": [
+        "not_a_lead"
+      ],
+      "note": "personal question about owner's travel"
+    },
+    {
+      "id": "1b681c8a-a8e5-4581-a5f8-c837029a4372",
+      "accept": null,
+      "note": "owner test message; excluded"
+    },
+    {
+      "id": "904c8057-b2fa-49f2-90ed-4d0317d94a7b",
+      "accept": [
+        "warm_intent"
+      ],
+      "note": "curious opener"
+    },
+    {
+      "id": "8ee7cc75-f6d0-4168-be46-e799b1e26068",
+      "accept": [
+        "follow_up"
+      ],
+      "note": "confused one-word reply mid-thread"
+    },
+    {
+      "id": "4d5a0d1b-68ce-4dae-9067-c094b52e9c13",
+      "accept": [
+        "not_a_lead"
+      ],
+      "note": "personal travel chat; was do_not_send in prod (wrong pause)"
+    },
+    {
+      "id": "d5a8f576-f17c-4d47-9aa3-1a5e110d17ff",
+      "accept": [
+        "warm_intent"
+      ],
+      "note": "es: asks for help, first touch"
+    },
+    {
+      "id": "ddb422d5-879b-4833-b2d3-856a3f9c72ab",
+      "accept": [
+        "warm_intent",
+        "follow_up"
+      ],
+      "note": "es: asks how the coach works"
+    },
+    {
+      "id": "fed42854-3723-4a84-9f08-a525722d983f",
+      "accept": [
+        "follow_up",
+        "warm_intent"
+      ],
+      "note": "es: answers qualifying question"
+    },
+    {
+      "id": "0d14aaa3-979e-4bbb-bcd8-926d2cce548b",
+      "accept": [
+        "follow_up"
+      ],
+      "note": "es: pushback on assumption"
+    },
+    {
+      "id": "b1c92ffb-4f71-4a48-acab-5adf87bf29d2",
+      "accept": [
+        "follow_up"
+      ],
+      "note": "es: 'don't know'"
+    },
+    {
+      "id": "27e9a805-e614-4818-8530-28cd57eb9c60",
+      "accept": [
+        "warm_intent",
+        "follow_up"
+      ],
+      "note": "es: describes situation"
+    },
+    {
+      "id": "02488290-3efe-46d5-abc6-bdcec19aaf92",
+      "accept": [
+        "warm_intent",
+        "follow_up"
+      ],
+      "note": "es: describes situation"
+    },
+    {
+      "id": "a61b322d-f7be-40f7-9169-bbe75d3f03d1",
+      "accept": [
+        "follow_up"
+      ],
+      "note": "es: answers qualifying question"
+    },
+    {
+      "id": "80a1eed2-a8ea-440e-af53-58f3b9c5af8d",
+      "accept": [
+        "follow_up"
+      ],
+      "note": "es: one-word answer"
+    },
+    {
+      "id": "b2b6d85f-65ac-4bf5-bcdc-d664afe646d0",
+      "accept": [
+        "objection_price",
+        "warm_intent"
+      ],
+      "note": "es: asks if program is expensive"
+    },
+    {
+      "id": "94092141-3e17-44f5-9b3f-8eff16210a44",
+      "accept": [
+        "follow_up"
+      ],
+      "note": "es: banter mid-thread"
+    },
+    {
+      "id": "b9b2685f-d1d4-414f-90a6-86ab002cac9a",
+      "accept": [
+        "objection_time",
+        "follow_up"
+      ],
+      "note": "es: work schedule makes it hard"
+    },
+    {
+      "id": "bc33aed5-65f9-456e-b3ad-e7197da5367c",
+      "accept": [
+        "warm_intent"
+      ],
+      "note": "es: asks info and price (buying signal)"
+    },
+    {
+      "id": "944e84db-50b5-4757-b0b0-418f4f11df98",
+      "accept": [
+        "warm_intent"
+      ],
+      "note": "es: asks price, first touch; was objection_price in prod"
+    },
+    {
+      "id": "bfc96e29-1a21-4ed2-bf53-3d8e1a60a044",
+      "accept": [
+        "warm_intent",
+        "follow_up"
+      ],
+      "note": "es: asks for info"
+    },
+    {
+      "id": "bbdf234f-4e42-4b5e-899b-bde1b722361c",
+      "accept": [
+        "follow_up"
+      ],
+      "note": "es: states goal"
+    },
+    {
+      "id": "ac8e8213-1a07-4aa6-b64d-75e136babc13",
+      "accept": [
+        "follow_up"
+      ],
+      "note": "es: answers qualifying question"
+    },
+    {
+      "id": "ce4c2b7e-ca1b-4977-9e7a-a60fb4a2c982",
+      "accept": [
+        "follow_up"
+      ],
+      "note": "es: answers qualifying question"
+    },
+    {
+      "id": "8e7dc8f7-b010-479e-85b4-e0f0daed07f4",
+      "accept": [
+        "follow_up",
+        "not_a_lead"
+      ],
+      "note": "thanks"
+    },
+    {
+      "id": "cfde5136-55de-449e-9c1f-b8463d613f0f",
+      "accept": [
+        "follow_up"
+      ],
+      "note": "'?' after AI question"
+    },
+    {
+      "id": "3971107d-af6f-4e44-9b53-fac6b1ebc0f4",
+      "accept": [
+        "follow_up"
+      ],
+      "note": "'lol' mid-thread"
+    },
+    {
+      "id": "4be2f303-a13f-4fb6-8735-daa76acdfb1f",
+      "accept": [
+        "not_a_lead",
+        "follow_up"
+      ],
+      "note": "banter about a video"
+    },
+    {
+      "id": "22756b53-3fd7-4e13-97eb-3972fb89ee40",
+      "accept": [
+        "follow_up"
+      ],
+      "note": "acknowledgement"
+    },
+    {
+      "id": "9bc47131-54a8-44ea-941a-e2ce7f9fb63d",
+      "accept": [
+        "follow_up",
+        "not_a_lead"
+      ],
+      "note": "laughing reaction"
+    },
+    {
+      "id": "53bdf683-caf7-4433-88a3-15788a9ad831",
+      "accept": [
+        "not_a_lead",
+        "warm_intent"
+      ],
+      "note": "another creator's automated outreach to owner"
+    },
+    {
+      "id": "553b5ff0-6ce9-496d-a78c-a66799855a10",
+      "accept": [
+        "not_a_lead"
+      ],
+      "note": "political banter; was do_not_send in prod (wrong pause)"
+    },
+    {
+      "id": "0ff63a85-5c10-4cde-b550-58cf50fe48a5",
+      "accept": [
+        "follow_up",
+        "not_a_lead"
+      ],
+      "note": "laughing emoji reaction"
+    },
+    {
+      "id": "fbbb07a4-66f0-47e2-bbe0-19278ac6255a",
+      "accept": [
+        "not_a_lead"
+      ],
+      "note": "someone pitching their app to owner"
+    },
+    {
+      "id": "387b550a-237e-49ec-91e3-eb3251ea89a7",
+      "accept": [
+        "follow_up",
+        "warm_intent"
+      ],
+      "note": "agrees to check out offer after owner's manual msg"
+    },
+    {
+      "id": "a80b5eb3-4f58-401e-b629-5a448c6e7464",
+      "accept": [
+        "follow_up"
+      ],
+      "note": "answers qualifying question"
+    },
+    {
+      "id": "0ca6c7b1-d2b0-4a4a-aa7b-14617283b90a",
+      "accept": [
+        "follow_up"
+      ],
+      "note": "answers qualifying question"
+    },
+    {
+      "id": "a151048d-25a2-4891-87c0-a3a8a823f711",
+      "accept": [
+        "follow_up"
+      ],
+      "note": "describes business"
+    },
+    {
+      "id": "78eb209a-d1f9-4c3f-b760-38a04ea7bd18",
+      "accept": [
+        "not_a_lead",
+        "follow_up"
+      ],
+      "note": "personal plans"
+    },
+    {
+      "id": "55bcddf1-b481-4ff1-9b96-b0333aa76509",
+      "accept": [
+        "warm_intent"
+      ],
+      "note": "states interest in the product"
+    },
+    {
+      "id": "f19f4261-743a-4f8e-b6a9-4ca9e0d069e2",
+      "accept": null,
+      "note": "owner test echoing AI text; excluded"
+    },
+    {
+      "id": "eeee69bd-76b6-485c-8b7d-f11086250c87",
+      "accept": [
+        "warm_intent",
+        "follow_up"
+      ],
+      "note": "asks how coaching works"
+    },
+    {
+      "id": "0f511f5d-cba0-4731-ac88-f7bb18819e4a",
+      "accept": [
+        "follow_up"
+      ],
+      "note": "answers how they found the page"
+    },
+    {
+      "id": "ec03864a-a480-4554-9821-5fc0a651a198",
+      "accept": [
+        "follow_up"
+      ],
+      "note": "'?' after AI question"
+    },
+    {
+      "id": "fed51c21-2fe2-429c-b57b-bdb9bd296af2",
+      "accept": [
+        "follow_up"
+      ],
+      "note": "acknowledgement"
+    },
+    {
+      "id": "2d35b520-ef37-4d91-8425-62d9dafe210f",
+      "accept": [
+        "follow_up"
+      ],
+      "note": "asks if it's an auto response (identity q, not hostile)"
+    },
+    {
+      "id": "a37dcf60-aafd-4a70-8c0b-10f09624c01a",
+      "accept": [
+        "follow_up",
+        "not_a_lead"
+      ],
+      "note": "laughing reaction to AI disclosure"
+    },
+    {
+      "id": "2d1e9402-b97a-4e5a-9ad9-d01a5f6c9a3c",
+      "accept": [
+        "not_a_lead"
+      ],
+      "note": "personal life update to owner"
+    },
+    {
+      "id": "247f5e86-5fed-4df3-8cbe-7a95de3874eb",
+      "accept": [
+        "not_a_lead",
+        "warm_intent"
+      ],
+      "note": "another creator's follow-back outreach"
+    },
+    {
+      "id": "7dbb2623-5e93-451c-98f1-46dbe660c6c9",
+      "accept": [
+        "warm_intent",
+        "follow_up",
+        "not_a_lead"
+      ],
+      "note": "wave emoji opener"
+    },
+    {
+      "id": "60fef25b-498a-4455-9f15-959fb22b2c18",
+      "accept": [
+        "follow_up",
+        "not_a_lead"
+      ],
+      "note": "heart reaction to owner's msg"
+    },
+    {
+      "id": "9dd09bb2-48c1-46df-9341-a846f3ce9e63",
+      "accept": [
+        "not_a_lead",
+        "follow_up"
+      ],
+      "note": "'Hi' after owner's flirty msg"
+    },
+    {
+      "id": "6b15a9e2-ce62-462d-99c8-d7dba2e3e9d3",
+      "accept": [
+        "not_a_lead",
+        "follow_up"
+      ],
+      "note": "social pleasantry"
+    },
+    {
+      "id": "bb559a19-e10d-4650-a499-4e0563d63bca",
+      "accept": [
+        "follow_up",
+        "not_a_lead"
+      ],
+      "note": "thanks"
+    },
+    {
+      "id": "d396a8af-645a-43e7-ae2c-37d2a804c7bb",
+      "accept": [
+        "not_a_lead",
+        "follow_up"
+      ],
+      "note": "'Broo' opener"
+    },
+    {
+      "id": "a809653d-b281-4561-8515-5f61147069fd",
+      "accept": [
+        "not_a_lead",
+        "follow_up"
+      ],
+      "note": "'how are you'"
+    },
+    {
+      "id": "8d378b9e-655a-40ea-b14a-4c6f4c9b9f0f",
+      "accept": [
+        "not_a_lead"
+      ],
+      "note": "friend banter after owner asks about going out"
+    },
+    {
+      "id": "8f3fe53f-8ff6-4816-b39c-1f21c95c07cf",
+      "accept": [
+        "not_a_lead"
+      ],
+      "note": "affectionate reply"
+    },
+    {
+      "id": "9ff8a546-1303-44dd-9904-bebd404681dd",
+      "accept": [
+        "not_a_lead",
+        "follow_up"
+      ],
+      "note": "misdirected personal plans; was do_not_send in prod (wrong pause)"
+    },
+    {
+      "id": "2b83df4f-12d7-472f-8e3c-54fe08ea1fd1",
+      "accept": [
+        "warm_intent",
+        "follow_up",
+        "not_a_lead"
+      ],
+      "note": "'Hellooo' opener"
+    },
+    {
+      "id": "19c81f34-e488-4471-86ff-123a4de8902e",
+      "accept": [
+        "not_a_lead"
+      ],
+      "note": "personal: missed each other at event"
+    },
+    {
+      "id": "ae19f4df-5c06-482e-a960-a1273da833a9",
+      "accept": [
+        "not_a_lead"
+      ],
+      "note": "asks owner's plans tonight"
+    },
+    {
+      "id": "ba82dd4d-a2b9-4eb3-8415-7f65d09b18f8",
+      "accept": [
+        "not_a_lead",
+        "follow_up"
+      ],
+      "note": "banter"
+    },
+    {
+      "id": "a0f79df5-2c34-4623-8780-340b9fc42fc7",
+      "accept": [
+        "follow_up",
+        "not_a_lead"
+      ],
+      "note": "'wym'"
+    },
+    {
+      "id": "c529bdb3-01d5-4ee1-8877-bb747ddae815",
+      "accept": [
+        "follow_up"
+      ],
+      "note": "answers 'what do you do' (business type); was do_not_send in prod (wrong pause)"
+    },
+    {
+      "id": "792afceb-90b9-48a7-bf2d-75803d787899",
+      "accept": [
+        "not_a_lead",
+        "follow_up"
+      ],
+      "note": "laughing at owner's banter"
+    },
+    {
+      "id": "cb0a5d0b-d6d2-4af9-b909-1e1e27bbe259",
+      "accept": [
+        "not_a_lead",
+        "follow_up"
+      ],
+      "note": "pleasantry after owner introduced himself"
+    },
+    {
+      "id": "4c063717-1973-4fe7-b4c3-cfa8ce5926b8",
+      "accept": [
+        "not_a_lead"
+      ],
+      "note": "pleasantry"
+    },
+    {
+      "id": "798228b8-6340-4f38-ab96-5df7f39fb926",
+      "accept": [
+        "not_a_lead"
+      ],
+      "note": "friend check-in opener"
+    },
+    {
+      "id": "0b32f7fd-2f8c-4743-9637-3a5821050867",
+      "accept": [
+        "not_a_lead"
+      ],
+      "note": "flirty opener"
+    },
+    {
+      "id": "7b4d182f-7c38-4475-886e-39482eb36599",
+      "accept": [
+        "not_a_lead",
+        "follow_up"
+      ],
+      "note": "thanks, social"
+    },
+    {
+      "id": "8dddd2d5-64ce-407f-a693-6e0976b64b57",
+      "accept": [
+        "not_a_lead",
+        "follow_up"
+      ],
+      "note": "social agreement"
+    },
+    {
+      "id": "00620d36-8e0c-4c86-be8d-63fef10864f0",
+      "accept": [
+        "not_a_lead"
+      ],
+      "note": "friend banter"
+    },
+    {
+      "id": "b19b2bde-1ef8-42b5-87dd-4ea0e5f520d2",
+      "accept": [
+        "not_a_lead"
+      ],
+      "note": "birthday wishes to owner"
+    },
+    {
+      "id": "b78e3401-2bdd-4abc-bcbb-770c3bd2e39e",
+      "accept": [
+        "follow_up",
+        "not_a_lead"
+      ],
+      "note": "asks if it's an auto reply"
+    },
+    {
+      "id": "39213b92-2d6d-4de1-a728-3a4cf41d4fe2",
+      "accept": [
+        "objection_time",
+        "follow_up"
+      ],
+      "note": "defers: will get back to you"
+    },
+    {
+      "id": "d7b9bc66-6129-4b6f-88f3-7af8497276f6",
+      "accept": [
+        "booking_cta"
+      ],
+      "note": "asks for meeting link; was follow_up in prod"
+    }
+  ]
+}

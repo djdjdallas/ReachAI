@@ -23,6 +23,7 @@ import {
   withTimeout,
 } from "@/lib/dm-intent";
 import { statusForIntent } from "@/lib/intent-status";
+import { pauseReasonForDoNotSend } from "@/lib/dm-pause-reason";
 import { findVoiceSnippetForIntent, getSendableAudioUrl } from "@/lib/voice/matcher";
 import { sendVoiceMessage, logVoiceSend } from "@/lib/voice/sender";
 
@@ -359,48 +360,6 @@ async function markSkipForSender(supabase, user_id, sender_id, reason) {
     .eq("user_id", user_id)
     .eq("instagram_sender_id", sender_id);
   if (error) log.error("[webhook] markSkipForSender failed:", error.code);
-}
-
-// Map a do_not_send classification to a specific, debuggable pause reason.
-// Previously every do_not_send pause flattened to 'hostile_or_refund', which
-// mislabeled benign-but-suspicious flags. Concretely: the อัศวิน thread was a
-// coach who DM'd Dom and whose message echoed coach-outreach-script language;
-// the classifier correctly flagged it do_not_send with signals
-// ['echoes_coach_script', ...], but the DB recorded ai_pause_reason=
-// 'hostile_or_refund', implying hostility that wasn't there. We now preserve
-// the most specific signal so the dashboard reason chip is accurate. This is a
-// debuggability change only — it does NOT alter whether the AI pauses, and it
-// does NOT touch the classifier's signal definitions (see src/lib/dm-intent.js).
-//
-// Priority order matters: a message that is BOTH hostile and script-echoing is
-// hostility first. Prompt injection is the most severe and wins outright.
-const DO_NOT_SEND_REASON_RULES = [
-  { reason: "prompt_injection", signals: ["prompt_injection_attempt"] },
-  {
-    reason: "hostile_or_refund",
-    signals: [
-      "refund_demand", "chargeback_threat", "scam_accusation", "legal_threat",
-      "hate_speech", "hostile", "abuse", "abusive", "crisis_signal",
-      "self_harm", "suicide", "threat",
-    ],
-  },
-  {
-    reason: "flagged_coach_script",
-    signals: ["echoes_coach_script", "suspicious_pattern", "likely_test_or_probe"],
-  },
-];
-
-function pauseReasonForDoNotSend(signals) {
-  const sigs = Array.isArray(signals)
-    ? signals.map((s) => String(s).toLowerCase())
-    : [];
-  for (const rule of DO_NOT_SEND_REASON_RULES) {
-    if (rule.signals.some((s) => sigs.includes(s))) return rule.reason;
-  }
-  // No recognized signal — keep a generic do_not_send marker rather than
-  // overstating it as hostility. 'hostile_or_refund' is reserved for the
-  // hostility/refund signal set above.
-  return "flagged_do_not_send";
 }
 
 // v1 qualifying-loop detector. Heuristic, no embeddings:
