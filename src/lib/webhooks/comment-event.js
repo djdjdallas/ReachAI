@@ -142,7 +142,7 @@ async function processCommentEvent(entry, change) {
   }
 
   // 8. Build/reuse the context bundle for this post, then classify.
-  const { bundle } = await buildContextBundle({
+  const { bundle, offerSnapshot } = await buildContextBundle({
     postId: postRow.id,
     creatorId,
     caption: postRow.caption || "",
@@ -151,7 +151,11 @@ async function processCommentEvent(entry, change) {
   const { classification, raw, latencyMs } = await classifyComment({
     commentText,
     postCaption: postRow.caption || "",
-    creatorOffer: null,
+    // The bundle's offer snapshot. This was hard-wired to null, so the
+    // classifier never saw the offer: the post's own CTA keyword ("comment
+    // STRONG") classified LOW_SIGNAL and price questions UNCERTAIN.
+    // scripts/replay-comment-classifier.mjs: 11/14 → 14/14 with the offer.
+    creatorOffer: offerSnapshot,
   });
 
   // Honors the COMMENT_CLASSIFIER_ENABLED env kill switch.
