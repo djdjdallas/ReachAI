@@ -12,8 +12,10 @@ import { sendEmail } from "@/lib/notifications";
  * - NEVER throws to the caller. sendEmail already never throws and the whole
  *   body is wrapped again, so a Resend outage is invisible to webhook
  *   processing. Callers invoke fire-and-forget with .catch(console.error).
- * - Fires only for the two hands-to-human pause reasons. The do-not-send
- *   pause is spam suppression, not a handoff, and manual takeover was the
+ * - Fires only for pauses a human must act on: the two hands-to-human
+ *   reasons, plus do_not_send pauses for hostility/refund/legal and crisis
+ *   (see OWNER_ALERT_PAUSE_REASONS in src/lib/dm-intent-gate.js). Injection
+ *   and spam do_not_send pauses stay silent, and manual takeover was the
  *   human's own action — neither should email.
  * - The caller guards the false→true ai_paused transition, so a retried
  *   webhook delivery can't produce a duplicate email.
@@ -28,6 +30,10 @@ const REASON_COPY = {
     "this one has a question that deserves your personal touch",
   qualifying_loop_detected:
     "the conversation was going in circles, so the AI stepped back instead of repeating itself",
+  hostile_or_refund:
+    "this message looked hostile or mentioned a refund, chargeback, or legal issue, so the AI stopped replying",
+  crisis_signal:
+    "this message may be from someone going through something hard, so the AI stopped replying. Please check in personally",
 };
 
 function escapeHtml(s) {
@@ -50,7 +56,7 @@ function snippet(text, max = 200) {
  * @param {object} params
  * @param {object} params.user - public.users row (needs email)
  * @param {object} params.conversation - conversations row (needs id, sender_name)
- * @param {"complex_objection"|"qualifying_loop_detected"} params.reason
+ * @param {"complex_objection"|"qualifying_loop_detected"|"hostile_or_refund"|"crisis_signal"} params.reason
  * @param {string} params.leadMessage - the lead's latest message text
  */
 export async function sendHandoffEmail({ user, conversation, reason, leadMessage }) {

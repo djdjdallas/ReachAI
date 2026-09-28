@@ -14,6 +14,7 @@ describe("statusForIntent", () => {
     ["objection_time", 0.9, "qualifying"],
     ["objection_trust", 0.9, "qualifying"],
     ["follow_up", 0.95, "new"],
+    ["not_a_lead", 0.95, "new"],
     ["do_not_send", 0.9, "not_a_fit"],
     ["do_not_send", 0.69, "new"],
     ["warm_intent", 0.49, "new"],

@@ -45,6 +45,9 @@ export const INTENT_TO_STATUS = {
   objection_time: "qualifying",
   objection_trust: "qualifying",
   follow_up: "new",
+  // Personal contact / off-topic: not a lead, so never promoted — and never
+  // cold-labeled either (the owner may still want to sell to a friend).
+  not_a_lead: "new",
   do_not_send: "not_a_fit",
 };
 
