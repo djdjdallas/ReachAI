@@ -260,4 +260,21 @@ PR A success bar: 0 critical misses on both sets under `--strict`, with prod acc
 - **Wording (P2-22):** "six buckets" → seven; the bare "reply with" injection trigger is gone; the cache comment is corrected (4,096 minimum); version `v1.0-shadow` → `v1.1`.
 - **No AI tells:** the dm-templates editor's pre-filled default and placeholders no longer contain em dashes. `scripts/fix-dm-template-dash-2026-09-28.sql` fixes the one saved template that has one.
 - New `comment-trigger-rules.test.js`; `decideAction` had no tests.
-- **Open (not a code bug in this PR):** 2 posts have monitoring enabled, but `comment_classifications` has 0 rows ever, so comment events do not appear to reach the pipeline. Check the Meta webhook `comments` subscription and permissions.
+- **Comment traffic:** `comment_classifications` has 0 rows because there is no live comment traffic yet, not because of a delivery problem. `instagram_business_manage_comments` is approved (confirmed by Dom 2026-09-29). Checked and ruled out: the insert schema, check constraints, and plan gates. The first real comments on a monitored post will be the first production data; re-run `scripts/replay-comment-classifier.mjs` against them once they exist.
+
+---
+
+## 14. Status: audit list complete (2026-09-29)
+
+PRs #31 (harness), #32 (taxonomy), #33 (reply prompt + reply-lint), #34 (escalation) and #35 (comment classifier) are merged. Every §7 item is closed.
+
+Regression tooling (all read-only, run with `--env-file=.env.local --import ./scripts/_ext-loader.mjs`):
+- `scripts/replay-dm-intent.mjs --strict`: DM intent against 75 prod gold rows and 20 synthetic cases.
+- `scripts/replay-reply-prompt.mjs`: reply prompt checks for AI tells, identity, grounding and pronouns.
+- `scripts/replay-escalation.mjs`: human-in-loop escalation.
+- `scripts/replay-comment-classifier.mjs`: comment intent with and without the offer.
+
+Loose ends, not bugs:
+- Only 3 of 6 coaches have a `creator_offers` row, so the other 3 get no price grounding. The "dominick" test account's offer row ("Clinchd", $97.99) doesn't match its script offer (a fitness program).
+- The handoff email uses one generic line for every escalation category.
+- `src` has 67 pre-existing eslint errors on main.
