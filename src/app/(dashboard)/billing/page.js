@@ -107,7 +107,7 @@ export default function BillingPage() {
       const { data: userProfile } = await supabase
         .from("users")
         .select(
-          "plan, subscription_status, stripe_customer_id, dm_count_this_month, trial_ends_at"
+          "plan, subscription_status, stripe_customer_id, dm_count_this_month, trial_ends_at, cancel_at"
         )
         .eq("id", authUser.id)
         .single();
@@ -273,6 +273,21 @@ export default function BillingPage() {
               )}
             </div>
             <p className="text-sm text-muted-foreground">{planDisplayName}</p>
+            {/* Pending cancellation (users.cancel_at, written by the
+                customer.subscription.updated webhook). Status stays
+                'active' until this date, so without it the plan looked
+                like it would renew. */}
+            {profile?.cancel_at && subscriptionStatus !== "canceled" && (
+              <p className="text-sm font-medium text-amber-700">
+                Your plan ends{" "}
+                {new Date(profile.cancel_at).toLocaleDateString("en-US", {
+                  month: "long",
+                  day: "numeric",
+                  year: "numeric",
+                })}
+                .
+              </p>
+            )}
           </CardContent>
           {profile?.stripe_customer_id && (
             <CardFooter>
