@@ -4,10 +4,11 @@ import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
 import { PowerOff, Loader2 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
+import { shouldShowAiInactiveBanner } from "@/lib/onboarding";
 
-// Persistent (non-dismissible) banner shown when Instagram is connected but
-// the AI is in handoff or off mode, so inbound DMs are saved but never
-// answered. A paying customer spent their whole subscription in this state
+// Persistent (non-dismissible) banner shown when Instagram is connected, the
+// subscription is one the reply gates serve, and the AI is in handoff or off
+// mode, so inbound DMs are saved but never answered. A paying customer spent their whole subscription in this state
 // without noticing (8 of 11 threads skipped as ai_inactive), so this is
 // deliberately not dismissible: it disappears only when the AI is on.
 //
@@ -26,7 +27,7 @@ export default function AiInactiveBanner() {
       if (!user || cancelled) return;
       supabase
         .from("users")
-        .select("ai_mode, instagram_business_account_id")
+        .select("ai_mode, instagram_business_account_id, subscription_status")
         .eq("id", user.id)
         .single()
         .then(({ data }) => {
@@ -60,9 +61,7 @@ export default function AiInactiveBanner() {
     }
   };
 
-  if (!profile?.instagram_business_account_id || profile.ai_mode === "active") {
-    return null;
-  }
+  if (!shouldShowAiInactiveBanner(profile)) return null;
 
   return (
     <div className="sticky top-0 z-30 bg-red-50 border-b border-red-200 px-6 py-2.5 flex items-center gap-3">

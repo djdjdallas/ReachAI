@@ -3,6 +3,7 @@
 import { useState, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { resolveOnboardingAiMode } from "@/lib/onboarding";
 import posthog from "posthog-js";
 import { Loader2, AlertCircle, X } from "lucide-react";
 
@@ -67,11 +68,13 @@ function OnboardingPage() {
   const [finalizingVoice, setFinalizingVoice] = useState(false);
 
   // Step 5
-  // Step 5 toggle. Starts ON: finishing onboarding arms the AI unless the
-  // user explicitly turns it off. Re-synced from the saved ai_mode once the
-  // profile loads, so an explicit earlier 'handoff' choice is preserved.
+  // Step 5 toggle INTENT. Starts ON: finishing onboarding arms the AI unless
+  // the user explicitly turns it off. Re-synced from the saved ai_mode once
+  // the profile loads, so an explicit earlier 'handoff' choice is preserved.
   // (It used to start OFF, which made the footer's primary button read
   // "Continue with Handoff Mode" and silently left new users' AI off.)
+  // What the toggle SHOWS, and what finalize writes, is aiArmed below: the
+  // intent only counts once a greeting exists (scriptReady).
   const [aiActive, setAiActive] = useState(true);
   const [activating, setActivating] = useState(false);
 
@@ -633,6 +636,10 @@ function OnboardingPage() {
   };
 
   const scriptReady = !!profile?.script_config?.greeting;
+  // The toggle as shown: ON only when the user wants it AND a greeting
+  // exists, so a user with no script sees it OFF and can't finish with
+  // ai_mode='active' while the webhook silently skips every reply.
+  const aiArmed = aiActive && scriptReady;
   const instagramConnected = !!profile?.instagram_business_account_id;
 
   // Step 3 — persist voice prefs (tone/traits/response_length) and advance.
@@ -677,11 +684,17 @@ function OnboardingPage() {
   // the in-page toggle: ON → active (the default), OFF → handoff (only when
   // the user turned it off). Pass
   // { activate: true } to arm the AI regardless of the toggle (the "Go Live
-  // Now" CTA). Every dashboard-bound exit from step 5 MUST go through here —
-  // a bare router.push("/dashboard") leaves onboarding_completed false and
-  // middleware bounces the user straight back to step 2.
+  // Now" CTA). Either way 'active' also needs scriptReady
+  // (resolveOnboardingAiMode). Every dashboard-bound exit from step 5 MUST go
+  // through here: a bare router.push("/dashboard") leaves
+  // onboarding_completed false and middleware bounces the user straight back
+  // to step 2.
   const handleFinalizeAndGo = async ({ activate } = {}) => {
-    const goLive = activate === undefined ? aiActive : activate;
+    const goLive =
+      resolveOnboardingAiMode({
+        wantsActive: activate === undefined ? aiActive : activate,
+        scriptReady,
+      }) === "active";
     setAiError(null);
     setActivating(true);
     try {
@@ -870,7 +883,7 @@ function OnboardingPage() {
       {step === 5 && (
         <Step5GoLive
           profile={profile}
-          aiActive={aiActive}
+          aiActive={aiArmed}
           activating={activating}
           scriptReady={scriptReady}
           instagramConnected={instagramConnected}
@@ -879,7 +892,7 @@ function OnboardingPage() {
           // Dashboard" (toggle on) keeps it armed. Either way onboarding is
           // persisted as complete before navigating.
           onGoToDashboard={() =>
-            handleFinalizeAndGo({ activate: aiActive || scriptReady })
+            handleFinalizeAndGo({ activate: aiArmed || scriptReady })
           }
           onFinalize={() => handleFinalizeAndGo()}
           onBack={() => setStep(4)}
