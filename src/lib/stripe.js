@@ -26,7 +26,19 @@ export const PLANS = {
   },
 };
 
-export async function createCheckoutSession(customerId, priceId, userId) {
+/**
+ * @param {string} customerId
+ * @param {string} priceId
+ * @param {string} userId
+ * @param {object} [options]
+ * @param {number|null} [options.trialEnd] - unix seconds; the user's
+ *   REMAINING in-app trial from planCheckoutTrial (src/lib/checkout-trial.js).
+ *   Null charges today.
+ * @param {string} [options.submitMessage] - shown above Checkout's pay button
+ *   (custom_text.submit), e.g. "You'll be charged $197 today."
+ */
+export async function createCheckoutSession(customerId, priceId, userId, options = {}) {
+  const { trialEnd = null, submitMessage = null } = options;
   return getStripe().checkout.sessions.create({
     customer: customerId,
     payment_method_types: ["card"],
@@ -35,14 +47,16 @@ export async function createCheckoutSession(customerId, priceId, userId) {
     // Affiliate attribution: promoters get a per-promoter promotion code;
     // payouts are read off the code's customers in the Stripe dashboard.
     allow_promotion_codes: true,
-    // No trial_period_days here: the 7-day trial is granted once at signup by
-    // the DB trigger (008_trial_on_signup). Granting another at checkout
-    // stacked ~14 free days, delayed first revenue a week on every
-    // conversion, and let a cancel inside that week collect $0 while the DB
-    // already said active.
+    // Never trial_period_days: the 7-day trial is granted once at signup by
+    // the DB trigger (008_trial_on_signup). A fresh trial here stacked ~14
+    // free days. trial_end carries only what is LEFT of that signup trial
+    // (never more), so paying mid-trial no longer forfeits the remaining
+    // days. See src/lib/checkout-trial.js.
     subscription_data: {
       metadata: { userId },
+      ...(trialEnd ? { trial_end: trialEnd } : {}),
     },
+    ...(submitMessage ? { custom_text: { submit: { message: submitMessage } } } : {}),
     success_url: `${process.env.NEXT_PUBLIC_APP_URL}/dashboard`,
     cancel_url: `${process.env.NEXT_PUBLIC_APP_URL}/billing`,
     metadata: { userId },

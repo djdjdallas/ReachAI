@@ -8,6 +8,11 @@ import {
   getStripe,
   PLANS,
 } from "@/lib/stripe";
+import {
+  planCheckoutTrial,
+  chargeTodayText,
+  trialContinuesText,
+} from "@/lib/checkout-trial";
 
 export async function POST(request) {
   try {
@@ -38,7 +43,7 @@ export async function POST(request) {
     // Fetch user profile to check for existing Stripe customer
     const { data: userProfile, error: profileError } = await getSupabaseAdmin()
       .from("users")
-      .select("stripe_customer_id, email")
+      .select("stripe_customer_id, email, subscription_status, trial_ends_at")
       .eq("id", user.id)
       .single();
 
@@ -85,8 +90,19 @@ export async function POST(request) {
       return NextResponse.json({ url: portal.url }, { status: 200 });
     }
 
-    // Create checkout session
-    const session = await createCheckoutSession(customerId, priceId, user.id);
+    // Carry the remaining in-app trial (never more), or charge today and say
+    // so on the Checkout page. The billing page shows the same line before
+    // the click (same helper).
+    const { trialEnd, chargeToday } = planCheckoutTrial({
+      subscriptionStatus: userProfile.subscription_status,
+      trialEndsAt: userProfile.trial_ends_at,
+    });
+    const session = await createCheckoutSession(customerId, priceId, user.id, {
+      trialEnd,
+      submitMessage: chargeToday
+        ? chargeTodayText(plan.price)
+        : trialContinuesText(trialEnd, plan.price),
+    });
 
     return NextResponse.json({ url: session.url }, { status: 200 });
   } catch (error) {

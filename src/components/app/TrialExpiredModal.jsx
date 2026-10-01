@@ -12,6 +12,11 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import { chargeTodayText } from "@/lib/checkout-trial";
+
+// This modal always checks out the Base plan. Keep in sync with
+// PLANS.base.price in src/lib/stripe.js (server-only module).
+const BASE_PRICE_CENTS = 9700;
 
 // Hard-block modal shown when the user's trial has expired and they have
 // no active subscription. Non-dismissible by intent — closing the dialog
@@ -62,8 +67,8 @@ export default function TrialExpiredModal() {
           <DialogTitle>Your free trial has ended</DialogTitle>
           <DialogDescription className="leading-relaxed">
             Subscribe to keep your AI agent active and continue replying to
-            your Instagram DMs. Your conversations and settings are saved —
-            you can pick up right where you left off.
+            your Instagram DMs. Your conversations and settings are saved,
+            so you can pick up right where you left off.
           </DialogDescription>
         </DialogHeader>
         <div className="flex flex-col gap-2 pt-2">
@@ -79,6 +84,12 @@ export default function TrialExpiredModal() {
             )}
             Upgrade now
           </Button>
+          {/* The trial is over by definition here, so checkout charges
+              immediately. Say so before the click (create-checkout puts the
+              same line on the Stripe page). */}
+          <p className="text-xs text-stone-500 text-center">
+            {chargeTodayText(BASE_PRICE_CENTS)}
+          </p>
           <Button
             variant="ghost"
             onClick={handleSignOut}

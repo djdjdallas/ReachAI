@@ -29,12 +29,20 @@ import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Separator } from "@/components/ui/separator";
 import { getDmLimit, getPlanDisplay } from "@/lib/plans";
+import {
+  planCheckoutTrial,
+  chargeTodayText,
+  trialContinuesText,
+} from "@/lib/checkout-trial";
 
 const PLANS = [
   {
     id: "base",
     name: "Base Plan",
     price: "$97",
+    // Keep in sync with PLANS.base.price in src/lib/stripe.js (that module
+    // pulls in the Stripe SDK, so it can't be imported client-side).
+    priceCents: 9700,
     period: "/mo",
     dmLimit: "1,500 qualified conversations/month",
     features: [
@@ -51,6 +59,7 @@ const PLANS = [
     id: "unlimited",
     name: "Unlimited Plan",
     price: "$197",
+    priceCents: 19700,
     period: "/mo",
     dmLimit: "Unlimited conversations",
     features: [
@@ -98,7 +107,7 @@ export default function BillingPage() {
       const { data: userProfile } = await supabase
         .from("users")
         .select(
-          "plan, subscription_status, stripe_customer_id, dm_count_this_month, cancel_at"
+          "plan, subscription_status, stripe_customer_id, dm_count_this_month, trial_ends_at, cancel_at"
         )
         .eq("id", authUser.id)
         .single();
@@ -358,6 +367,20 @@ export default function BillingPage() {
             const isCurrentPlan =
               currentPlan === plan.id &&
               subscriptionStatus === "active";
+            // Same decision create-checkout makes, shown before the click.
+            // Live subscribers are sent to the portal instead, so no line.
+            const hasLiveSubscription = ["active", "past_due"].includes(
+              subscriptionStatus
+            );
+            const checkoutTrial = planCheckoutTrial({
+              subscriptionStatus,
+              trialEndsAt: profile?.trial_ends_at,
+            });
+            const chargeNote = hasLiveSubscription
+              ? null
+              : checkoutTrial.chargeToday
+                ? chargeTodayText(plan.priceCents)
+                : trialContinuesText(checkoutTrial.trialEnd, plan.priceCents);
             return (
               <Card
                 key={plan.id}
@@ -393,7 +416,7 @@ export default function BillingPage() {
                     ))}
                   </ul>
                 </CardContent>
-                <CardFooter>
+                <CardFooter className="flex-col gap-2">
                   {isCurrentPlan ? (
                     <Button disabled className="w-full" variant="outline">
                       Current Plan
@@ -412,6 +435,11 @@ export default function BillingPage() {
                         ? "Upgrade"
                         : "Subscribe"}
                     </Button>
+                  )}
+                  {!isCurrentPlan && chargeNote && (
+                    <p className="text-xs text-muted-foreground text-center">
+                      {chargeNote}
+                    </p>
                   )}
                 </CardFooter>
               </Card>

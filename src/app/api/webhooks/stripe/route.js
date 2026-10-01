@@ -1,5 +1,6 @@
 import { NextResponse, after } from "next/server";
 import { getStripe, PLANS } from "@/lib/stripe";
+import { formatPrice, formatTrialDate } from "@/lib/checkout-trial";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import { pendingCancelFromSubscription } from "@/lib/stripe-cancel";
 import { getPostHogClient } from "@/lib/posthog-server";
@@ -79,6 +80,29 @@ export async function POST(request) {
 
           if (currentUser?.ai_mode === "off") {
             updateData.ai_mode = "active";
+          }
+
+          // Align trial_ends_at with what Stripe actually did, so the row
+          // stops showing the stale signup date. Checkout carries the
+          // remaining in-app trial (src/lib/checkout-trial.js): if the new
+          // subscription has a trial, trial_ends_at becomes its trial_end
+          // (same instant, rounded down). If the user was charged today,
+          // the trial is over and trial_ends_at is cleared. On a lookup
+          // failure the column is left as-is rather than guessed.
+          if (session.subscription) {
+            try {
+              const sub = await getStripe().subscriptions.retrieve(
+                session.subscription
+              );
+              updateData.trial_ends_at = sub.trial_end
+                ? new Date(sub.trial_end * 1000).toISOString()
+                : null;
+            } catch (err) {
+              console.error(
+                "[stripe-webhook] trial_ends_at alignment skipped:",
+                err?.message
+              );
+            }
           }
 
           const { data: activatedRows, error: activateError } = await supabase
@@ -187,15 +211,26 @@ export async function POST(request) {
           .single();
 
         if (owner?.email) {
+          // Live again since checkout carries the remaining trial
+          // (src/lib/checkout-trial.js). Names the real date and amount: the
+          // trial is whatever was left of the signup trial, not "7-day".
+          const price = subscription.items?.data?.[0]?.price?.unit_amount;
+          const endDate = subscription.trial_end
+            ? formatTrialDate(subscription.trial_end)
+            : null;
+          const chargeLine =
+            endDate && typeof price === "number"
+              ? `Your Clinchd trial ends on ${endDate}, and your card will be charged ${formatPrice(price)} then.`
+              : "Your Clinchd trial ends in a few days, and your card will be charged for the plan you selected.";
           try {
             const { sendEmail } = await import("@/lib/notifications");
             await sendEmail({
               to: owner.email,
               subject: "Your Clinchd trial ends soon",
               html: `<p>Hi ${owner.full_name || "there"},</p>
-                <p>Just a heads-up: your 7-day Clinchd trial ends in a few days, and your card will be charged for the plan you selected. If you'd like to cancel or change plans, open the billing page in your dashboard — no pressure.</p>
+                <p>Just a heads-up: ${chargeLine} If you'd like to cancel or change plans, open the billing page in your dashboard. No pressure.</p>
                 <p><a href="${process.env.NEXT_PUBLIC_APP_URL}/billing">Manage billing →</a></p>
-                <p>— Clinchd</p>`,
+                <p>Clinchd</p>`,
             });
           } catch (err) {
             console.error("trial_will_end email failed:", err?.message);
