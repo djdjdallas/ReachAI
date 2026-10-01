@@ -77,15 +77,16 @@ export function shouldActivateCheckout(liveStatus) {
 }
 
 /**
- * customer.subscription.deleted. PostgREST .or() filter for the cancel
- * UPDATE: only a row tracking this subscription (or none yet) matches, so a
- * late delete of the OLD subscription can't cancel a customer who has since
- * resubscribed. In the UPDATE itself, not a prior read, so it holds even
- * when it races the checkout that writes the new subscription id.
+ * PostgREST .or() filter for the users UPDATE in customer.subscription.updated
+ * and customer.subscription.deleted: only a row tracking this subscription (or
+ * none yet) matches, so a late event for the OLD subscription can't overwrite
+ * or cancel a customer who has since resubscribed. In the UPDATE itself, not
+ * a prior read, so it holds even when it races the checkout that writes the
+ * new subscription id.
  *
  * @param {string} subscriptionId - Stripe ids are [A-Za-z0-9_], safe here
  */
-export function deletionMatchFilter(subscriptionId) {
+export function trackedSubscriptionFilter(subscriptionId) {
   return `stripe_subscription_id.is.null,stripe_subscription_id.eq.${subscriptionId}`;
 }
 

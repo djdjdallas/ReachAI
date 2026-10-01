@@ -3,7 +3,7 @@ import {
   mapSubscriptionStatus,
   decideSubscriptionUpdate,
   shouldActivateCheckout,
-  deletionMatchFilter,
+  trackedSubscriptionFilter,
   CLEAR_PENDING_CANCEL,
 } from "./stripe-subscription-guard";
 
@@ -86,9 +86,9 @@ describe("shouldActivateCheckout (H2)", () => {
   );
 });
 
-describe("deletionMatchFilter", () => {
+describe("trackedSubscriptionFilter", () => {
   it("matches a row tracking this subscription, or none yet", () => {
-    expect(deletionMatchFilter(SUB)).toBe(
+    expect(trackedSubscriptionFilter(SUB)).toBe(
       "stripe_subscription_id.is.null,stripe_subscription_id.eq.sub_current"
     );
   });

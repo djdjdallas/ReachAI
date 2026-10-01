@@ -215,6 +215,33 @@ describe("customer.subscription.updated (M2)", () => {
     expect(res.status).toBe(500);
   });
 
+  it("an update for the old subscription that races a resubscribe leaves the new one alone", async () => {
+    // The read sees sub_new's predecessor as tracked, so decideSubscriptionUpdate
+    // applies; checkout writes sub_new before the UPDATE runs. The guard in the
+    // UPDATE's WHERE keeps the stale event off the row, cancel fields included.
+    stripe.subscriptions.retrieve.mockResolvedValue({
+      id: "sub_old",
+      status: "active",
+      cancel_at: 1792987723,
+      items: { data: [{ price: { id: "price_base" } }] },
+    });
+    db = fakeDb(
+      { users: [user({ stripe_subscription_id: "sub_old", plan: "unlimited" })] },
+      { afterRead: (t) => Object.assign(t.users[0], { stripe_subscription_id: "sub_new" }) }
+    );
+    const res = await post({
+      type: "customer.subscription.updated",
+      data: { object: { id: "sub_old", customer: "cus_1" } },
+    });
+    expect(res.status).toBe(200);
+    expect(db.tables.users[0]).toMatchObject({
+      stripe_subscription_id: "sub_new",
+      plan: "unlimited",
+      cancel_at: null,
+    });
+    expect(sendBusinessEventAlert).not.toHaveBeenCalled();
+  });
+
   it("applies a cancel request when the read and write succeed", async () => {
     db = fakeDb({ users: [user()] });
     const res = await post(updated);

@@ -9,7 +9,7 @@ import {
   mapSubscriptionStatus,
   decideSubscriptionUpdate,
   shouldActivateCheckout,
-  deletionMatchFilter,
+  trackedSubscriptionFilter,
   CLEAR_PENDING_CANCEL,
 } from "@/lib/stripe-subscription-guard";
 import { getPostHogClient } from "@/lib/posthog-server";
@@ -310,11 +310,25 @@ export async function POST(request) {
           updateData.drip_enabled = false;
         }
 
-        const { error: updateError } = await supabase
+        // decideSubscriptionUpdate read the row; the same subscription guard
+        // also sits in the UPDATE, so a checkout that writes a new
+        // subscription id between that read and this write makes this event
+        // match no row instead of overwriting the new subscription.
+        const { data: updatedRows, error: updateError } = await supabase
           .from("users")
           .update(updateData)
-          .eq("stripe_customer_id", customerId);
+          .eq("stripe_customer_id", customerId)
+          .or(trackedSubscriptionFilter(subscription.id))
+          .select("id");
         if (updateError) throw updateError;
+        if (!updatedRows?.length) {
+          console.warn(
+            "[stripe-webhook] customer.subscription.updated matched no row tracking this subscription, skipped.",
+            "subscription:", subscription.id,
+            "customer:", customerId
+          );
+          break;
+        }
 
         // Pending cancellation: the portal schedules cancel_at for the
         // period end and status stays 'active' until then. syncPendingCancel
@@ -406,7 +420,7 @@ export async function POST(request) {
             drip_enabled: false,
           })
           .eq("stripe_customer_id", customerId)
-          .or(deletionMatchFilter(subscription.id))
+          .or(trackedSubscriptionFilter(subscription.id))
           .select("id");
         if (cancelError) throw cancelError;
         if (!canceledRows?.length) {
