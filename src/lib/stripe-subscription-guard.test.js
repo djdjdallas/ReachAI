@@ -3,7 +3,7 @@ import {
   mapSubscriptionStatus,
   decideSubscriptionUpdate,
   shouldActivateCheckout,
-  shouldApplyDeletion,
+  deletionMatchFilter,
   CLEAR_PENDING_CANCEL,
 } from "./stripe-subscription-guard";
 
@@ -74,26 +74,23 @@ describe("decideSubscriptionUpdate (H2)", () => {
 });
 
 describe("shouldActivateCheckout (H2)", () => {
-  it.each(["active", "trialing", "past_due", "incomplete"])("activates for a live %s subscription", (s) => {
+  it.each(["active", "trialing"])("activates for a serving %s subscription", (s) => {
     expect(shouldActivateCheckout(s)).toBe(true);
   });
 
-  it.each(["canceled", "incomplete_expired"])("ignores a replay after the subscription ended (%s)", (s) => {
-    expect(shouldActivateCheckout(s)).toBe(false);
-  });
+  it.each(["canceled", "incomplete_expired", "unpaid", "past_due", "paused", "incomplete", null])(
+    "does not activate for %s (replay after the subscription stopped serving)",
+    (s) => {
+      expect(shouldActivateCheckout(s)).toBe(false);
+    }
+  );
 });
 
-describe("shouldApplyDeletion", () => {
-  it("cancels the tracked subscription", () => {
-    expect(shouldApplyDeletion({ row: { stripe_subscription_id: SUB }, subscriptionId: SUB })).toBe(true);
-  });
-
-  it("ignores a late delete of the old subscription after a resubscribe", () => {
-    expect(shouldApplyDeletion({ row: { stripe_subscription_id: SUB }, subscriptionId: "sub_old" })).toBe(false);
-  });
-
-  it("cancels when the row never recorded a subscription id", () => {
-    expect(shouldApplyDeletion({ row: { stripe_subscription_id: null }, subscriptionId: SUB })).toBe(true);
+describe("deletionMatchFilter", () => {
+  it("matches a row tracking this subscription, or none yet", () => {
+    expect(deletionMatchFilter(SUB)).toBe(
+      "stripe_subscription_id.is.null,stripe_subscription_id.eq.sub_current"
+    );
   });
 });
 

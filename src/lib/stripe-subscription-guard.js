@@ -65,24 +65,28 @@ export function decideSubscriptionUpdate({ row, subscriptionId, liveStatus }) {
 /**
  * checkout.session.completed. A new checkout legitimately activates a
  * canceled row (that is a resubscribe), so there is no row guard here: the
- * question is only whether the subscription it created is still alive. A
- * replay after that subscription ended must not activate anything.
+ * question is only whether the subscription it created is serving right
+ * now. Allowlist, not blocklist: a replay after the subscription ended, went
+ * unpaid, paused or past_due must not write 'active'.
  *
  * @param {string|null} liveStatus - status of session.subscription, read
  *   from Stripe now (null for a session with no subscription)
  */
 export function shouldActivateCheckout(liveStatus) {
-  return !["canceled", "incomplete_expired"].includes(liveStatus);
+  return liveStatus === "active" || liveStatus === "trialing";
 }
 
 /**
- * customer.subscription.deleted. Skips a deletion of a subscription the row
- * no longer tracks: a late delete of the OLD subscription must not cancel a
- * customer who has since resubscribed.
+ * customer.subscription.deleted. PostgREST .or() filter for the cancel
+ * UPDATE: only a row tracking this subscription (or none yet) matches, so a
+ * late delete of the OLD subscription can't cancel a customer who has since
+ * resubscribed. In the UPDATE itself, not a prior read, so it holds even
+ * when it races the checkout that writes the new subscription id.
+ *
+ * @param {string} subscriptionId - Stripe ids are [A-Za-z0-9_], safe here
  */
-export function shouldApplyDeletion({ row, subscriptionId }) {
-  if (!row) return false;
-  return !row.stripe_subscription_id || row.stripe_subscription_id === subscriptionId;
+export function deletionMatchFilter(subscriptionId) {
+  return `stripe_subscription_id.is.null,stripe_subscription_id.eq.${subscriptionId}`;
 }
 
 // Written on checkout.session.completed and customer.subscription.deleted.
