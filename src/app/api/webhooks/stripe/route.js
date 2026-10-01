@@ -4,6 +4,7 @@ import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import { getPostHogClient } from "@/lib/posthog-server";
 import { sendBusinessEventAlert } from "@/lib/alerts/business-events";
 import { sendEmail } from "@/lib/notifications";
+import { subscriptionIdFromInvoice } from "@/lib/stripe-invoice";
 
 // Map a Stripe price ID to the plan key ("base" or "unlimited")
 function getPlanFromPriceId(priceId) {
@@ -160,7 +161,10 @@ export async function POST(request) {
         // that user back to active permanently.
         const invoice = event.data.object;
         const customerId = invoice.customer;
-        if (customerId && invoice.subscription) {
+        // subscriptionIdFromInvoice: on this endpoint's API version the ID is
+        // at parent.subscription_details.subscription, not invoice.subscription
+        // (which made this handler a permanent no-op).
+        if (customerId && subscriptionIdFromInvoice(invoice)) {
           await supabase
             .from("users")
             .update({ subscription_status: "active" })
@@ -369,6 +373,11 @@ export async function POST(request) {
       case "invoice.payment_failed": {
         const invoice = event.data.object;
         const customerId = invoice.customer;
+
+        // Same guard as payment_succeeded: only a failed SUBSCRIPTION invoice
+        // means the plan is at risk. A failed one-off invoice must not flip
+        // the account to past_due or send the dunning email.
+        if (!customerId || !subscriptionIdFromInvoice(invoice)) break;
 
         await supabase
           .from("users")
