@@ -1,5 +1,10 @@
 import { describe, it, expect } from "vitest";
-import { subscriptionIdFromInvoice } from "./stripe-invoice";
+import {
+  subscriptionIdFromInvoice,
+  markPastDue,
+  dunningEmailHtml,
+} from "./stripe-invoice";
+import { fakeSupabase } from "./test-utils/fake-supabase";
 
 describe("subscriptionIdFromInvoice", () => {
   it("reads parent.subscription_details.subscription (API 2025-03-31 and later)", () => {
@@ -40,5 +45,37 @@ describe("subscriptionIdFromInvoice", () => {
     [null],
   ])("returns null for a non-subscription invoice %j", (invoice) => {
     expect(subscriptionIdFromInvoice(invoice)).toBeNull();
+  });
+});
+
+describe("markPastDue", () => {
+  it("flips an active customer to past_due and returns the row for dunning", async () => {
+    const db = fakeSupabase({
+      users: [{ stripe_customer_id: "cus_a", subscription_status: "active", email: "a@x.com", full_name: "A" }],
+    });
+    expect(await markPastDue(db, "cus_a")).toEqual({ email: "a@x.com", full_name: "A" });
+    expect(db.tables.users[0].subscription_status).toBe("past_due");
+  });
+
+  it("never resurrects a canceled customer (late final-invoice failure after deletion)", async () => {
+    const db = fakeSupabase({
+      users: [{ stripe_customer_id: "cus_c", subscription_status: "canceled", email: "c@x.com" }],
+    });
+    // null means no dunning email goes out either.
+    expect(await markPastDue(db, "cus_c")).toBeNull();
+    expect(db.tables.users[0].subscription_status).toBe("canceled");
+  });
+});
+
+describe("dunningEmailHtml", () => {
+  it("has no long dashes and names the billing link", () => {
+    const html = dunningEmailHtml({ fullName: "Sam", billingUrl: "https://app/billing" });
+    expect(html).not.toMatch(/[–—]/);
+    expect(html).toContain("Hi Sam,");
+    expect(html).toContain('href="https://app/billing"');
+  });
+
+  it("greets without a name", () => {
+    expect(dunningEmailHtml({ fullName: null, billingUrl: "u" })).toContain("<p>Hi,</p>");
   });
 });

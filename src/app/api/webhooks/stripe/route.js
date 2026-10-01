@@ -6,7 +6,11 @@ import { pendingCancelFromSubscription } from "@/lib/stripe-cancel";
 import { getPostHogClient } from "@/lib/posthog-server";
 import { sendBusinessEventAlert } from "@/lib/alerts/business-events";
 import { sendEmail } from "@/lib/notifications";
-import { subscriptionIdFromInvoice } from "@/lib/stripe-invoice";
+import {
+  subscriptionIdFromInvoice,
+  markPastDue,
+  dunningEmailHtml,
+} from "@/lib/stripe-invoice";
 
 // Map a Stripe price ID to the plan key ("base" or "unlimited")
 function getPlanFromPriceId(priceId) {
@@ -450,30 +454,25 @@ export async function POST(request) {
         // the account to past_due or send the dunning email.
         if (!customerId || !subscriptionIdFromInvoice(invoice)) break;
 
-        await supabase
-          .from("users")
-          .update({ subscription_status: "past_due" })
-          .eq("stripe_customer_id", customerId);
+        // Never resurrects a canceled row (markPastDue). The dunning email
+        // goes only to a row that was actually flipped, so a late failure
+        // for an already-canceled customer sends nothing.
+        const pastDueUser = await markPastDue(supabase, customerId);
 
         // Dunning: past_due used to be silent — the coach found out from
         // lost leads. AI replies keep running through the grace window (the
         // DM gate allows past_due), but the coach needs to fix the card
         // before Stripe gives up and cancels.
-        const { data: pastDueUser } = await supabase
-          .from("users")
-          .select("email, full_name")
-          .eq("stripe_customer_id", customerId)
-          .maybeSingle();
         if (pastDueUser?.email) {
           const billingUrl = `${process.env.NEXT_PUBLIC_APP_URL}/billing`;
           after(() =>
             sendEmail({
               to: pastDueUser.email,
               subject: "Your Clinchd payment didn't go through",
-            html: `<p>Hi${pastDueUser.full_name ? ` ${pastDueUser.full_name}` : ""},</p>
-<p>Your latest Clinchd payment failed — usually an expired or declined card. Your AI agent is still replying to leads for now, and Stripe will retry the charge automatically over the next few days.</p>
-<p>To avoid any interruption, update your payment method here: <a href="${billingUrl}">${billingUrl}</a></p>
-<p>— Clinchd</p>`,
+              html: dunningEmailHtml({
+                fullName: pastDueUser.full_name,
+                billingUrl,
+              }),
             }).catch((err) =>
               console.error("[stripe-webhook] dunning email failed:", err?.message)
             )
