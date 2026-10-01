@@ -1,6 +1,7 @@
 import { NextResponse, after } from "next/server";
 import { getStripe, PLANS } from "@/lib/stripe";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
+import { pendingCancelFromSubscription } from "@/lib/stripe-cancel";
 import { getPostHogClient } from "@/lib/posthog-server";
 import { sendBusinessEventAlert } from "@/lib/alerts/business-events";
 import { sendEmail } from "@/lib/notifications";
@@ -231,13 +232,24 @@ export async function POST(request) {
         // reactivation. Trial expiry (webhook AI path + /api/ai/reply C1
         // gate) hard-flips ai_mode='off'; without restoration here a
         // coach who pays after expiry comes back as a silent account.
+        // Also reads the fields the cancellation alert needs, and the
+        // current cancel_at to tell a NEW cancel request from a repeat.
         const { data: currentUser } = await supabase
           .from("users")
-          .select("ai_mode")
+          .select("ai_mode, email, instagram_username, plan, cancel_at")
           .eq("stripe_customer_id", customerId)
           .maybeSingle();
 
-        const updateData = { subscription_status: subscriptionStatus };
+        // Pending cancellation: the portal schedules cancel_at for the
+        // period end and status stays 'active' until then. Written on every
+        // update, so a reactivation clears both columns.
+        const { cancelAt, canceledAt } =
+          pendingCancelFromSubscription(subscription);
+        const updateData = {
+          subscription_status: subscriptionStatus,
+          cancel_at: cancelAt,
+          canceled_at: canceledAt,
+        };
         if (plan) {
           updateData.plan = plan;
         }
@@ -267,6 +279,30 @@ export async function POST(request) {
           .from("users")
           .update(updateData)
           .eq("stripe_customer_id", customerId);
+
+        // Founder alert on a NEW cancel request (cancel_at was empty and is
+        // now set): the save-the-customer window, weeks before
+        // customer.subscription.deleted. A Stripe retry of the same event
+        // finds cancel_at already set and stays silent.
+        if (cancelAt && currentUser && !currentUser.cancel_at) {
+          after(() =>
+            sendBusinessEventAlert("cancellation_requested", {
+              email: currentUser.email,
+              instagramUsername: currentUser.instagram_username,
+              plan: plan || currentUser.plan,
+              cancelAt,
+              canceledAt,
+              reason: subscription.cancellation_details?.feedback || null,
+              comment: subscription.cancellation_details?.comment || null,
+              stripeCustomerId: customerId,
+            }).catch(console.error)
+          );
+          getPostHogClient().capture({
+            distinctId: currentUser.email || customerId,
+            event: "subscription_cancel_requested",
+            properties: { cancel_at: cancelAt, plan: plan || currentUser.plan },
+          });
+        }
 
         // When drip is being disabled by a downgrade, cancel every scheduled
         // nudge for that coach so nothing fires mid-cycle after they downgrade.

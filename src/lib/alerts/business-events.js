@@ -3,7 +3,8 @@ import { sendEmail, sendSms } from "@/lib/notifications";
 /**
  * Founder-facing business-event alerts: signup, Instagram connect (including
  * the loud account-CHANGED case from the July 14 incident), subscription
- * started, subscription canceled.
+ * started, cancellation requested (still paying until the period ends),
+ * subscription canceled.
  *
  * Design rules:
  * - NEVER throws to the caller. sendEmail/sendSms already never throw, and
@@ -25,7 +26,11 @@ const FOUNDER_EMAIL =
 
 const FOUNDER_PHONE = process.env.ALERT_PHONE || null;
 
-const SMS_EVENTS = new Set(["subscription_started", "subscription_canceled"]);
+const SMS_EVENTS = new Set([
+  "subscription_started",
+  "cancellation_requested",
+  "subscription_canceled",
+]);
 
 function escapeHtml(s) {
   return String(s ?? "").replace(
@@ -105,6 +110,24 @@ function compose(event, p) {
         ].join("\n"),
       };
 
+    // Fires when a cancel is first scheduled (customer.subscription.updated
+    // sets cancel_at), weeks before subscription_canceled. This is the
+    // window to save the customer, so it carries the reason they gave.
+    case "cancellation_requested":
+      return {
+        subject: `[clinchd] ⏳ cancel requested: ${p.email || "unknown email"} (${igLabel(p.instagramUsername)}), ${p.plan || "unknown"}, ends ${p.cancelAt || "unknown"}`,
+        body: [
+          `email: ${p.email || "unknown"}`,
+          `instagram: ${igLabel(p.instagramUsername)}`,
+          `plan: ${p.plan || "unknown"}`,
+          `access ends: ${p.cancelAt || "unknown"}`,
+          `requested at: ${p.canceledAt || "unknown"}`,
+          `reason: ${p.reason || "none given"}`,
+          `comment: ${p.comment || "none"}`,
+          `stripe customer: ${p.stripeCustomerId || "unknown"}`,
+        ].join("\n"),
+      };
+
     case "subscription_canceled": {
       const n = p.conversationCount ?? "unknown";
       return {
@@ -125,7 +148,7 @@ function compose(event, p) {
 }
 
 /**
- * @param {"signup"|"instagram_connected"|"subscription_started"|"subscription_canceled"} event
+ * @param {"signup"|"instagram_connected"|"subscription_started"|"cancellation_requested"|"subscription_canceled"} event
  * @param {object} payload - event-specific fields, see compose()
  * @returns {Promise<boolean>} true when the founder EMAIL was accepted by
  *   Resend. Still never throws; the boolean lets a caller with a retryable
