@@ -67,7 +67,12 @@ function OnboardingPage() {
   const [finalizingVoice, setFinalizingVoice] = useState(false);
 
   // Step 5
-  const [aiActive, setAiActive] = useState(false);
+  // Step 5 toggle. Starts ON: finishing onboarding arms the AI unless the
+  // user explicitly turns it off. Re-synced from the saved ai_mode once the
+  // profile loads, so an explicit earlier 'handoff' choice is preserved.
+  // (It used to start OFF, which made the footer's primary button read
+  // "Continue with Handoff Mode" and silently left new users' AI off.)
+  const [aiActive, setAiActive] = useState(true);
   const [activating, setActivating] = useState(false);
 
   // AI/API errors surfaced to the user
@@ -211,8 +216,21 @@ function OnboardingPage() {
         .single();
 
       if (userProfile) {
-        // Auto-advance: if Instagram is connected and user is on step 1, go to step 2
+        // Every step after 1 needs a connected Instagram account. ?step= is
+        // read straight from the URL in the initial state, so a deep link
+        // (or a disconnect after onboarding) could skip the Connect step.
+        // The page renders a loader until init finishes, so correcting the
+        // step here never flashes a later step.
         const urlStep = parseInt(searchParams.get("step"), 10);
+        if (!userProfile.instagram_business_account_id && urlStep > 1) {
+          setStep(1);
+        }
+
+        // Toggle mirrors the saved choice. A new user has the column default
+        // ('active'); someone who switched to handoff keeps handoff.
+        setAiActive(userProfile.ai_mode ? userProfile.ai_mode === "active" : true);
+
+        // Auto-advance: if Instagram is connected and user is on step 1, go to step 2
         if (
           userProfile.instagram_business_account_id &&
           (!urlStep || urlStep <= 1)
@@ -656,7 +674,8 @@ function OnboardingPage() {
   };
 
   // Step 5 — finalize onboarding and route to dashboard. ai_mode is read from
-  // the in-page toggle: ON → active, OFF → handoff (safer default). Pass
+  // the in-page toggle: ON → active (the default), OFF → handoff (only when
+  // the user turned it off). Pass
   // { activate: true } to arm the AI regardless of the toggle (the "Go Live
   // Now" CTA). Every dashboard-bound exit from step 5 MUST go through here —
   // a bare router.push("/dashboard") leaves onboarding_completed false and

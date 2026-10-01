@@ -1,6 +1,7 @@
 import Sidebar from "@/components/sidebar";
 import DashboardHeader from "@/components/app/DashboardHeader";
 import OnboardingGate from "@/components/app/OnboardingGate";
+import AiInactiveBanner from "@/components/app/AiInactiveBanner";
 import TrialExpiredGate from "@/components/app/TrialExpiredGate";
 import { ErrorBoundary } from "@/components/error-boundary";
 
@@ -15,6 +16,7 @@ export default function DashboardLayout({ children }) {
         <DashboardHeader />
         <TrialExpiredGate />
         <OnboardingGate />
+        <AiInactiveBanner />
         <div className="flex-1 overflow-y-auto">
           <ErrorBoundary>{children}</ErrorBoundary>
         </div>
