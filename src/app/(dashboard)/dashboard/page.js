@@ -20,6 +20,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import StatusBadge from "@/components/app/StatusBadge";
 import { parseTimestamp, relativeTime } from "@/lib/dates";
+import { countMissedLeads, missedLeadsText } from "@/lib/inactive-inbound";
 
 function getInitials(name) {
   if (!name) return "?";
@@ -76,6 +77,9 @@ export default function DashboardPage() {
   });
   const [conversations, setConversations] = useState([]);
   const [heldForGreeting, setHeldForGreeting] = useState(0);
+  // Leads who messaged after the trial or plan ended (expired / canceled
+  // only). The webhook still saves their messages; the AI can't reply.
+  const [missedLeads, setMissedLeads] = useState(0);
 
   const fetchData = useCallback(
     async (userId) => {
@@ -197,6 +201,9 @@ export default function DashboardPage() {
 
       if (userProfile) {
         setProfile(userProfile);
+        if (["expired", "canceled"].includes(userProfile.subscription_status)) {
+          setMissedLeads(await countMissedLeads(supabase, authUser.id));
+        }
       }
 
       await fetchData(authUser.id);
@@ -323,6 +330,20 @@ export default function DashboardPage() {
           </div>
           <Button size="sm" variant="outline" asChild>
             <Link href="/settings">Connect</Link>
+          </Button>
+        </div>
+      )}
+
+      {missedLeadsText(missedLeads, profile?.subscription_status) && (
+        <div className="flex items-center gap-3 p-4 rounded-2xl border border-red-200 bg-red-50">
+          <AlertTriangle className="h-5 w-5 text-red-600 shrink-0" />
+          <div className="flex-1">
+            <p className="text-sm font-medium text-red-700">
+              {missedLeadsText(missedLeads, profile?.subscription_status)}
+            </p>
+          </div>
+          <Button size="sm" variant="outline" asChild>
+            <Link href="/billing">Upgrade</Link>
           </Button>
         </div>
       )}
