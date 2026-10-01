@@ -2,7 +2,17 @@ import { NextResponse, after } from "next/server";
 import { getStripe, PLANS } from "@/lib/stripe";
 import { formatPrice, formatTrialDate } from "@/lib/checkout-trial";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
-import { pendingCancelFromSubscription } from "@/lib/stripe-cancel";
+import {
+  pendingCancelFromSubscription,
+  syncPendingCancel,
+} from "@/lib/stripe-cancel";
+import {
+  mapSubscriptionStatus,
+  decideSubscriptionUpdate,
+  shouldActivateCheckout,
+  shouldApplyDeletion,
+  CLEAR_PENDING_CANCEL,
+} from "@/lib/stripe-subscription-guard";
 import { getPostHogClient } from "@/lib/posthog-server";
 import { sendBusinessEventAlert } from "@/lib/alerts/business-events";
 import { sendEmail } from "@/lib/notifications";
@@ -50,6 +60,26 @@ export async function POST(request) {
         const userId =
           session.metadata?.userId || session.client_reference_id || null;
 
+        // A replay of this event after the subscription ended must not
+        // re-activate the row (shouldActivateCheckout). Live status from
+        // Stripe, not the payload. A lookup failure throws, so the webhook
+        // 500s and Stripe retries rather than activating blind.
+        let liveSubscription = null;
+        if (userId && session.subscription) {
+          liveSubscription = await getStripe().subscriptions.retrieve(
+            session.subscription
+          );
+        }
+        if (userId && !shouldActivateCheckout(liveSubscription?.status ?? null)) {
+          console.warn(
+            "[stripe-webhook] checkout.session.completed for an ended subscription, skipped.",
+            "session:", session.id,
+            "subscription:", session.subscription,
+            "status:", liveSubscription?.status
+          );
+          break;
+        }
+
         if (userId) {
           // Fix 6: Retrieve line items to determine which plan was purchased
           let plan = "base";
@@ -80,6 +110,8 @@ export async function POST(request) {
             stripe_customer_id: session.customer,
             stripe_subscription_id: session.subscription,
             plan,
+            // A new subscription ends any earlier pending cancel.
+            ...CLEAR_PENDING_CANCEL,
           };
 
           if (currentUser?.ai_mode === "off") {
@@ -247,52 +279,46 @@ export async function POST(request) {
         const subscription = event.data.object;
         const customerId = subscription.customer;
 
-        // Map Stripe subscription status to our status
-        let subscriptionStatus;
-        switch (subscription.status) {
-          case "active":
-          case "trialing":
-            subscriptionStatus = "active";
-            break;
-          case "past_due":
-            subscriptionStatus = "past_due";
-            break;
-          case "canceled":
-          case "unpaid":
-            subscriptionStatus = "canceled";
-            break;
-          default:
-            subscriptionStatus = subscription.status;
-        }
+        // Decide on the LIVE subscription, not this payload: a retried or
+        // out-of-order delivery carries stale status and cancel fields
+        // (src/lib/stripe-subscription-guard.js). A lookup failure throws,
+        // so the webhook 500s and Stripe retries.
+        const live = await getStripe().subscriptions.retrieve(subscription.id);
+        const subscriptionStatus = mapSubscriptionStatus(live.status);
 
         // Fix 6: Also sync plan on subscription changes (portal upgrades/downgrades)
         let plan;
-        if (subscription.items?.data?.length > 0) {
-          plan = getPlanFromPriceId(subscription.items.data[0].price.id);
+        if (live.items?.data?.length > 0) {
+          plan = getPlanFromPriceId(live.items.data[0].price.id);
         }
 
         // Fetch current ai_mode so we can decide whether to restore it on
         // reactivation. Trial expiry (webhook AI path + /api/ai/reply C1
         // gate) hard-flips ai_mode='off'; without restoration here a
         // coach who pays after expiry comes back as a silent account.
-        // Also reads the fields the cancellation alert needs, and the
-        // current cancel_at to tell a NEW cancel request from a repeat.
+        // Also reads what decideSubscriptionUpdate needs.
         const { data: currentUser } = await supabase
           .from("users")
-          .select("ai_mode, email, instagram_username, plan, cancel_at")
+          .select("ai_mode, subscription_status, stripe_subscription_id")
           .eq("stripe_customer_id", customerId)
           .maybeSingle();
 
-        // Pending cancellation: the portal schedules cancel_at for the
-        // period end and status stays 'active' until then. Written on every
-        // update, so a reactivation clears both columns.
-        const { cancelAt, canceledAt } =
-          pendingCancelFromSubscription(subscription);
-        const updateData = {
-          subscription_status: subscriptionStatus,
-          cancel_at: cancelAt,
-          canceled_at: canceledAt,
-        };
+        const decision = decideSubscriptionUpdate({
+          row: currentUser,
+          subscriptionId: subscription.id,
+          liveStatus: live.status,
+        });
+        if (!decision.apply) {
+          console.warn(
+            "[stripe-webhook] customer.subscription.updated skipped:",
+            decision.reason,
+            "subscription:", subscription.id,
+            "customer:", customerId
+          );
+          break;
+        }
+
+        const updateData = { subscription_status: subscriptionStatus };
         if (plan) {
           updateData.plan = plan;
         }
@@ -323,27 +349,38 @@ export async function POST(request) {
           .update(updateData)
           .eq("stripe_customer_id", customerId);
 
-        // Founder alert on a NEW cancel request (cancel_at was empty and is
-        // now set): the save-the-customer window, weeks before
-        // customer.subscription.deleted. A Stripe retry of the same event
-        // finds cancel_at already set and stays silent.
-        if (cancelAt && currentUser && !currentUser.cancel_at) {
+        // Pending cancellation: the portal schedules cancel_at for the
+        // period end and status stays 'active' until then. syncPendingCancel
+        // sets it with a conditional update, so of two deliveries of the
+        // same cancel exactly one is a NEW request, and a reactivation
+        // clears both columns. Read off the live subscription, so a cancel
+        // event delivered after a reactivation sets nothing.
+        const pending = pendingCancelFromSubscription(live);
+        const { newRequest, row: canceling } = await syncPendingCancel(
+          supabase,
+          customerId,
+          pending
+        );
+
+        // Founder alert on a NEW cancel request: the save-the-customer
+        // window, weeks before customer.subscription.deleted.
+        if (newRequest) {
           after(() =>
             sendBusinessEventAlert("cancellation_requested", {
-              email: currentUser.email,
-              instagramUsername: currentUser.instagram_username,
-              plan: plan || currentUser.plan,
-              cancelAt,
-              canceledAt,
-              reason: subscription.cancellation_details?.feedback || null,
-              comment: subscription.cancellation_details?.comment || null,
+              email: canceling.email,
+              instagramUsername: canceling.instagram_username,
+              plan: canceling.plan,
+              cancelAt: pending.cancelAt,
+              canceledAt: pending.canceledAt,
+              reason: live.cancellation_details?.feedback || null,
+              comment: live.cancellation_details?.comment || null,
               stripeCustomerId: customerId,
             }).catch(console.error)
           );
           getPostHogClient().capture({
-            distinctId: currentUser.email || customerId,
+            distinctId: canceling.email || customerId,
             event: "subscription_cancel_requested",
-            properties: { cancel_at: cancelAt, plan: plan || currentUser.plan },
+            properties: { cancel_at: pending.cancelAt, plan: canceling.plan },
           });
         }
 
@@ -376,14 +413,30 @@ export async function POST(request) {
 
         const { data: canceledUser } = await supabase
           .from("users")
-          .select("id, email, plan, created_at")
+          .select("id, email, plan, created_at, stripe_subscription_id")
           .eq("stripe_customer_id", customerId)
           .single();
+
+        // A late delete of a subscription this row no longer tracks (the
+        // customer resubscribed since) must not cancel the new one.
+        if (
+          canceledUser &&
+          !shouldApplyDeletion({ row: canceledUser, subscriptionId: subscription.id })
+        ) {
+          console.warn(
+            "[stripe-webhook] customer.subscription.deleted for an old subscription, skipped.",
+            "subscription:", subscription.id,
+            "customer:", customerId
+          );
+          break;
+        }
 
         await supabase
           .from("users")
           .update({
             subscription_status: "canceled",
+            // The cancel is no longer pending; it happened.
+            ...CLEAR_PENDING_CANCEL,
             // Reset the plan tier too: gates that key on plan alone (e.g.
             // comment-to-DM) otherwise keep running for canceled Unlimited
             // users forever — classifier spend + DM dispatch, free.
