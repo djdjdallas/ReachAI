@@ -231,7 +231,8 @@ export default function SettingsPage() {
         setDeleting(false);
         return;
       }
-      posthog.capture("account_deleted");
+      // account_deleted is captured server-side by /api/user/delete:
+      // reset() and the redirect below dropped a client-side capture.
       posthog.reset();
       await signOutAndClearState();
       window.location.href = "/login?deleted=true";

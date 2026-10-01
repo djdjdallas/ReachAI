@@ -3,6 +3,11 @@ import { createClient } from "@/lib/supabase/server";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import { getStripe } from "@/lib/stripe";
 import { decryptToken } from "@/lib/token-utils";
+import {
+  sendBusinessEventAlert,
+  accountAgeHours,
+} from "@/lib/alerts/business-events";
+import { getPostHogClient } from "@/lib/posthog-server";
 
 export async function DELETE() {
   const supabase = await createClient();
@@ -19,14 +24,48 @@ export async function DELETE() {
   const admin = getSupabaseAdmin();
 
   try {
-    // 1. Cancel Stripe subscription if one exists
     const { data: profile } = await admin
       .from("users")
       .select(
-        "stripe_subscription_id, meta_page_access_token, instagram_business_account_id"
+        "stripe_subscription_id, meta_page_access_token, instagram_business_account_id, email, instagram_username, plan, subscription_status, created_at"
       )
       .eq("id", userId)
       .single();
+
+    // 0. Make the deletion visible BEFORE anything is deleted, while the
+    // row is still readable. Both are awaited so a Vercel freeze can't drop
+    // them, and neither can block the deletion: sendBusinessEventAlert
+    // never throws, and the PostHog capture is wrapped. The client used to
+    // capture account_deleted itself, but posthog.reset() and the redirect
+    // right after it dropped the event (it never reached PostHog for the
+    // 2026-09-25 self-delete).
+    const email = profile?.email || user.email || null;
+    const ageHours = accountAgeHours(profile?.created_at);
+    await sendBusinessEventAlert("account_deleted", {
+      email,
+      instagramUsername: profile?.instagram_username || null,
+      plan: profile?.plan || null,
+      subscriptionStatus: profile?.subscription_status || null,
+      createdAt: profile?.created_at || null,
+      accountAgeHours: ageHours,
+    });
+    try {
+      await getPostHogClient().captureImmediate({
+        distinctId: email || userId,
+        event: "account_deleted",
+        properties: {
+          user_id: userId,
+          plan: profile?.plan || null,
+          subscription_status: profile?.subscription_status || null,
+          instagram_connected: !!profile?.instagram_business_account_id,
+          account_age_hours: ageHours,
+        },
+      });
+    } catch (err) {
+      console.error("[delete-account] posthog capture failed:", err?.message);
+    }
+
+    // 1. Cancel Stripe subscription if one exists
 
     if (profile?.stripe_subscription_id) {
       try {
