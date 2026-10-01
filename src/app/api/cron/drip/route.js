@@ -35,6 +35,9 @@ export async function GET(request) {
       .select("id")
       .is("drip_enrolled_at", null)
       .in("subscription_status", ["active", "trialing"])
+      // A pending cancellation keeps status 'active' until the period ends;
+      // don't start an onboarding drip for someone who is leaving.
+      .is("cancel_at", null)
       .gte("created_at", fourteenDaysAgo);
 
     if (stragglers && stragglers.length > 0) {
@@ -57,7 +60,11 @@ export async function GET(request) {
       .select("id, email, full_name, drip_enrolled_at, drip_step")
       .not("drip_enrolled_at", "is", null)
       .lt("drip_step", DRIP_SEQUENCE.length)
-      .in("subscription_status", ["active", "trialing"]);
+      .in("subscription_status", ["active", "trialing"])
+      // Stop the onboarding drip once a cancellation is pending (status
+      // stays 'active' until the period ends). A canceled customer kept
+      // getting "your AI DM setter is waiting" emails.
+      .is("cancel_at", null);
 
     if (queryErr) {
       console.error("Drip cron query error:", queryErr);
