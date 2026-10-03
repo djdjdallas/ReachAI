@@ -10,7 +10,7 @@ import {
   mapSubscriptionStatus,
   decideSubscriptionUpdate,
   shouldActivateCheckout,
-  shouldApplyDeletion,
+  trackedSubscriptionFilter,
   CLEAR_PENDING_CANCEL,
 } from "@/lib/stripe-subscription-guard";
 import { getPostHogClient } from "@/lib/posthog-server";
@@ -60,10 +60,11 @@ export async function POST(request) {
         const userId =
           session.metadata?.userId || session.client_reference_id || null;
 
-        // A replay of this event after the subscription ended must not
-        // re-activate the row (shouldActivateCheckout). Live status from
-        // Stripe, not the payload. A lookup failure throws, so the webhook
-        // 500s and Stripe retries rather than activating blind.
+        // Only a subscription that is serving right now activates the row
+        // (shouldActivateCheckout): a replay after it ended, went unpaid or
+        // past_due must not write 'active'. Live status from Stripe, not the
+        // payload. A lookup failure throws, so the webhook 500s and Stripe
+        // retries rather than activating blind.
         let liveSubscription = null;
         if (userId && session.subscription) {
           liveSubscription = await getStripe().subscriptions.retrieve(
@@ -72,7 +73,7 @@ export async function POST(request) {
         }
         if (userId && !shouldActivateCheckout(liveSubscription?.status ?? null)) {
           console.warn(
-            "[stripe-webhook] checkout.session.completed for an ended subscription, skipped.",
+            "[stripe-webhook] checkout.session.completed for a subscription that is not active or trialing, skipped.",
             "session:", session.id,
             "subscription:", session.subscription,
             "status:", liveSubscription?.status
@@ -96,9 +97,10 @@ export async function POST(request) {
           }
 
           // Mirror the .updated handler: if trial expiry hard-flipped
-          // ai_mode to 'off', restore on checkout completion. We always
-          // resolve to subscription_status='active' here so no extra
-          // status guard is needed. 'handoff' is intentionally preserved.
+          // ai_mode to 'off', restore on checkout completion. The status is
+          // the live one, which the allowlist above already limited to
+          // active/trialing, so no extra status guard is needed. 'handoff'
+          // is intentionally preserved.
           const { data: currentUser } = await supabase
             .from("users")
             .select("ai_mode, email")
@@ -106,7 +108,7 @@ export async function POST(request) {
             .maybeSingle();
 
           const updateData = {
-            subscription_status: "active",
+            subscription_status: mapSubscriptionStatus(liveSubscription.status),
             stripe_customer_id: session.customer,
             stripe_subscription_id: session.subscription,
             plan,
@@ -296,12 +298,15 @@ export async function POST(request) {
         // reactivation. Trial expiry (webhook AI path + /api/ai/reply C1
         // gate) hard-flips ai_mode='off'; without restoration here a
         // coach who pays after expiry comes back as a silent account.
-        // Also reads what decideSubscriptionUpdate needs.
-        const { data: currentUser } = await supabase
+        // Also reads what decideSubscriptionUpdate needs. A read error throws
+        // (500, Stripe retries): treated as "no row" it skipped the event
+        // with a 200 and the change was lost.
+        const { data: currentUser, error: readError } = await supabase
           .from("users")
           .select("ai_mode, subscription_status, stripe_subscription_id")
           .eq("stripe_customer_id", customerId)
           .maybeSingle();
+        if (readError) throw readError;
 
         const decision = decideSubscriptionUpdate({
           row: currentUser,
@@ -344,10 +349,25 @@ export async function POST(request) {
           updateData.drip_enabled = false;
         }
 
-        await supabase
+        // decideSubscriptionUpdate read the row; the same subscription guard
+        // also sits in the UPDATE, so a checkout that writes a new
+        // subscription id between that read and this write makes this event
+        // match no row instead of overwriting the new subscription.
+        const { data: updatedRows, error: updateError } = await supabase
           .from("users")
           .update(updateData)
-          .eq("stripe_customer_id", customerId);
+          .eq("stripe_customer_id", customerId)
+          .or(trackedSubscriptionFilter(subscription.id))
+          .select("id");
+        if (updateError) throw updateError;
+        if (!updatedRows?.length) {
+          console.warn(
+            "[stripe-webhook] customer.subscription.updated matched no row tracking this subscription, skipped.",
+            "subscription:", subscription.id,
+            "customer:", customerId
+          );
+          break;
+        }
 
         // Pending cancellation: the portal schedules cancel_at for the
         // period end and status stays 'active' until then. syncPendingCancel
@@ -411,27 +431,20 @@ export async function POST(request) {
         const subscription = event.data.object;
         const customerId = subscription.customer;
 
-        const { data: canceledUser } = await supabase
+        // Read before the write: the alert wants the plan as it was. A read
+        // error throws (500, Stripe retries) rather than reading as no row.
+        const { data: canceledUser, error: readError } = await supabase
           .from("users")
-          .select("id, email, plan, created_at, stripe_subscription_id")
+          .select("id, email, plan, created_at")
           .eq("stripe_customer_id", customerId)
-          .single();
+          .maybeSingle();
+        if (readError) throw readError;
 
-        // A late delete of a subscription this row no longer tracks (the
-        // customer resubscribed since) must not cancel the new one.
-        if (
-          canceledUser &&
-          !shouldApplyDeletion({ row: canceledUser, subscriptionId: subscription.id })
-        ) {
-          console.warn(
-            "[stripe-webhook] customer.subscription.deleted for an old subscription, skipped.",
-            "subscription:", subscription.id,
-            "customer:", customerId
-          );
-          break;
-        }
-
-        await supabase
+        // The subscription guard lives in the UPDATE itself, not in a prior
+        // read: a late delete of a subscription this row no longer tracks
+        // (the customer resubscribed since) matches no row, even if it races
+        // the checkout that wrote the new subscription id.
+        const { data: canceledRows, error: cancelError } = await supabase
           .from("users")
           .update({
             subscription_status: "canceled",
@@ -445,7 +458,18 @@ export async function POST(request) {
             voice_replies_enabled: false,
             drip_enabled: false,
           })
-          .eq("stripe_customer_id", customerId);
+          .eq("stripe_customer_id", customerId)
+          .or(trackedSubscriptionFilter(subscription.id))
+          .select("id");
+        if (cancelError) throw cancelError;
+        if (!canceledRows?.length) {
+          console.warn(
+            "[stripe-webhook] customer.subscription.deleted matched no row tracking this subscription, skipped.",
+            "subscription:", subscription.id,
+            "customer:", customerId
+          );
+          break;
+        }
 
         // Cancel any scheduled follow-up nudges so none fire after cancellation.
         if (canceledUser?.id) {

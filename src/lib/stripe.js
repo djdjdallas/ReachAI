@@ -4,7 +4,10 @@ let _stripe;
 
 export function getStripe() {
   if (!_stripe) {
-    _stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
+    // 10s, not the SDK's 80s: a slow Stripe read in a webhook handler then
+    // fails fast with a 500 and Stripe redelivers, instead of the handler
+    // outliving Stripe's own delivery timeout.
+    _stripe = new Stripe(process.env.STRIPE_SECRET_KEY, { timeout: 10_000 });
   }
   return _stripe;
 }
