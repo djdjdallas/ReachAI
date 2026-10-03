@@ -4,7 +4,7 @@ import { sendEmail, sendSms } from "@/lib/notifications";
  * Founder-facing business-event alerts: signup, Instagram connect (including
  * the loud account-CHANGED case from the July 14 incident), subscription
  * started, cancellation requested (still paying until the period ends),
- * subscription canceled.
+ * subscription canceled, account deleted (self-serve, from Settings).
  *
  * Design rules:
  * - NEVER throws to the caller. sendEmail/sendSms already never throw, and
@@ -52,6 +52,15 @@ function igLabel(username, igba) {
 function formatAmount(amountCents) {
   if (typeof amountCents !== "number") return "unknown";
   return `$${(amountCents / 100).toFixed(2)}`;
+}
+
+// Whole hours since createdAt, one decimal under a day so a same-night
+// delete reads as "7.3h" rather than "7h". null when createdAt is missing.
+export function accountAgeHours(createdAt, now = Date.now()) {
+  const t = createdAt ? new Date(createdAt).getTime() : NaN;
+  if (!Number.isFinite(t)) return null;
+  const hours = Math.max(0, (now - t) / 3_600_000);
+  return hours < 24 ? Math.round(hours * 10) / 10 : Math.round(hours);
 }
 
 function compose(event, p) {
@@ -128,6 +137,25 @@ function compose(event, p) {
         ].join("\n"),
       };
 
+    // Fires from /api/user/delete BEFORE anything is deleted, so the row's
+    // details are still readable. The 2026-09-25 self-delete was only found
+    // days later in the Supabase auth log.
+    case "account_deleted": {
+      const age = typeof p.accountAgeHours === "number" ? `${p.accountAgeHours}h` : "unknown";
+      return {
+        subject: `[clinchd] account deleted: ${p.email || "unknown email"} (${igLabel(p.instagramUsername)}), ${p.plan || "unknown"}/${p.subscriptionStatus || "unknown"}, ${age} old`,
+        body: [
+          `email: ${p.email || "unknown"}`,
+          `instagram: ${igLabel(p.instagramUsername)}`,
+          `plan: ${p.plan || "unknown"}`,
+          `subscription status: ${p.subscriptionStatus || "unknown"}`,
+          `created: ${p.createdAt || "unknown"}`,
+          `account age: ${age}`,
+          `deleted at: ${new Date().toISOString()}`,
+        ].join("\n"),
+      };
+    }
+
     case "subscription_canceled": {
       const n = p.conversationCount ?? "unknown";
       return {
@@ -148,7 +176,7 @@ function compose(event, p) {
 }
 
 /**
- * @param {"signup"|"instagram_connected"|"subscription_started"|"cancellation_requested"|"subscription_canceled"} event
+ * @param {"signup"|"instagram_connected"|"subscription_started"|"cancellation_requested"|"subscription_canceled"|"account_deleted"} event
  * @param {object} payload - event-specific fields, see compose()
  * @returns {Promise<boolean>} true when the founder EMAIL was accepted by
  *   Resend. Still never throws; the boolean lets a caller with a retryable

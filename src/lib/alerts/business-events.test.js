@@ -4,7 +4,7 @@ const sendEmail = vi.fn(async () => ({ success: true }));
 const sendSms = vi.fn(async () => ({ success: true }));
 vi.mock("@/lib/notifications", () => ({ sendEmail, sendSms }));
 
-const { sendBusinessEventAlert } = await import("./business-events");
+const { sendBusinessEventAlert, accountAgeHours } = await import("./business-events");
 
 describe("cancellation_requested alert", () => {
   beforeEach(() => {
@@ -42,5 +42,54 @@ describe("cancellation_requested alert", () => {
     const { html } = sendEmail.mock.calls[0][0];
     expect(html).toContain("instagram: unknown");
     expect(html).toContain("comment: none");
+  });
+});
+
+describe("account_deleted alert", () => {
+  beforeEach(() => {
+    sendEmail.mockClear();
+  });
+
+  it("carries email, instagram, plan, status, created and age", async () => {
+    await sendBusinessEventAlert("account_deleted", {
+      email: "coach@example.com",
+      instagramUsername: "coachig",
+      plan: "base",
+      subscriptionStatus: "trialing",
+      createdAt: "2026-09-24T03:10:56.000Z",
+      accountAgeHours: 27.3,
+    });
+    const { subject, html } = sendEmail.mock.calls[0][0];
+    expect(subject).toBe("[clinchd] account deleted: coach@example.com (@coachig), base/trialing, 27.3h old");
+    for (const line of [
+      "instagram: @coachig",
+      "plan: base",
+      "subscription status: trialing",
+      "created: 2026-09-24T03:10:56.000Z",
+      "account age: 27.3h",
+    ]) {
+      expect(html).toContain(line);
+    }
+    expect(subject + html).not.toMatch(/[–—]/);
+  });
+
+  it("degrades gracefully with missing fields", async () => {
+    await sendBusinessEventAlert("account_deleted", {});
+    const { subject } = sendEmail.mock.calls[0][0];
+    expect(subject).toContain("unknown email");
+    expect(subject).toContain("unknown old");
+  });
+});
+
+describe("accountAgeHours", () => {
+  const created = "2026-09-24T03:10:56Z";
+  it("one decimal under a day", () => {
+    expect(accountAgeHours(created, Date.parse("2026-09-24T10:28:00Z"))).toBe(7.3);
+  });
+  it("whole hours from a day on", () => {
+    expect(accountAgeHours(created, Date.parse("2026-09-26T03:40:00Z"))).toBe(48);
+  });
+  it("null without a created date", () => {
+    expect(accountAgeHours(null)).toBeNull();
   });
 });
