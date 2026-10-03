@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Lock, ArrowRight, Loader2 } from "lucide-react";
 import posthog from "posthog-js";
 import { signOutAndClearState } from "@/lib/sign-out";
@@ -13,6 +13,8 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { chargeTodayText } from "@/lib/checkout-trial";
+import { createClient } from "@/lib/supabase/client";
+import { countMissedLeads, missedLeadsText } from "@/lib/inactive-inbound";
 
 // This modal always checks out the Base plan. Keep in sync with
 // PLANS.base.price in src/lib/stripe.js (server-only module).
@@ -25,6 +27,22 @@ const BASE_PRICE_CENTS = 9700;
 // switch accounts without being trapped).
 export default function TrialExpiredModal() {
   const [checkoutLoading, setCheckoutLoading] = useState(false);
+  // Leads who messaged since the trial ended. This modal covers the
+  // dashboard for expired users, so the count is shown here too.
+  const [missedLeads, setMissedLeads] = useState(0);
+
+  useEffect(() => {
+    let cancelled = false;
+    const supabase = createClient();
+    supabase.auth.getUser().then(async ({ data: { user } }) => {
+      if (!user || cancelled) return;
+      const n = await countMissedLeads(supabase, user.id);
+      if (!cancelled) setMissedLeads(n);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const handleUpgrade = async () => {
     setCheckoutLoading(true);
@@ -71,6 +89,11 @@ export default function TrialExpiredModal() {
             so you can pick up right where you left off.
           </DialogDescription>
         </DialogHeader>
+        {missedLeadsText(missedLeads, "expired") && (
+          <p className="text-sm font-medium text-red-700 bg-red-50 border border-red-200 rounded-xl px-3 py-2">
+            {missedLeadsText(missedLeads, "expired")}
+          </p>
+        )}
         <div className="flex flex-col gap-2 pt-2">
           <Button
             onClick={handleUpgrade}

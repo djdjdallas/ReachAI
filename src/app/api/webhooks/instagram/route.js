@@ -27,6 +27,7 @@ import { getActiveOffer, ownerFromUser } from "@/lib/active-offer";
 import { lintReply } from "@/lib/reply-lint";
 import { findVoiceSnippetForIntent, getSendableAudioUrl } from "@/lib/voice/matcher";
 import { sendVoiceMessage, logVoiceSend } from "@/lib/voice/sender";
+import { inactiveGate, inactiveSentinelReason } from "@/lib/inactive-inbound";
 
 // Hard wall-clock budget for the whole inbound chain. The 20s delay cap
 // (+15% jitter ≈ 23s) plus the 30s-capped model calls and the Meta send must
@@ -359,18 +360,6 @@ async function pauseForHumanTakeover(supabase, conversation_id) {
     return true;
   }
   return false;
-}
-
-// User-level gates fire before we look up/create a conversation. If a row
-// already exists for this sender we still want to surface the reason on it;
-// otherwise we silently no-op (no conversation yet to annotate).
-async function markSkipForSender(supabase, user_id, sender_id, reason) {
-  const { error } = await supabase
-    .from("conversations")
-    .update({ last_skip_reason: reason })
-    .eq("user_id", user_id)
-    .eq("instagram_sender_id", sender_id);
-  if (error) log.error("[webhook] markSkipForSender failed:", error.code);
 }
 
 // Human-in-loop escalation check. Never throws: resolves to an outcome object
@@ -886,35 +875,31 @@ async function processIncomingMessage({
     return;
   }
 
-  // past_due gets a grace window: it means one invoice failed and Stripe's
-  // smart retries are still running (often a transient card decline). Cutting
-  // replies here silently ghosted a paying coach's leads for days. Access
-  // truly ends at customer.subscription.deleted → status 'canceled'.
-  if (!["active", "trialing", "past_due"].includes(user.subscription_status)) {
-    await markSkipForSender(supabase, user.id, senderId, "subscription_inactive");
-    return;
-  }
-
-  // Fix #1: Check trial expiry
-  if (user.subscription_status === "trialing") {
-    const trialEnd = user.trial_ends_at ? new Date(user.trial_ends_at) : null;
-    if (trialEnd && new Date() > trialEnd) {
-      await supabase
-        .from("users")
-        .update({ subscription_status: "expired", ai_mode: "off" })
-        .eq("id", user.id);
-      await markSkipForSender(supabase, user.id, senderId, "trial_expired");
-      return;
-    }
+  // ── Subscription gate ───────────────────────────────────────────────
+  // Non-serving accounts (trial expired, canceled) get NO reply, but the
+  // lead's message is still saved below, right after the conversation is
+  // resolved, so the coach sees it and the dashboard can count missed
+  // leads. It used to return here, before the save, dropping every inbound
+  // DM. past_due is served (grace window while Stripe retries the card;
+  // access truly ends at customer.subscription.deleted → 'canceled').
+  const inactive = inactiveGate(user);
+  if (inactive?.flipToExpired) {
+    // First turn after the trial lapsed: flip the row so the
+    // TrialExpiredGate modal and /api/ai/reply agree.
+    await supabase
+      .from("users")
+      .update({ subscription_status: "expired", ai_mode: "off" })
+      .eq("id", user.id);
   }
 
   // Lazy-reset monthly DM count
   const now = new Date();
   const resetAt = user.dm_count_reset_at ? new Date(user.dm_count_reset_at) : null;
   if (
-    !resetAt ||
-    now.getMonth() !== resetAt.getMonth() ||
-    now.getFullYear() !== resetAt.getFullYear()
+    !inactive &&
+    (!resetAt ||
+      now.getMonth() !== resetAt.getMonth() ||
+      now.getFullYear() !== resetAt.getFullYear())
   ) {
     await supabase
       .from("users")
@@ -1012,6 +997,29 @@ async function processIncomingMessage({
     } else if (result?.missing) {
       conversation.missing_outbound_context = true;
     }
+  }
+
+  // ── Non-serving account: save the inbound, nothing else ─────────────
+  // Runs BEFORE the ai_mode gate: expiry and cancellation also set
+  // ai_mode='off', whose contract is "save nothing", and that would drop
+  // the lead again. Everything below this point (DM metering, drip cancel,
+  // history, classifiers, model calls, typing indicators, voice, sends) is
+  // unreachable for these accounts.
+  if (inactive) {
+    const inactiveInsert = await insertMessageIfNew(supabase, {
+      conversation_id: conversation.id,
+      role: "user",
+      content: messageText,
+      provider_message_id: providerMessageId,
+      source: "lead",
+    });
+    await markSkip(supabase, conversation.id, inactive.reason);
+    await recordClassification(
+      supabase,
+      inactiveInsert.data?.id,
+      classificationSentinel("skipped", inactiveSentinelReason(inactive.reason), false)
+    );
+    return;
   }
 
   // ── Global AI mode gate ─────────────────────────────────────────────
