@@ -27,18 +27,18 @@ export default function SignupPage() {
   const [fullName, setFullName] = useState("");
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(false);
-  // Inline post-submit state: instead of routing straight into onboarding
-  // (which only worked because Supabase confirmation was effectively off),
-  // we show a "Check your inbox" panel that mirrors the email Supabase
-  // sends. Tracks the email so resend works after a stale page reload.
+  // Inline post-submit state for when Supabase requires email confirmation:
+  // a "Check your inbox" panel that mirrors the email Supabase sends. Only
+  // shown when signUp returns NO session. With confirmation off (the
+  // current project setting) signUp returns a live session and no email is
+  // ever sent, so the page routes straight to onboarding instead; telling
+  // those users to wait for an email that never comes sent at least one
+  // (2026-09-24) off to sign up a second way. Tracks the email so resend
+  // works after a stale page reload.
   const [checkEmailSent, setCheckEmailSent] = useState(false);
   const [pendingEmail, setPendingEmail] = useState("");
   const [resendLoading, setResendLoading] = useState(false);
   const [resendNotice, setResendNotice] = useState(null);
-  // Suppress the unused warning while preserving the import; router is kept
-  // for future use (e.g. if confirmation is disabled in the dashboard we
-  // could fall back to direct routing).
-  void router;
 
   const handleGoogleSignup = async () => {
     const supabase = createClient();
@@ -57,7 +57,7 @@ export default function SignupPage() {
 
     try {
       const supabase = createClient();
-      const { error } = await supabase.auth.signUp({
+      const { data, error } = await supabase.auth.signUp({
         email,
         password,
         options: {
@@ -78,6 +78,13 @@ export default function SignupPage() {
 
       posthog.identify(email, { email, full_name: fullName });
       posthog.capture("user_signed_up", { email, full_name: fullName });
+
+      // Signed in already (confirmation off): no email is coming.
+      if (data?.session) {
+        router.replace("/onboarding");
+        return;
+      }
+
       setPendingEmail(email);
       setCheckEmailSent(true);
     } catch (err) {
