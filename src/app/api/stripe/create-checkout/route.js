@@ -10,6 +10,13 @@ import {
 import { ensureStripeCustomer } from "@/lib/billing/customer";
 import { decideCheckoutTrial } from "@/lib/billing/trial-policy";
 import { offerText } from "@/lib/checkout-trial";
+import { accessDecision } from "@/lib/billing/access";
+import { ACCESS_COLUMNS } from "@/lib/billing/status";
+import { isManagedAccount } from "@/lib/billing/managed";
+import { SUPPORT_EMAIL } from "@/lib/support";
+
+// Shown when a comped (or other managed) account tries to buy a plan.
+export const MANAGED_ACCOUNT_MESSAGE = `Your plan is complimentary, so there's nothing to buy. Questions? Email ${SUPPORT_EMAIL}.`;
 
 // Where Stripe sends the coach back. Allowlisted; never a URL from the
 // client. The plan-selection page is the default (new signups, paywall);
@@ -45,12 +52,23 @@ export async function POST(request) {
     const admin = getSupabaseAdmin();
     const { data: userProfile, error: profileError } = await admin
       .from("users")
-      .select("email, subscription_status, trial_ends_at, stripe_subscription_id")
+      .select(`email, ${ACCESS_COLUMNS}`)
       .eq("id", user.id)
       .single();
 
     if (profileError || !userProfile) {
       return NextResponse.json({ error: "User profile not found" }, { status: 404 });
+    }
+
+    // Comped and managed accounts have nothing to buy (src/lib/billing/
+    // managed.js). /billing hides the plan buttons for them; this is the
+    // server-side rule, so a stale page or a hand-made request can't start
+    // a paid Checkout for a comped founder. Checked before any Stripe call.
+    if (isManagedAccount(accessDecision(userProfile))) {
+      return NextResponse.json(
+        { error: "managed_account", message: MANAGED_ACCOUNT_MESSAGE },
+        { status: 409 }
+      );
     }
 
     const customerId = await ensureStripeCustomer(admin, user);

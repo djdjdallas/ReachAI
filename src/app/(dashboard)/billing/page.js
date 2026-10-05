@@ -136,9 +136,10 @@ export default function BillingPage() {
         return;
       }
 
-      // No URL = server didn't return a Checkout session. Surface it.
+      // No URL = server didn't return a Checkout session. Surface it (the
+      // server's own message when it sent one, e.g. a comped account).
       setBillingError(
-        `Couldn't start checkout. Try again, or contact ${SUPPORT_EMAIL}.`
+        data.message || `Couldn't start checkout. Try again, or contact ${SUPPORT_EMAIL}.`
       );
       setCheckoutLoading(null);
     } catch (err) {
@@ -389,6 +390,16 @@ export default function BillingPage() {
           </CardContent>
         </Card>
       </div>
+
+      {view.accessUnavailable && (
+        <p className="text-sm text-muted-foreground">
+          Couldn&apos;t load your plan options. Refresh the page, or email{" "}
+          <a href={SUPPORT_MAILTO} className="font-semibold underline">
+            {SUPPORT_EMAIL}
+          </a>
+          .
+        </p>
+      )}
 
       {view.showPlanButtons && (
       <>

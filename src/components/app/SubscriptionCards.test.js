@@ -11,6 +11,13 @@ describe("Settings subscription summary", () => {
     });
   });
 
+  it("ended comp: no longer complimentary, offers a plan", () => {
+    expect(subscriptionSummary(p({}), { kind: "comped", hasAccess: false, reason: "comp_ended" })).toMatchObject({
+      title: "No active plan",
+      choosePlan: true,
+    });
+  });
+
   it("Stripe trial: trial end and first charge", () => {
     const s = subscriptionSummary(p({ subscription_status: "trialing", trial_ends_at: "2026-10-13T12:00:00Z" }), {
       kind: "stripe",
