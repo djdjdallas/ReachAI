@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { sendEmail } from "@/lib/notifications";
+import { SUPPORT_EMAIL } from "@/lib/support";
 
 /**
  * POST /api/alerts/notify
@@ -38,9 +39,7 @@ export async function POST(request) {
   }
 
   const to =
-    process.env.ALERT_EMAIL ||
-    process.env.ADMIN_EMAIL ||
-    "dominickjerell@gmail.com";
+    SUPPORT_EMAIL; // the one founder/support inbox (src/lib/support.js)
 
   const html = `<pre style="font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:14px;white-space:pre-wrap;word-break:break-word;line-height:1.55;color:#1c1917;">${escapeHtml(
     message

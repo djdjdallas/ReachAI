@@ -1,4 +1,5 @@
 import { sendEmail, sendSms } from "@/lib/notifications";
+import { SUPPORT_EMAIL } from "@/lib/support";
 
 /**
  * Founder-facing business-event alerts: signup, Instagram connect (including
@@ -11,7 +12,8 @@ import { sendEmail, sendSms } from "@/lib/notifications";
  *   the whole body is wrapped again so even a template bug can't propagate
  *   into signup, OAuth, or Stripe webhook processing. Callers still invoke
  *   fire-and-forget with .catch(console.error) per convention.
- * - Email goes to the founder via the existing ALERT_EMAIL || ADMIN_EMAIL
+ * - Email goes to the founder at SUPPORT_EMAIL (src/lib/support.js). The
+ *   old ALERT_EMAIL / ADMIN_EMAIL env fallbacks are no longer read here.
  *   convention (src/lib/tokens/reconnect.js, /api/alerts/notify).
  * - SMS (existing sendSms helper) fires only for the two money events and
  *   only when ALERT_PHONE is set; silently skipped otherwise.
@@ -19,10 +21,7 @@ import { sendEmail, sendSms } from "@/lib/notifications";
  *   preserves line breaks — no templating.
  */
 
-const FOUNDER_EMAIL =
-  process.env.ALERT_EMAIL ||
-  process.env.ADMIN_EMAIL ||
-  "dominickjerell@gmail.com";
+const FOUNDER_EMAIL = SUPPORT_EMAIL;
 
 const FOUNDER_PHONE = process.env.ALERT_PHONE || null;
 

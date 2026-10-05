@@ -1,5 +1,6 @@
 import { sendEmail } from "@/lib/notifications";
 import { describeUsers } from "@/lib/users/identity";
+import { SUPPORT_EMAIL } from "@/lib/support";
 
 /**
  * Token self-healing constants + failure classification + reconnect
@@ -198,9 +199,7 @@ export async function sendCoachReconnectEmail(identity, provider, cause = "unkno
 export async function sendOpsReconnectDigest(entries) {
   if (!entries?.length) return;
   const to =
-    process.env.ALERT_EMAIL ||
-    process.env.ADMIN_EMAIL ||
-    "dominickjerell@gmail.com";
+    SUPPORT_EMAIL; // the one founder/support inbox (src/lib/support.js)
 
   const rows = entries
     .map(

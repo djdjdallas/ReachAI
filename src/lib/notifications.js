@@ -1,6 +1,7 @@
 import { Resend } from "resend";
 import twilio from "twilio";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
+import { SUPPORT_EMAIL } from "@/lib/support";
 
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL || "https://clinchd.io";
 
@@ -31,6 +32,8 @@ export async function sendEmail({ to, subject, html }) {
   try {
     const { data, error } = await getResend().emails.send({
       from: process.env.RESEND_FROM_EMAIL || "Clinchd <notifications@clinchd.io>",
+      // Replies from coaches reach a real inbox, not the sending address.
+      replyTo: SUPPORT_EMAIL,
       to,
       subject,
       html,
