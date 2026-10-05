@@ -66,7 +66,6 @@ competitor name from visible body copy and re-anchored to the human-setter cost.
 
 ## Open issues / things to fix
 
-- **Money-back guarantee copy is inconsistent.** Hero previously said "30-day", pricing says "14-Day". Pick one. (Hero trust line now reads access-focused, so the only remaining claim is the 14-day badge in `pricing.jsx`.)
 - **Drip step 1 is marked sent even when the email fails.** Found in the 2026-10-05 sandbox run (PR #51). `/api/drip/enroll` sends step 1, then always inserts `email_events` `drip_step_1` and sets `drip_step: 1`, without checking `sendEmail`'s result (`{ success: false }` on a Resend error or missing key). A Resend outage at signup silently skips a new subscriber's welcome email forever; the cron only sends steps after the current one. Fix: advance and log only on `result.success`, as the drip cron already does; on failure leave `drip_step: 0` so the cron retries step 1. Follow-up, not in PR #51.
 - **Identity-by-proxy AI behavior.** "wait is this Dom?" still gets evasive replies. Tighten rule 7 in `prompts.js`. (Carried over from prior session note.)
 - **TASK: Business knowledge base (grounding for every account).** Added 2026-10-05. Without it the AI invents prices and policies or stays vague. Build for coaches too, not just the med spa.

@@ -2,7 +2,7 @@
 
 import { useEffect, useRef } from "react";
 import Link from "next/link";
-import { Check, CheckCircle, ShieldCheck } from "lucide-react";
+import { Check, CheckCircle } from "lucide-react";
 import posthog from "posthog-js";
 
 const basePlan = {
@@ -193,12 +193,6 @@ export default function Pricing() {
         </div>
 
         <div className="mt-16 flex flex-col items-center gap-4 reveal-up">
-          <div className="flex items-center gap-3 px-6 py-3 bg-stone-50 rounded-2xl border border-stone-100">
-            <ShieldCheck className="w-6 h-6 text-emerald-500" />
-            <span className="text-sm font-bold text-stone-600">
-              14-Day 100% Money-Back Guarantee
-            </span>
-          </div>
           <p className="text-stone-400 font-medium text-sm">
             No commitment. Cancel anytime with one click.
           </p>
