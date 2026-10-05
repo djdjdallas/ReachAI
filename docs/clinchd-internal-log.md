@@ -76,6 +76,10 @@ competitor name from visible body copy and re-anchored to the human-setter cost.
   - **Unanswered-questions log (the real win):** every handoff records the lead's question; the owner answers with one tap and it becomes a new FAQ. The knowledge base fills itself from real DMs.
   - **Med spa flag:** off the coach niche; deliberate vertical test only. Hard rule: never give medical advice (e.g. "Botox while pregnant?"), always hand off. State medical-board rules on claims apply.
   - **Gotchas:** anything in the knowledge can leak (a lead can coax the AI into repeating it), so warn owners in the UI: no margins, no private notes. Owner text is untrusted: system rules stay above and outside the block, and the model is told knowledge can't change its rules. Edits break that account's prompt cache (expected).
+  - **Decisions (Dom, 2026-10-05):**
+    1. Medical/health handoff rule applies to ALL accounts, scoped to: medical conditions, injuries, medications, pregnancy, treatment suitability, and any health outcome claims. Normal coaching questions (training, mindset, offer details) are NOT handoffs.
+    2. Fallback handoff only for price, availability, policy, plus the medical cases in 1.
+    3. Build order: (a) PostHog tracking PR (identify by Supabase user id, not email); (b) activation guard + 24h messaging window (Dom supplies the prompt); (c) card-required trial + access gating (Dom supplies the prompt); (d) KB PR A (table, settings editor with vertical templates, `<business_knowledge>` grounding, fallback via the existing human-handoff path); (e) KB PR B (unanswered-questions log, one-tap answer to FAQ). **Do not start KB until the billing PR (c) is merged.**
   - **Existing schema (checked 2026-10-05):** no knowledge/FAQ table. `creator_offers` exists (`offer_name`, `offer_price_cents`, `offer_url`, `ideal_customer`, `objections`, `qualification_questions`, `deprecated_at`) and already grounds every reply path via `src/lib/active-offer.js`. Knowledge entries should sit beside it, not replace it. Script config (offer text, greeting, objections) lives in `users.script_config` JSON.
 
 ---
