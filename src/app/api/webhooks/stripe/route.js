@@ -493,9 +493,11 @@ export async function POST(request) {
                 "x-internal-secret": process.env.CRON_SECRET || "",
               },
               body: JSON.stringify({ userId }),
-            }).catch((err) =>
-              console.error("Drip enrollment failed:", err.message)
-            )
+            })
+              .then((res) => {
+                if (!res.ok) console.error("[stripe-webhook] drip enrollment failed:", res.status, "user:", userId);
+              })
+              .catch((err) => console.error("[stripe-webhook] drip enrollment failed:", err?.message, "user:", userId))
           );
           break;
         }
