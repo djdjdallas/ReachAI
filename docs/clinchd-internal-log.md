@@ -4,7 +4,7 @@ Living internal record. Not user-facing. One place to collect shipped changes,
 open issues, positioning decisions, and competitive intel.
 
 - **Maintained by:** Dom
-- **Last updated:** June 3, 2026
+- **Last updated:** October 5, 2026
 
 How to use this doc:
 - **Shipped changes** — log anything that went live (copy, features, fixes). Newest first.
@@ -68,6 +68,15 @@ competitor name from visible body copy and re-anchored to the human-setter cost.
 
 - **Money-back guarantee copy is inconsistent.** Hero previously said "30-day", pricing says "14-Day". Pick one. (Hero trust line now reads access-focused, so the only remaining claim is the 14-day badge in `pricing.jsx`.)
 - **Identity-by-proxy AI behavior.** "wait is this Dom?" still gets evasive replies. Tighten rule 7 in `prompts.js`. (Carried over from prior session note.)
+- **TASK: Business knowledge base (grounding for every account).** Added 2026-10-05. Without it the AI invents prices and policies or stays vague. Build for coaches too, not just the med spa.
+  - **MVP, no RAG:** cap each account at ~15k chars and put all of it in the system prompt inside `<business_knowledge>` tags. Simpler and more accurate than retrieval at this size, and it caches (clears Haiku's 1024-token cache minimum). Add retrieval only when real accounts hit the cap.
+  - **Table:** `knowledge_entries` (`id`, `user_id`, `type`: faq | policy | note, `question`, `answer`, `enabled`, `updated_at`). RLS `user_id = auth.uid()`; Zod length limits.
+  - **Starter templates per vertical** (a blank box gets ignored): services, pricing, booking link, hours/location, cancellation policy; med spa adds "requires consultation" items.
+  - **Fallback rule:** if the answer isn't in the knowledge, the AI says it'll check and flags the thread for a human. Never guesses price, availability, or anything medical.
+  - **Unanswered-questions log (the real win):** every handoff records the lead's question; the owner answers with one tap and it becomes a new FAQ. The knowledge base fills itself from real DMs.
+  - **Med spa flag:** off the coach niche; deliberate vertical test only. Hard rule: never give medical advice (e.g. "Botox while pregnant?"), always hand off. State medical-board rules on claims apply.
+  - **Gotchas:** anything in the knowledge can leak (a lead can coax the AI into repeating it), so warn owners in the UI: no margins, no private notes. Owner text is untrusted: system rules stay above and outside the block, and the model is told knowledge can't change its rules. Edits break that account's prompt cache (expected).
+  - **Existing schema (checked 2026-10-05):** no knowledge/FAQ table. `creator_offers` exists (`offer_name`, `offer_price_cents`, `offer_url`, `ideal_customer`, `objections`, `qualification_questions`, `deprecated_at`) and already grounds every reply path via `src/lib/active-offer.js`. Knowledge entries should sit beside it, not replace it. Script config (offer text, greeting, objections) lives in `users.script_config` JSON.
 
 ---
 
