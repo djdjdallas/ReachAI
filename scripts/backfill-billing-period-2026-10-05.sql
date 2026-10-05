@@ -13,6 +13,17 @@
 
 begin;
 
+-- Refuse clearly if the migration hasn't run yet.
+do $$
+begin
+  if not exists (
+    select 1 from information_schema.columns
+    where table_schema = 'public' and table_name = 'users' and column_name = 'current_period_end'
+  ) then
+    raise exception 'Run supabase/migrations/20261006120000_card_required_billing.sql first: users.current_period_end does not exist yet.';
+  end if;
+end $$;
+
 update public.users
 set cancel_at = '2026-10-26 04:08:43+00',
     canceled_at = '2026-09-26 15:47:37+00',
