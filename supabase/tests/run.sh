@@ -16,6 +16,7 @@ MIGRATIONS=(
   20261006140000_stripe_webhook_events.sql
   20261007120000_revoke_definer_execute.sql
   20261007130000_protect_lead_messages.sql
+  20261007140000_ci_grant_reader.sql
 )
 psql_() { psql -X -v ON_ERROR_STOP=1 -q "$@"; }
 
@@ -73,6 +74,26 @@ q "create function public.zz_future_fn() returns int language sql security defin
 expect "a NEW function is not browser-callable" "permission denied" "$(as_role authenticated "select public.zz_future_fn()")"
 q "grant execute on function public.zz_future_fn() to authenticated" >/dev/null
 expect "an explicit grant shows up in the check" "zz_future_fn() auth=true" "$(as_role service_role "select signature||' auth='||authenticated_can_execute from public.browser_executable_definer_functions()")"
+q "drop function public.zz_future_fn()" >/dev/null
+
+echo "# CI grant reader (logs in as the real role)"
+# Test-only password on the throwaway cluster; prod's is set by hand.
+psql_ -d $DB -c "alter role ci_grant_reader password 'ci-test-only'"
+as_ci() { PGPASSWORD=ci-test-only psql -X -U ci_grant_reader -d $DB -tA -c "$1" 2>&1 | head -1; }
+expect "ci: runs the grant check" "[]" "$(as_ci "select coalesce(json_agg(t), '[]') from public.browser_executable_definer_functions() t")"
+expect "ci: check output passes the script" "OK: 0" "$(as_ci "select coalesce(json_agg(t), '[]') from public.browser_executable_definer_functions() t" | node ../../scripts/check-definer-grants.mjs 2>&1)"
+expect "ci: cannot read messages" "permission denied" "$(as_ci "select count(*) from public.messages")"
+expect "ci: cannot read stripe_webhook_events" "permission denied" "$(as_ci "select count(*) from public.stripe_webhook_events")"
+expect "ci: cannot call a definer function" "permission denied" "$(as_ci "select public.increment_dm_count('11111111-1111-1111-1111-111111111111')")"
+expect "ci: read-only session" "read-only transaction" "$(as_ci "create table public.ci_probe(x int)")"
+# read-only is only a default the role can switch off; these prove the
+# boundary holds without it.
+as_ci_rw() { PGPASSWORD=ci-test-only psql -X -U ci_grant_reader -d $DB -tA -c "set transaction_read_only = off; $1" 2>&1 | grep -v '^SET$' | head -1; }
+expect "ci (read-write): cannot create roles" "permission denied" "$(as_ci_rw "create role ci_probe2")"
+expect "ci (read-write): cannot create tables in public" "permission denied" "$(as_ci_rw "create table public.ci_probe(x int)")"
+expect "ci (read-write): cannot write messages" "permission denied" "$(as_ci_rw "delete from public.messages")"
+expect "ci: reads catalogs" "t" "$(as_ci "select count(*) > 0 from pg_proc")"
+expect "ci: no table grants at all" "0" "$(q "select count(*) from information_schema.role_table_grants where grantee = 'ci_grant_reader'")"
 
 echo "# M2: stripe_webhook_events"
 expect "claims start as processing" "processing" "$(as_role service_role "insert into public.stripe_webhook_events(event_id,event_type) values ('evt_1','x') returning status")"

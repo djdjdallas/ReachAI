@@ -5,10 +5,11 @@
 # (scripts/definer-grants-allowlist.json).
 # 1. Static (always): every definer function a migration creates has a
 #    revoke (src/lib/db/definer-grants.test.js).
-# 2. Live (when the repo secrets are set): asks the database which definer
-#    functions anon/authenticated can execute right now. Catches grants
-#    made outside migrations (SQL editor, dashboard). Read-only.
-#    Secrets: SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY.
+# 2. Live (when the SUPABASE_CI_DB_URL secret is set): asks the database
+#    which definer functions anon/authenticated can execute right now.
+#    Catches grants made outside migrations (SQL editor, dashboard).
+#    Connects as ci_grant_reader (migration 20261007140000): a
+#    catalog-only, read-only login. Never the service-role key.
 name: db-checks
 
 on:
@@ -23,8 +24,7 @@ jobs:
   definer-grants:
     runs-on: ubuntu-latest
     env:
-      NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+      SUPABASE_CI_DB_URL: ${{ secrets.SUPABASE_CI_DB_URL }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -34,9 +34,13 @@ jobs:
       - run: npm ci
       - name: Static check (migrations)
         run: npx vitest run src/lib/db/definer-grants.test.js
-      - name: Live check (database)
-        if: env.SUPABASE_SERVICE_ROLE_KEY != ''
-        run: node scripts/check-definer-grants.mjs
+      - name: Live check (database, as ci_grant_reader)
+        if: env.SUPABASE_CI_DB_URL != ''
+        run: |
+          psql "$SUPABASE_CI_DB_URL" -X -tA -v ON_ERROR_STOP=1 \
+            -c "select coalesce(json_agg(t), '[]') from public.browser_executable_definer_functions() t" \
+            > definer-rows.json
+          node scripts/check-definer-grants.mjs definer-rows.json
 
   # Audit M1/L7/H1/M2 regression tests against a throwaway Postgres 17:
   # bootstrap + the real migration files + browser vs server assertions.
