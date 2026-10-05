@@ -306,7 +306,7 @@ export default function VsInro() {
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
           <CTABanner
             headline="The AI setter built for coaches, not campaigns."
-            subheadline="Start your 7-day free trial — no credit card required. Flat $97 to start, $197 unlimited when you scale."
+            subheadline="Start your 7-day free trial. Card required, cancel anytime before day 7 and you won't be charged. Flat $97 to start, $197 unlimited when you scale."
             buttonText="Start Free Trial"
             buttonHref="/signup"
             variant="dark"

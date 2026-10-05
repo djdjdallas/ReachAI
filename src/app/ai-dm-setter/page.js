@@ -373,7 +373,7 @@ export default function AiDmSetterPage() {
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
           <CTABanner
             headline="Ready to replace your DM setter with AI?"
-            subheadline="Start your 7-day free trial. No credit card required. Set up in under 30 minutes."
+            subheadline="Start your 7-day free trial. Card required, cancel anytime before day 7 and you won't be charged. Set up in under 30 minutes."
             buttonText="Start Free Trial"
             buttonHref="/signup"
             variant="dark"
