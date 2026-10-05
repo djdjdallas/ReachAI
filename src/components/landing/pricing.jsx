@@ -103,7 +103,7 @@ export default function Pricing() {
                 Start 7-Day Trial
               </Link>
               <p className="text-[11px] text-stone-400 font-bold uppercase tracking-wider">
-                Includes 7-day free trial
+                Includes 7-day free trial for new accounts
               </p>
             </div>
           </div>
@@ -142,7 +142,7 @@ export default function Pricing() {
                 Get Unlimited Access
               </Link>
               <p className="text-[11px] text-white/70 font-bold uppercase tracking-wider">
-                Includes 7-day free trial
+                Includes 7-day free trial for new accounts
               </p>
             </div>
           </div>

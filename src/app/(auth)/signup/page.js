@@ -312,7 +312,7 @@ export default function SignupPage() {
               <div className="mb-8 text-center">
                 <h2 className="text-3xl font-black mb-2">Create Account</h2>
                 <p className="text-sm text-stone-500 font-medium">
-                  7-day free trial. Card required, cancel anytime before day 7 and you won&apos;t be charged.
+                  7-day free trial for new accounts. Card required, cancel anytime before day 7 and you won&apos;t be charged.
                 </p>
               </div>
 

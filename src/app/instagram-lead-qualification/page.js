@@ -309,7 +309,7 @@ export default function InstagramLeadQualificationPage() {
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
           <CTABanner
             headline="Ready to qualify leads automatically?"
-            subheadline="Start your 7-day free trial. Card required, cancel anytime before day 7 and you won't be charged. Set up in under 30 minutes."
+            subheadline="7-day free trial for new accounts. Card required, cancel anytime before day 7 and you won't be charged. Set up in under 30 minutes."
             buttonText="Start Free Trial"
             buttonHref="/signup"
             variant="dark"
