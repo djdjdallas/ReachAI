@@ -51,7 +51,7 @@ export async function DELETE() {
     });
     try {
       await getPostHogClient().captureImmediate({
-        distinctId: email || userId,
+        distinctId: userId,
         event: "account_deleted",
         properties: {
           user_id: userId,

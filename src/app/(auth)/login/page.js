@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import posthog from "posthog-js";
+import { identifyUser } from "@/lib/analytics-identify";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -64,7 +65,7 @@ export default function LoginPage() {
 
     try {
       const supabase = createClient();
-      const { error } = await supabase.auth.signInWithPassword({
+      const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password,
       });
@@ -84,7 +85,9 @@ export default function LoginPage() {
         return;
       }
 
-      posthog.identify(email, { email });
+      // Identify before the capture so it lands on the user's person
+      // (PostHogIdentify would also catch it, but after this event).
+      identifyUser(posthog, data?.user);
       posthog.capture("user_logged_in", { method: "email" });
       router.push("/dashboard");
     } catch (err) {

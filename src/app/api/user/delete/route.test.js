@@ -100,7 +100,7 @@ describe("DELETE /api/user/delete", () => {
       accountAgeHours: 5,
     });
     expect(capture.mock.calls[0][0]).toMatchObject({
-      distinctId: "coach@example.com",
+      distinctId: "user-1",
       event: "account_deleted",
     });
   });

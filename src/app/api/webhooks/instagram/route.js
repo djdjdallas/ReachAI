@@ -630,7 +630,7 @@ async function handleEchoEvent(event) {
         return;
       } else {
         getPostHogClient().capture({
-          distinctId: user.email || user.id,
+          distinctId: user.id,
           event: "conversation_created",
           properties: {
             conversation_id: newConv.id,
@@ -793,7 +793,7 @@ async function attachNativeSendContext(supabase, {
         return { matched: false, missing: false };
       }
       getPostHogClient().capture({
-        distinctId: userEmail || userId,
+        distinctId: userId,
         event: "native_send_missing_context",
         properties: { conversation_id: conversationId },
       });
@@ -825,7 +825,7 @@ async function attachNativeSendContext(supabase, {
     }
 
     getPostHogClient().capture({
-      distinctId: userEmail || userId,
+      distinctId: userId,
       event: "native_send_matched",
       properties: {
         conversation_id: conversationId,
@@ -969,7 +969,7 @@ async function processIncomingMessage({
       return;
     } else {
       getPostHogClient().capture({
-        distinctId: user.email || user.id,
+        distinctId: user.id,
         event: "conversation_created",
         properties: { conversation_id: newConv.id, sender_name: senderName },
       });
@@ -1188,7 +1188,7 @@ async function processIncomingMessage({
     const canceled = await cancelDripForConversation(conversation.id, "lead_replied");
     if (canceled > 0) {
       getPostHogClient().capture({
-        distinctId: user.email || user.id,
+        distinctId: user.id,
         event: "drip_canceled",
         properties: {
           conversation_id: conversation.id,
@@ -1202,7 +1202,7 @@ async function processIncomingMessage({
   }
 
   getPostHogClient().capture({
-    distinctId: user.email || user.id,
+    distinctId: user.id,
     event: "message_received",
     properties: { conversation_id: conversation.id, message_length: messageText.length },
   });
@@ -1324,7 +1324,7 @@ async function processIncomingMessage({
       }).catch(console.error);
     }
     getPostHogClient().capture({
-      distinctId: user.email || user.id,
+      distinctId: user.id,
       event: "qualifying_loop_detected",
       properties: { conversation_id: conversation.id },
     });
@@ -1425,7 +1425,7 @@ async function processIncomingMessage({
   if (dmIntent) {
     try {
       getPostHogClient().capture({
-        distinctId: user.email || user.id,
+        distinctId: user.id,
         event: "dm_intent_classified",
         properties: {
           conversation_id: conversation.id,
@@ -1484,7 +1484,7 @@ async function processIncomingMessage({
       });
       if (enqueued) {
         getPostHogClient().capture({
-          distinctId: user.email || user.id,
+          distinctId: user.id,
           event: "drip_scheduled",
           properties: {
             conversation_id: conversation.id,
@@ -1534,7 +1534,7 @@ async function processIncomingMessage({
     }
     if (escalated) {
       getPostHogClient().capture({
-        distinctId: user.email || user.id,
+        distinctId: user.id,
         event: "human_in_loop_triggered",
         properties: {
           conversation_id: conversation.id,
@@ -1553,7 +1553,7 @@ async function processIncomingMessage({
         status: "skipped_do_not_send",
       });
       getPostHogClient().capture({
-        distinctId: user.email || user.id,
+        distinctId: user.id,
         event: "dm_paused_do_not_send",
         properties: {
           conversation_id: conversation.id,
@@ -1576,7 +1576,7 @@ async function processIncomingMessage({
       gate.action === "hold" ? SKIP.DO_NOT_SEND_HELD : SKIP.NOT_A_LEAD;
     await markSkip(supabase, conversation.id, skipReason);
     getPostHogClient().capture({
-      distinctId: user.email || user.id,
+      distinctId: user.id,
       event: gate.action === "hold" ? "dm_held_do_not_send" : "dm_skipped_not_a_lead",
       properties: {
         conversation_id: conversation.id,
@@ -1710,7 +1710,7 @@ async function processIncomingMessage({
           });
 
           getPostHogClient().capture({
-            distinctId: user.email || user.id,
+            distinctId: user.id,
             event: "ai_reply_sent",
             properties: {
               conversation_id: conversation.id,
@@ -1757,7 +1757,7 @@ async function processIncomingMessage({
     fireSenderAction(user, senderId, "typing_off");
     await markSkip(supabase, conversation.id, SKIP.GENERATION_FAILED);
     getPostHogClient().capture({
-      distinctId: user.email || user.id,
+      distinctId: user.id,
       event: "ai_reply_failed",
       properties: { conversation_id: conversation.id, error: err.message },
     });
@@ -1773,7 +1773,7 @@ async function processIncomingMessage({
     await markSkip(supabase, conversation.id, SKIP.REPLY_BLOCKED);
     log.warn("[webhook] reply blocked by lint (placeholder) for conversation:", conversation.id);
     getPostHogClient().capture({
-      distinctId: user.email || user.id,
+      distinctId: user.id,
       event: "ai_reply_blocked",
       properties: { conversation_id: conversation.id, reason: "placeholder" },
     });
@@ -1834,7 +1834,7 @@ async function processIncomingMessage({
       // the owner to send by hand.
       await markSkip(supabase, conversation.id, SKIP.RATE_LIMITED);
       getPostHogClient().capture({
-        distinctId: user.email || user.id,
+        distinctId: user.id,
         event: "ai_reply_rate_limited",
         properties: { conversation_id: conversation.id },
       });
@@ -1863,7 +1863,7 @@ async function processIncomingMessage({
         if (midError) log.warn("[webhook] mid stamp failed:", midError.code);
       }
       getPostHogClient().capture({
-        distinctId: user.email || user.id,
+        distinctId: user.id,
         event: "ai_reply_sent",
         properties: {
           conversation_id: conversation.id,
@@ -1888,7 +1888,7 @@ async function processIncomingMessage({
         await flagMetaReconnect(supabase, user.id, err, "webhook:send");
       }
       getPostHogClient().capture({
-        distinctId: user.email || user.id,
+        distinctId: user.id,
         event: "message_delivery_failed",
         properties: { conversation_id: conversation.id, error: err.message },
       });
@@ -1928,7 +1928,7 @@ async function processIncomingMessage({
   if (newStatus !== conversation.status) {
     await supabase.from("conversations").update({ status: newStatus }).eq("id", conversation.id);
     getPostHogClient().capture({
-      distinctId: user.email || user.id,
+      distinctId: user.id,
       event: "lead_status_changed",
       properties: {
         conversation_id: conversation.id,

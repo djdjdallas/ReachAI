@@ -87,7 +87,7 @@ export async function maybePostPublicReply({
         retryable: result.retryable === true,
       });
       getPostHogClient().capture({
-        distinctId: ownerUser.email || ownerUser.id,
+        distinctId: ownerUser.id,
         event: "comment_public_reply_failed",
         properties: {
           user_id: ownerUser.id,
@@ -126,7 +126,7 @@ export async function maybePostPublicReply({
     });
 
     getPostHogClient().capture({
-      distinctId: ownerUser.email || ownerUser.id,
+      distinctId: ownerUser.id,
       event: "comment_public_reply_posted",
       properties: {
         user_id: ownerUser.id,
@@ -154,7 +154,7 @@ export async function maybePostPublicReply({
     }
     try {
       getPostHogClient().capture({
-        distinctId: ownerUser?.email || ownerUser?.id || "unknown",
+        distinctId: ownerUser?.id || "unknown",
         event: "comment_public_reply_failed",
         properties: {
           user_id: ownerUser?.id || null,

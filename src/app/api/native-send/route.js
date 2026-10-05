@@ -73,7 +73,7 @@ export async function POST(request) {
   }
 
   getPostHogClient().capture({
-    distinctId: user.email || user.id,
+    distinctId: user.id,
     event: "native_send_logged",
     properties: { native_send_id: inserted.id, has_ig_user_id: !!igUserId },
   });
