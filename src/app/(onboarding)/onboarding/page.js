@@ -95,6 +95,14 @@ function OnboardingPage() {
   // silently dropping the coach back on step 1.
   const [igConnectError, setIgConnectError] = useState(null);
 
+  // Leads the webhook is holding because no opening line is saved
+  // (greeting_not_configured). Someone who connects Instagram and stops
+  // mid-onboarding has ai_mode 'active' (the column default) but no
+  // greeting, so every lead is held. Middleware keeps them in onboarding,
+  // where the dashboard's "Opening line needed" banner never shows, so the
+  // count is surfaced here too.
+  const [heldForGreeting, setHeldForGreeting] = useState(0);
+
   useEffect(() => {
     if (!searchParams) return;
     const code = searchParams.get("error");
@@ -260,6 +268,18 @@ function OnboardingPage() {
         .single();
 
       if (userProfile) {
+        if (
+          userProfile.instagram_business_account_id &&
+          !userProfile.script_config?.greeting
+        ) {
+          const { count: heldCount } = await supabase
+            .from("conversations")
+            .select("id", { count: "exact", head: true })
+            .eq("user_id", authUser.id)
+            .eq("last_skip_reason", "greeting_not_configured");
+          if (!cancelled) setHeldForGreeting(heldCount || 0);
+        }
+
         // Every step after 1 needs a connected Instagram account. ?step= is
         // read straight from the URL in the initial state, so a deep link
         // (or a disconnect after onboarding) could skip the Connect step.
@@ -800,6 +820,30 @@ function OnboardingPage() {
               className="rounded-sm p-1 opacity-70 transition-opacity hover:opacity-100"
             >
               <X className="h-4 w-4" />
+            </button>
+          </div>
+        </div>
+      )}
+
+      {heldForGreeting > 0 && !scriptReady && step !== 4 && (
+        <div className="px-4 pt-4">
+          <div className="max-w-5xl mx-auto flex flex-col sm:flex-row sm:items-center gap-3 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+            <AlertCircle className="h-5 w-5 flex-shrink-0 text-amber-600" />
+            <p className="flex-1 leading-relaxed">
+              <span className="font-bold">
+                {heldForGreeting === 1
+                  ? "1 lead is waiting for a reply."
+                  : `${heldForGreeting} leads are waiting for a reply.`}
+              </span>{" "}
+              Your AI can&apos;t answer anyone until you save an opening line.
+              It takes about a minute.
+            </p>
+            <button
+              type="button"
+              onClick={() => setStep(offer && targetCustomer ? 4 : 2)}
+              className="shrink-0 rounded-full bg-[#ff7e67] px-4 py-2 text-xs font-bold text-white hover:bg-[#ff6a50]"
+            >
+              Finish setup
             </button>
           </div>
         </div>
