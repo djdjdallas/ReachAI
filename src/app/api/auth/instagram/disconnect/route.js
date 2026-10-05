@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import { decryptToken } from "@/lib/token-utils";
 
 export async function POST() {
@@ -51,8 +52,10 @@ export async function POST() {
       }
     }
 
-    // Clear all connection fields
-    await supabase
+    // Clear all connection fields. Admin client: the browser role can't
+    // write Meta token or connection columns (users UPDATE allowlist,
+    // migration 20261005150000). The user was authenticated above.
+    await getSupabaseAdmin()
       .from("users")
       .update({
         instagram_business_account_id: null,

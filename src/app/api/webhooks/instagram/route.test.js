@@ -209,6 +209,8 @@ describe("inbound DM for a serving account (unchanged)", () => {
     expect(dmIntent.classifyDMIntent).toHaveBeenCalled();
     expect(ai.generateReply).toHaveBeenCalled();
     expect(ig.sendInstagramMessage).toHaveBeenCalled();
+    // The reply carries the lead's arrival time into the send's 24h guard.
+    expect(ig.sendInstagramMessage.mock.calls[0][4]).toEqual({ lastInboundAt: expect.any(Number) });
   });
 
   it("an active user in handoff mode keeps the handoff behavior (saved, ai_inactive, no AI)", async () => {

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import { getOnboardingState } from "@/lib/onboarding";
+import { validateOpeningLine } from "@/lib/opening-line";
 
 const ALLOWED_MODES = ["active", "handoff", "off"];
 
@@ -37,6 +38,17 @@ export async function POST(request) {
     }
 
     if (mode === "active") {
+      // Server-side activation guard (the UI check is only for UX): never
+      // turn the AI on without a valid opening line, or the webhook holds
+      // every inbound lead. The users-table trigger enforces the same rule
+      // for browser writes.
+      const openingLine = validateOpeningLine(profile.script_config?.greeting);
+      if (!openingLine.ok) {
+        return NextResponse.json(
+          { error: openingLine.error, missing: { greeting: true } },
+          { status: 400 }
+        );
+      }
       const onboarding = getOnboardingState(profile);
       if (!onboarding.complete) {
         return NextResponse.json(

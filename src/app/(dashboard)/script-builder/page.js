@@ -4,6 +4,8 @@ import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import posthog from "posthog-js";
+import { normalizeBookingUrl } from "@/lib/booking-url";
+import { openingLineDbErrorMessage } from "@/lib/opening-line";
 import {
   Loader2,
   Sparkles,
@@ -535,11 +537,17 @@ export default function ScriptBuilderPage() {
         script_mode: scriptMode,
       };
 
+      const booking = normalizeBookingUrl(calendlyUrl);
+      if (!booking.ok) {
+        setError({ source: "save", message: booking.error });
+        return;
+      }
+
       const { error: dbErr } = await supabase
         .from("users")
         .update({
           script_config: scriptConfig,
-          calendly_url: calendlyUrl,
+          calendly_url: booking.value,
         })
         .eq("id", user.id);
 
@@ -551,7 +559,8 @@ export default function ScriptBuilderPage() {
       setError({
         source: "save",
         message:
-          "Couldn't save your changes. Check your connection and try again — your edits are still here.",
+          openingLineDbErrorMessage(err) ||
+          "Couldn't save your changes. Check your connection and try again. Your edits are still here.",
       });
     } finally {
       setSaving(false);

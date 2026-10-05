@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { signOutAndClearState } from "@/lib/sign-out";
 import posthog from "posthog-js";
+import { hasOpeningLine } from "@/lib/opening-line";
 import {
   Loader2,
   Save,
@@ -1039,14 +1040,11 @@ export default function SettingsPage() {
                 onClick={async () => {
                   setDisconnectingGcal(true);
                   try {
-                    await supabase
-                      .from("users")
-                      .update({
-                        google_calendar_access_token: null,
-                        google_calendar_refresh_token: null,
-                        google_calendar_token_expires_at: null,
-                      })
-                      .eq("id", authUser.id);
+                    // Server route: the browser can't write token columns.
+                    const res = await fetch("/api/auth/google-calendar/disconnect", {
+                      method: "POST",
+                    });
+                    if (!res.ok) throw new Error("Disconnect failed");
                     setGcalConnected(false);
                   } catch (err) {
                     console.error("Error disconnecting Google Calendar:", err);
@@ -1223,7 +1221,7 @@ export default function SettingsPage() {
               <TabsList>
                 <TabsTrigger
                   value="active"
-                  disabled={togglingAi}
+                  disabled={togglingAi || (aiMode !== "active" && !hasOpeningLine(profile?.script_config))}
                   className="data-[state=active]:bg-green-100 data-[state=active]:text-green-700"
                 >
                   Active
@@ -1245,6 +1243,18 @@ export default function SettingsPage() {
               </TabsList>
             </Tabs>
           </div>
+
+          {!aiModeError && profile && !hasOpeningLine(profile.script_config) && (
+            <div className="flex items-start gap-2 px-3 py-2 rounded-lg bg-amber-50 border border-amber-200 text-amber-800 text-xs leading-relaxed">
+              <AlertTriangle className="h-3.5 w-3.5 mt-0.5 shrink-0" />
+              <span>
+                Add an opening line before turning the AI on.{" "}
+                <a href="/script-builder" className="underline font-medium">
+                  Set it in Script Builder
+                </a>
+              </span>
+            </div>
+          )}
 
           {aiModeError && (
             <div className="flex items-start gap-2 px-3 py-2 rounded-lg bg-amber-50 border border-amber-200 text-amber-800 text-xs leading-relaxed">

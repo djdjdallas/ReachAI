@@ -1679,6 +1679,7 @@ async function processIncomingMessage({
             encryptedAccessToken: user.meta_page_access_token,
             recipientPsid: senderId,
             audioUrl,
+            lastInboundAt: receivedAtMs,
           });
 
           await supabase
@@ -1846,11 +1847,14 @@ async function processIncomingMessage({
   if (canSend) {
     // Send reply via Meta Instagram API
     try {
+      // The lead's message arrived at receivedAtMs, so this reply is inside
+      // the 24h window by construction; sendInstagramMessage still checks.
       const sendResult = await sendInstagramMessage(
         user.instagram_business_account_id,
         senderId,
         aiReply,
-        decryptToken(user.meta_page_access_token)
+        decryptToken(user.meta_page_access_token),
+        { lastInboundAt: receivedAtMs }
       );
       // Stamp the Meta mid so the echo of this send dedups. If the echo
       // webhook won the race, handleEchoEvent already stamped this same mid

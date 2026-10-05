@@ -21,6 +21,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import StatusBadge from "@/components/app/StatusBadge";
 import { parseTimestamp, relativeTime } from "@/lib/dates";
 import { countMissedLeads, missedLeadsText } from "@/lib/inactive-inbound";
+import { hasOpeningLine } from "@/lib/opening-line";
 
 function getInitials(name) {
   if (!name) return "?";
@@ -298,12 +299,17 @@ export default function DashboardPage() {
           </Button>
         </div>
       )}
-      {igConnected && !profile?.script_config?.greeting && (
+      {igConnected && !hasOpeningLine(profile?.script_config) && (
         <div className="flex items-center gap-3 p-4 rounded-2xl border border-amber-200 bg-amber-50">
           <AlertTriangle className="h-5 w-5 text-amber-600 shrink-0" />
           <div className="flex-1">
+            {/* AI on with no opening line (e.g. accounts from before the
+                ai_mode default became 'handoff'): nothing is sent, and
+                nothing will be sent automatically once a line is added. */}
             <p className="text-sm font-medium text-amber-700">
-              Opening line needed
+              {profile?.ai_mode === "active"
+                ? "Replies are paused until you add an opening line"
+                : "Opening line needed"}
             </p>
             <p className="text-xs text-amber-600/80">
               {heldForGreeting > 0

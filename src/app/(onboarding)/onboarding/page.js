@@ -11,6 +11,8 @@ import {
   fillIfEmpty,
 } from "@/lib/onboarding";
 import posthog from "posthog-js";
+import { normalizeBookingUrl } from "@/lib/booking-url";
+import { openingLineDbErrorMessage } from "@/lib/opening-line";
 import { Loader2, AlertCircle, X } from "lucide-react";
 
 import OnboardingHeader from "./components/OnboardingHeader";
@@ -403,19 +405,22 @@ function OnboardingPage() {
       human_in_loop: humanInLoop,
     });
 
+    const booking = normalizeBookingUrl(calendlyUrl);
+    if (!booking.ok) throw new Error(booking.error);
+
     const { error: dbErr } = await supabase
       .from("users")
       .update({
         script_config: scriptConfig,
-        calendly_url: calendlyUrl,
+        calendly_url: booking.value,
       })
       .eq("id", user.id);
-    if (dbErr) throw dbErr;
+    if (dbErr) throw new Error(openingLineDbErrorMessage(dbErr) || dbErr.message);
 
     setProfile((prev) => ({
       ...prev,
       script_config: scriptConfig,
-      calendly_url: calendlyUrl,
+      calendly_url: booking.value,
     }));
     return scriptConfig;
   };
