@@ -162,3 +162,41 @@ describe("trialLedgerSecretFingerprint", async () => {
     expect(trialLedgerSecretFingerprint("")).toBeNull();
   });
 });
+
+describe("recordTrialLedger (audit L1: throws so Stripe retries)", async () => {
+  const { recordTrialLedger } = await import("./trial-policy");
+  const admin = (error = null) => {
+    const upsert = vi.fn(async () => ({ error }));
+    return { from: vi.fn(() => ({ upsert })), upsert };
+  };
+
+  it("records the HMAC, never the email", async () => {
+    const a = admin();
+    await recordTrialLedger(a, { email: "New.Coach+x@gmail.com", stripeCustomerId: "cus_1", source: "stripe_checkout" });
+    expect(a.upsert).toHaveBeenCalledWith(
+      { email_hash: createHmac("sha256", SECRET).update("newcoach@gmail.com").digest("hex"), stripe_customer_id: "cus_1", source: "stripe_checkout" },
+      { onConflict: "email_hash", ignoreDuplicates: true }
+    );
+  });
+
+  it("throws when the write fails", async () => {
+    await expect(
+      recordTrialLedger(admin({ message: "timeout" }), { email: "a@b.co", stripeCustomerId: "cus_1", source: "x" })
+    ).rejects.toThrow(/upsert failed: timeout/);
+  });
+
+  it("throws without TRIAL_LEDGER_SECRET", async () => {
+    delete process.env.TRIAL_LEDGER_SECRET;
+    const a = admin();
+    await expect(recordTrialLedger(a, { email: "a@b.co", stripeCustomerId: "cus_1", source: "x" })).rejects.toThrow(
+      /TRIAL_LEDGER_SECRET/
+    );
+    expect(a.upsert).not.toHaveBeenCalled();
+  });
+
+  it("an unusable email is skipped without throwing (a retry can't fix it)", async () => {
+    const a = admin();
+    await expect(recordTrialLedger(a, { email: null, stripeCustomerId: "cus_1", source: "x" })).resolves.toBeUndefined();
+    expect(a.upsert).not.toHaveBeenCalled();
+  });
+});

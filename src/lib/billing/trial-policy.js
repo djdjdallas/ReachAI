@@ -146,21 +146,24 @@ export async function decideCheckoutTrial({ user, customerId, stripe, admin, now
  * Record that this person has trialed or subscribed. Called by the Stripe
  * webhook when a subscription is created. Idempotent (upsert on the email
  * hash; the first record wins).
+ *
+ * Throws on failure (audit L1): a missing TRIAL_LEDGER_SECRET or a failed
+ * write. The webhook then returns 500 and Stripe retries the event (for up
+ * to 3 days), instead of the person being silently left out of the ledger
+ * and able to take another trial later. An email that can't be normalized
+ * is skipped without throwing: no retry would change it.
  */
 export async function recordTrialLedger(admin, { email, stripeCustomerId, source }) {
-  let key;
-  try {
-    key = trialLedgerKey(email);
-  } catch (err) {
-    console.error("[trial-ledger] not recorded:", err?.message);
+  const key = trialLedgerKey(email); // throws without TRIAL_LEDGER_SECRET
+  if (!key) {
+    console.warn("[trial-ledger] not recorded: no usable email");
     return;
   }
-  if (!key) return;
   const { error } = await admin
     .from("billing_trial_ledger")
     .upsert(
       { email_hash: key, stripe_customer_id: stripeCustomerId || null, source },
       { onConflict: "email_hash", ignoreDuplicates: true }
     );
-  if (error) console.error("[trial-ledger] upsert failed:", error.message);
+  if (error) throw new Error(`[trial-ledger] upsert failed: ${error.message}`);
 }

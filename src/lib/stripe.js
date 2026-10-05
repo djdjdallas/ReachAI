@@ -39,6 +39,9 @@ export function planForCheckout(planId) {
   return Object.prototype.hasOwnProperty.call(PLANS, planId) ? PLANS[planId] : null;
 }
 
+// Checkout sessions expire 30 minutes after creation (audit M3).
+export const CHECKOUT_EXPIRES_SECONDS = 30 * 60;
+
 /**
  * Card-required subscription Checkout. Payment details are always
  * collected, including for a free trial.
@@ -56,6 +59,7 @@ export function planForCheckout(planId) {
  * @param {string} [options.submitMessage] - shown above Checkout's pay button
  * @param {string} [options.successPath] - app path Stripe returns to on success
  * @param {string} [options.cancelPath] - app path for "back"
+ * @param {number} [options.now] - ms, for tests
  */
 export async function createCheckoutSession(customerId, priceId, userId, options = {}) {
   const {
@@ -64,6 +68,7 @@ export async function createCheckoutSession(customerId, priceId, userId, options
     submitMessage = null,
     successPath = "/choose-plan?checkout=success",
     cancelPath = "/choose-plan",
+    now = Date.now(),
   } = options;
   if (trialPeriodDays && trialEnd) {
     throw new Error("createCheckoutSession: trialPeriodDays and trialEnd are exclusive");
@@ -75,9 +80,16 @@ export async function createCheckoutSession(customerId, priceId, userId, options
     payment_method_collection: "always",
     line_items: [{ price: priceId, quantity: 1 }],
     mode: "subscription",
-    // Affiliate attribution: promoters get a per-promoter promotion code;
-    // payouts are read off the code's customers in the Stripe dashboard.
-    allow_promotion_codes: true,
+    // No promotion codes (audit L9): a code could zero out the first
+    // charge of a no-trial checkout. Affiliate attribution via promoter
+    // codes is off until it comes back deliberately.
+    allow_promotion_codes: false,
+    // Short-lived (audit M3): an abandoned session stays payable until it
+    // expires, and two payable sessions are how one customer ends up with
+    // two subscriptions. Stripe's minimum is 30 minutes from creation; the
+    // extra minute absorbs clock skew between us and Stripe, which would
+    // otherwise reject the session.
+    expires_at: Math.floor(now / 1000) + CHECKOUT_EXPIRES_SECONDS + 60,
     subscription_data: {
       metadata: { userId },
       ...(trialPeriodDays ? { trial_period_days: trialPeriodDays } : {}),

@@ -52,6 +52,14 @@ describe("createCheckoutSession (card-required)", () => {
     expect(sd).not.toHaveProperty("trial_end");
   });
 
+  it("expires 30 minutes out (+1 min skew buffer) and takes no promotion codes (audit M3, L9)", async () => {
+    const now = Date.parse("2026-10-06T12:00:00Z");
+    await createCheckoutSession("cus_1", "price_base_env", "user-1", { trialPeriodDays: 7, now });
+    const args = create.mock.calls[0][0];
+    expect(args.expires_at).toBe(now / 1000 + 31 * 60);
+    expect(args.allow_promotion_codes).toBe(false);
+  });
+
   it("refuses both trial options at once", async () => {
     await expect(
       createCheckoutSession("cus_1", "price_base_env", "user-1", { trialPeriodDays: 7, trialEnd: 1790000000 })
