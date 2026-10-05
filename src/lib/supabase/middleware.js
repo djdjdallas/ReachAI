@@ -17,6 +17,22 @@ export function reachableWithoutAccess(pathname) {
   );
 }
 
+// What a request without access gets. Pages redirect to the paywall. APIs
+// get a 402 JSON, except browser navigations to /api/auth/* (the "Connect
+// Instagram" link is a plain GET the browser opens): those redirect to
+// /choose-plan too, instead of showing the coach a page of raw JSON.
+// Found in the 2026-10-05 sandbox run.
+/**
+ * @param {{method: string, pathname: string, accept: string|null}} req
+ * @returns {"redirect"|"json"}
+ */
+export function noAccessResponse({ method, pathname, accept }) {
+  if (!pathname.startsWith("/api/")) return "redirect";
+  const browserNavigation = method === "GET" && (accept || "").includes("text/html");
+  if (pathname.startsWith("/api/auth/") && browserNavigation) return "redirect";
+  return "json";
+}
+
 export async function updateSession(request) {
   let supabaseResponse = NextResponse.next({ request });
 
@@ -128,8 +144,8 @@ export async function updateSession(request) {
 
   // ── Access gate (paywall) ────────────────────────────────────────────
   // The single access check (src/lib/billing/access.js) on every protected
-  // page and API. No access: pages go to /choose-plan (plan selection and
-  // paywall), APIs get 402. Never uses
+  // page and API. No access: pages (and browser navigations to /api/auth/*)
+  // go to /choose-plan, other APIs get 402 (noAccessResponse). Never uses
   // onboarding_completed (browser-writable). Fails OPEN on a read error:
   // this is routing, and every send path enforces access on its own and
   // fails closed, so a database blip can't lock every coach out.
@@ -142,7 +158,12 @@ export async function updateSession(request) {
     if (billingError) {
       console.error("[middleware] access check read failed:", billingError.code);
     } else if (!hasActiveAccess(billingRow)) {
-      if (pathname.startsWith("/api/")) {
+      const kind = noAccessResponse({
+        method: request.method,
+        pathname,
+        accept: request.headers.get("accept"),
+      });
+      if (kind === "json") {
         return NextResponse.json({ error: "no_access" }, { status: 402 });
       }
       const url = request.nextUrl.clone();

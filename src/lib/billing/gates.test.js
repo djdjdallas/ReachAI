@@ -4,7 +4,7 @@ vi.mock("@supabase/ssr", () => ({ createServerClient: vi.fn() }));
 
 const { canUseCommentToDM } = await import("@/lib/comment-to-dm-gate");
 const { canUseVoiceReplies, canUseDripSequences } = await import("@/lib/plan");
-const { reachableWithoutAccess } = await import("@/lib/supabase/middleware");
+const { reachableWithoutAccess, noAccessResponse } = await import("@/lib/supabase/middleware");
 
 const future = new Date(Date.now() + 30 * 86_400_000).toISOString();
 const past = new Date(Date.now() - 30 * 86_400_000).toISOString();
@@ -73,4 +73,27 @@ describe("middleware paywall allowlist", () => {
     "%s is not",
     (p) => expect(reachableWithoutAccess(p)).toBe(false)
   );
+});
+
+describe("middleware response without access (sandbox Case 10)", () => {
+  const html = "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8";
+
+  it("a browser opening /api/auth/instagram is sent to the paywall, not raw JSON", () => {
+    expect(noAccessResponse({ method: "GET", pathname: "/api/auth/instagram", accept: html })).toBe("redirect");
+    expect(noAccessResponse({ method: "GET", pathname: "/api/auth/google-calendar", accept: html })).toBe("redirect");
+  });
+
+  it.each([
+    ["fetch() to /api/auth/* (no text/html)", { method: "GET", pathname: "/api/auth/instagram", accept: "*/*" }],
+    ["POST to /api/auth/*", { method: "POST", pathname: "/api/auth/instagram/disconnect", accept: html }],
+    ["no Accept header", { method: "GET", pathname: "/api/auth/instagram", accept: null }],
+    ["other APIs, even as a GET with text/html", { method: "GET", pathname: "/api/ai/reply", accept: html }],
+    ["AI on", { method: "POST", pathname: "/api/users/ai-mode", accept: "application/json" }],
+  ])("%s keeps the 402", (_label, req) => {
+    expect(noAccessResponse(req)).toBe("json");
+  });
+
+  it("pages always redirect", () => {
+    expect(noAccessResponse({ method: "GET", pathname: "/dashboard", accept: html })).toBe("redirect");
+  });
 });
