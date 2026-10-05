@@ -118,3 +118,23 @@ export function getPlanDisplay(plan) {
   if (p) return { name: p.displayName, price: formatPlanPrice(p.priceCents), period: "/mo" };
   return { name: "Free", price: "$0", period: "" };
 }
+
+/**
+ * Label for a plan's button on /billing. Direction comes from the catalog
+ * price, so a cheaper plan is never called an "Upgrade" (sandbox run,
+ * 2026-10-05: Base showed "Upgrade" to an Unlimited subscriber).
+ *
+ * @param {object} args
+ * @param {string} args.currentPlanId - users.plan
+ * @param {boolean} args.hasLivePlan - a serving Stripe subscription or a
+ *   comped plan. Without one (new, canceled, legacy trial) every plan is a
+ *   new subscription, whatever users.plan says (new rows default to 'base').
+ * @param {string} args.targetPlanId
+ */
+export function planButtonLabel({ currentPlanId, hasLivePlan, targetPlanId }) {
+  if (!hasLivePlan) return "Subscribe";
+  const current = PLAN_CATALOG[currentPlanId];
+  const target = PLAN_CATALOG[targetPlanId];
+  if (!current || !target) return "Switch plan";
+  return target.priceCents > current.priceCents ? "Upgrade" : `Switch to ${target.name}`;
+}

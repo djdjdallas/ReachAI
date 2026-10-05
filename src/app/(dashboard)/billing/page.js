@@ -34,6 +34,7 @@ import {
   PLAN_IDS,
   PLAN_CATALOG,
   formatPlanPrice,
+  planButtonLabel,
 } from "@/lib/plans";
 import { SUPPORT_EMAIL, SUPPORT_MAILTO } from "@/lib/support";
 
@@ -186,6 +187,12 @@ export default function BillingPage() {
       : "muted";
 
   const planDisplay = getPlanDisplay(currentPlan);
+  // A Stripe subscription in any serving status (including a card-required
+  // trial), or a comped account. A legacy no-card trial is 'trialing'
+  // without a subscription and should still see Subscribe.
+  const hasLivePlan =
+    subscriptionStatus === "active" ||
+    (!!profile?.stripe_subscription_id && ["trialing", "past_due"].includes(subscriptionStatus));
   const planDisplayName = planDisplay.name;
   const planPrice =
     currentPlan === "free"
@@ -359,15 +366,7 @@ export default function BillingPage() {
         <h2 className="text-lg font-semibold mb-4">Available Plans</h2>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {PLANS.map((plan) => {
-            // A Stripe subscription in any serving status (including a card-
-            // required trial), or a comped account. A legacy no-card trial
-            // is 'trialing' without a subscription and should still see
-            // Subscribe.
-            const isCurrentPlan =
-              currentPlan === plan.id &&
-              (subscriptionStatus === "active" ||
-                (!!profile?.stripe_subscription_id &&
-                  ["trialing", "past_due"].includes(subscriptionStatus)));
+            const isCurrentPlan = hasLivePlan && currentPlan === plan.id;
             // Same decision create-checkout makes, from the server. Null for
             // live subscribers (they're sent to the portal instead).
             const chargeNote = offerLines?.[plan.id] || null;
@@ -421,9 +420,7 @@ export default function BillingPage() {
                       {checkoutLoading === plan.id && (
                         <Loader2 className="h-4 w-4 animate-spin" />
                       )}
-                      {currentPlan !== "free" && !isCurrentPlan
-                        ? "Upgrade"
-                        : "Subscribe"}
+                      {planButtonLabel({ currentPlanId: currentPlan, hasLivePlan, targetPlanId: plan.id })}
                     </Button>
                   )}
                   {!isCurrentPlan && chargeNote && (
