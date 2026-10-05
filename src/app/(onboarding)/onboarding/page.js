@@ -103,6 +103,43 @@ function OnboardingPage() {
   // count is surfaced here too.
   const [heldForGreeting, setHeldForGreeting] = useState(0);
 
+  // Result of Step 2's Connect Calendly round trip (/api/auth/calendly
+  // ?return=onboarding sends the coach back with ?calendly=...).
+  const [calendlyNotice, setCalendlyNotice] = useState(null);
+  const [connectingCalendly, setConnectingCalendly] = useState(false);
+
+  useEffect(() => {
+    if (!searchParams) return;
+    const status = searchParams.get("calendly");
+    if (!status) return;
+    const warning = searchParams.get("warning");
+    let notice;
+    if (status === "connected" && !warning) {
+      notice = { kind: "success", message: "Calendly connected. Your AI will share your booking link in DMs." };
+    } else if (status === "connected" && warning === "calendly_plan_limit") {
+      notice = {
+        kind: "warning",
+        message:
+          "Calendly connected. Your Calendly plan doesn't send booking updates, so booked calls won't be marked automatically, but your AI will still share your link.",
+      };
+    } else if (status === "connected") {
+      notice = {
+        kind: "warning",
+        message:
+          "Calendly connected, but booking updates didn't set up. Your AI will still share your link. You can retry from Settings later.",
+      };
+    } else {
+      notice = { kind: "error", message: "Couldn't connect Calendly. Try again, or paste your booking link instead." };
+    }
+    setCalendlyNotice(notice);
+    const params = new URLSearchParams(searchParams.toString());
+    params.delete("calendly");
+    params.delete("warning");
+    params.delete("reason");
+    const next = params.toString();
+    router.replace(`/onboarding${next ? `?${next}` : ""}`, { scroll: false });
+  }, [searchParams, router]);
+
   useEffect(() => {
     if (!searchParams) return;
     const code = searchParams.get("error");
@@ -117,7 +154,7 @@ function OnboardingPage() {
       auth_failed:
         "Authorization was denied. Click Connect Instagram to try again.",
       ig_switch_blocked:
-        "That's a different Instagram account than the one already connected here. To switch accounts, finish setup first, then use Settings → Instagram Connection — or reconnect with the original account.",
+        "That's a different Instagram account than the one already connected here. To switch accounts, finish setup first, then use Settings → Instagram Connection, or reconnect with the original account.",
       ig_already_connected:
         "This Instagram account is already connected to another Clinchd account. Disconnect it there first, or contact dom@clinchd.io.",
       ig_save_failed:
@@ -346,43 +383,48 @@ function OnboardingPage() {
     setObjections(obj);
   };
 
+  // Step 2's save without advancing. Returns the saved script_config.
+  const persistStep2 = async () => {
+    // A blank form field never erases a saved value (mergeKeepingSaved).
+    const scriptConfig = mergeKeepingSaved(await fetchLatestScriptConfig(), {
+      greeting,
+      qualifying_questions: qualifyingQuestions,
+      interest_response: interestResponse,
+      objection_handlers: objectionHandlers,
+      booking_message: bookingMessage,
+      not_a_fit_message: notAFitMessage,
+      offer,
+      targetCustomer,
+      objections,
+      tone,
+      traits,
+      response_length: responseLength,
+      script_mode: scriptMode,
+      human_in_loop: humanInLoop,
+    });
+
+    const { error: dbErr } = await supabase
+      .from("users")
+      .update({
+        script_config: scriptConfig,
+        calendly_url: calendlyUrl,
+      })
+      .eq("id", user.id);
+    if (dbErr) throw dbErr;
+
+    setProfile((prev) => ({
+      ...prev,
+      script_config: scriptConfig,
+      calendly_url: calendlyUrl,
+    }));
+    return scriptConfig;
+  };
+
   const handleSaveScriptConfig = async () => {
     setAiError(null);
     setSaving(true);
     try {
-      // A blank form field never erases a saved value (mergeKeepingSaved).
-      const scriptConfig = mergeKeepingSaved(await fetchLatestScriptConfig(), {
-        greeting,
-        qualifying_questions: qualifyingQuestions,
-        interest_response: interestResponse,
-        objection_handlers: objectionHandlers,
-        booking_message: bookingMessage,
-        not_a_fit_message: notAFitMessage,
-        offer,
-        targetCustomer,
-        objections,
-        tone,
-        traits,
-        response_length: responseLength,
-        script_mode: scriptMode,
-        human_in_loop: humanInLoop,
-      });
-
-      const { error: dbErr } = await supabase
-        .from("users")
-        .update({
-          script_config: scriptConfig,
-          calendly_url: calendlyUrl,
-        })
-        .eq("id", user.id);
-      if (dbErr) throw dbErr;
-
-      setProfile((prev) => ({
-        ...prev,
-        script_config: scriptConfig,
-        calendly_url: calendlyUrl,
-      }));
-
+      await persistStep2();
       setStep(3);
       posthog.capture("onboarding_step_completed", { step: 2 });
     } catch (err) {
@@ -390,6 +432,21 @@ function OnboardingPage() {
       setAiError(err?.message || "Failed to save. Please try again.");
     } finally {
       setSaving(false);
+    }
+  };
+
+  // Connect Calendly from Step 2. Saves what's typed first: the OAuth round
+  // trip reloads the page, which would otherwise drop the form.
+  const handleConnectCalendly = async () => {
+    setAiError(null);
+    setConnectingCalendly(true);
+    try {
+      await persistStep2();
+      window.location.href = "/api/auth/calendly?return=onboarding";
+    } catch (err) {
+      console.error("Error saving before Calendly connect:", err);
+      setAiError(err?.message || "Couldn't save your answers. Try again.");
+      setConnectingCalendly(false);
     }
   };
 
@@ -866,6 +923,11 @@ function OnboardingPage() {
           setObjections={setObjections}
           calendlyUrl={calendlyUrl}
           setCalendlyUrl={setCalendlyUrl}
+          calendlyConnected={!!profile?.calendly_user_uri}
+          connectingCalendly={connectingCalendly}
+          onConnectCalendly={handleConnectCalendly}
+          calendlyNotice={calendlyNotice}
+          onDismissCalendlyNotice={() => setCalendlyNotice(null)}
           saving={saving}
           generating={generating}
           onSave={handleSaveScriptConfig}

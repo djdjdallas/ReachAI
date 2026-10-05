@@ -8,8 +8,33 @@ import {
 } from "@/lib/calendly";
 import { encryptToken } from "@/lib/token-utils";
 
+// Settings keeps its existing query strings. Onboarding (Step 2's Connect
+// Calendly button) gets its own calendly= flag, because onboarding's error=
+// param is reserved for Instagram connect errors.
+function destination(baseUrl, returnTo, { connected = false, warning = null, error = null }) {
+  if (returnTo === "onboarding") {
+    const status = connected
+      ? `calendly=connected${warning ? `&warning=${warning}` : ""}`
+      : `calendly=error&reason=${error}`;
+    return `${baseUrl}/onboarding?step=2&${status}`;
+  }
+  if (connected) {
+    return `${baseUrl}/settings?calendly=connected${warning ? `&warning=${warning}` : ""}`;
+  }
+  return `${baseUrl}/settings?error=${error}`;
+}
+
+function redirectTo(url) {
+  const response = NextResponse.redirect(url);
+  response.cookies.set("calendly_oauth_state", "", { maxAge: 0, path: "/" });
+  response.cookies.set("calendly_return", "", { maxAge: 0, path: "/" });
+  return response;
+}
+
 export async function GET(request) {
   const baseUrl = process.env.NEXT_PUBLIC_APP_URL;
+  const returnTo =
+    request.cookies.get("calendly_return")?.value === "onboarding" ? "onboarding" : "settings";
 
   try {
     const { searchParams } = new URL(request.url);
@@ -20,12 +45,12 @@ export async function GET(request) {
     const storedState = request.cookies.get("calendly_oauth_state")?.value;
     if (!state || !storedState || state !== storedState) {
       console.error("Calendly OAuth state mismatch");
-      return NextResponse.redirect(`${baseUrl}/settings?error=invalid_state`);
+      return redirectTo(destination(baseUrl, returnTo, { error: "invalid_state" }));
     }
 
     if (error || !code) {
       console.error("Calendly OAuth error:", error || "no code returned");
-      return NextResponse.redirect(`${baseUrl}/settings?error=calendly_denied`);
+      return redirectTo(destination(baseUrl, returnTo, { error: "calendly_denied" }));
     }
 
     const supabase = await createClient();
@@ -83,15 +108,11 @@ export async function GET(request) {
       })
       .eq("id", user.id);
 
-    const redirectPath = webhookError
-      ? `/settings?calendly=connected&warning=${webhookError}`
-      : `/settings?calendly=connected`;
-
-    const response = NextResponse.redirect(`${baseUrl}${redirectPath}`);
-    response.cookies.set("calendly_oauth_state", "", { maxAge: 0, path: "/" });
-    return response;
+    return redirectTo(
+      destination(baseUrl, returnTo, { connected: true, warning: webhookError })
+    );
   } catch (err) {
     console.error("Calendly callback error:", err);
-    return NextResponse.redirect(`${baseUrl}/settings?error=calendly_callback_failed`);
+    return redirectTo(destination(baseUrl, returnTo, { error: "calendly_callback_failed" }));
   }
 }
