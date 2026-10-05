@@ -202,7 +202,8 @@ export default function PrivacyPage() {
         <p>
           When you disconnect your Instagram account or close your Clinchd account, we
           delete all conversation and comment data within 30 days, except where required to
-          retain it for legal compliance or fraud prevention.
+          retain it for legal compliance or fraud prevention. After account deletion we keep a
+          one-way hash of your email address only to prevent repeated free trials.
         </p>
 
         <h2>8. Data Security</h2>

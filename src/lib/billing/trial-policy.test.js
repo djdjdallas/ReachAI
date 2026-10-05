@@ -1,9 +1,18 @@
-import { describe, it, expect, vi } from "vitest";
-import { normalizeEmailForTrial, decideCheckoutTrial, TRIAL_DAYS } from "./trial-policy";
+import { describe, it, expect, vi, beforeEach } from "vitest";
+import { createHmac } from "node:crypto";
+import {
+  normalizeEmailForTrial,
+  trialLedgerKey,
+  decideCheckoutTrial,
+  TRIAL_DAYS,
+} from "./trial-policy";
 
-// Same inputs/outputs as public.normalize_email_for_trial (migration
-// 20261006130000), checked against Postgres 17: the two must agree.
-describe("normalizeEmailForTrial (parity with the SQL function)", () => {
+const SECRET = "test-secret";
+beforeEach(() => {
+  process.env.TRIAL_LEDGER_SECRET = SECRET;
+});
+
+describe("normalizeEmailForTrial", () => {
   it.each([
     ["Green.Evans97+x@Gmail.com", "greenevans97@gmail.com"],
     ["greenevans97@googlemail.com", "greenevans97@gmail.com"],
@@ -17,6 +26,39 @@ describe("normalizeEmailForTrial (parity with the SQL function)", () => {
     [null, null],
   ])("%j -> %j", (input, expected) => {
     expect(normalizeEmailForTrial(input)).toBe(expected);
+  });
+});
+
+describe("trialLedgerKey (HMAC-SHA256 of the normalized email)", () => {
+  const hmac = (s) => createHmac("sha256", SECRET).update(s).digest("hex");
+
+  it("hashes the normalized email, never storing the email", () => {
+    const key = trialLedgerKey("Green.Evans97+promo@Gmail.com", SECRET);
+    expect(key).toBe(hmac("greenevans97@gmail.com"));
+    expect(key).toMatch(/^[0-9a-f]{64}$/);
+    expect(key).not.toContain("greenevans");
+  });
+
+  it("fixed test vector: changing the normalization or hash orphans every ledger row", () => {
+    expect(trialLedgerKey("greenevans97@gmail.com", "test-secret")).toBe(
+      "bde9108855568258f6b9ec231d35b83c88042c47a86d0964c434ed4bf211d6f7"
+    );
+  });
+
+  it("every variant of one inbox gets the same key", () => {
+    const keys = ["greenevans97@gmail.com", "Green.Evans97@googlemail.com", "greenevans97+x@gmail.com"].map((e) =>
+      trialLedgerKey(e, SECRET)
+    );
+    expect(new Set(keys).size).toBe(1);
+  });
+
+  it("depends on the secret", () => {
+    expect(trialLedgerKey("a@b.co", "one")).not.toBe(trialLedgerKey("a@b.co", "two"));
+  });
+
+  it("null for an unusable email; throws without a secret", () => {
+    expect(trialLedgerKey("nope", SECRET)).toBeNull();
+    expect(() => trialLedgerKey("a@b.co", "")).toThrow(/TRIAL_LEDGER_SECRET/);
   });
 });
 
@@ -40,8 +82,11 @@ describe("decideCheckoutTrial", () => {
       mode: "trial",
       trialPeriodDays: TRIAL_DAYS,
     });
-    // Looked up by the normalized email.
-    expect(d.eq).toHaveBeenCalledWith("normalized_email", "newcoach@gmail.com");
+    // Looked up by the HMAC of the normalized email, never the email.
+    expect(d.eq).toHaveBeenCalledWith(
+      "email_hash",
+      createHmac("sha256", SECRET).update("newcoach@gmail.com").digest("hex")
+    );
   });
 
   it("legacy trial still running (>=49h): carries the remaining days (decision B)", async () => {
@@ -81,10 +126,16 @@ describe("decideCheckoutTrial", () => {
     const r = await decideCheckoutTrial({
       user: { ...newUser, email: "Green.Evans97@gmail.com" },
       customerId: "cus_brand_new",
-      ...deps({ ledger: { normalized_email: "greenevans97@gmail.com" } }),
+      ...deps({ ledger: { email_hash: "x".repeat(64) } }),
       now: NOW,
     });
     expect(r).toEqual({ mode: "none", reason: "email_had_trial" });
+  });
+
+  it("fails closed without TRIAL_LEDGER_SECRET", async () => {
+    delete process.env.TRIAL_LEDGER_SECRET;
+    const r = await decideCheckoutTrial({ user: newUser, customerId: "cus_new", ...deps(), now: NOW });
+    expect(r).toEqual({ mode: "none", reason: "ledger_unavailable" });
   });
 
   it("fails closed when the ledger can't be read", async () => {

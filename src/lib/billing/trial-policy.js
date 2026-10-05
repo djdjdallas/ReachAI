@@ -13,13 +13,16 @@
 //      ends, they're charged today.
 //   2. This Stripe customer has ever had a subscription (any status,
 //      including a trial that was canceled).
-//   3. The normalized email is in billing_trial_ledger: someone with this
+//   3. The person's email key is in billing_trial_ledger: someone with this
 //      email already trialed or subscribed, even under a deleted account
-//      (Evans deleted his account and re-signed up to get a second trial).
-//      The ledger has no foreign key to users, so it survives deletion.
+//      (one customer deleted their account and signed up again to get a
+//      second trial). The ledger has no foreign key to users, so it
+//      survives deletion. It stores only a one-way HMAC-SHA256 of the
+//      normalized email (keyed with TRIAL_LEDGER_SECRET), never the email.
 //
 // Otherwise: a 7-day trial.
 
+import crypto from "node:crypto";
 import { planCheckoutTrial } from "@/lib/checkout-trial";
 
 export const TRIAL_DAYS = 7;
@@ -46,6 +49,25 @@ export function normalizeEmailForTrial(email) {
   if (domain === "gmail.com") local = local.replace(/\./g, "");
   if (!local) return null;
   return `${local}@${domain}`;
+}
+
+/**
+ * The ledger key for an email: HMAC-SHA256(normalized email,
+ * TRIAL_LEDGER_SECRET), hex. One-way, so the ledger holds no email
+ * addresses; the secret stops anyone holding a copy of the table from
+ * testing guessed emails against it. Server-only (the secret never reaches
+ * the client). Throws when the secret is missing, which callers treat as
+ * "can't check" and so give no trial.
+ *
+ * @param {string|null|undefined} email
+ * @param {string} [secret]
+ * @returns {string|null} null for an unusable email
+ */
+export function trialLedgerKey(email, secret = process.env.TRIAL_LEDGER_SECRET) {
+  const normalized = normalizeEmailForTrial(email);
+  if (!normalized) return null;
+  if (!secret) throw new Error("TRIAL_LEDGER_SECRET is not set");
+  return crypto.createHmac("sha256", secret).update(normalized).digest("hex");
 }
 
 /**
@@ -88,12 +110,18 @@ export async function decideCheckoutTrial({ user, customerId, stripe, admin, now
   }
 
   // 3. The person, across accounts and customers.
-  const normalized = normalizeEmailForTrial(user.email);
-  if (normalized) {
+  let key;
+  try {
+    key = trialLedgerKey(user.email);
+  } catch {
+    // Fail closed: no secret, no way to check, no trial.
+    return { mode: "none", reason: "ledger_unavailable" };
+  }
+  if (key) {
     const { data: ledgerRow, error } = await admin
       .from("billing_trial_ledger")
-      .select("normalized_email")
-      .eq("normalized_email", normalized)
+      .select("email_hash")
+      .eq("email_hash", key)
       .maybeSingle();
     // Fail closed: if we can't check, don't hand out a trial.
     if (error) return { mode: "none", reason: "ledger_unavailable" };
@@ -105,17 +133,23 @@ export async function decideCheckoutTrial({ user, customerId, stripe, admin, now
 
 /**
  * Record that this person has trialed or subscribed. Called by the Stripe
- * webhook when a subscription is created. Idempotent (upsert on the
- * normalized email; the first record wins).
+ * webhook when a subscription is created. Idempotent (upsert on the email
+ * hash; the first record wins).
  */
 export async function recordTrialLedger(admin, { email, stripeCustomerId, source }) {
-  const normalized = normalizeEmailForTrial(email);
-  if (!normalized) return;
+  let key;
+  try {
+    key = trialLedgerKey(email);
+  } catch (err) {
+    console.error("[trial-ledger] not recorded:", err?.message);
+    return;
+  }
+  if (!key) return;
   const { error } = await admin
     .from("billing_trial_ledger")
     .upsert(
-      { normalized_email: normalized, stripe_customer_id: stripeCustomerId || null, source },
-      { onConflict: "normalized_email", ignoreDuplicates: true }
+      { email_hash: key, stripe_customer_id: stripeCustomerId || null, source },
+      { onConflict: "email_hash", ignoreDuplicates: true }
     );
   if (error) console.error("[trial-ledger] upsert failed:", error.message);
 }
