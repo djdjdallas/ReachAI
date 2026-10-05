@@ -3,7 +3,13 @@
 import { useState, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import { resolveOnboardingAiMode } from "@/lib/onboarding";
+import {
+  resolveOnboardingAiMode,
+  autoImportPending,
+  AUTO_IMPORT_WAIT_MS,
+  mergeKeepingSaved,
+  fillIfEmpty,
+} from "@/lib/onboarding";
 import posthog from "posthog-js";
 import { Loader2, AlertCircle, X } from "lucide-react";
 
@@ -120,8 +126,9 @@ function OnboardingPage() {
     router.replace(`/onboarding${next ? `?${next}` : ""}`, { scroll: false });
   }, [searchParams, router]);
 
-  // Post-OAuth Instagram auto-import — background voice-profile import.
-  // True while we're polling for it to finish (max ~8s).
+  // Post-OAuth Instagram auto-import (voice profile + offer, target
+  // customer, objections, greeting). True while we wait for it in the
+  // background; the page stays usable and shows a "personalizing" banner.
   const [autoImporting, setAutoImporting] = useState(false);
 
   // Persisted user preferences (Step 3 + Step 4 controls)
@@ -200,6 +207,40 @@ function OnboardingPage() {
       }
     }
 
+    // Imported values only fill fields that are still empty in the form.
+    function applyImported(refreshed) {
+      setProfile(refreshed);
+      const sc = refreshed.script_config || {};
+      setOffer((prev) => fillIfEmpty(prev, sc.offer));
+      setTargetCustomer((prev) => fillIfEmpty(prev, sc.targetCustomer));
+      setObjections((prev) => fillIfEmpty(prev, sc.objections));
+      setGreeting((prev) => fillIfEmpty(prev, sc.greeting));
+      if (refreshed.voice_profile?.status === "ready") {
+        setVoiceProfile((prev) => prev ?? refreshed.voice_profile);
+      }
+    }
+
+    async function waitForAutoImport(userId) {
+      const start = Date.now();
+      let latest = null;
+      while (!cancelled && Date.now() - start < AUTO_IMPORT_WAIT_MS) {
+        await new Promise((r) => setTimeout(r, 1500));
+        if (cancelled) return;
+        const { data: refreshed } = await supabase
+          .from("users")
+          .select("*")
+          .eq("id", userId)
+          .single();
+        if (refreshed) {
+          latest = refreshed;
+          if (!autoImportPending(refreshed)) break;
+        }
+      }
+      if (cancelled) return;
+      if (latest) applyImported(latest);
+      setAutoImporting(false);
+    }
+
     async function init() {
       const {
         data: { user: authUser },
@@ -241,41 +282,17 @@ function OnboardingPage() {
           setStep(2);
         }
 
-        // Background voice-profile auto-import may still be running. If
-        // Instagram is connected, the voice profile is not yet ready, and
-        // we have not yet stamped attempted_at, we poll for ~8 seconds
-        // before settling on whatever state we end up with.
-        const mayBeImporting =
-          !!userProfile.instagram_business_account_id &&
-          userProfile.voice_profile?.status !== "ready" &&
-          !userProfile.instagram_auto_import_attempted_at;
+        applyProfile(userProfile);
 
-        if (mayBeImporting) {
+        // The post-connect import takes ~6.5s and may still be running.
+        // Don't block the page on it: show onboarding now, wait in the
+        // background, then fold the result into fields the coach hasn't
+        // typed in. (It used to block on a spinner and stop at
+        // attempted_at, which is stamped before the work starts, so the
+        // imported fields never reached the form.)
+        if (autoImportPending(userProfile)) {
           setAutoImporting(true);
-          // Poll every 1.5s up to 8s. Stop as soon as attempted_at is
-          // stamped — at that point we have a final result (success or
-          // skipped). Always do a final refetch before unsetting.
-          const start = Date.now();
-          let finalProfile = userProfile;
-          while (!cancelled && Date.now() - start < 8000) {
-            await new Promise((r) => setTimeout(r, 1500));
-            if (cancelled) break;
-            const { data: refreshed } = await supabase
-              .from("users")
-              .select("*")
-              .eq("id", authUser.id)
-              .single();
-            if (refreshed) {
-              finalProfile = refreshed;
-              if (refreshed.instagram_auto_import_attempted_at) break;
-            }
-          }
-          if (!cancelled) {
-            applyProfile(finalProfile);
-            setAutoImporting(false);
-          }
-        } else {
-          applyProfile(userProfile);
+          waitForAutoImport(authUser.id);
         }
       }
 
@@ -290,6 +307,18 @@ function OnboardingPage() {
 
   // --- Handlers ---
 
+  // The stored script_config right now. Saves build on this, not on the
+  // profile as loaded: the auto-import may have written fields since.
+  const fetchLatestScriptConfig = async () => {
+    const { data, error } = await supabase
+      .from("users")
+      .select("script_config")
+      .eq("id", user.id)
+      .single();
+    if (error) throw error;
+    return data?.script_config || {};
+  };
+
   const handleApplyPreset = ({ offer: o, targetCustomer: t, objections: obj }) => {
     setAiError(null);
     setOffer(o);
@@ -301,27 +330,23 @@ function OnboardingPage() {
     setAiError(null);
     setSaving(true);
     try {
-      const scriptConfig = {
-        ...(profile?.script_config || {}),
-        ...(greeting && { greeting }),
-        ...(qualifyingQuestions && {
-          qualifying_questions: qualifyingQuestions,
-        }),
-        ...(interestResponse && { interest_response: interestResponse }),
-        ...(objectionHandlers && { objection_handlers: objectionHandlers }),
-        ...(bookingMessage && { booking_message: bookingMessage }),
-        ...(notAFitMessage && { not_a_fit_message: notAFitMessage }),
-      };
-
-      // Always overwrite core + preference fields
-      scriptConfig.offer = offer;
-      scriptConfig.targetCustomer = targetCustomer;
-      scriptConfig.objections = objections;
-      scriptConfig.tone = tone;
-      scriptConfig.traits = traits;
-      scriptConfig.response_length = responseLength;
-      scriptConfig.script_mode = scriptMode;
-      scriptConfig.human_in_loop = humanInLoop;
+      // A blank form field never erases a saved value (mergeKeepingSaved).
+      const scriptConfig = mergeKeepingSaved(await fetchLatestScriptConfig(), {
+        greeting,
+        qualifying_questions: qualifyingQuestions,
+        interest_response: interestResponse,
+        objection_handlers: objectionHandlers,
+        booking_message: bookingMessage,
+        not_a_fit_message: notAFitMessage,
+        offer,
+        targetCustomer,
+        objections,
+        tone,
+        traits,
+        response_length: responseLength,
+        script_mode: scriptMode,
+        human_in_loop: humanInLoop,
+      });
 
       const { error: dbErr } = await supabase
         .from("users")
@@ -400,8 +425,7 @@ function OnboardingPage() {
     setAiError(null);
     setSaving(true);
     try {
-      const scriptConfig = {
-        ...(profile?.script_config || {}),
+      const scriptConfig = mergeKeepingSaved(await fetchLatestScriptConfig(), {
         offer,
         targetCustomer,
         objections,
@@ -416,7 +440,7 @@ function OnboardingPage() {
         response_length: responseLength,
         script_mode: scriptMode,
         human_in_loop: humanInLoop,
-      };
+      });
 
       const { error: dbErr } = await supabase
         .from("users")
@@ -650,12 +674,11 @@ function OnboardingPage() {
     setAiError(null);
     setSaving(true);
     try {
-      const scriptConfig = {
-        ...(profile?.script_config || {}),
+      const scriptConfig = mergeKeepingSaved(await fetchLatestScriptConfig(), {
         tone,
         traits,
         response_length: responseLength,
-      };
+      });
 
       const { error: dbErr } = await supabase
         .from("users")
