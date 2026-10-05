@@ -28,54 +28,28 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Separator } from "@/components/ui/separator";
-import { getDmLimit, getPlanDisplay } from "@/lib/plans";
 import {
-  planCheckoutTrial,
-  chargeTodayText,
-  trialContinuesText,
-} from "@/lib/checkout-trial";
+  getDmLimit,
+  getPlanDisplay,
+  PLAN_IDS,
+  PLAN_CATALOG,
+  formatPlanPrice,
+} from "@/lib/plans";
 
-const PLANS = [
-  {
-    id: "base",
-    name: "Base Plan",
-    price: "$97",
-    // Keep in sync with PLANS.base.price in src/lib/stripe.js (that module
-    // pulls in the Stripe SDK, so it can't be imported client-side).
-    priceCents: 9700,
+// Plans come from the one catalog (src/lib/plans.js); price ids stay on the
+// server. No local copy of prices here.
+const PLANS = PLAN_IDS.map((id) => {
+  const p = PLAN_CATALOG[id];
+  return {
+    id,
+    name: p.displayName,
+    price: formatPlanPrice(p.priceCents),
     period: "/mo",
-    dmLimit: "1,500 qualified conversations/month",
-    features: [
-      "1,500 AI-assisted qualified conversations per month",
-      "AI-assisted lead qualification",
-      "Calendar-connected call booking",
-      "Script builder with AI generation",
-      "Conversation dashboard",
-      "Email support",
-    ],
-    popular: false,
-  },
-  {
-    id: "unlimited",
-    name: "Unlimited Plan",
-    price: "$197",
-    priceCents: 19700,
-    period: "/mo",
-    dmLimit: "Unlimited conversations",
-    features: [
-      "Unlimited AI-assisted conversations",
-      "AI-assisted lead qualification",
-      "Calendar-connected call booking",
-      "Script builder with AI generation",
-      "Conversation dashboard",
-      "Advanced analytics & reporting",
-      "Priority support",
-      "Custom AI personality tuning",
-      "Comment-to-DM with AI intent grading",
-    ],
-    popular: true,
-  },
-];
+    dmLimit: p.dmLimitLabel,
+    features: p.features,
+    popular: p.popular,
+  };
+});
 
 export default function BillingPage() {
   const router = useRouter();
@@ -90,6 +64,9 @@ export default function BillingPage() {
   // returned nothing / threw) or portal (manage-subscription link did the
   // same). Cleared the next time the user clicks either button.
   const [billingError, setBillingError] = useState(null);
+  // Each plan's offer line ("7-day free trial...", "charged today", ...),
+  // decided on the server exactly as Checkout will (checkout-offer API).
+  const [offerLines, setOfferLines] = useState(null);
 
   useEffect(() => {
     async function init() {
@@ -116,6 +93,11 @@ export default function BillingPage() {
         setProfile(userProfile);
       }
 
+      fetch("/api/billing/checkout-offer")
+        .then((res) => (res.ok ? res.json() : null))
+        .then((data) => setOfferLines(data?.lines || null))
+        .catch(() => {});
+
       setLoading(false);
     }
 
@@ -129,7 +111,7 @@ export default function BillingPage() {
       const res = await fetch("/api/stripe/create-checkout", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ planId }),
+        body: JSON.stringify({ planId, returnTo: "billing" }),
       });
 
       const data = await res.json().catch(() => ({}));
@@ -367,20 +349,9 @@ export default function BillingPage() {
             const isCurrentPlan =
               currentPlan === plan.id &&
               subscriptionStatus === "active";
-            // Same decision create-checkout makes, shown before the click.
-            // Live subscribers are sent to the portal instead, so no line.
-            const hasLiveSubscription = ["active", "past_due"].includes(
-              subscriptionStatus
-            );
-            const checkoutTrial = planCheckoutTrial({
-              subscriptionStatus,
-              trialEndsAt: profile?.trial_ends_at,
-            });
-            const chargeNote = hasLiveSubscription
-              ? null
-              : checkoutTrial.chargeToday
-                ? chargeTodayText(plan.priceCents)
-                : trialContinuesText(checkoutTrial.trialEnd, plan.priceCents);
+            // Same decision create-checkout makes, from the server. Null for
+            // live subscribers (they're sent to the portal instead).
+            const chargeNote = offerLines?.[plan.id] || null;
             return (
               <Card
                 key={plan.id}

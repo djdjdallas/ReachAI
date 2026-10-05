@@ -30,7 +30,7 @@ export async function GET(request) {
       .eq("id", user.id)
       .single();
     if (billingError || !hasActiveAccess(billing)) {
-      return NextResponse.redirect(`${baseUrl}/billing?reason=choose_plan`);
+      return NextResponse.redirect(`${baseUrl}/choose-plan`);
     }
 
     const state = crypto.randomBytes(32).toString("hex");

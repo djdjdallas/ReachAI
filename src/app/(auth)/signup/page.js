@@ -83,9 +83,10 @@ export default function SignupPage() {
       if (data?.session) identifyUser(posthog, data.user);
       posthog.capture("user_signed_up", { email, full_name: fullName });
 
-      // Signed in already (confirmation off): no email is coming.
+      // Signed in already (confirmation off): no email is coming. Plan
+      // selection comes first (card-required trial), then onboarding.
       if (data?.session) {
-        router.replace("/onboarding");
+        router.replace("/choose-plan");
         return;
       }
 

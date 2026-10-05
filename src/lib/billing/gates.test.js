@@ -64,7 +64,7 @@ describe("feature gates use hasActiveAccess (no founder bypass)", () => {
 });
 
 describe("middleware paywall allowlist", () => {
-  it.each(["/billing", "/billing/success", "/api/stripe/create-checkout", "/api/stripe/create-portal", "/api/billing/access", "/api/user/delete"])(
+  it.each(["/choose-plan", "/billing", "/billing/success", "/api/stripe/create-checkout", "/api/stripe/create-portal", "/api/billing/access", "/api/user/delete"])(
     "%s is reachable without access",
     (p) => expect(reachableWithoutAccess(p)).toBe(true)
   );

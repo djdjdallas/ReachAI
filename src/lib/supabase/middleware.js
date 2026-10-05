@@ -3,11 +3,12 @@ import { NextResponse } from "next/server";
 import { hasActiveAccess } from "@/lib/billing/access";
 import { ACCESS_COLUMNS } from "@/lib/billing/status";
 
-// Reachable without access (paywall): billing, its Stripe/access APIs, and
-// account deletion. Sign-out is a client-side Supabase call and the Help
+// Reachable without access (paywall): plan selection, billing, their
+// Stripe/access APIs, and account deletion. Sign-out is a client-side Supabase call and the Help
 // link is a mailto, so neither needs a route here.
 export function reachableWithoutAccess(pathname) {
   return (
+    pathname === "/choose-plan" ||
     pathname === "/billing" ||
     pathname.startsWith("/billing/") ||
     pathname.startsWith("/api/stripe/") ||
@@ -124,7 +125,8 @@ export async function updateSession(request) {
 
   // ── Access gate (paywall) ────────────────────────────────────────────
   // The single access check (src/lib/billing/access.js) on every protected
-  // page and API. No access: pages go to /billing, APIs get 402. Never uses
+  // page and API. No access: pages go to /choose-plan (plan selection and
+  // paywall), APIs get 402. Never uses
   // onboarding_completed (browser-writable). Fails OPEN on a read error:
   // this is routing, and every send path enforces access on its own and
   // fails closed, so a database blip can't lock every coach out.
@@ -141,7 +143,7 @@ export async function updateSession(request) {
         return NextResponse.json({ error: "no_access" }, { status: 402 });
       }
       const url = request.nextUrl.clone();
-      url.pathname = "/billing";
+      url.pathname = "/choose-plan";
       url.search = "";
       return NextResponse.redirect(url);
     }

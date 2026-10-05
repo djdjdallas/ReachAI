@@ -3,16 +3,21 @@ import { createClient } from "@/lib/supabase/server";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import {
   createCheckoutSession,
-  createCustomer,
   createCustomerPortalSession,
   getStripe,
-  PLANS,
+  planForCheckout,
 } from "@/lib/stripe";
-import {
-  planCheckoutTrial,
-  chargeTodayText,
-  trialContinuesText,
-} from "@/lib/checkout-trial";
+import { ensureStripeCustomer } from "@/lib/billing/customer";
+import { decideCheckoutTrial } from "@/lib/billing/trial-policy";
+import { offerText } from "@/lib/checkout-trial";
+
+// Where Stripe sends the coach back. Allowlisted; never a URL from the
+// client. The plan-selection page is the default (new signups, paywall);
+// the billing page passes "billing".
+const RETURN_PATHS = {
+  "choose-plan": { success: "/choose-plan?checkout=success", cancel: "/choose-plan" },
+  billing: { success: "/choose-plan?checkout=success", cancel: "/billing" },
+};
 
 export async function POST(request) {
   try {
@@ -27,54 +32,33 @@ export async function POST(request) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const { planId } = await request.json();
+    const { planId, returnTo } = await request.json().catch(() => ({}));
 
-    // Validate plan ID against known plans (server-side only)
-    const plan = PLANS[planId];
+    // The plan id is validated server-side against PLANS; the price id
+    // comes from server config, never from the request.
+    const plan = planForCheckout(planId);
     if (!plan?.priceId) {
-      return NextResponse.json(
-        { error: "Invalid plan" },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: "Invalid plan" }, { status: 400 });
     }
+    const paths = RETURN_PATHS[returnTo] || RETURN_PATHS["choose-plan"];
 
-    const priceId = plan.priceId;
-
-    // Fetch user profile to check for existing Stripe customer
-    const { data: userProfile, error: profileError } = await getSupabaseAdmin()
+    const admin = getSupabaseAdmin();
+    const { data: userProfile, error: profileError } = await admin
       .from("users")
-      .select("stripe_customer_id, email, subscription_status, trial_ends_at")
+      .select("email, subscription_status, trial_ends_at, stripe_subscription_id")
       .eq("id", user.id)
       .single();
 
     if (profileError || !userProfile) {
-      return NextResponse.json(
-        { error: "User profile not found" },
-        { status: 404 }
-      );
+      return NextResponse.json({ error: "User profile not found" }, { status: 404 });
     }
 
-    // Get or create Stripe customer
-    let customerId = userProfile.stripe_customer_id;
-
-    if (!customerId) {
-      const customer = await createCustomer(
-        userProfile.email || user.email,
-        user.id
-      );
-      customerId = customer.id;
-
-      // Save Stripe customer ID
-      await getSupabaseAdmin()
-        .from("users")
-        .update({ stripe_customer_id: customerId })
-        .eq("id", user.id);
-    }
+    const customerId = await ensureStripeCustomer(admin, user);
 
     // Never start a second subscription: an active customer clicking
     // Subscribe/Upgrade used to get a brand-new concurrent subscription
     // (double-billed, plus webhook last-event-wins flapping the plan column).
-    // Stripe is the source of truth here — DB status can lag webhook delivery.
+    // Stripe is the source of truth here; DB status can lag webhook delivery.
     const existing = await getStripe().subscriptions.list({
       customer: customerId,
       status: "all",
@@ -90,26 +74,27 @@ export async function POST(request) {
       return NextResponse.json({ url: portal.url }, { status: 200 });
     }
 
-    // Carry the remaining in-app trial (never more), or charge today and say
-    // so on the Checkout page. The billing page shows the same line before
-    // the click (same helper).
-    const { trialEnd, chargeToday } = planCheckoutTrial({
-      subscriptionStatus: userProfile.subscription_status,
-      trialEndsAt: userProfile.trial_ends_at,
+    // One trial per person (src/lib/billing/trial-policy.js): a 7-day trial
+    // for someone new, the remaining days for a legacy trial, otherwise
+    // charge today. The plan page shows the same decision before the click.
+    const offer = await decideCheckoutTrial({
+      user: { ...userProfile, email: userProfile.email || user.email },
+      customerId,
+      stripe: getStripe(),
+      admin,
     });
-    const session = await createCheckoutSession(customerId, priceId, user.id, {
-      trialEnd,
-      submitMessage: chargeToday
-        ? chargeTodayText(plan.price)
-        : trialContinuesText(trialEnd, plan.price),
+
+    const session = await createCheckoutSession(customerId, plan.priceId, user.id, {
+      trialPeriodDays: offer.mode === "trial" ? offer.trialPeriodDays : null,
+      trialEnd: offer.mode === "carry" ? offer.trialEnd : null,
+      submitMessage: offerText(offer, plan.price),
+      successPath: paths.success,
+      cancelPath: paths.cancel,
     });
 
     return NextResponse.json({ url: session.url }, { status: 200 });
   } catch (error) {
     console.error("Create checkout error:", error);
-    return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }
