@@ -84,7 +84,7 @@ export default function BillingPage() {
       const { data: userProfile } = await supabase
         .from("users")
         .select(
-          "plan, subscription_status, stripe_customer_id, dm_count_this_month, trial_ends_at, cancel_at"
+          "plan, subscription_status, stripe_customer_id, stripe_subscription_id, dm_count_this_month, trial_ends_at, cancel_at"
         )
         .eq("id", authUser.id)
         .single();
@@ -346,9 +346,15 @@ export default function BillingPage() {
         <h2 className="text-lg font-semibold mb-4">Available Plans</h2>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {PLANS.map((plan) => {
+            // A Stripe subscription in any serving status (including a card-
+            // required trial), or a comped account. A legacy no-card trial
+            // is 'trialing' without a subscription and should still see
+            // Subscribe.
             const isCurrentPlan =
               currentPlan === plan.id &&
-              subscriptionStatus === "active";
+              (subscriptionStatus === "active" ||
+                (!!profile?.stripe_subscription_id &&
+                  ["trialing", "past_due"].includes(subscriptionStatus)));
             // Same decision create-checkout makes, from the server. Null for
             // live subscribers (they're sent to the portal instead).
             const chargeNote = offerLines?.[plan.id] || null;

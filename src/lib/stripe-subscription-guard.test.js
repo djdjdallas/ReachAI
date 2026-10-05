@@ -1,6 +1,5 @@
 import { describe, it, expect } from "vitest";
 import {
-  mapSubscriptionStatus,
   decideSubscriptionUpdate,
   shouldActivateCheckout,
   trackedSubscriptionFilter,
@@ -8,19 +7,6 @@ import {
 } from "./stripe-subscription-guard";
 
 const SUB = "sub_current";
-
-describe("mapSubscriptionStatus", () => {
-  it.each([
-    ["active", "active"],
-    ["trialing", "active"],
-    ["past_due", "past_due"],
-    ["canceled", "canceled"],
-    ["unpaid", "canceled"],
-    ["incomplete", "incomplete"],
-  ])("%s → %s", (stripe, ours) => {
-    expect(mapSubscriptionStatus(stripe)).toBe(ours);
-  });
-});
 
 describe("decideSubscriptionUpdate (H2)", () => {
   const active = { subscription_status: "active", stripe_subscription_id: SUB };

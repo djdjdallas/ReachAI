@@ -30,6 +30,8 @@ vi.mock("@/lib/posthog-server", () => ({ getPostHogClient: () => ({ capture }) }
 const sendBusinessEventAlert = vi.fn(async () => true);
 vi.mock("@/lib/alerts/business-events", () => ({ sendBusinessEventAlert }));
 vi.mock("@/lib/notifications", () => ({ sendEmail: vi.fn(async () => ({})) }));
+const recordTrialLedger = vi.fn(async () => {});
+vi.mock("@/lib/billing/trial-policy", () => ({ recordTrialLedger }));
 
 const { POST } = await import("./route");
 
@@ -72,6 +74,10 @@ function fakeDb(tables, { failOn = {}, afterRead } = {}) {
           if (failure) return { data: null, error: { message: failure } };
           const hit = rows.filter((r) => matches(r, filters));
           if (kind === "update") for (const r of hit) Object.assign(r, data);
+          if (kind === "delete") {
+            for (const r of hit) rows.splice(rows.indexOf(r), 1);
+            return { data: null, error: null };
+          }
           if (kind === "select" && table === "users" && readHook) {
             const snapshot = hit.map((r) => ({ ...r }));
             readHook(tables);
@@ -97,14 +103,33 @@ function fakeDb(tables, { failOn = {}, afterRead } = {}) {
       return {
         select: () => query("select"),
         update: (data) => query("update", data),
+        delete: () => query("delete"),
+        // insert ... on conflict do nothing: returns only the rows inserted.
+        upsert: (data, { onConflict } = {}) => {
+          const rule = failOn[`${table}.upsert`];
+          const list = Array.isArray(data) ? data : [data];
+          const inserted = [];
+          if (!rule) {
+            for (const r of list) {
+              if (!rows.some((x) => x[onConflict] === r[onConflict])) {
+                rows.push({ ...r });
+                inserted.push({ ...r });
+              }
+            }
+          }
+          const result = rule ? { data: null, error: { message: rule } } : { data: inserted, error: null };
+          const b = { select: () => b, then: (res, rej) => Promise.resolve(result).then(res, rej) };
+          return b;
+        },
       };
     },
   };
 }
 
+let eventSeq = 0;
 const post = (event) =>
   POST({
-    text: async () => JSON.stringify(event),
+    text: async () => JSON.stringify({ id: event.id ?? `evt_${++eventSeq}`, ...event }),
     headers: { get: () => "sig" },
   });
 
@@ -268,19 +293,30 @@ describe("checkout.session.completed (M3)", () => {
     }
   );
 
-  it.each(["active", "trialing"])("activates for a live %s subscription", async (status) => {
-    stripe.subscriptions.retrieve.mockResolvedValue({ id: "sub_new", status });
+  it.each(["active", "trialing"])("activates for a live %s subscription, storing Stripe's own status", async (status) => {
+    stripe.subscriptions.retrieve.mockResolvedValue({
+      id: "sub_new",
+      status,
+      items: { data: [{ price: { id: "price_unl" }, current_period_end: 1792987723 }] },
+    });
     db = fakeDb({
       users: [user({ subscription_status: "canceled", stripe_subscription_id: "sub_old", plan: "base", ai_mode: "off", cancel_at: "2026-08-01T00:00:00.000Z" })],
     });
     const res = await post(checkout);
     expect(res.status).toBe(200);
     expect(db.tables.users[0]).toMatchObject({
-      subscription_status: "active",
+      // Stored as Stripe reports it: a card-required trial is 'trialing'.
+      subscription_status: status,
       stripe_subscription_id: "sub_new",
       plan: "unlimited",
+      current_period_end: new Date(1792987723 * 1000).toISOString(),
       ai_mode: "active",
       cancel_at: null,
+    });
+    expect(recordTrialLedger).toHaveBeenCalledWith(expect.anything(), {
+      email: "coach@example.com",
+      stripeCustomerId: "cus_1",
+      source: "stripe_checkout",
     });
   });
 
@@ -290,5 +326,121 @@ describe("checkout.session.completed (M3)", () => {
     const res = await post(checkout);
     expect(res.status).toBe(500);
     expect(db.tables.users[0].subscription_status).toBe("canceled");
+  });
+});
+
+describe("idempotency (stripe_webhook_events)", () => {
+  const cancelReq = {
+    id: "evt_cancel_1",
+    type: "customer.subscription.updated",
+    data: { object: { id: "sub_new", customer: "cus_1" } },
+  };
+
+  beforeEach(() => {
+    sendBusinessEventAlert.mockClear();
+    stripe.subscriptions.retrieve.mockResolvedValue({
+      id: "sub_new",
+      status: "active",
+      cancel_at: 1792987723,
+      cancel_at_period_end: false,
+      canceled_at: 1790437657,
+      items: { data: [{ price: { id: "price_unl" }, current_period_end: 1792987723 }] },
+    });
+  });
+
+  it("a redelivered event is acknowledged without processing: one alert, not two", async () => {
+    db = fakeDb({ users: [user()] });
+    const first = await post(cancelReq);
+    const second = await post(cancelReq);
+    expect(first.status).toBe(200);
+    expect(second).toMatchObject({ status: 200, body: { received: true, duplicate: true } });
+    expect(sendBusinessEventAlert).toHaveBeenCalledTimes(1);
+    expect(db.tables.stripe_webhook_events).toHaveLength(1);
+  });
+
+  it("a failed event releases its claim so Stripe's retry processes it", async () => {
+    db = fakeDb({ users: [user()] }, { failOn: { "users.select": "connection reset" } });
+    const failed = await post(cancelReq);
+    expect(failed.status).toBe(500);
+    expect(db.tables.stripe_webhook_events).toHaveLength(0);
+
+    db = fakeDb({ users: [user()] });
+    const retried = await post(cancelReq);
+    expect(retried.status).toBe(200);
+    expect(sendBusinessEventAlert).toHaveBeenCalledWith("cancellation_requested", expect.any(Object));
+  });
+
+  it("if the events table is unavailable, the event is still processed", async () => {
+    db = fakeDb({ users: [user()] }, { failOn: { "stripe_webhook_events.upsert": "relation does not exist" } });
+    const res = await post(cancelReq);
+    expect(res.status).toBe(200);
+    expect(db.tables.users[0].cancel_at).toBe(new Date(1792987723 * 1000).toISOString());
+  });
+});
+
+describe("customer.subscription.created and invoices sync from the live subscription", () => {
+  beforeEach(() => {
+    recordTrialLedger.mockClear();
+  });
+
+  it("a brand-new card-required signup becomes 'trialing' with its period end, and is recorded in the trial ledger", async () => {
+    stripe.subscriptions.retrieve.mockResolvedValue({
+      id: "sub_fresh",
+      customer: "cus_1",
+      status: "trialing",
+      trial_end: 1790600000,
+      items: { data: [{ price: { id: "price_base" }, current_period_end: 1790600000 }] },
+    });
+    db = fakeDb({
+      users: [user({ subscription_status: "inactive", stripe_subscription_id: null, plan: "base", ai_mode: "handoff" })],
+    });
+    const res = await post({ type: "customer.subscription.created", data: { object: { id: "sub_fresh", customer: "cus_1" } } });
+    expect(res.status).toBe(200);
+    expect(db.tables.users[0]).toMatchObject({
+      subscription_status: "trialing",
+      stripe_subscription_id: "sub_fresh",
+      plan: "base",
+      current_period_end: new Date(1790600000 * 1000).toISOString(),
+      trial_ends_at: new Date(1790600000 * 1000).toISOString(),
+      ai_mode: "handoff", // an explicit handoff is never flipped
+    });
+    expect(recordTrialLedger).toHaveBeenCalledWith(expect.anything(), {
+      email: "coach@example.com",
+      stripeCustomerId: "cus_1",
+      source: "stripe_subscription",
+    });
+  });
+
+  it("invoice.payment_succeeded for a $0 trial invoice keeps 'trialing' (no hard-coded 'active')", async () => {
+    stripe.subscriptions.retrieve.mockResolvedValue({
+      id: "sub_new",
+      customer: "cus_1",
+      status: "trialing",
+      items: { data: [{ price: { id: "price_unl" }, current_period_end: 1790600000 }] },
+    });
+    db = fakeDb({ users: [user({ subscription_status: "trialing" })] });
+    await post({
+      type: "invoice.payment_succeeded",
+      data: { object: { customer: "cus_1", parent: { subscription_details: { subscription: "sub_new" } } } },
+    });
+    expect(db.tables.users[0].subscription_status).toBe("trialing");
+  });
+
+  it("trial converts to paid: the renewal invoice syncs 'active' and the new period end", async () => {
+    stripe.subscriptions.retrieve.mockResolvedValue({
+      id: "sub_new",
+      customer: "cus_1",
+      status: "active",
+      items: { data: [{ price: { id: "price_unl" }, current_period_end: 1793200000 }] },
+    });
+    db = fakeDb({ users: [user({ subscription_status: "trialing" })] });
+    await post({
+      type: "invoice.payment_succeeded",
+      data: { object: { customer: "cus_1", parent: { subscription_details: { subscription: "sub_new" } } } },
+    });
+    expect(db.tables.users[0]).toMatchObject({
+      subscription_status: "active",
+      current_period_end: new Date(1793200000 * 1000).toISOString(),
+    });
   });
 });
