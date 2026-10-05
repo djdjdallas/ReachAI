@@ -100,7 +100,7 @@ export default function Step4Preview({
               <p className="text-xs text-stone-600 mt-1 leading-relaxed">
                 You need a greeting saved before you can go live. Click below
                 to have the AI write one based on the offer and target
-                customer you set in Step 2 — or scroll down and write it
+                customer you set in Step 2, or scroll down and write it
                 yourself in the editor.
               </p>
               <button
@@ -476,7 +476,7 @@ export default function Step4Preview({
                           ? "Hey! Great to connect. We help e-commerce store owners handle their DM outreach and book more calls. Want me to share how it works?"
                           : activeScenario === "objection"
                           ? "I totally get that burnout, Jordan. Most programs just give you more 'to-do' lists. We focus strictly on building the systems so your business scales while you actually step back."
-                          : "Love the energy! Let me grab a time that works for a quick call — here's my calendar link.")}
+                          : "Love the energy! Let me grab a time that works for a quick call. Here's my calendar link.")}
                     </div>
                     <p className="text-[10px] text-stone-400 font-bold px-1 italic">
                       Read 10:16 AM
