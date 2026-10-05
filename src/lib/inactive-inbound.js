@@ -1,41 +1,45 @@
-// Leaf module, no imports. Shared by the Instagram webhook (server) and the
-// dashboard / trial-expired modal (client).
+// Shared by the Instagram webhook (server) and the dashboard / trial-expired
+// modal (client).
 //
-// A lead who DMs a coach whose subscription doesn't serve (trial expired,
-// canceled) used to be dropped before the message was saved: the webhook
-// returned early, so the coach never saw it and nobody could count it.
-// @nucerlifts lost 481 threads this way in two weeks while hand-replying in
-// the Instagram app. The webhook now SAVES the inbound message for these
-// accounts and does nothing else: no AI, classifier, voice, drip, or send.
+// A lead who DMs a coach without access (trial ended, canceled) used to be
+// dropped before the message was saved: the webhook returned early, so the
+// coach never saw it and nobody could count it. @nucerlifts lost 481
+// threads this way in two weeks while hand-replying in the Instagram app.
+// The webhook now SAVES the inbound message for these accounts and does
+// nothing else: no AI, classifier, voice, drip, or send.
 
-// Statuses the reply gates serve. past_due is a grace window while Stripe
-// retries the card; access ends at 'canceled'.
-export const SERVING_STATUSES = ["active", "trialing", "past_due"];
+import { accessDecision } from "@/lib/billing/access";
 
 export const INACTIVE_REASONS = Object.freeze({
   SUBSCRIPTION_INACTIVE: "subscription_inactive",
-  // The turn that discovers a lapsed trial (and flips the row to 'expired').
+  // A legacy no-card trial that has ended (kept as its own reason so the
+  // missed-leads count can say "since your trial ended").
   TRIAL_EXPIRED: "trial_expired",
 });
 
 /**
- * Why this account must not get an AI reply, or null when it is served.
+ * Why this account must not get an AI reply, or null when it has access.
+ * The decision is hasActiveAccess's (src/lib/billing/access.js); this only
+ * names the skip reason. Server-side use (the Instagram webhook).
  *
- * @param {object} user - users row (subscription_status, trial_ends_at)
+ * No status flip: the old version rewrote a lapsed 'trialing' row to
+ * 'expired' + ai_mode 'off'. With Stripe's own statuses stored, a Stripe
+ * trial is also 'trialing', so that flip could expire a real subscription
+ * whose renewal webhook hadn't landed yet. Access is computed, not stored.
+ *
+ * @param {object} user - users row with ACCESS_COLUMNS
  * @param {number} [now] - ms since epoch, for tests
- * @returns {{reason: string, flipToExpired: boolean}|null}
+ * @returns {{reason: string}|null}
  */
 export function inactiveGate(user, now = Date.now()) {
-  if (!SERVING_STATUSES.includes(user?.subscription_status)) {
-    return { reason: INACTIVE_REASONS.SUBSCRIPTION_INACTIVE, flipToExpired: false };
-  }
-  if (user.subscription_status === "trialing") {
-    const endMs = user.trial_ends_at ? new Date(user.trial_ends_at).getTime() : NaN;
-    if (Number.isFinite(endMs) && now > endMs) {
-      return { reason: INACTIVE_REASONS.TRIAL_EXPIRED, flipToExpired: true };
-    }
-  }
-  return null;
+  const decision = accessDecision(user, now);
+  if (decision.hasAccess) return null;
+  return {
+    reason:
+      decision.reason === "legacy_trial_ended"
+        ? INACTIVE_REASONS.TRIAL_EXPIRED
+        : INACTIVE_REASONS.SUBSCRIPTION_INACTIVE,
+  };
 }
 
 // intent_classification.reason written on every inbound the gate saves, so

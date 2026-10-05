@@ -1,6 +1,9 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { getOAuthUrl } from "@/lib/instagram";
+import { getSupabaseAdmin } from "@/lib/supabase/admin";
+import { hasActiveAccess } from "@/lib/billing/access";
+import { ACCESS_COLUMNS } from "@/lib/billing/status";
 import crypto from "crypto";
 
 export async function GET(request) {
@@ -18,6 +21,18 @@ export async function GET(request) {
     }
 
     const baseUrl = process.env.NEXT_PUBLIC_APP_URL;
+
+    // No access, no Instagram connect: a new signup must finish Checkout
+    // first (card-required trial). Server-side; the UI only hides the button.
+    const { data: billing, error: billingError } = await getSupabaseAdmin()
+      .from("users")
+      .select(ACCESS_COLUMNS)
+      .eq("id", user.id)
+      .single();
+    if (billingError || !hasActiveAccess(billing)) {
+      return NextResponse.redirect(`${baseUrl}/billing?reason=choose_plan`);
+    }
+
     const state = crypto.randomBytes(32).toString("hex");
 
     const authUrl = getOAuthUrl(state);

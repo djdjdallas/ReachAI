@@ -17,6 +17,7 @@ import { shouldShowAiInactiveBanner } from "@/lib/onboarding";
 export default function AiInactiveBanner() {
   const pathname = usePathname();
   const [profile, setProfile] = useState(null);
+  const [hasAccess, setHasAccess] = useState(null);
   const [turningOn, setTurningOn] = useState(false);
   const [error, setError] = useState(null);
 
@@ -27,13 +28,19 @@ export default function AiInactiveBanner() {
       if (!user || cancelled) return;
       supabase
         .from("users")
-        .select("ai_mode, instagram_business_account_id, subscription_status")
+        .select("ai_mode, instagram_business_account_id")
         .eq("id", user.id)
         .single()
         .then(({ data }) => {
           if (!cancelled && data) setProfile(data);
         });
     });
+    fetch("/api/billing/access")
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (!cancelled && data) setHasAccess(!!data.hasAccess);
+      })
+      .catch(() => {});
     return () => {
       cancelled = true;
     };
@@ -61,7 +68,7 @@ export default function AiInactiveBanner() {
     }
   };
 
-  if (!shouldShowAiInactiveBanner(profile)) return null;
+  if (!shouldShowAiInactiveBanner(profile, hasAccess)) return null;
 
   return (
     <div className="sticky top-0 z-30 bg-red-50 border-b border-red-200 px-6 py-2.5 flex items-center gap-3">

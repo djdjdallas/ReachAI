@@ -34,17 +34,16 @@ export function resolveOnboardingAiMode({ wantsActive, scriptReady }) {
   return wantsActive && scriptReady ? "active" : "handoff";
 }
 
-// Subscription states the reply gates serve (webhook + /api/ai/reply).
-const SERVING_STATUSES = ["active", "trialing", "past_due"];
-
 // The AI-inactive banner offers "Turn it on", which only helps when turning
-// it on would actually make the AI reply: Instagram connected, a serving
-// subscription, and ai_mode not already active. A canceled or expired user
-// could flip ai_mode and watch the banner vanish while the AI stays silent.
-export function shouldShowAiInactiveBanner(profile) {
+// it on would actually make the AI reply: Instagram connected, the account
+// has access, and ai_mode not already active. A user without access could
+// flip ai_mode and watch the banner vanish while the AI stays silent.
+// hasAccess comes from the server (GET /api/billing/access); the browser
+// never computes access itself.
+export function shouldShowAiInactiveBanner(profile, hasAccess) {
   return (
     !!profile?.instagram_business_account_id &&
-    SERVING_STATUSES.includes(profile.subscription_status) &&
+    hasAccess === true &&
     profile.ai_mode !== "active"
   );
 }

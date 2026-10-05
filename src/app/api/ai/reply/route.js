@@ -9,6 +9,7 @@ import { sendInstagramMessage } from "@/lib/instagram";
 import { decryptToken } from "@/lib/token-utils";
 import { getPostHogClient } from "@/lib/posthog-server";
 import { enforceAiRateLimit } from "@/lib/rate-limit";
+import { hasActiveAccess } from "@/lib/billing/access";
 import {
   isWithinMessagingWindow,
   WINDOW_CLOSED_MESSAGE,
@@ -54,38 +55,15 @@ export async function POST(request) {
       );
     }
 
-    // Subscription / trial / DM-cap gate — mirrors the webhook AI path at
-    // src/app/api/webhooks/instagram/route.js:409-552 so manual dashboard
-    // sends can't bypass the same enforcement inbound replies get.
-    // past_due allowed: grace window while Stripe smart-retries the failed
-    // invoice — mirrors the webhook gate. Access ends at 'canceled'.
-    if (
-      !["active", "trialing", "past_due"].includes(
-        userProfile.subscription_status
-      )
-    ) {
+    // Access gate: the single access check (src/lib/billing/access.js),
+    // the same one the webhook AI path uses, so a dashboard send can't
+    // bypass it. userProfile is select("*"), which includes ACCESS_COLUMNS.
+    // No status flip: access is computed, not stored.
+    if (!hasActiveAccess(userProfile)) {
       return NextResponse.json(
         { error: "subscription_inactive" },
         { status: 402 }
       );
-    }
-
-    if (userProfile.subscription_status === "trialing") {
-      const trialEnd = userProfile.trial_ends_at
-        ? new Date(userProfile.trial_ends_at)
-        : null;
-      if (trialEnd && new Date() > trialEnd) {
-        // Side-effect parity with the webhook: flip to expired + ai_mode off
-        // so the TrialExpiredGate modal and webhook path stay consistent.
-        await getSupabaseAdmin()
-          .from("users")
-          .update({ subscription_status: "expired", ai_mode: "off" })
-          .eq("id", user.id);
-        return NextResponse.json(
-          { error: "trial_expired" },
-          { status: 402 }
-        );
-      }
     }
 
     // Fetch conversation

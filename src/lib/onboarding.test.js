@@ -26,33 +26,26 @@ describe("resolveOnboardingAiMode", () => {
 describe("shouldShowAiInactiveBanner", () => {
   const base = { instagram_business_account_id: "1789", ai_mode: "handoff" };
 
-  it.each(["active", "trialing", "past_due"])(
-    "shows for a %s subscription with the AI off",
-    (subscription_status) => {
-      expect(shouldShowAiInactiveBanner({ ...base, subscription_status })).toBe(true);
-    }
-  );
+  it("shows when the account has access and the AI is off", () => {
+    expect(shouldShowAiInactiveBanner(base, true)).toBe(true);
+    expect(shouldShowAiInactiveBanner({ ...base, ai_mode: "off" }, true)).toBe(true);
+  });
 
-  it.each(["canceled", "expired", null])(
-    "hides for a %s subscription, where turning it on would do nothing",
-    (subscription_status) => {
-      expect(
-        shouldShowAiInactiveBanner({ ...base, ai_mode: "off", subscription_status })
-      ).toBe(false);
-    }
-  );
+  it("hides without access, where turning it on would do nothing", () => {
+    expect(shouldShowAiInactiveBanner({ ...base, ai_mode: "off" }, false)).toBe(false);
+  });
+
+  it("hides until the server's access answer arrives", () => {
+    expect(shouldShowAiInactiveBanner(base, null)).toBe(false);
+  });
 
   it("hides when the AI is already active", () => {
-    expect(
-      shouldShowAiInactiveBanner({ ...base, ai_mode: "active", subscription_status: "active" })
-    ).toBe(false);
+    expect(shouldShowAiInactiveBanner({ ...base, ai_mode: "active" }, true)).toBe(false);
   });
 
   it("hides without a connected Instagram account or before the profile loads", () => {
-    expect(
-      shouldShowAiInactiveBanner({ ai_mode: "off", subscription_status: "active" })
-    ).toBe(false);
-    expect(shouldShowAiInactiveBanner(null)).toBe(false);
+    expect(shouldShowAiInactiveBanner({ ai_mode: "off" }, true)).toBe(false);
+    expect(shouldShowAiInactiveBanner(null, true)).toBe(false);
   });
 });
 

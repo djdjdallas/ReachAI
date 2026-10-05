@@ -1,3 +1,5 @@
+import { hasActiveAccess } from "@/lib/billing/access";
+import { ACCESS_COLUMNS } from "@/lib/billing/status";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import { decryptToken } from "@/lib/token-utils";
 import { sendInstagramMessage } from "@/lib/instagram";
@@ -47,7 +49,7 @@ export async function processDrip(dripRow) {
   const { data: user } = await admin
     .from("users")
     .select(
-      "id, email, plan, subscription_status, drip_enabled, ai_mode, script_config, voice_profile, calendly_url, meta_page_access_token, instagram_business_account_id, full_name, instagram_username"
+      `id, email, drip_enabled, ai_mode, script_config, voice_profile, calendly_url, meta_page_access_token, instagram_business_account_id, full_name, instagram_username, ${ACCESS_COLUMNS}`
     )
     .eq("id", dripRow.user_id)
     .single();
@@ -59,11 +61,10 @@ export async function processDrip(dripRow) {
     return markDripStatus(dripRow.id, "skipped", { skipReason: "ai_mode_not_active" });
   }
 
-  // CONDITION 2: User still on Unlimited and active/trialing (downgrade path).
-  if (
-    user.plan !== "unlimited" ||
-    !["active", "trialing"].includes(user.subscription_status)
-  ) {
+  // CONDITION 2: still on Unlimited AND has access (the single access
+  // check, src/lib/billing/access.js): covers downgrades, cancellations
+  // and trials that ended since this nudge was scheduled.
+  if (user.plan !== "unlimited" || !hasActiveAccess(user)) {
     return markDripStatus(dripRow.id, "skipped", {
       skipReason: "plan_no_longer_eligible",
     });

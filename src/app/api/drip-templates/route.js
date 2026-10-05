@@ -5,6 +5,7 @@ import { canUseDripSequences } from "@/lib/plan";
 import { VOICE_ELIGIBLE_CLASSES } from "@/lib/dm-intent";
 import { enforceAiRateLimit } from "@/lib/rate-limit";
 import { listDripTemplates, createDripTemplate } from "@/lib/drip/templates";
+import { ACCESS_COLUMNS } from "@/lib/billing/status";
 
 const ELIGIBLE_CLASS_SET = new Set(VOICE_ELIGIBLE_CLASSES);
 const MAX_LABEL_LEN = 80;
@@ -20,7 +21,7 @@ async function authedUser() {
 
   const { data: profile } = await supabase
     .from("users")
-    .select("id, email, plan, subscription_status")
+    .select(`id, email, ${ACCESS_COLUMNS}`)
     .eq("id", user.id)
     .maybeSingle();
 

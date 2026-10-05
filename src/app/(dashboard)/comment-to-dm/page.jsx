@@ -10,6 +10,7 @@ import {
 import { createClient } from "@/lib/supabase/server";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import { canUseCommentToDM } from "@/lib/comment-to-dm-gate";
+import { ACCESS_COLUMNS } from "@/lib/billing/status";
 
 export const metadata = {
   title: "Comment to DM · Clinchd",
@@ -29,11 +30,11 @@ export default async function CommentToDmLandingPage() {
 
   const { data: profile } = await supabase
     .from("users")
-    .select("plan, email")
+    .select(`email, ${ACCESS_COLUMNS}`)
     .eq("id", user.id)
     .maybeSingle();
 
-  if (!canUseCommentToDM({ plan: profile?.plan, email: user.email })) {
+  if (!canUseCommentToDM(profile)) {
     return (
       <div className="max-w-3xl mx-auto p-6 md:p-10">
         <div

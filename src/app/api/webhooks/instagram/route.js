@@ -875,22 +875,13 @@ async function processIncomingMessage({
     return;
   }
 
-  // ── Subscription gate ───────────────────────────────────────────────
-  // Non-serving accounts (trial expired, canceled) get NO reply, but the
-  // lead's message is still saved below, right after the conversation is
-  // resolved, so the coach sees it and the dashboard can count missed
-  // leads. It used to return here, before the save, dropping every inbound
-  // DM. past_due is served (grace window while Stripe retries the card;
-  // access truly ends at customer.subscription.deleted → 'canceled').
+  // ── Access gate ──────────────────────────────────────────────────────
+  // hasActiveAccess (src/lib/billing/access.js) via inactiveGate. Accounts
+  // without access get NO reply, but the lead's message is still saved
+  // below, right after the conversation is resolved, so the coach sees it
+  // and the dashboard can count missed leads. This is the send pipeline's
+  // gate: it holds even if the coach never opens the dashboard.
   const inactive = inactiveGate(user);
-  if (inactive?.flipToExpired) {
-    // First turn after the trial lapsed: flip the row so the
-    // TrialExpiredGate modal and /api/ai/reply agree.
-    await supabase
-      .from("users")
-      .update({ subscription_status: "expired", ai_mode: "off" })
-      .eq("id", user.id);
-  }
 
   // Lazy-reset monthly DM count
   const now = new Date();

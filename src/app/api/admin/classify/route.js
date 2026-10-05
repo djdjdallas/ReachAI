@@ -6,6 +6,7 @@ import { buildContextBundle } from "@/lib/contextBundle";
 import { decideAction } from "@/lib/comment-trigger-rules";
 import { getPostHogClient } from "@/lib/posthog-server";
 import { canUseCommentToDM } from "@/lib/comment-to-dm-gate";
+import { ACCESS_COLUMNS } from "@/lib/billing/status";
 
 // POST /api/admin/classify
 // Body: {
@@ -37,11 +38,11 @@ export async function POST(request) {
 
     const { data: profile } = await supabase
       .from("users")
-      .select("plan, email")
+      .select(`email, ${ACCESS_COLUMNS}`)
       .eq("id", user.id)
       .maybeSingle();
 
-    if (!canUseCommentToDM({ plan: profile?.plan, email: user.email })) {
+    if (!canUseCommentToDM(profile)) {
       return NextResponse.json({ error: "Not found" }, { status: 404 });
     }
 

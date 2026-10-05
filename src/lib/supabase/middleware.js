@@ -1,5 +1,20 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse } from "next/server";
+import { hasActiveAccess } from "@/lib/billing/access";
+import { ACCESS_COLUMNS } from "@/lib/billing/status";
+
+// Reachable without access (paywall): billing, its Stripe/access APIs, and
+// account deletion. Sign-out is a client-side Supabase call and the Help
+// link is a mailto, so neither needs a route here.
+export function reachableWithoutAccess(pathname) {
+  return (
+    pathname === "/billing" ||
+    pathname.startsWith("/billing/") ||
+    pathname.startsWith("/api/stripe/") ||
+    pathname.startsWith("/api/billing/") ||
+    pathname === "/api/user/delete"
+  );
+}
 
 export async function updateSession(request) {
   let supabaseResponse = NextResponse.next({ request });
@@ -107,13 +122,39 @@ export async function updateSession(request) {
     return NextResponse.redirect(url);
   }
 
+  // ── Access gate (paywall) ────────────────────────────────────────────
+  // The single access check (src/lib/billing/access.js) on every protected
+  // page and API. No access: pages go to /billing, APIs get 402. Never uses
+  // onboarding_completed (browser-writable). Fails OPEN on a read error:
+  // this is routing, and every send path enforces access on its own and
+  // fails closed, so a database blip can't lock every coach out.
+  if (!reachableWithoutAccess(pathname)) {
+    const { data: billingRow, error: billingError } = await supabase
+      .from("users")
+      .select(ACCESS_COLUMNS)
+      .eq("id", user.id)
+      .single();
+    if (billingError) {
+      console.error("[middleware] access check read failed:", billingError.code);
+    } else if (!hasActiveAccess(billingRow)) {
+      if (pathname.startsWith("/api/")) {
+        return NextResponse.json({ error: "no_access" }, { status: 402 });
+      }
+      const url = request.nextUrl.clone();
+      url.pathname = "/billing";
+      url.search = "";
+      return NextResponse.redirect(url);
+    }
+  }
+
   // Onboarding guard — redirect to onboarding if not completed
   // Skip for onboarding routes themselves and API routes
   const isDashboardRoute =
     pathname.startsWith("/dashboard") ||
     pathname.startsWith("/conversations") ||
     pathname.startsWith("/analytics") ||
-    pathname.startsWith("/billing") ||
+    // /billing is deliberately NOT here: it's the paywall, reachable before
+    // onboarding (a new signup picks a plan first).
     pathname.startsWith("/settings") ||
     pathname.startsWith("/script-builder") ||
     pathname.startsWith("/playground") ||

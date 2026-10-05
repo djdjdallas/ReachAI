@@ -103,7 +103,10 @@ function user(overrides = {}) {
     instagram_business_account_id: IGBA,
     meta_page_access_token: "enc",
     meta_reconnect_required: false,
+    // A paying Stripe-backed account (access via src/lib/billing/access.js).
     subscription_status: "active",
+    stripe_subscription_id: "sub_test",
+    current_period_end: new Date(Date.now() + 20 * 24 * 3_600_000).toISOString(),
     trial_ends_at: null,
     ai_mode: "active",
     response_delay: 0,
@@ -170,15 +173,19 @@ describe("inbound DM for a non-serving account (C1)", () => {
     expect(AI_AND_OUTBOUND()).toEqual(NONE);
   });
 
-  it("flips a lapsed trial to expired, saves the message, and still makes no AI or outbound call", async () => {
+  it("a lapsed legacy no-card trial: saves the message, no AI or outbound call, and no status flip", async () => {
     db.state.user = user({
       subscription_status: "trialing",
+      stripe_subscription_id: null,
+      current_period_end: null,
       trial_ends_at: new Date(Date.now() - 60_000).toISOString(),
     });
 
     await POST(inbound());
 
-    expect(db.userUpdates()).toContainEqual({ subscription_status: "expired", ai_mode: "off" });
+    // Access is computed (hasActiveAccess), never stored: the old lazy flip
+    // to 'expired' + ai_mode 'off' is gone.
+    expect(db.userUpdates().some((u) => "subscription_status" in u || "ai_mode" in u)).toBe(false);
     expect(db.inserted("messages")).toHaveLength(1);
     expect(db.conversationSkipReasons()).toContain("trial_expired");
     expect(AI_AND_OUTBOUND()).toEqual(NONE);

@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import { canUseDripSequences } from "@/lib/plan";
 import DripSequencesClient from "./DripSequencesClient";
+import { ACCESS_COLUMNS } from "@/lib/billing/status";
 
 export const metadata = {
   title: "Follow-up Nudges · Clinchd",
@@ -22,7 +23,7 @@ export default async function DripSequencesPage() {
 
   const { data: profile } = await supabase
     .from("users")
-    .select("id, email, plan, subscription_status, drip_enabled, drip_delay_hours")
+    .select(`id, email, drip_enabled, drip_delay_hours, ${ACCESS_COLUMNS}`)
     .eq("id", user.id)
     .maybeSingle();
 

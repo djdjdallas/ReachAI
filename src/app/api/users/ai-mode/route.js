@@ -3,6 +3,8 @@ import { createClient } from "@/lib/supabase/server";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import { getOnboardingState } from "@/lib/onboarding";
 import { validateOpeningLine } from "@/lib/opening-line";
+import { hasActiveAccess } from "@/lib/billing/access";
+import { ACCESS_COLUMNS } from "@/lib/billing/status";
 
 const ALLOWED_MODES = ["active", "handoff", "off"];
 
@@ -29,7 +31,7 @@ export async function POST(request) {
     const admin = getSupabaseAdmin();
     const { data: profile, error: profileError } = await admin
       .from("users")
-      .select("script_config, instagram_business_account_id")
+      .select(`script_config, instagram_business_account_id, ${ACCESS_COLUMNS}`)
       .eq("id", user.id)
       .single();
 
@@ -38,6 +40,16 @@ export async function POST(request) {
     }
 
     if (mode === "active") {
+      // No access, no AI: the single access check (src/lib/billing/access.js).
+      // The send paths refuse anyway; this stops the toggle from claiming
+      // the AI is on for an account that can't be served.
+      if (!hasActiveAccess(profile)) {
+        return NextResponse.json(
+          { error: "Choose a plan to turn the AI on.", code: "no_access" },
+          { status: 402 }
+        );
+      }
+
       // Server-side activation guard (the UI check is only for UX): never
       // turn the AI on without a valid opening line, or the webhook holds
       // every inbound lead. The users-table trigger enforces the same rule

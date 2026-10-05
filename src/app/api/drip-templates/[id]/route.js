@@ -4,6 +4,7 @@ import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import { canUseDripSequences } from "@/lib/plan";
 import { enforceAiRateLimit } from "@/lib/rate-limit";
 import { updateDripTemplate, deleteDripTemplate } from "@/lib/drip/templates";
+import { ACCESS_COLUMNS } from "@/lib/billing/status";
 
 const MAX_LABEL_LEN = 80;
 const MIN_CONTENT_LEN = 10;
@@ -18,7 +19,7 @@ async function authedUser() {
 
   const { data: profile } = await supabase
     .from("users")
-    .select("id, email, plan, subscription_status")
+    .select(`id, email, ${ACCESS_COLUMNS}`)
     .eq("id", user.id)
     .maybeSingle();
 

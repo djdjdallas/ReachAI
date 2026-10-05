@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { canUseVoiceReplies } from "@/lib/plan";
 import { getSignedPlaybackUrl } from "@/lib/voice/snippets";
+import { ACCESS_COLUMNS } from "@/lib/billing/status";
 
 export async function GET(_request, { params }) {
   const supabase = await createClient();
@@ -14,7 +15,7 @@ export async function GET(_request, { params }) {
 
   const { data: profile } = await supabase
     .from("users")
-    .select("id, email, plan, subscription_status")
+    .select(`id, email, ${ACCESS_COLUMNS}`)
     .eq("id", user.id)
     .maybeSingle();
 

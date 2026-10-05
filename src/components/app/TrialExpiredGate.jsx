@@ -2,65 +2,53 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { Clock, X } from "lucide-react";
-import { createClient } from "@/lib/supabase/client";
-import { isFounder } from "@/lib/founder";
 import TrialExpiredModal from "./TrialExpiredModal";
 
 const SESSION_DISMISS_KEY = "clinchd:trial-warning-banner-dismissed";
 
-// Decides — purely client-side from the user's profile — whether to show
-// the hard-block expired modal or the soft 3-day-warning banner. Founder
-// emails (FOUNDER_EMAILS) bypass both.
-//
-// State machine:
-//   subscription_status === 'trialing' && trial_ends_at <= now      → expired
-//   subscription_status === 'expired'                                → expired
-//   subscription_status === 'trialing' && 0 < daysRemaining <= 3     → endingSoon
-//   anything else                                                    → null
-function computeTrialState(profile) {
-  if (!profile) return { kind: "none" };
-  const status = profile.subscription_status;
-  const endsAt = profile.trial_ends_at ? new Date(profile.trial_ends_at) : null;
-  const now = new Date();
-
-  if (status === "expired") return { kind: "expired" };
-  if (status === "trialing" && endsAt && endsAt <= now) {
-    return { kind: "expired" };
-  }
-  if (status === "trialing" && endsAt && endsAt > now) {
-    const msRemaining = endsAt.getTime() - now.getTime();
+// UX only. The access DECISION is the server's (GET /api/billing/access,
+// backed by hasActiveAccess in src/lib/billing/access.js); middleware
+// already sends users without access to /billing, and every send path
+// refuses on its own. This shows:
+//   - the hard-block modal if a no-access user still lands on a dashboard
+//     page (not on /billing, which IS the paywall);
+//   - the soft banner during the last 3 days of a legacy no-card trial.
+// No founder email bypass: founder accounts are comped rows.
+function computeTrialState(access, now = Date.now()) {
+  if (!access) return { kind: "none" };
+  if (!access.hasAccess) return { kind: "expired" };
+  if (access.trialEndsAt) {
+    const msRemaining = new Date(access.trialEndsAt).getTime() - now;
     const daysRemaining = Math.ceil(msRemaining / (1000 * 60 * 60 * 24));
-    if (daysRemaining <= 3) return { kind: "endingSoon", daysRemaining };
+    if (daysRemaining > 0 && daysRemaining <= 3) return { kind: "endingSoon", daysRemaining };
   }
   return { kind: "none" };
 }
 
 export default function TrialExpiredGate() {
-  const [profile, setProfile] = useState(null);
+  const pathname = usePathname();
+  const [access, setAccess] = useState(null);
   // Lazy init reads sessionStorage once on the client; safe because the
-  // banner only renders after `profile` is set (post-auth, client-only).
+  // banner only renders after `access` is set (post-auth, client-only).
   const [bannerDismissed, setBannerDismissed] = useState(() => {
     if (typeof window === "undefined") return false;
     return sessionStorage.getItem(SESSION_DISMISS_KEY) === "1";
   });
 
   useEffect(() => {
-    const supabase = createClient();
-    supabase.auth.getUser().then(({ data: { user } }) => {
-      if (!user) return;
-      // Founder bypass: don't even fetch the profile, nothing to render.
-      if (isFounder(user.email)) return;
-      supabase
-        .from("users")
-        .select("email, subscription_status, trial_ends_at")
-        .eq("id", user.id)
-        .single()
-        .then(({ data }) => {
-          if (data) setProfile({ ...data, _authEmail: user.email });
-        });
-    });
-  }, []);
+    let cancelled = false;
+    fetch("/api/billing/access")
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (!cancelled && data) setAccess(data);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [pathname]);
 
   const dismissBanner = () => {
     setBannerDismissed(true);
@@ -69,14 +57,12 @@ export default function TrialExpiredGate() {
     }
   };
 
-  if (!profile) return null;
-  // Belt-and-suspenders: also check the persisted email in case auth and
-  // profile rows ever diverge.
-  if (isFounder(profile.email) || isFounder(profile._authEmail)) return null;
+  if (!access) return null;
 
-  const state = computeTrialState(profile);
+  const state = computeTrialState(access);
 
-  if (state.kind === "expired") {
+  // /billing is the paywall itself; the modal would cover the plan cards.
+  if (state.kind === "expired" && !pathname?.startsWith("/billing")) {
     return <TrialExpiredModal />;
   }
 

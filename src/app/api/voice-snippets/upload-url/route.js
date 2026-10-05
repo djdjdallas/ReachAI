@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import { canUseVoiceReplies } from "@/lib/plan";
 import { enforceAiRateLimit } from "@/lib/rate-limit";
+import { ACCESS_COLUMNS } from "@/lib/billing/status";
 
 const ALLOWED_EXTENSIONS = new Set(["mp3", "m4a", "wav", "ogg"]);
 const BUCKET = "voice-snippets";
@@ -19,7 +20,7 @@ export async function POST(request) {
 
   const { data: profile } = await supabase
     .from("users")
-    .select("id, email, plan, subscription_status")
+    .select(`id, email, ${ACCESS_COLUMNS}`)
     .eq("id", user.id)
     .maybeSingle();
 

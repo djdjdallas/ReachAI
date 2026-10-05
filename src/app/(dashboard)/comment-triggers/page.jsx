@@ -5,6 +5,7 @@ import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import { canUseCommentToDM } from "@/lib/comment-to-dm-gate";
 import { decryptToken } from "@/lib/token-utils";
 import PostPicker from "./PostPicker";
+import { ACCESS_COLUMNS } from "@/lib/billing/status";
 
 export const metadata = {
   title: "Comment to DM · Clinchd",
@@ -38,13 +39,13 @@ export default async function CommentTriggersPage() {
 
   const { data: profile } = await supabase
     .from("users")
-    .select("plan, email, instagram_business_account_id, meta_page_access_token")
+    .select(`email, instagram_business_account_id, meta_page_access_token, ${ACCESS_COLUMNS}`)
     .eq("id", user.id)
     .maybeSingle();
 
   // Paywall: gate hides the picker UI behind a plan check. Founder bypass is
   // preserved by canUseCommentToDM so Dom can dogfood on his account.
-  if (!canUseCommentToDM({ plan: profile?.plan, email: user.email })) {
+  if (!canUseCommentToDM(profile)) {
     return (
       <div className="max-w-3xl mx-auto p-6 md:p-10">
         <div

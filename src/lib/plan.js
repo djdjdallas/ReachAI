@@ -1,58 +1,38 @@
-import { isFounder } from "@/lib/founder";
+import { hasActiveAccess } from "@/lib/billing/access";
 
 /**
- * Returns true when the user is allowed to use the Voice Replies feature.
+ * Voice Replies: Unlimited plan AND access (the single access check,
+ * src/lib/billing/access.js). 'base' does not include voice replies.
  *
- * Gating rules:
- *   - Founders (dominickjerell@gmail.com and anyone in FOUNDER_EMAILS) bypass
- *     the subscription gate so we can dogfood freely on the production
- *     account.
- *   - Everyone else needs plan === 'unlimited' AND a subscription_status of
- *     'active' or 'trialing'. 'base' does NOT include voice replies.
+ * The per-user kill switch (users.voice_replies_enabled) is enforced
+ * separately inside the matcher (src/lib/voice/matcher.js).
  *
- * Important: founder bypass covers the SUBSCRIPTION gate only. The
- * per-user kill switch (users.voice_replies_enabled) is enforced separately
- * inside the matcher (src/lib/voice/matcher.js) so a founder cannot
- * accidentally voice-reply from the Meta App Review test account while it
- * is being inspected.
+ * No founder email bypass: founder accounts are comped rows, which
+ * hasActiveAccess covers.
  *
- * @param {object} user - public.users row (must include plan, email,
- *                        subscription_status)
+ * @param {object} user - public.users row; must include ACCESS_COLUMNS
+ *   (src/lib/billing/status.js)
  * @returns {boolean}
  */
 export function canUseVoiceReplies(user) {
   if (!user) return false;
-  if (isFounder(user.email)) return true;
   if (user.plan !== "unlimited") return false;
-  return user.subscription_status === "active" || user.subscription_status === "trialing";
+  return hasActiveAccess(user);
 }
 
 /**
- * Returns true when the user is allowed to use Drip Sequences (in-window
- * follow-up nudges). Mirrors canUseVoiceReplies exactly.
+ * Drip Sequences (in-window follow-up nudges): Unlimited plan AND access.
+ * Mirrors canUseVoiceReplies.
  *
- * Gating rules:
- *   - Founders bypass the subscription gate so we can dogfood on the
- *     production account.
- *   - Everyone else needs plan === 'unlimited' AND a subscription_status of
- *     'active' or 'trialing'.
+ * The per-user master toggle (users.drip_enabled) is the kill switch for
+ * everyone; it is checked at enqueue time (webhook Insertion C) and again
+ * at fire time (drip processor, Condition 1).
  *
- * IMPORTANT: founder bypass covers the SUBSCRIPTION gate ONLY. The per-user
- * master toggle (users.drip_enabled) is the kill switch for ALL users,
- * founder included — it is checked separately at enqueue time (webhook
- * Insertion C) and re-verified at fire time (drip processor, Condition 1).
- * A founder can browse /drip-sequences but no nudge fires until they flip
- * drip_enabled on, which keeps the Meta App Review test account safe by
- * default.
- *
- * @param {object} user - public.users row (must include plan, email,
- *                        subscription_status)
+ * @param {object} user - public.users row; must include ACCESS_COLUMNS
  * @returns {boolean}
  */
 export function canUseDripSequences(user) {
   if (!user) return false;
-  if (isFounder(user.email)) return true;
-  const okPlan = user.plan === "unlimited";
-  const okStatus = ["active", "trialing"].includes(user.subscription_status);
-  return okPlan && okStatus;
+  if (user.plan !== "unlimited") return false;
+  return hasActiveAccess(user);
 }

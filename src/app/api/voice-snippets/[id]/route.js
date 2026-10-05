@@ -5,6 +5,7 @@ import {
   toggleVoiceSnippet,
   deleteVoiceSnippet,
 } from "@/lib/voice/snippets";
+import { ACCESS_COLUMNS } from "@/lib/billing/status";
 
 async function authedUser() {
   const supabase = await createClient();
@@ -15,7 +16,7 @@ async function authedUser() {
 
   const { data: profile } = await supabase
     .from("users")
-    .select("id, email, plan, subscription_status")
+    .select(`id, email, ${ACCESS_COLUMNS}`)
     .eq("id", user.id)
     .maybeSingle();
 
