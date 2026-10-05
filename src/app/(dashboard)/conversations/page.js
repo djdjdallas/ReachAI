@@ -4,6 +4,11 @@ import { useState, useEffect, useCallback, useRef, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import posthog from "posthog-js";
+import { hasOpeningLine } from "@/lib/opening-line";
+import {
+  isWithinMessagingWindow,
+  WINDOW_CLOSED_MESSAGE,
+} from "@/lib/instagram/messaging-window";
 import {
   MessageSquare,
   Send,
@@ -222,6 +227,9 @@ function ConversationsPage() {
   const [conversations, setConversations] = useState([]);
   const [selectedConvo, setSelectedConvo] = useState(null);
   const [messages, setMessages] = useState([]);
+  // Set when the server refuses a send because the 24h window closed while
+  // this thread was open (the client-side check below covers the rest).
+  const [windowClosedNotice, setWindowClosedNotice] = useState(false);
   const [messagesLoading, setMessagesLoading] = useState(false);
   const [newMessage, setNewMessage] = useState("");
   const [sending, setSending] = useState(false);
@@ -292,7 +300,7 @@ function ConversationsPage() {
 
       const { data: userProfile } = await supabase
         .from("users")
-        .select("ai_mode")
+        .select("ai_mode, script_config")
         .eq("id", authUser.id)
         .single();
       if (userProfile) setProfile(userProfile);
@@ -435,15 +443,24 @@ function ConversationsPage() {
     scrollToBottom();
   }, [messages, scrollToBottom]);
 
+  // Instagram's 24h window, computed from the lead's last inbound message in
+  // this thread (no stored state). The server enforces the same rule in
+  // sendInstagramMessage; this only explains it before the coach types.
+  const lastLeadAt = [...messages]
+    .reverse()
+    .find((m) => m.role === "user" && m.source === "lead")?.created_at;
+  const replyWindowOpen = !windowClosedNotice && isWithinMessagingWindow(lastLeadAt);
+
   const handleSelectConversation = (convo) => {
     setSelectedConvo(convo);
+    setWindowClosedNotice(false);
     setNewMessage("");
     router.replace(`/conversations?thread=${convo.id}`, { scroll: false });
   };
 
   const handleSendMessage = async (e) => {
     e.preventDefault();
-    if (!newMessage.trim() || !selectedConvo || sending) return;
+    if (!newMessage.trim() || !selectedConvo || sending || !replyWindowOpen) return;
 
     const messageText = newMessage.trim();
     setSending(true);
@@ -469,6 +486,13 @@ function ConversationsPage() {
           manual: true,
         }),
       });
+      if (res.status === 409) {
+        const body = await res.json().catch(() => ({}));
+        if (body?.error === "messaging_window_closed") {
+          setWindowClosedNotice(true);
+          throw new Error("messaging_window_closed");
+        }
+      }
       if (!res.ok) throw new Error("Failed to send message");
       await fetchMessages(selectedConvo.id);
       // The send endpoint auto-pauses the AI for this thread (human takeover).
@@ -742,6 +766,7 @@ function ConversationsPage() {
               <TabsList className="h-8">
                 <TabsTrigger
                   value="active"
+                  disabled={!!profile && profile.ai_mode !== "active" && !hasOpeningLine(profile.script_config)}
                   className="text-[11px] px-2.5 data-[state=active]:bg-green-100 data-[state=active]:text-green-700"
                 >
                   Active
@@ -761,6 +786,17 @@ function ConversationsPage() {
               </TabsList>
             </Tabs>
           </div>
+          {!aiModeError && profile && !hasOpeningLine(profile.script_config) && (
+            <div className="flex items-start gap-2 px-3 py-2 rounded-lg bg-amber-50 border border-amber-200 text-amber-800 text-xs leading-relaxed">
+              <AlertCircle className="h-3.5 w-3.5 mt-0.5 shrink-0" />
+              <span>
+                Add an opening line before turning the AI on.{" "}
+                <a href="/script-builder" className="underline font-medium">
+                  Set it in Script Builder
+                </a>
+              </span>
+            </div>
+          )}
           {aiModeError && (
             <div className="flex items-start gap-2 px-3 py-2 rounded-lg bg-amber-50 border border-amber-200 text-amber-800 text-xs leading-relaxed">
               <AlertCircle className="h-3.5 w-3.5 mt-0.5 shrink-0" />
@@ -1311,6 +1347,12 @@ function ConversationsPage() {
               </div>
             </div>
 
+            {!replyWindowOpen && (
+              <div className="mx-3 md:mx-6 mt-3 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+                {WINDOW_CLOSED_MESSAGE}
+              </div>
+            )}
+
             {/* Message Input — text-base on mobile so iOS doesn't zoom on focus */}
             <div className="p-3 md:p-6 border-t border-stone-100 flex items-center gap-4">
               <div className="flex-1 relative">
@@ -1320,12 +1362,12 @@ function ConversationsPage() {
                     placeholder="Type a message or use AI suggestions..."
                     value={newMessage}
                     onChange={(e) => setNewMessage(e.target.value)}
-                    disabled={sending}
+                    disabled={sending || !replyWindowOpen}
                     className="w-full min-w-0 px-4 md:px-5 py-3 bg-stone-50 border border-stone-200 rounded-2xl text-base md:text-sm focus:outline-none focus:ring-2 focus:ring-[#ff7e67]/20 focus:border-[#ff7e67] transition-all"
                   />
                   <button
                     type="submit"
-                    disabled={!newMessage.trim() || sending}
+                    disabled={!newMessage.trim() || sending || !replyWindowOpen}
                     className="w-12 h-12 bg-[#ff7e67] text-white rounded-2xl flex items-center justify-center shadow-lg shadow-[#ff7e67]/20 hover:scale-105 active:scale-95 transition-all disabled:opacity-50 disabled:hover:scale-100 shrink-0"
                   >
                     {sending ? (
