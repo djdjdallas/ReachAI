@@ -148,3 +148,17 @@ describe("decideCheckoutTrial", () => {
     expect(r).toEqual({ mode: "none", reason: "ledger_unavailable" });
   });
 });
+
+describe("trialLedgerSecretFingerprint", async () => {
+  const { trialLedgerSecretFingerprint } = await import("./trial-policy");
+  it("is short, stable, secret-dependent, and never the secret", () => {
+    const a = trialLedgerSecretFingerprint("secret-a");
+    expect(a).toMatch(/^[0-9a-f]{12}$/);
+    expect(trialLedgerSecretFingerprint("secret-a")).toBe(a);
+    expect(trialLedgerSecretFingerprint("secret-b")).not.toBe(a);
+    expect(a).not.toContain("secret");
+  });
+  it("null without a secret", () => {
+    expect(trialLedgerSecretFingerprint("")).toBeNull();
+  });
+});

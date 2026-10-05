@@ -182,10 +182,10 @@ export async function sendCoachReconnectEmail(identity, provider, cause = "unkno
     to: identity.email,
     subject: `Action needed: reconnect ${meta.label} to keep Clinchd running`,
     html: `<p>Hi${greeting},</p>
-<p>${lead} It needs to be reconnected — until you do, Clinchd can't ${meta.impact}.</p>
+<p>${lead} It needs to be reconnected. Until you do, Clinchd can't ${meta.impact}.</p>
 <p><a href="${url}">Reconnect ${meta.label} &rarr;</a></p>
-<p>It only takes about 30 seconds. If you need a hand, just reply to this email or reach us at dom@clinchd.io.</p>
-<p>&mdash; Clinchd</p>`,
+<p>It only takes about 30 seconds. If you need a hand, just reply to this email or reach us at ${SUPPORT_EMAIL}.</p>
+<p>Clinchd</p>`,
   });
   return true;
 }

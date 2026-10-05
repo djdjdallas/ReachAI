@@ -342,7 +342,7 @@ export async function POST(request) {
             // loudly (session + customer ids make it recoverable by hand) but
             // still return 200 so Stripe doesn't retry-storm.
             console.error(
-              "[stripe-webhook] checkout.session.completed with NO user identifier — activation skipped.",
+              "[stripe-webhook] checkout.session.completed with NO user identifier, activation skipped.",
               "session:", session.id,
               "customer:", session.customer
             );

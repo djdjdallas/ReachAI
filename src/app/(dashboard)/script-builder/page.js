@@ -48,6 +48,7 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Separator } from "@/components/ui/separator";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { SUPPORT_EMAIL } from "@/lib/support";
 
 function ChatBubble({ message, isAi }) {
   return (
@@ -484,7 +485,7 @@ export default function ScriptBuilderPage() {
         setError({
           source: "generate",
           message:
-            "Script generation failed. Check your inputs and try again, or contact dom@clinchd.io.",
+            `Script generation failed. Check your inputs and try again, or contact ${SUPPORT_EMAIL}.`,
         });
         return;
       }
@@ -513,7 +514,7 @@ export default function ScriptBuilderPage() {
       setError({
         source: "generate",
         message:
-          "Script generation failed. Check your inputs and try again, or contact dom@clinchd.io.",
+          `Script generation failed. Check your inputs and try again, or contact ${SUPPORT_EMAIL}.`,
       });
     } finally {
       setGenerating(false);

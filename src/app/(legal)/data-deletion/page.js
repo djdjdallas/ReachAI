@@ -1,3 +1,4 @@
+import { SUPPORT_EMAIL, SUPPORT_MAILTO } from "@/lib/support";
 export const metadata = {
   title: "Data Deletion Request | Clinchd",
   description: "Request deletion of data Clinchd holds about you.",
@@ -35,7 +36,7 @@ export default function DataDeletionPage() {
         <p>
           If you commented on a Clinchd customer&apos;s post or messaged their Instagram
           account and want us to delete data we hold about you, email{" "}
-          <a href="mailto:privacy@clinchd.io">privacy@clinchd.io</a> with:
+          <a href={SUPPORT_MAILTO}>{SUPPORT_EMAIL}</a> with:
         </p>
         <ul>
           <li>Your Instagram username</li>
@@ -64,10 +65,8 @@ export default function DataDeletionPage() {
 
         <h2>Questions</h2>
         <p>
-          Email <a href="mailto:privacy@clinchd.io">privacy@clinchd.io</a> with any
-          questions about data deletion or our privacy practices. For general support, you
-          can also reach us at{" "}
-          <a href="mailto:dom@clinchd.io">dom@clinchd.io</a>.
+          Email <a href={SUPPORT_MAILTO}>{SUPPORT_EMAIL}</a> with any questions about
+          data deletion, our privacy practices, or anything else.
         </p>
       </div>
     </div>

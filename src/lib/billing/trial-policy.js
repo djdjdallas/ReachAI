@@ -71,6 +71,17 @@ export function trialLedgerKey(email, secret = process.env.TRIAL_LEDGER_SECRET) 
 }
 
 /**
+ * A short, non-reversible fingerprint of TRIAL_LEDGER_SECRET, so the seed
+ * script (local env) and production can be compared without revealing the
+ * secret. Different fingerprints = every seeded hash is wrong and every
+ * existing user would get a second trial.
+ */
+export function trialLedgerSecretFingerprint(secret = process.env.TRIAL_LEDGER_SECRET) {
+  if (!secret) return null;
+  return crypto.createHmac("sha256", secret).update("clinchd-trial-ledger-fingerprint").digest("hex").slice(0, 12);
+}
+
+/**
  * Decide the trial for a Checkout session.
  *
  * @param {object} args

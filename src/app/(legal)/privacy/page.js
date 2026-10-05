@@ -1,3 +1,4 @@
+import { SUPPORT_EMAIL, SUPPORT_MAILTO } from "@/lib/support";
 export const metadata = {
   title: "Privacy Policy | Clinchd",
   description: "Clinchd privacy policy — how we collect, use, and protect your data.",
@@ -277,8 +278,7 @@ export default function PrivacyPage() {
         <h2>13. Contact</h2>
         <p>
           For privacy questions or to exercise your rights under this policy, contact us at{" "}
-          <a href="mailto:privacy@clinchd.io">privacy@clinchd.io</a> or{" "}
-          <a href="mailto:dom@clinchd.io">dom@clinchd.io</a>.
+          <a href={SUPPORT_MAILTO}>{SUPPORT_EMAIL}</a>.
         </p>
       </div>
     </div>

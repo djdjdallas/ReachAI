@@ -35,6 +35,7 @@ import {
   PLAN_CATALOG,
   formatPlanPrice,
 } from "@/lib/plans";
+import { SUPPORT_EMAIL, SUPPORT_MAILTO } from "@/lib/support";
 
 // Plans come from the one catalog (src/lib/plans.js); price ids stay on the
 // server. No local copy of prices here.
@@ -126,13 +127,13 @@ export default function BillingPage() {
 
       // No URL = server didn't return a Checkout session. Surface it.
       setBillingError(
-        "Couldn't start checkout. Try again, or contact dom@clinchd.io."
+        `Couldn't start checkout. Try again, or contact ${SUPPORT_EMAIL}.`
       );
       setCheckoutLoading(null);
     } catch (err) {
       console.error("Error creating checkout:", err);
       setBillingError(
-        "Couldn't start checkout. Try again, or contact dom@clinchd.io."
+        `Couldn't start checkout. Try again, or contact ${SUPPORT_EMAIL}.`
       );
       setCheckoutLoading(null);
     }
@@ -156,13 +157,13 @@ export default function BillingPage() {
       }
 
       setBillingError(
-        "Couldn't open the billing portal. Try again, or contact dom@clinchd.io."
+        `Couldn't open the billing portal. Try again, or contact ${SUPPORT_EMAIL}.`
       );
       setPortalLoading(false);
     } catch (err) {
       console.error("Error creating portal:", err);
       setBillingError(
-        "Couldn't open the billing portal. Try again, or contact dom@clinchd.io."
+        `Couldn't open the billing portal. Try again, or contact ${SUPPORT_EMAIL}.`
       );
       setPortalLoading(false);
     }
@@ -207,6 +208,18 @@ export default function BillingPage() {
           Manage your subscription and track usage.
         </p>
       </div>
+
+      {subscriptionStatus === "past_due" && (
+        <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+          Your last payment didn&apos;t go through. Use{" "}
+          <span className="font-semibold">Manage Subscription</span> below to update your card
+          and keep your AI replying. Questions? Email{" "}
+          <a href={SUPPORT_MAILTO} className="font-semibold underline">
+            {SUPPORT_EMAIL}
+          </a>
+          .
+        </div>
+      )}
 
       {billingError && (
         <div className="flex items-start gap-3 rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-900 dark:border-red-900/40 dark:bg-red-950/30 dark:text-red-100">
