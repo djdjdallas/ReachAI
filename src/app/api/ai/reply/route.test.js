@@ -79,6 +79,7 @@ vi.mock("@/lib/posthog-server", () => ({ getPostHogClient: () => ({ capture: vi.
 vi.mock("@/lib/rate-limit", () => ({ enforceAiRateLimit: async () => null }));
 
 const { POST } = await import("./route");
+const { lateDelivery, LATE_HOURS } = await import("@/lib/instagram/late-delivery.fixture");
 
 const req = (body) =>
   new Request("https://app.test/api/ai/reply", { method: "POST", body: JSON.stringify(body) });
@@ -102,6 +103,16 @@ describe("POST /api/ai/reply messaging window", () => {
       message: "Reply window closed. Reply from the Instagram app.",
     });
     expect(generateReply).not.toHaveBeenCalled();
+    expect(sendInstagramMessage).not.toHaveBeenCalled();
+    expect(ops.some((o) => o.table === "messages" && o.op === "insert")).toBe(false);
+  });
+
+  it(`a lead message Meta delivered ${LATE_HOURS}h late (stored with its send time) reads as a closed window`, async () => {
+    // The webhook stores the lead's real send time (see the Instagram route
+    // test); this is that row as the dashboard reply reads it.
+    state.lastLeadAt = lateDelivery().storedCreatedAt;
+    const res = await POST(req({ conversationId: "conv-1", message: "hey", manual: true }));
+    expect(res.status).toBe(409);
     expect(sendInstagramMessage).not.toHaveBeenCalled();
     expect(ops.some((o) => o.table === "messages" && o.op === "insert")).toBe(false);
   });

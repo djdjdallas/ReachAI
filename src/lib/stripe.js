@@ -80,9 +80,10 @@ export async function createCheckoutSession(customerId, priceId, userId, options
     payment_method_collection: "always",
     line_items: [{ price: priceId, quantity: 1 }],
     mode: "subscription",
-    // No promotion codes (audit L9): a code could zero out the first
-    // charge of a no-trial checkout. Affiliate attribution via promoter
-    // codes is off until it comes back deliberately.
+    // No free-text promotion codes (audit L9): a code could zero out the
+    // first charge of a no-trial checkout. When affiliate codes come back,
+    // validate the code on our server and pass it as
+    // `discounts: [{ promotion_code }]`; never re-enable this field.
     allow_promotion_codes: false,
     // Short-lived (audit M3): an abandoned session stays payable until it
     // expires, and two payable sessions are how one customer ends up with

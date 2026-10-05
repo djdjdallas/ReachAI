@@ -73,6 +73,7 @@ vi.mock("@/lib/voice/sender", () => voice);
 vi.mock("@/lib/drip/queue", () => drip);
 
 const { POST } = await import("./route");
+const { lateDelivery, LATE_HOURS } = await import("@/lib/instagram/late-delivery.fixture");
 
 const IGBA = "17841400000000000";
 const LEAD = "lead-igsid-1";
@@ -280,6 +281,38 @@ describe("send-time checks (audit L6, LM1)", () => {
     const { lastInboundAt } = ig.sendInstagramMessage.mock.calls[0][4];
     expect(lastInboundAt).toBeGreaterThanOrEqual(before);
     expect(lastInboundAt).toBeLessThanOrEqual(Date.now());
+  });
+});
+
+describe("late Meta delivery (stored with the lead's real send time)", () => {
+  it(`a message sent ${LATE_HOURS}h ago and delivered now is saved with its send time, and gets no AI turn`, async () => {
+    db.state.user = user();
+    const late = lateDelivery();
+    await POST(inbound("still interested?", "mid-30h", late.sentAtMs));
+
+    const saved = db.inserted("messages").find((m) => m.source === "lead");
+    expect(saved).toMatchObject({ role: "user", source: "lead" });
+    // Within a second of the fixture (the fixture's "now" is a hair earlier).
+    expect(Math.abs(Date.parse(saved.created_at) - Date.parse(late.storedCreatedAt))).toBeLessThan(1000);
+    expect(db.conversationSkipReasons()).toContain("messaging_window_closed");
+    expect(AI_AND_OUTBOUND()).toEqual(NONE);
+  });
+
+  it("an on-time message is saved with its send time too (no change in behavior)", async () => {
+    db.state.user = user();
+    const sentAt = Date.now() - 2000;
+    await POST(inbound("hi", "mid-ontime", sentAt));
+    const saved = db.inserted("messages").find((m) => m.source === "lead");
+    expect(saved.created_at).toBe(new Date(sentAt).toISOString());
+    expect(ig.sendInstagramMessage).toHaveBeenCalled();
+  });
+
+  it("inactive-account saves use the send time as well", async () => {
+    db.state.user = user({ subscription_status: "canceled", ai_mode: "off" });
+    const late = lateDelivery();
+    await POST(inbound("hello?", "mid-inactive", late.sentAtMs));
+    const saved = db.inserted("messages")[0];
+    expect(Math.abs(Date.parse(saved.created_at) - late.sentAtMs)).toBeLessThan(1000);
   });
 });
 

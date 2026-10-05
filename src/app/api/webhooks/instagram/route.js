@@ -30,7 +30,7 @@ import { sendVoiceMessage, logVoiceSend } from "@/lib/voice/sender";
 import { inactiveGate, inactiveSentinelReason } from "@/lib/inactive-inbound";
 import { hasActiveAccess } from "@/lib/billing/access";
 import { ACCESS_COLUMNS } from "@/lib/billing/status";
-import { inboundAtMs } from "@/lib/instagram/messaging-window";
+import { inboundAtMs, isWithinMessagingWindow } from "@/lib/instagram/messaging-window";
 
 // Hard wall-clock budget for the whole inbound chain. The 20s delay cap
 // (+15% jitter ≈ 23s) plus the 30s-capped model calls and the Meta send must
@@ -278,6 +278,8 @@ const SKIP = {
   GENERATION_FAILED: "generation_failed",
   SEND_FAILED: "send_failed",
   RECONNECT_REQUIRED: "reconnect_required",
+  // The lead's message was already more than 24h old when Meta delivered it.
+  MESSAGING_WINDOW_CLOSED: "messaging_window_closed",
 };
 
 // Mark a conversation's `last_skip_reason` so the dashboard can explain why
@@ -483,7 +485,13 @@ function detectQualifyingLoop(messages) {
   return true;
 }
 
-async function insertMessageIfNew(supabase, { conversation_id, role, content, provider_message_id, source }) {
+// created_at (optional): for an inbound lead message, when the lead SENT it
+// (leadSentAtMs, the earlier of Meta's event timestamp and receipt), so a
+// late Meta delivery isn't stored as a fresh message. The dashboard reply
+// and drip measure the 24h window from this column. Omitted: the column
+// default (now). Service role only; the M1 trigger rejects a browser-set
+// created_at.
+async function insertMessageIfNew(supabase, { conversation_id, role, content, provider_message_id, source, created_at }) {
   if (provider_message_id) {
     const { data: existing } = await supabase
       .from("messages")
@@ -494,7 +502,7 @@ async function insertMessageIfNew(supabase, { conversation_id, role, content, pr
   }
   const { data, error } = await supabase
     .from("messages")
-    .insert({ conversation_id, role, content, provider_message_id, source })
+    .insert({ conversation_id, role, content, provider_message_id, source, ...(created_at ? { created_at } : {}) })
     .select()
     .single();
   if (error?.code === "23505") return { duplicate: true };
@@ -503,11 +511,15 @@ async function insertMessageIfNew(supabase, { conversation_id, role, content, pr
   }
   // Set last_message_at to this message's own created_at so the canonical
   // recency field always equals the newest message (and the inbox reorders /
-  // realtime fires). Only bumped here, on a genuine message insert.
+  // realtime fires). Only bumped here, on a genuine message insert. Never
+  // moved backwards: a late delivery's created_at can predate messages
+  // already in the thread.
+  const bumpAt = data?.created_at || new Date().toISOString();
   const { error: bumpError } = await supabase
     .from("conversations")
-    .update({ last_message_at: data?.created_at || new Date().toISOString() })
-    .eq("id", conversation_id);
+    .update({ last_message_at: bumpAt })
+    .eq("id", conversation_id)
+    .or(`last_message_at.is.null,last_message_at.lt."${bumpAt}"`);
   if (bumpError) log.error("[webhook] conversation bump failed:", bumpError.code);
   return { data, error, duplicate: false };
 }
@@ -863,6 +875,7 @@ async function processIncomingMessage({
   leadSentAtMs = receivedAtMs,
 }) {
   const supabase = getSupabaseAdmin();
+  const leadSentAtIso = new Date(leadSentAtMs).toISOString();
 
   // Look up user. maybeSingle distinguishes the two failure shapes: zero
   // rows → data null (genuinely no user); 2+ rows → PGRST116 error
@@ -1014,6 +1027,7 @@ async function processIncomingMessage({
       content: messageText,
       provider_message_id: providerMessageId,
       source: "lead",
+      created_at: leadSentAtIso,
     });
     await markSkip(supabase, conversation.id, inactive.reason);
     await recordClassification(
@@ -1049,6 +1063,7 @@ async function processIncomingMessage({
       content: messageText,
       provider_message_id: providerMessageId,
       source: "lead",
+      created_at: leadSentAtIso,
     });
     await markSkip(supabase, conversation.id, SKIP.RECONNECT_REQUIRED);
     log.warn(`[webhook] skip reconnect_required user=${user.id} conversation=${conversation.id}`);
@@ -1073,6 +1088,7 @@ async function processIncomingMessage({
       content: messageText,
       provider_message_id: providerMessageId,
       source: "lead",
+      created_at: leadSentAtIso,
     });
 
     // Name the specific gate rather than a generic "skipped". These three
@@ -1106,6 +1122,7 @@ async function processIncomingMessage({
       content: messageText,
       provider_message_id: providerMessageId,
       source: "lead",
+      created_at: leadSentAtIso,
     });
     await markSkip(supabase, conversation.id, SKIP.GREETING_NOT_CONFIGURED);
     await recordClassification(
@@ -1125,8 +1142,25 @@ async function processIncomingMessage({
     content: messageText,
     provider_message_id: providerMessageId,
     source: "lead",
+    created_at: leadSentAtIso,
   });
   if (insertResult.duplicate) {
+    return;
+  }
+
+  // Already outside Instagram's 24h window (a Meta delivery that arrived a
+  // day late): no reply can be sent, so spend no DM quota, model call or
+  // typing indicator, and leave no saved-but-unsent reply in the thread.
+  // The message is saved above with its real time, so the dashboard shows
+  // the window as closed too.
+  if (!isWithinMessagingWindow(leadSentAtMs)) {
+    await markSkip(supabase, conversation.id, SKIP.MESSAGING_WINDOW_CLOSED);
+    await recordClassification(
+      supabase,
+      insertResult.data?.id,
+      classificationSentinel("skipped", "gated before classification: messaging_window_closed", false)
+    );
+    log.warn(`[webhook] inbound arrived outside the 24h window, not replying. conversation=${conversation.id}`);
     return;
   }
 
