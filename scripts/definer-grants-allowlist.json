@@ -1,0 +1,4 @@
+{
+  "_comment": "SECURITY DEFINER functions in public that the browser (anon/authenticated) may execute. Each entry needs the exact signature as browser_executable_definer_functions() prints it, the roles, and the reason. Empty on purpose: today every definer function is server-only. Checked by scripts/check-definer-grants.mjs.",
+  "allowed": []
+}

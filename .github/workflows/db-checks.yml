@@ -1,0 +1,60 @@
+# Database security checks.
+#
+# definer-grants (audit H1): no SECURITY DEFINER function may be
+# browser-executable without an allowlist entry
+# (scripts/definer-grants-allowlist.json).
+# 1. Static (always): every definer function a migration creates has a
+#    revoke (src/lib/db/definer-grants.test.js).
+# 2. Live (when the repo secrets are set): asks the database which definer
+#    functions anon/authenticated can execute right now. Catches grants
+#    made outside migrations (SQL editor, dashboard). Read-only.
+#    Secrets: SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY.
+name: db-checks
+
+on:
+  pull_request:
+  push:
+    branches: [claude/build-reachai-app-PeuJk]
+  schedule:
+    - cron: "17 9 * * *"
+  workflow_dispatch:
+
+jobs:
+  definer-grants:
+    runs-on: ubuntu-latest
+    env:
+      NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Static check (migrations)
+        run: npx vitest run src/lib/db/definer-grants.test.js
+      - name: Live check (database)
+        if: env.SUPABASE_SERVICE_ROLE_KEY != ''
+        run: node scripts/check-definer-grants.mjs
+
+  # Audit M1/L7/H1/M2 regression tests against a throwaway Postgres 17:
+  # bootstrap + the real migration files + browser vs server assertions.
+  db-tests:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd pg_isready --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      PGHOST: localhost
+      PGPORT: 5432
+      PGUSER: postgres
+      PGPASSWORD: postgres
+    steps:
+      - uses: actions/checkout@v4
+      - run: supabase/tests/run.sh
