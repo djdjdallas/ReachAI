@@ -77,14 +77,14 @@ const { POST } = await import("./route");
 const IGBA = "17841400000000000";
 const LEAD = "lead-igsid-1";
 
-function inbound(text = "how much is coaching?", mid = "mid-1") {
+function inbound(text = "how much is coaching?", mid = "mid-1", timestamp = undefined) {
   const body = JSON.stringify({
     object: "instagram",
     entry: [
       {
         id: IGBA,
         messaging: [
-          { sender: { id: LEAD }, recipient: { id: IGBA }, message: { mid, text } },
+          { sender: { id: LEAD }, recipient: { id: IGBA }, timestamp, message: { mid, text } },
         ],
       },
     ],
@@ -246,6 +246,40 @@ describe("inbound DM for a serving account (unchanged)", () => {
 
     expect(db.conversationSkipReasons()).not.toContain("subscription_inactive");
     expect(dmIntent.classifyDMIntent).toHaveBeenCalled();
+  });
+});
+
+describe("send-time checks (audit L6, LM1)", () => {
+  it("L6: access that ends during the reply delay stops the send", async () => {
+    db.state.user = user();
+    // Reply generation runs before the delay wait; the subscription ends
+    // in between (the post-delay recheck reads the row again).
+    ai.generateReply.mockImplementationOnce(async () => {
+      db.state.user = user({ subscription_status: "canceled" });
+      return "hey";
+    });
+
+    await POST(inbound());
+
+    expect(ai.generateReply).toHaveBeenCalled();
+    expect(ig.sendInstagramMessage).not.toHaveBeenCalled();
+    expect(db.conversationSkipReasons()).toContain("access_ended_during_delay");
+  });
+
+  it("LM1: the 24h window is measured from Meta's event timestamp when it is earlier", async () => {
+    db.state.user = user();
+    const sentAt = Date.now() - 3 * 3_600_000; // delivered 3h late
+    await POST(inbound("how much?", "mid-late", sentAt));
+    expect(ig.sendInstagramMessage.mock.calls[0][4]).toEqual({ lastInboundAt: sentAt });
+  });
+
+  it("LM1: a future event timestamp falls back to receipt time", async () => {
+    db.state.user = user();
+    const before = Date.now();
+    await POST(inbound("how much?", "mid-future", Date.now() + 3_600_000));
+    const { lastInboundAt } = ig.sendInstagramMessage.mock.calls[0][4];
+    expect(lastInboundAt).toBeGreaterThanOrEqual(before);
+    expect(lastInboundAt).toBeLessThanOrEqual(Date.now());
   });
 });
 

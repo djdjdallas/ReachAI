@@ -90,6 +90,9 @@ export async function updateSession(request) {
     // Both enforce their own token auth (CRON_SECRET / ALERT_TOKEN).
     pathname.startsWith("/api/cron") ||
     pathname.startsWith("/api/alerts") ||
+    // Called server-to-server by the Stripe webhook, no session cookie.
+    // Enforces its own secret (x-internal-secret, isAuthorizedInternal).
+    pathname === "/api/drip/enroll" ||
     pathname.startsWith("/compare") ||
     pathname.startsWith("/blog") ||
     pathname.startsWith("/for") ||

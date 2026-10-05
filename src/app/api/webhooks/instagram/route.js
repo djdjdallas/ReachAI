@@ -28,6 +28,9 @@ import { lintReply } from "@/lib/reply-lint";
 import { findVoiceSnippetForIntent, getSendableAudioUrl } from "@/lib/voice/matcher";
 import { sendVoiceMessage, logVoiceSend } from "@/lib/voice/sender";
 import { inactiveGate, inactiveSentinelReason } from "@/lib/inactive-inbound";
+import { hasActiveAccess } from "@/lib/billing/access";
+import { ACCESS_COLUMNS } from "@/lib/billing/status";
+import { inboundAtMs } from "@/lib/instagram/messaging-window";
 
 // Hard wall-clock budget for the whole inbound chain. The 20s delay cap
 // (+15% jitter ≈ 23s) plus the 30s-capped model calls and the Meta send must
@@ -143,6 +146,10 @@ async function handleMetaWebhook(body, rawBody, request) {
       // measured from here (webhook receipt of this event), so processing
       // time counts against the configured delay instead of adding to it.
       const receivedAtMs = Date.now();
+      // The 24h window starts when the lead SENT this message: the earlier of
+      // Meta's event timestamp and receipt (audit LM1), so a late or retried
+      // delivery can't make an expired window look open.
+      const leadSentAtMs = inboundAtMs(event.timestamp, receivedAtMs);
 
       try {
         // Fetch sender's name from Instagram API
@@ -196,6 +203,7 @@ async function handleMetaWebhook(body, rawBody, request) {
           senderUsername,
           providerMessageId: event.message?.mid || null,
           receivedAtMs,
+          leadSentAtMs,
         });
       } catch (err) {
         console.error("Error processing Meta message:", err);
@@ -850,6 +858,9 @@ async function processIncomingMessage({
   senderUsername,
   providerMessageId,
   receivedAtMs = Date.now(),
+  // When the lead sent it (inboundAtMs): the 24h window is measured from
+  // here. receivedAtMs stays the anchor for the reply-delay floor.
+  leadSentAtMs = receivedAtMs,
 }) {
   const supabase = getSupabaseAdmin();
 
@@ -1223,7 +1234,7 @@ async function processIncomingMessage({
           .maybeSingle(),
         supabase
           .from("users")
-          .select("ai_mode")
+          .select(`ai_mode, ${ACCESS_COLUMNS}`)
           .eq("id", user.id)
           .maybeSingle(),
       ]);
@@ -1233,6 +1244,14 @@ async function processIncomingMessage({
           convRes.error?.code || userRes.error?.code
         );
         return { blocked: false };
+      }
+      // Access, re-checked right before the send (audit L6): the reply
+      // delay plus generation can span a subscription ending or a trial
+      // running out, and the receipt-time gate saw the row from before.
+      // Same single access check (hasActiveAccess); a missing row reads as
+      // no access.
+      if (!hasActiveAccess(userRes.data || {})) {
+        return { blocked: true, reason: "access_ended_during_delay" };
       }
       // Mirror the receipt-time gate set exactly (ai_mode off/handoff,
       // ai_paused, status='manual') — see the per-thread gates above.
@@ -1670,7 +1689,7 @@ async function processIncomingMessage({
             encryptedAccessToken: user.meta_page_access_token,
             recipientPsid: senderId,
             audioUrl,
-            lastInboundAt: receivedAtMs,
+            lastInboundAt: leadSentAtMs,
           });
 
           await supabase
@@ -1838,14 +1857,15 @@ async function processIncomingMessage({
   if (canSend) {
     // Send reply via Meta Instagram API
     try {
-      // The lead's message arrived at receivedAtMs, so this reply is inside
-      // the 24h window by construction; sendInstagramMessage still checks.
+      // Measured from when the lead sent the message (leadSentAtMs), not
+      // when the webhook arrived. sendInstagramMessage refuses a send outside
+      // the window.
       const sendResult = await sendInstagramMessage(
         user.instagram_business_account_id,
         senderId,
         aiReply,
         decryptToken(user.meta_page_access_token),
-        { lastInboundAt: receivedAtMs }
+        { lastInboundAt: leadSentAtMs }
       );
       // Stamp the Meta mid so the echo of this send dedups. If the echo
       // webhook won the race, handleEchoEvent already stamped this same mid

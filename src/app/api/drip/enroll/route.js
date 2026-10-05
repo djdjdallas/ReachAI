@@ -2,15 +2,17 @@ import { NextResponse } from "next/server";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import { sendEmail } from "@/lib/notifications";
 import { DRIP_SEQUENCE } from "@/lib/drip-emails";
+import { isAuthorizedInternal } from "@/lib/cron-auth";
 
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL || "https://clinchd.io";
 
 export async function POST(request) {
   try {
-    // Internal-only endpoint — require a shared secret from callers (the
-    // Stripe webhook is the only real caller today; cron uses the same).
-    const provided = request.headers.get("x-internal-secret");
-    if (!process.env.CRON_SECRET || provided !== process.env.CRON_SECRET) {
+    // Internal-only endpoint: requires CRON_SECRET in x-internal-secret
+    // (the Stripe webhook is the only caller). Constant-time compare. Public
+    // in middleware (no session cookie on a server-to-server call), so this
+    // check is the only gate.
+    if (!isAuthorizedInternal(request)) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 

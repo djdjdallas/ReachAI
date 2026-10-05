@@ -95,6 +95,21 @@ describe("accessDecision: Stripe-backed rules", () => {
     ).toMatchObject({ hasAccess: false, reason: "past_due_expired" });
   });
 
+  it("past_due with no current_period_end is denied, never open-ended (audit L3)", () => {
+    expect(accessDecision(sub({ subscription_status: "past_due", current_period_end: null }), NOW)).toEqual({
+      hasAccess: false,
+      kind: "stripe",
+      reason: "past_due_unknown_period",
+    });
+    expect(hasActiveAccess(sub({ subscription_status: "past_due", current_period_end: "not a date" }), NOW)).toBe(false);
+  });
+
+  it("past_due access ends exactly 30 days after the period end", () => {
+    const end = NOW - PAST_DUE_GRACE_MS;
+    expect(hasActiveAccess(sub({ subscription_status: "past_due", current_period_end: iso(end) }), NOW)).toBe(true);
+    expect(hasActiveAccess(sub({ subscription_status: "past_due", current_period_end: iso(end - 1000) }), NOW)).toBe(false);
+  });
+
   it.each(["canceled", "unpaid", "incomplete", "incomplete_expired", "paused"])("%s has no access", (s) => {
     expect(hasActiveAccess(sub({ subscription_status: s, current_period_end: iso(NOW + DAY) }), NOW)).toBe(false);
   });

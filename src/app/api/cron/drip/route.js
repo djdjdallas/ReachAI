@@ -3,6 +3,8 @@ import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import { isAuthorizedCron } from "@/lib/cron-auth";
 import { sendEmail } from "@/lib/notifications";
 import { DRIP_SEQUENCE } from "@/lib/drip-emails";
+import { hasActiveAccess } from "@/lib/billing/access";
+import { ACCESS_COLUMNS } from "@/lib/billing/status";
 
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL || "https://clinchd.io";
 
@@ -28,19 +30,23 @@ export async function GET(request) {
       Date.now() - 14 * 24 * 60 * 60 * 1000
     ).toISOString();
 
-    // Includes trialing users so a coach who closes the tab mid-onboarding
-    // still gets the welcome / activation drip during their 7-day trial.
-    const { data: stragglers } = await supabase
+    // Who gets the drip is the single access check (hasActiveAccess, audit
+    // L5), not a status list: a raw 'active'/'trialing' match also caught
+    // expired legacy trials and periods that ended without a webhook, and
+    // missed nobody the access function would let in. Trialing users are
+    // included that way, so a coach who closes the tab mid-onboarding still
+    // gets the welcome drip during their trial.
+    const { data: enrollCandidates } = await supabase
       .from("users")
-      .select("id")
+      .select(`id, ${ACCESS_COLUMNS}`)
       .is("drip_enrolled_at", null)
-      .in("subscription_status", ["active", "trialing"])
       // A pending cancellation keeps status 'active' until the period ends;
       // don't start an onboarding drip for someone who is leaving.
       .is("cancel_at", null)
       .gte("created_at", fourteenDaysAgo);
+    const stragglers = (enrollCandidates || []).filter((u) => hasActiveAccess(u));
 
-    if (stragglers && stragglers.length > 0) {
+    if (stragglers.length > 0) {
       const nowIso = new Date().toISOString();
       for (const u of stragglers) {
         const { error: enrollErr } = await supabase
@@ -52,15 +58,13 @@ export async function GET(request) {
       }
     }
 
-    // Find users enrolled in drip who haven't finished all steps. Includes
-    // trialing users (matches the straggler enrollment above) so the welcome
-    // drip reaches a coach during their 7-day trial, not only after they pay.
-    const { data: users, error: queryErr } = await supabase
+    // Users enrolled in drip who haven't finished all steps and still have
+    // access (same access check as enrollment above).
+    const { data: enrolled, error: queryErr } = await supabase
       .from("users")
-      .select("id, email, full_name, drip_enrolled_at, drip_step")
+      .select(`id, email, full_name, drip_enrolled_at, drip_step, ${ACCESS_COLUMNS}`)
       .not("drip_enrolled_at", "is", null)
       .lt("drip_step", DRIP_SEQUENCE.length)
-      .in("subscription_status", ["active", "trialing"])
       // Stop the onboarding drip once a cancellation is pending (status
       // stays 'active' until the period ends). A canceled customer kept
       // getting "your AI DM setter is waiting" emails.
@@ -70,6 +74,7 @@ export async function GET(request) {
       console.error("Drip cron query error:", queryErr);
       return NextResponse.json({ error: "Query failed" }, { status: 500 });
     }
+    const users = (enrolled || []).filter((u) => hasActiveAccess(u));
 
     const now = Date.now();
 

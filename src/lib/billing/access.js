@@ -65,7 +65,17 @@ export function accessDecision(user, now = Date.now()) {
       return { hasAccess: true, kind: "stripe", reason: status };
     }
     if (status === S.PAST_DUE) {
-      if (periodEnd !== null && now > periodEnd + PAST_DUE_GRACE_MS) {
+      // The 30-day cap is measured from current_period_end: the failed
+      // renewal is the one due at the period end, so that is when past_due
+      // began. Unknown period end (audit L3) = unknown start = no cap to
+      // apply, so deny rather than grant open-ended access. The webhook
+      // writes current_period_end from the live subscription on every
+      // event, so a real past_due row always has one; no prod row was
+      // past_due with a null period end when this changed (2026-10-06).
+      if (periodEnd === null) {
+        return { hasAccess: false, kind: "stripe", reason: "past_due_unknown_period" };
+      }
+      if (now > periodEnd + PAST_DUE_GRACE_MS) {
         return { hasAccess: false, kind: "stripe", reason: "past_due_expired" };
       }
       return { hasAccess: true, kind: "stripe", reason: "past_due" };
