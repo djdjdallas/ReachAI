@@ -482,7 +482,7 @@ export default function ScriptBuilderPage() {
         setError({
           source: "generate",
           message:
-            "Script generation failed. Check your inputs and try again, or contact support@clinchd.io.",
+            "Script generation failed. Check your inputs and try again, or contact dom@clinchd.io.",
         });
         return;
       }
@@ -511,7 +511,7 @@ export default function ScriptBuilderPage() {
       setError({
         source: "generate",
         message:
-          "Script generation failed. Check your inputs and try again, or contact support@clinchd.io.",
+          "Script generation failed. Check your inputs and try again, or contact dom@clinchd.io.",
       });
     } finally {
       setGenerating(false);

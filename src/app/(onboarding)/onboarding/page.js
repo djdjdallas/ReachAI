@@ -3,7 +3,13 @@
 import { useState, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import { resolveOnboardingAiMode } from "@/lib/onboarding";
+import {
+  resolveOnboardingAiMode,
+  autoImportPending,
+  AUTO_IMPORT_WAIT_MS,
+  mergeKeepingSaved,
+  fillIfEmpty,
+} from "@/lib/onboarding";
 import posthog from "posthog-js";
 import { Loader2, AlertCircle, X } from "lucide-react";
 
@@ -89,6 +95,51 @@ function OnboardingPage() {
   // silently dropping the coach back on step 1.
   const [igConnectError, setIgConnectError] = useState(null);
 
+  // Leads the webhook is holding because no opening line is saved
+  // (greeting_not_configured). Someone who connects Instagram and stops
+  // mid-onboarding has ai_mode 'active' (the column default) but no
+  // greeting, so every lead is held. Middleware keeps them in onboarding,
+  // where the dashboard's "Opening line needed" banner never shows, so the
+  // count is surfaced here too.
+  const [heldForGreeting, setHeldForGreeting] = useState(0);
+
+  // Result of Step 2's Connect Calendly round trip (/api/auth/calendly
+  // ?return=onboarding sends the coach back with ?calendly=...).
+  const [calendlyNotice, setCalendlyNotice] = useState(null);
+  const [connectingCalendly, setConnectingCalendly] = useState(false);
+
+  useEffect(() => {
+    if (!searchParams) return;
+    const status = searchParams.get("calendly");
+    if (!status) return;
+    const warning = searchParams.get("warning");
+    let notice;
+    if (status === "connected" && !warning) {
+      notice = { kind: "success", message: "Calendly connected. Your AI will share your booking link in DMs." };
+    } else if (status === "connected" && warning === "calendly_plan_limit") {
+      notice = {
+        kind: "warning",
+        message:
+          "Calendly connected. Your Calendly plan doesn't send booking updates, so booked calls won't be marked automatically, but your AI will still share your link.",
+      };
+    } else if (status === "connected") {
+      notice = {
+        kind: "warning",
+        message:
+          "Calendly connected, but booking updates didn't set up. Your AI will still share your link. You can retry from Settings later.",
+      };
+    } else {
+      notice = { kind: "error", message: "Couldn't connect Calendly. Try again, or paste your booking link instead." };
+    }
+    setCalendlyNotice(notice);
+    const params = new URLSearchParams(searchParams.toString());
+    params.delete("calendly");
+    params.delete("warning");
+    params.delete("reason");
+    const next = params.toString();
+    router.replace(`/onboarding${next ? `?${next}` : ""}`, { scroll: false });
+  }, [searchParams, router]);
+
   useEffect(() => {
     if (!searchParams) return;
     const code = searchParams.get("error");
@@ -99,19 +150,19 @@ function OnboardingPage() {
       invalid_state:
         "Your connection attempt expired. Please click Connect Instagram to try again.",
       callback_failed:
-        "Instagram didn't return a successful response. Try reconnecting, or contact support@clinchd.io if it keeps failing.",
+        "Instagram didn't return a successful response. Try reconnecting, or contact dom@clinchd.io if it keeps failing.",
       auth_failed:
         "Authorization was denied. Click Connect Instagram to try again.",
       ig_switch_blocked:
-        "That's a different Instagram account than the one already connected here. To switch accounts, finish setup first, then use Settings → Instagram Connection — or reconnect with the original account.",
+        "That's a different Instagram account than the one already connected here. To switch accounts, finish setup first, then use Settings → Instagram Connection, or reconnect with the original account.",
       ig_already_connected:
-        "This Instagram account is already connected to another Clinchd account. Disconnect it there first, or contact support@clinchd.io.",
+        "This Instagram account is already connected to another Clinchd account. Disconnect it there first, or contact dom@clinchd.io.",
       ig_save_failed:
-        "Saving your Instagram connection failed. Try again, or contact support@clinchd.io if it keeps failing.",
+        "Saving your Instagram connection failed. Try again, or contact dom@clinchd.io if it keeps failing.",
     };
     const message =
       map[code] ||
-      "Something went wrong connecting your Instagram account. Try again, or contact support@clinchd.io.";
+      "Something went wrong connecting your Instagram account. Try again, or contact dom@clinchd.io.";
     setIgConnectError({ code, message });
     // Strip the error param so a refresh doesn't re-show the banner.
     const params = new URLSearchParams(searchParams.toString());
@@ -120,8 +171,9 @@ function OnboardingPage() {
     router.replace(`/onboarding${next ? `?${next}` : ""}`, { scroll: false });
   }, [searchParams, router]);
 
-  // Post-OAuth Instagram auto-import — background voice-profile import.
-  // True while we're polling for it to finish (max ~8s).
+  // Post-OAuth Instagram auto-import (voice profile + offer, target
+  // customer, objections, greeting). True while we wait for it in the
+  // background; the page stays usable and shows a "personalizing" banner.
   const [autoImporting, setAutoImporting] = useState(false);
 
   // Persisted user preferences (Step 3 + Step 4 controls)
@@ -200,6 +252,40 @@ function OnboardingPage() {
       }
     }
 
+    // Imported values only fill fields that are still empty in the form.
+    function applyImported(refreshed) {
+      setProfile(refreshed);
+      const sc = refreshed.script_config || {};
+      setOffer((prev) => fillIfEmpty(prev, sc.offer));
+      setTargetCustomer((prev) => fillIfEmpty(prev, sc.targetCustomer));
+      setObjections((prev) => fillIfEmpty(prev, sc.objections));
+      setGreeting((prev) => fillIfEmpty(prev, sc.greeting));
+      if (refreshed.voice_profile?.status === "ready") {
+        setVoiceProfile((prev) => prev ?? refreshed.voice_profile);
+      }
+    }
+
+    async function waitForAutoImport(userId) {
+      const start = Date.now();
+      let latest = null;
+      while (!cancelled && Date.now() - start < AUTO_IMPORT_WAIT_MS) {
+        await new Promise((r) => setTimeout(r, 1500));
+        if (cancelled) return;
+        const { data: refreshed } = await supabase
+          .from("users")
+          .select("*")
+          .eq("id", userId)
+          .single();
+        if (refreshed) {
+          latest = refreshed;
+          if (!autoImportPending(refreshed)) break;
+        }
+      }
+      if (cancelled) return;
+      if (latest) applyImported(latest);
+      setAutoImporting(false);
+    }
+
     async function init() {
       const {
         data: { user: authUser },
@@ -219,6 +305,18 @@ function OnboardingPage() {
         .single();
 
       if (userProfile) {
+        if (
+          userProfile.instagram_business_account_id &&
+          !userProfile.script_config?.greeting
+        ) {
+          const { count: heldCount } = await supabase
+            .from("conversations")
+            .select("id", { count: "exact", head: true })
+            .eq("user_id", authUser.id)
+            .eq("last_skip_reason", "greeting_not_configured");
+          if (!cancelled) setHeldForGreeting(heldCount || 0);
+        }
+
         // Every step after 1 needs a connected Instagram account. ?step= is
         // read straight from the URL in the initial state, so a deep link
         // (or a disconnect after onboarding) could skip the Connect step.
@@ -241,41 +339,17 @@ function OnboardingPage() {
           setStep(2);
         }
 
-        // Background voice-profile auto-import may still be running. If
-        // Instagram is connected, the voice profile is not yet ready, and
-        // we have not yet stamped attempted_at, we poll for ~8 seconds
-        // before settling on whatever state we end up with.
-        const mayBeImporting =
-          !!userProfile.instagram_business_account_id &&
-          userProfile.voice_profile?.status !== "ready" &&
-          !userProfile.instagram_auto_import_attempted_at;
+        applyProfile(userProfile);
 
-        if (mayBeImporting) {
+        // The post-connect import takes ~6.5s and may still be running.
+        // Don't block the page on it: show onboarding now, wait in the
+        // background, then fold the result into fields the coach hasn't
+        // typed in. (It used to block on a spinner and stop at
+        // attempted_at, which is stamped before the work starts, so the
+        // imported fields never reached the form.)
+        if (autoImportPending(userProfile)) {
           setAutoImporting(true);
-          // Poll every 1.5s up to 8s. Stop as soon as attempted_at is
-          // stamped — at that point we have a final result (success or
-          // skipped). Always do a final refetch before unsetting.
-          const start = Date.now();
-          let finalProfile = userProfile;
-          while (!cancelled && Date.now() - start < 8000) {
-            await new Promise((r) => setTimeout(r, 1500));
-            if (cancelled) break;
-            const { data: refreshed } = await supabase
-              .from("users")
-              .select("*")
-              .eq("id", authUser.id)
-              .single();
-            if (refreshed) {
-              finalProfile = refreshed;
-              if (refreshed.instagram_auto_import_attempted_at) break;
-            }
-          }
-          if (!cancelled) {
-            applyProfile(finalProfile);
-            setAutoImporting(false);
-          }
-        } else {
-          applyProfile(userProfile);
+          waitForAutoImport(authUser.id);
         }
       }
 
@@ -290,6 +364,18 @@ function OnboardingPage() {
 
   // --- Handlers ---
 
+  // The stored script_config right now. Saves build on this, not on the
+  // profile as loaded: the auto-import may have written fields since.
+  const fetchLatestScriptConfig = async () => {
+    const { data, error } = await supabase
+      .from("users")
+      .select("script_config")
+      .eq("id", user.id)
+      .single();
+    if (error) throw error;
+    return data?.script_config || {};
+  };
+
   const handleApplyPreset = ({ offer: o, targetCustomer: t, objections: obj }) => {
     setAiError(null);
     setOffer(o);
@@ -297,47 +383,48 @@ function OnboardingPage() {
     setObjections(obj);
   };
 
+  // Step 2's save without advancing. Returns the saved script_config.
+  const persistStep2 = async () => {
+    // A blank form field never erases a saved value (mergeKeepingSaved).
+    const scriptConfig = mergeKeepingSaved(await fetchLatestScriptConfig(), {
+      greeting,
+      qualifying_questions: qualifyingQuestions,
+      interest_response: interestResponse,
+      objection_handlers: objectionHandlers,
+      booking_message: bookingMessage,
+      not_a_fit_message: notAFitMessage,
+      offer,
+      targetCustomer,
+      objections,
+      tone,
+      traits,
+      response_length: responseLength,
+      script_mode: scriptMode,
+      human_in_loop: humanInLoop,
+    });
+
+    const { error: dbErr } = await supabase
+      .from("users")
+      .update({
+        script_config: scriptConfig,
+        calendly_url: calendlyUrl,
+      })
+      .eq("id", user.id);
+    if (dbErr) throw dbErr;
+
+    setProfile((prev) => ({
+      ...prev,
+      script_config: scriptConfig,
+      calendly_url: calendlyUrl,
+    }));
+    return scriptConfig;
+  };
+
   const handleSaveScriptConfig = async () => {
     setAiError(null);
     setSaving(true);
     try {
-      const scriptConfig = {
-        ...(profile?.script_config || {}),
-        ...(greeting && { greeting }),
-        ...(qualifyingQuestions && {
-          qualifying_questions: qualifyingQuestions,
-        }),
-        ...(interestResponse && { interest_response: interestResponse }),
-        ...(objectionHandlers && { objection_handlers: objectionHandlers }),
-        ...(bookingMessage && { booking_message: bookingMessage }),
-        ...(notAFitMessage && { not_a_fit_message: notAFitMessage }),
-      };
-
-      // Always overwrite core + preference fields
-      scriptConfig.offer = offer;
-      scriptConfig.targetCustomer = targetCustomer;
-      scriptConfig.objections = objections;
-      scriptConfig.tone = tone;
-      scriptConfig.traits = traits;
-      scriptConfig.response_length = responseLength;
-      scriptConfig.script_mode = scriptMode;
-      scriptConfig.human_in_loop = humanInLoop;
-
-      const { error: dbErr } = await supabase
-        .from("users")
-        .update({
-          script_config: scriptConfig,
-          calendly_url: calendlyUrl,
-        })
-        .eq("id", user.id);
-      if (dbErr) throw dbErr;
-
-      setProfile((prev) => ({
-        ...prev,
-        script_config: scriptConfig,
-        calendly_url: calendlyUrl,
-      }));
-
+      await persistStep2();
       setStep(3);
       posthog.capture("onboarding_step_completed", { step: 2 });
     } catch (err) {
@@ -345,6 +432,21 @@ function OnboardingPage() {
       setAiError(err?.message || "Failed to save. Please try again.");
     } finally {
       setSaving(false);
+    }
+  };
+
+  // Connect Calendly from Step 2. Saves what's typed first: the OAuth round
+  // trip reloads the page, which would otherwise drop the form.
+  const handleConnectCalendly = async () => {
+    setAiError(null);
+    setConnectingCalendly(true);
+    try {
+      await persistStep2();
+      window.location.href = "/api/auth/calendly?return=onboarding";
+    } catch (err) {
+      console.error("Error saving before Calendly connect:", err);
+      setAiError(err?.message || "Couldn't save your answers. Try again.");
+      setConnectingCalendly(false);
     }
   };
 
@@ -400,8 +502,7 @@ function OnboardingPage() {
     setAiError(null);
     setSaving(true);
     try {
-      const scriptConfig = {
-        ...(profile?.script_config || {}),
+      const scriptConfig = mergeKeepingSaved(await fetchLatestScriptConfig(), {
         offer,
         targetCustomer,
         objections,
@@ -416,7 +517,7 @@ function OnboardingPage() {
         response_length: responseLength,
         script_mode: scriptMode,
         human_in_loop: humanInLoop,
-      };
+      });
 
       const { error: dbErr } = await supabase
         .from("users")
@@ -650,12 +751,11 @@ function OnboardingPage() {
     setAiError(null);
     setSaving(true);
     try {
-      const scriptConfig = {
-        ...(profile?.script_config || {}),
+      const scriptConfig = mergeKeepingSaved(await fetchLatestScriptConfig(), {
         tone,
         traits,
         response_length: responseLength,
-      };
+      });
 
       const { error: dbErr } = await supabase
         .from("users")
@@ -682,10 +782,8 @@ function OnboardingPage() {
 
   // Step 5 — finalize onboarding and route to dashboard. ai_mode is read from
   // the in-page toggle: ON → active (the default), OFF → handoff (only when
-  // the user turned it off). Pass
-  // { activate: true } to arm the AI regardless of the toggle (the "Go Live
-  // Now" CTA). Either way 'active' also needs scriptReady
-  // (resolveOnboardingAiMode). Every dashboard-bound exit from step 5 MUST go
+  // the user turned it off). { activate } overrides the toggle; either way
+  // 'active' also needs scriptReady (resolveOnboardingAiMode). Every dashboard-bound exit from step 5 MUST go
   // through here: a bare router.push("/dashboard") leaves
   // onboarding_completed false and middleware bounces the user straight back
   // to step 2.
@@ -782,6 +880,30 @@ function OnboardingPage() {
         </div>
       )}
 
+      {heldForGreeting > 0 && !scriptReady && step !== 4 && (
+        <div className="px-4 pt-4">
+          <div className="max-w-5xl mx-auto flex flex-col sm:flex-row sm:items-center gap-3 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+            <AlertCircle className="h-5 w-5 flex-shrink-0 text-amber-600" />
+            <p className="flex-1 leading-relaxed">
+              <span className="font-bold">
+                {heldForGreeting === 1
+                  ? "1 lead is waiting for a reply."
+                  : `${heldForGreeting} leads are waiting for a reply.`}
+              </span>{" "}
+              Your AI can&apos;t answer anyone until you save an opening line.
+              It takes about a minute.
+            </p>
+            <button
+              type="button"
+              onClick={() => setStep(offer && targetCustomer ? 4 : 2)}
+              className="shrink-0 rounded-full bg-[#ff7e67] px-4 py-2 text-xs font-bold text-white hover:bg-[#ff6a50]"
+            >
+              Finish setup
+            </button>
+          </div>
+        </div>
+      )}
+
       {step === 1 && (
         <Step1Connect
           instagramConnected={instagramConnected}
@@ -799,6 +921,11 @@ function OnboardingPage() {
           setObjections={setObjections}
           calendlyUrl={calendlyUrl}
           setCalendlyUrl={setCalendlyUrl}
+          calendlyConnected={!!profile?.calendly_user_uri}
+          connectingCalendly={connectingCalendly}
+          onConnectCalendly={handleConnectCalendly}
+          calendlyNotice={calendlyNotice}
+          onDismissCalendlyNotice={() => setCalendlyNotice(null)}
           saving={saving}
           generating={generating}
           onSave={handleSaveScriptConfig}
@@ -888,12 +1015,8 @@ function OnboardingPage() {
           scriptReady={scriptReady}
           instagramConnected={instagramConnected}
           onGoLive={handleGoLive}
-          // "Go Live Now" (toggle off, script ready) arms the AI; "Go to
-          // Dashboard" (toggle on) keeps it armed. Either way onboarding is
-          // persisted as complete before navigating.
-          onGoToDashboard={() =>
-            handleFinalizeAndGo({ activate: aiArmed || scriptReady })
-          }
+          // Both finish buttons follow the toggle; onboarding is persisted
+          // as complete before navigating.
           onFinalize={() => handleFinalizeAndGo()}
           onBack={() => setStep(4)}
         />

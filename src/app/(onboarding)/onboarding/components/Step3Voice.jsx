@@ -123,7 +123,7 @@ export default function Step3Voice({
                 </h3>
                 {voiceProfile?.status === "ready" && (
                   <p className="text-xs text-stone-500 mb-6 font-medium">
-                    Your analyzed voice is active — tone is used as a fallback
+                    Your analyzed voice is active. Tone is used as a fallback
                     only if you clear your voice profile.
                   </p>
                 )}
@@ -228,7 +228,7 @@ export default function Step3Voice({
                   3. Brand Voice Sample
                 </h3>
                 <p className="text-xs text-stone-500 mb-6 font-medium">
-                  Paste real messages you&apos;ve sent — DMs, texts, or social
+                  Paste real messages you&apos;ve sent: DMs, texts, or social
                   posts. One per line (minimum 3).
                 </p>
 
@@ -302,7 +302,7 @@ export default function Step3Voice({
                             </div>
                             {isStrong
                               ? `Strong profile (${count} samples)`
-                              : `${count} sample${count !== 1 ? "s" : ""} analyzed — add ${8 - count}+ more for a stronger profile`}
+                              : `${count} sample${count !== 1 ? "s" : ""} analyzed. Add ${8 - count}+ more for a stronger profile`}
                           </div>
                         );
                       })()}
@@ -339,7 +339,7 @@ export default function Step3Voice({
                   <div className="space-y-4">
                     <textarea
                       rows={6}
-                      placeholder={`Paste real messages you've sent — DMs, texts, or social posts. One message per line.\n\nExample:\nhey! saw your post, that's fire. what made you start your agency?\nhonestly that's impressive for 6 months in. what's your biggest bottleneck rn?`}
+                      placeholder={`Paste real messages you've sent: DMs, texts, or social posts. One message per line.\n\nExample:\nhey! saw your post, that's fire. what made you start your agency?\nhonestly that's impressive for 6 months in. what's your biggest bottleneck rn?`}
                       className="w-full bg-stone-50 border border-stone-200 rounded-2xl p-5 text-sm focus:outline-none focus:ring-2 focus:ring-[#ff7e67]/20 focus:border-[#ff7e67] transition-all resize-none"
                       value={sampleText}
                       onChange={(e) => setSampleText(e.target.value)}
@@ -619,7 +619,7 @@ export default function Step3Voice({
                                 {label}
                               </p>
                               <p className="text-xs text-stone-300 leading-relaxed">
-                                {value || "—"}
+                                {value || "Not set"}
                               </p>
                             </div>
                           ))}

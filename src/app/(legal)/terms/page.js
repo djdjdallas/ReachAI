@@ -112,7 +112,7 @@ export default function TermsPage() {
           </li>
           <li>All payments are processed securely through Stripe.</li>
           <li>
-            Refunds are handled on a case-by-case basis. Contact support@clinchd.com for
+            Refunds are handled on a case-by-case basis. Contact dom@clinchd.io for
             refund requests.
           </li>
           <li>
@@ -161,7 +161,7 @@ export default function TermsPage() {
         <p>
           We reserve the right to suspend or terminate your account at any time for
           violation of these Terms. You may cancel your account at any time through your
-          account settings or by contacting support@clinchd.com.
+          account settings or by contacting dom@clinchd.io.
         </p>
 
         <h2>14. Changes to Terms</h2>
@@ -181,7 +181,7 @@ export default function TermsPage() {
         <h2>16. Contact Us</h2>
         <p>
           If you have questions about these Terms of Service, contact us at{" "}
-          <a href="mailto:support@clinchd.com">support@clinchd.com</a>.
+          <a href="mailto:dom@clinchd.io">dom@clinchd.io</a>.
         </p>
       </div>
     </div>

@@ -17,6 +17,11 @@ import { analyzeInstagramVoice } from "@/lib/anthropic/analyze-instagram-voice";
  *
  * Always returns 200 (even on error). This is a background enhancement;
  * we never surface failures to the user.
+ *
+ * Stamps users.instagram_auto_import_finished_at on every exit once the
+ * attempt has started (success or skip), so the onboarding page can wait for
+ * the RESULT. It used to stop polling at attempted_at, which is stamped
+ * before the ~6.5s fetch + analysis, so imported fields never reached it.
  */
 export async function POST() {
   try {
@@ -70,6 +75,7 @@ export async function POST() {
         .from("users")
         .update({ instagram_auto_import_attempted_at: new Date().toISOString() })
         .eq("id", user.id);
+      await stampFinished(admin, user.id);
       return NextResponse.json({
         skipped: true,
         reason: "voice_profile_already_configured",
@@ -91,144 +97,12 @@ export async function POST() {
       .update({ instagram_auto_import_attempted_at: new Date().toISOString() })
       .eq("id", user.id);
 
-    // Fetch bio + captions.
-    let content;
     try {
-      content = await fetchProfileContent(profile);
-    } catch (err) {
-      if (err instanceof InstagramFetchError) {
-        console.error(
-          "[auto-profile] graph fetch failed:",
-          err.kind,
-          err.message
-        );
-        const reasonMap = {
-          token_invalid: "token_invalid",
-          rate_limit: "rate_limit",
-          no_token: "token_invalid",
-        };
-        return NextResponse.json({
-          skipped: true,
-          reason: reasonMap[err.kind] || "error",
-        });
-      }
-      console.error("[auto-profile] unexpected fetch error:", err?.message);
-      return NextResponse.json({ skipped: true, reason: "error" });
+      return await runImport(admin, user.id, profile);
+    } finally {
+      // Success or skip: tell the onboarding page the result is in.
+      await stampFinished(admin, user.id);
     }
-
-    if (!content) {
-      return NextResponse.json({ skipped: true, reason: "no_signal" });
-    }
-
-    // Run Claude analyzer.
-    let analyzed;
-    try {
-      analyzed = await analyzeInstagramVoice({
-        bio: content.bio,
-        name: content.name,
-        captions: content.captions,
-      });
-    } catch (err) {
-      if (err?.kind === "content_flag") {
-        console.error(
-          "[auto-profile] content flag tripped:",
-          err.message,
-          JSON.stringify(err.payload).slice(0, 500)
-        );
-        return NextResponse.json({ skipped: true, reason: "content_flag" });
-      }
-      if (err?.kind === "parse_failed") {
-        return NextResponse.json({ skipped: true, reason: "parse_failed" });
-      }
-      console.error("[auto-profile] analyzer threw:", err?.message);
-      return NextResponse.json({ skipped: true, reason: "error" });
-    }
-
-    // ── Merge: voice_profile ────────────────────────────────────────────
-    // Replace entirely when current is null/not-ready. Status was already
-    // verified above, but re-read to avoid a TOCTOU window.
-    const { data: fresh } = await admin
-      .from("users")
-      .select("voice_profile, script_config")
-      .eq("id", user.id)
-      .single();
-
-    const update = {};
-
-    if (!fresh?.voice_profile || fresh.voice_profile.status !== "ready") {
-      const vp = analyzed.voice_profile || {};
-      update.voice_profile = {
-        voice_summary: vp.voice_summary,
-        voice_traits: vp.voice_traits || {},
-        suggested_response_length: ["short", "medium", "long"].includes(
-          vp.suggested_response_length
-        )
-          ? vp.suggested_response_length
-          : null,
-        confidence: ["high", "medium", "low"].includes(vp.confidence)
-          ? vp.confidence
-          : "low",
-        preview_replies: [],
-        sample_count: (content.captions || []).length,
-        status: "ready",
-        source: "instagram_auto",
-        imported_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      };
-    }
-
-    // ── Merge: script_config ─ per-field, never overwrite populated ─────
-    const positioning = analyzed.starter_positioning || {};
-    const currentSc =
-      fresh?.script_config && typeof fresh.script_config === "object"
-        ? fresh.script_config
-        : {};
-
-    const isEmpty = (v) =>
-      v == null || (typeof v === "string" && v.trim().length === 0);
-
-    const newSc = { ...currentSc };
-    let scChanged = false;
-
-    if (isEmpty(currentSc.offer) && !isEmpty(positioning.offer)) {
-      newSc.offer = positioning.offer.trim();
-      scChanged = true;
-    }
-    if (isEmpty(currentSc.targetCustomer) && !isEmpty(positioning.target_customer)) {
-      newSc.targetCustomer = positioning.target_customer.trim();
-      scChanged = true;
-    }
-    if (isEmpty(currentSc.objections) && !isEmpty(positioning.objections)) {
-      newSc.objections = positioning.objections.trim();
-      scChanged = true;
-    }
-    // Greeting: the reply pipeline holds every inbound lead until
-    // script_config.greeting exists (the webhook's greeting gate), and a
-    // coach who skips the onboarding modal otherwise has no path that sets
-    // it — their account looks live but can never reply. Same never-
-    // overwrite rule as the fields above: only fill when currently empty,
-    // and the coach can rewrite it any time in Script Builder.
-    if (isEmpty(currentSc.greeting) && !isEmpty(positioning.greeting)) {
-      newSc.greeting = positioning.greeting.trim();
-      scChanged = true;
-    }
-
-    if (scChanged) {
-      update.script_config = newSc;
-    }
-
-    if (Object.keys(update).length > 0) {
-      const { error: updateErr } = await admin
-        .from("users")
-        .update(update)
-        .eq("id", user.id);
-      if (updateErr) {
-        console.error("[auto-profile] db update failed:", updateErr.message);
-        return NextResponse.json({ skipped: true, reason: "error" });
-      }
-    }
-
-    return NextResponse.json({ ok: true, source: "instagram_auto" });
   } catch (err) {
     console.error("[auto-profile] unexpected error:", err);
     // Best-effort: also stamp attempted_at on unexpected exception so we
@@ -256,4 +130,162 @@ export async function POST() {
     }
     return NextResponse.json({ skipped: true, reason: "error" });
   }
+}
+
+// Best-effort: a failure here only makes the onboarding page wait out its
+// cap. Also tolerates the column not existing yet (migration not run).
+async function stampFinished(admin, userId) {
+  try {
+    const { error } = await admin
+      .from("users")
+      .update({ instagram_auto_import_finished_at: new Date().toISOString() })
+      .eq("id", userId);
+    if (error) console.error("[auto-profile] finished stamp failed:", error.message);
+  } catch (err) {
+    console.error("[auto-profile] finished stamp threw:", err?.message);
+  }
+}
+
+// Everything after the attempted_at stamp: fetch, analyze, merge. Every
+// return path ends in POST's finally, which stamps finished_at.
+async function runImport(admin, userId, profile) {
+  const user = { id: userId };
+  // Fetch bio + captions.
+  let content;
+  try {
+    content = await fetchProfileContent(profile);
+  } catch (err) {
+    if (err instanceof InstagramFetchError) {
+      console.error(
+        "[auto-profile] graph fetch failed:",
+        err.kind,
+        err.message
+      );
+      const reasonMap = {
+        token_invalid: "token_invalid",
+        rate_limit: "rate_limit",
+        no_token: "token_invalid",
+      };
+      return NextResponse.json({
+        skipped: true,
+        reason: reasonMap[err.kind] || "error",
+      });
+    }
+    console.error("[auto-profile] unexpected fetch error:", err?.message);
+    return NextResponse.json({ skipped: true, reason: "error" });
+  }
+
+  if (!content) {
+    return NextResponse.json({ skipped: true, reason: "no_signal" });
+  }
+
+  // Run Claude analyzer.
+  let analyzed;
+  try {
+    analyzed = await analyzeInstagramVoice({
+      bio: content.bio,
+      name: content.name,
+      captions: content.captions,
+    });
+  } catch (err) {
+    if (err?.kind === "content_flag") {
+      console.error(
+        "[auto-profile] content flag tripped:",
+        err.message,
+        JSON.stringify(err.payload).slice(0, 500)
+      );
+      return NextResponse.json({ skipped: true, reason: "content_flag" });
+    }
+    if (err?.kind === "parse_failed") {
+      return NextResponse.json({ skipped: true, reason: "parse_failed" });
+    }
+    console.error("[auto-profile] analyzer threw:", err?.message);
+    return NextResponse.json({ skipped: true, reason: "error" });
+  }
+
+  // ── Merge: voice_profile ────────────────────────────────────────────
+  // Replace entirely when current is null/not-ready. Status was already
+  // verified above, but re-read to avoid a TOCTOU window.
+  const { data: fresh } = await admin
+    .from("users")
+    .select("voice_profile, script_config")
+    .eq("id", user.id)
+    .single();
+
+  const update = {};
+
+  if (!fresh?.voice_profile || fresh.voice_profile.status !== "ready") {
+    const vp = analyzed.voice_profile || {};
+    update.voice_profile = {
+      voice_summary: vp.voice_summary,
+      voice_traits: vp.voice_traits || {},
+      suggested_response_length: ["short", "medium", "long"].includes(
+        vp.suggested_response_length
+      )
+        ? vp.suggested_response_length
+        : null,
+      confidence: ["high", "medium", "low"].includes(vp.confidence)
+        ? vp.confidence
+        : "low",
+      preview_replies: [],
+      sample_count: (content.captions || []).length,
+      status: "ready",
+      source: "instagram_auto",
+      imported_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
+  }
+
+  // ── Merge: script_config ─ per-field, never overwrite populated ─────
+  const positioning = analyzed.starter_positioning || {};
+  const currentSc =
+    fresh?.script_config && typeof fresh.script_config === "object"
+      ? fresh.script_config
+      : {};
+
+  const isEmpty = (v) =>
+    v == null || (typeof v === "string" && v.trim().length === 0);
+
+  const newSc = { ...currentSc };
+  let scChanged = false;
+
+  if (isEmpty(currentSc.offer) && !isEmpty(positioning.offer)) {
+    newSc.offer = positioning.offer.trim();
+    scChanged = true;
+  }
+  if (isEmpty(currentSc.targetCustomer) && !isEmpty(positioning.target_customer)) {
+    newSc.targetCustomer = positioning.target_customer.trim();
+    scChanged = true;
+  }
+  if (isEmpty(currentSc.objections) && !isEmpty(positioning.objections)) {
+    newSc.objections = positioning.objections.trim();
+    scChanged = true;
+  }
+  // Greeting: the reply pipeline holds every inbound lead until
+  // script_config.greeting exists (the webhook's greeting gate), and a
+  // coach who skips the onboarding modal otherwise has no path that sets
+  // it — their account looks live but can never reply. Same never-
+  // overwrite rule as the fields above: only fill when currently empty,
+  // and the coach can rewrite it any time in Script Builder.
+  if (isEmpty(currentSc.greeting) && !isEmpty(positioning.greeting)) {
+    newSc.greeting = positioning.greeting.trim();
+    scChanged = true;
+  }
+
+  if (scChanged) {
+    update.script_config = newSc;
+  }
+
+  if (Object.keys(update).length > 0) {
+    const { error: updateErr } = await admin
+      .from("users")
+      .update(update)
+      .eq("id", user.id);
+    if (updateErr) {
+      console.error("[auto-profile] db update failed:", updateErr.message);
+      return NextResponse.json({ skipped: true, reason: "error" });
+    }
+  }
+
+  return NextResponse.json({ ok: true, source: "instagram_auto" });
 }

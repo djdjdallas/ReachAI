@@ -144,13 +144,13 @@ export default function BillingPage() {
 
       // No URL = server didn't return a Checkout session. Surface it.
       setBillingError(
-        "Couldn't start checkout. Try again, or contact support@clinchd.io."
+        "Couldn't start checkout. Try again, or contact dom@clinchd.io."
       );
       setCheckoutLoading(null);
     } catch (err) {
       console.error("Error creating checkout:", err);
       setBillingError(
-        "Couldn't start checkout. Try again, or contact support@clinchd.io."
+        "Couldn't start checkout. Try again, or contact dom@clinchd.io."
       );
       setCheckoutLoading(null);
     }
@@ -174,13 +174,13 @@ export default function BillingPage() {
       }
 
       setBillingError(
-        "Couldn't open the billing portal. Try again, or contact support@clinchd.io."
+        "Couldn't open the billing portal. Try again, or contact dom@clinchd.io."
       );
       setPortalLoading(false);
     } catch (err) {
       console.error("Error creating portal:", err);
       setBillingError(
-        "Couldn't open the billing portal. Try again, or contact support@clinchd.io."
+        "Couldn't open the billing portal. Try again, or contact dom@clinchd.io."
       );
       setPortalLoading(false);
     }

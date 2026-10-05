@@ -17,6 +17,8 @@ import {
   Loader2,
   X,
   Sparkles,
+  CalendarCheck,
+  CheckCircle2,
 } from "lucide-react";
 
 import OnboardingFooter from "./OnboardingFooter";
@@ -93,6 +95,11 @@ export default function Step2Script({
   setObjections,
   calendlyUrl,
   setCalendlyUrl,
+  calendlyConnected = false,
+  connectingCalendly = false,
+  onConnectCalendly,
+  calendlyNotice = null,
+  onDismissCalendlyNotice,
   saving,
   generating,
   onSave,
@@ -218,7 +225,7 @@ export default function Step2Script({
                   </div>
                   <textarea
                     rows={3}
-                    placeholder={`e.g., "I don't have time" — We actually help you free up time...\n"It's too expensive" — The ROI typically covers the investment within the first month...`}
+                    placeholder={`e.g., "I don't have time": We actually help you free up time...\n"It's too expensive": The ROI typically covers the investment within the first month...`}
                     className="w-full px-5 py-4 bg-stone-50 border border-stone-100 rounded-2xl text-sm focus:outline-none focus:ring-4 focus:ring-[#ff7e67]/5 transition-all font-medium resize-none"
                     value={objections}
                     onChange={(e) => setObjections(e.target.value)}
@@ -226,44 +233,72 @@ export default function Step2Script({
                 </div>
               </div>
 
-              {/* Call to Action / Booking Link */}
+              {/* Booking link. Connecting Calendly sets it automatically and
+                  marks booked calls in the dashboard; pasting a link (e.g.
+                  Cal.com) still works. This used to ask the coach to add a
+                  Calendly webhook by hand and send us the signing secret. */}
               <div>
                 <label className="text-sm font-black text-stone-400 uppercase tracking-widest block mb-2">
-                  Booking Link (Calendly / Cal.com)
+                  Booking Link
                 </label>
-                <div className="relative">
-                  <input
-                    type="url"
-                    placeholder="https://calendly.com/yourname/30min"
-                    className="w-full px-5 py-4 bg-stone-50 border border-stone-100 rounded-2xl text-sm focus:outline-none focus:ring-4 focus:ring-[#ff7e67]/5 transition-all font-bold text-stone-900"
-                    value={calendlyUrl}
-                    onChange={(e) => setCalendlyUrl(e.target.value)}
-                  />
-                </div>
 
-                {/* Calendly webhook setup instructions — ensures booked calls
-                    update the conversation status automatically. */}
-                <div className="mt-4 rounded-2xl border border-stone-200 bg-stone-50/80 p-4 text-xs text-stone-600 leading-relaxed space-y-2">
-                  <p className="font-bold text-stone-900">
-                    Optional: auto-mark bookings as confirmed
-                  </p>
-                  <p>
-                    In Calendly, open{" "}
-                    <strong>Integrations → Webhooks</strong> and add this URL:
-                  </p>
-                  <code className="block rounded-lg bg-white border border-stone-200 px-3 py-2 text-[11px] text-stone-800 font-mono break-all">
-                    https://www.clinchd.io/api/webhooks/calendly
-                  </code>
-                  <p>
-                    Subscribe to the{" "}
-                    <strong>invitee.created</strong> and{" "}
-                    <strong>invitee.canceled</strong> events. Copy the signing
-                    secret Calendly gives you — our team will paste it into
-                    your Clinchd environment so bookings flow back into your
-                    dashboard. Until that&apos;s wired up, the AI still sends
-                    the link; you just won&apos;t see bookings auto-confirm.
-                  </p>
-                </div>
+                {calendlyNotice && (
+                  <div
+                    className={`mb-3 flex items-start gap-2 rounded-2xl border p-3 text-xs leading-relaxed ${
+                      calendlyNotice.kind === "success"
+                        ? "border-emerald-200 bg-emerald-50 text-emerald-900"
+                        : calendlyNotice.kind === "warning"
+                          ? "border-amber-200 bg-amber-50 text-amber-900"
+                          : "border-red-200 bg-red-50 text-red-900"
+                    }`}
+                  >
+                    <p className="flex-1">{calendlyNotice.message}</p>
+                    {onDismissCalendlyNotice && (
+                      <button
+                        type="button"
+                        onClick={onDismissCalendlyNotice}
+                        aria-label="Dismiss"
+                        className="shrink-0 p-0.5 opacity-70 hover:opacity-100"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    )}
+                  </div>
+                )}
+
+                {calendlyConnected ? (
+                  <div className="mb-3 flex items-center gap-2 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-bold text-emerald-900">
+                    <CheckCircle2 className="w-4 h-4 shrink-0" />
+                    Calendly connected
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={onConnectCalendly}
+                    disabled={connectingCalendly || !onConnectCalendly}
+                    className="mb-3 w-full flex items-center justify-center gap-2 rounded-2xl bg-stone-900 px-5 py-4 text-sm font-bold text-white hover:bg-[#ff7e67] transition-all disabled:opacity-50"
+                  >
+                    {connectingCalendly ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <CalendarCheck className="w-4 h-4" />
+                    )}
+                    {connectingCalendly ? "Opening Calendly..." : "Connect Calendly"}
+                  </button>
+                )}
+
+                <input
+                  type="url"
+                  placeholder="Or paste any booking link (Cal.com, etc.)"
+                  className="w-full px-5 py-4 bg-stone-50 border border-stone-100 rounded-2xl text-sm focus:outline-none focus:ring-4 focus:ring-[#ff7e67]/5 transition-all font-bold text-stone-900"
+                  value={calendlyUrl}
+                  onChange={(e) => setCalendlyUrl(e.target.value)}
+                />
+                <p className="mt-2 text-xs text-stone-500 leading-relaxed">
+                  {calendlyConnected
+                    ? "Your AI shares this link when a lead is ready to book, and booked calls show up in your dashboard."
+                    : "Connecting Calendly fills this in and marks booked calls in your dashboard. A pasted link works too; bookings just won't be tracked."}
+                </p>
               </div>
             </div>
 
@@ -361,8 +396,8 @@ export default function Step2Script({
             <div className="mt-10 p-6 bg-stone-900 rounded-3xl text-center relative overflow-hidden">
               <div className="absolute -right-4 -bottom-4 w-20 h-20 bg-[#ff7e67] rounded-full blur-2xl opacity-20" />
               <p className="text-stone-300 text-xs font-medium mb-4 relative z-10">
-                Don&apos;t know what to write? Let our AI analyze your website
-                and write the script for you.
+                Not sure what to write? Fill in your offer and ideal customer,
+                and the AI drafts the rest of your script.
               </p>
               <button
                 onClick={onGenerate}

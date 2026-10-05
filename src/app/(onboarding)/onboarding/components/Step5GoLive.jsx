@@ -14,6 +14,12 @@ import {
 
 import OnboardingFooter from "./OnboardingFooter";
 
+// Both finish buttons do the same thing: complete onboarding with whatever
+// the toggle shows. They used to disagree with the toggle off: the big
+// button read "Go Live Now" and armed the AI, while the footer read
+// "Continue with Handoff Mode" and didn't.
+const finishLabel = (aiActive) => (aiActive ? "Go Live" : "Finish in Handoff Mode");
+
 export default function Step5GoLive({
   profile,
   aiActive,
@@ -21,7 +27,6 @@ export default function Step5GoLive({
   scriptReady,
   instagramConnected,
   onGoLive,
-  onGoToDashboard,
   onFinalize,
   onBack,
 }) {
@@ -240,10 +245,11 @@ export default function Step5GoLive({
         <div className="flex flex-col items-center gap-8">
           <div className="flex flex-col sm:flex-row items-center gap-4">
             <button
-              onClick={onGoToDashboard}
-              className="px-12 py-6 bg-[#ff7e67] text-white rounded-full text-xl font-black shadow-2xl shadow-[#ff7e67]/40 hover:scale-105 active:scale-95 transition-all flex items-center gap-3 group"
+              onClick={onFinalize}
+              disabled={activating}
+              className="px-12 py-6 bg-[#ff7e67] text-white rounded-full text-xl font-black shadow-2xl shadow-[#ff7e67]/40 hover:scale-105 active:scale-95 transition-all flex items-center gap-3 group disabled:opacity-60"
             >
-              {aiActive ? "Go to Dashboard" : "Go Live Now"}
+              {finishLabel(aiActive)}
               <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
             </button>
             <button
@@ -285,7 +291,7 @@ export default function Step5GoLive({
       <OnboardingFooter
         onBack={onBack}
         onPrimary={onFinalize}
-        primaryLabel={aiActive ? "Go Live" : "Continue with Handoff Mode"}
+        primaryLabel={finishLabel(aiActive)}
         primaryLoading={activating}
         completion="100% Ready"
       />
