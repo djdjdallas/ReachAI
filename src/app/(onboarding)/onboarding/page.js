@@ -782,10 +782,8 @@ function OnboardingPage() {
 
   // Step 5 — finalize onboarding and route to dashboard. ai_mode is read from
   // the in-page toggle: ON → active (the default), OFF → handoff (only when
-  // the user turned it off). Pass
-  // { activate: true } to arm the AI regardless of the toggle (the "Go Live
-  // Now" CTA). Either way 'active' also needs scriptReady
-  // (resolveOnboardingAiMode). Every dashboard-bound exit from step 5 MUST go
+  // the user turned it off). { activate } overrides the toggle; either way
+  // 'active' also needs scriptReady (resolveOnboardingAiMode). Every dashboard-bound exit from step 5 MUST go
   // through here: a bare router.push("/dashboard") leaves
   // onboarding_completed false and middleware bounces the user straight back
   // to step 2.
@@ -1017,12 +1015,8 @@ function OnboardingPage() {
           scriptReady={scriptReady}
           instagramConnected={instagramConnected}
           onGoLive={handleGoLive}
-          // "Go Live Now" (toggle off, script ready) arms the AI; "Go to
-          // Dashboard" (toggle on) keeps it armed. Either way onboarding is
-          // persisted as complete before navigating.
-          onGoToDashboard={() =>
-            handleFinalizeAndGo({ activate: aiArmed || scriptReady })
-          }
+          // Both finish buttons follow the toggle; onboarding is persisted
+          // as complete before navigating.
           onFinalize={() => handleFinalizeAndGo()}
           onBack={() => setStep(4)}
         />
