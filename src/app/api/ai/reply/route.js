@@ -266,7 +266,7 @@ export async function POST(request) {
     }
 
     getPostHogClient().capture({
-      distinctId: user.email || user.id,
+      distinctId: user.id,
       event: "dashboard_reply_sent",
       properties: { conversation_id: conversationId, message_length: replyContent.length, manual: !!manual },
     });

@@ -31,7 +31,7 @@ export async function GET(request) {
         error || "no_code"
       );
       getPostHogClient().capture({
-        distinctId: "anonymous",
+        distinctId: (await sessionUserId()) || "anonymous",
         event: "instagram_connection_failed",
         properties: { reason: "oauth_denied", error: error || "no_code" },
       });
@@ -47,7 +47,7 @@ export async function GET(request) {
     if (!state || !storedState || state !== storedState) {
       console.error("OAuth state mismatch");
       getPostHogClient().capture({
-        distinctId: "anonymous",
+        distinctId: (await sessionUserId()) || "anonymous",
         event: "instagram_connection_failed",
         properties: { reason: "invalid_state" },
       });
@@ -122,7 +122,7 @@ export async function GET(request) {
         "[ig-callback] No IGBA ID resolved from /me. Aborting token save and redirecting with error."
       );
       getPostHogClient().capture({
-        distinctId: user.email || user.id,
+        distinctId: user.id,
         event: "instagram_connection_failed",
         properties: { reason: "no_igba_id" },
       });
@@ -173,7 +173,7 @@ export async function GET(request) {
           }).catch(console.error)
         );
         getPostHogClient().capture({
-          distinctId: user.email || user.id,
+          distinctId: user.id,
           event: "instagram_switch_blocked",
           properties: { old_igba: priorIgba, new_igba: igbaId },
         });
@@ -232,7 +232,7 @@ export async function GET(request) {
       const errParam =
         igSaveError.code === "23505" ? "ig_already_connected" : "ig_save_failed";
       getPostHogClient().capture({
-        distinctId: user.email || user.id,
+        distinctId: user.id,
         event: "instagram_connection_failed",
         properties: { reason: errParam, igba: igbaId },
       });
@@ -284,6 +284,19 @@ export async function GET(request) {
       }).catch(console.error)
     );
 
+    // Funnel: pairs with the client's instagram_connect_clicked, so a click
+    // with neither this nor instagram_connection_failed is a coach who left
+    // on Instagram's side.
+    getPostHogClient().capture({
+      distinctId: user.id,
+      event: "instagram_connected",
+      properties: {
+        igba: igbaId,
+        first_connect: !priorIgba,
+        changed: !!priorIgba && priorIgba !== igbaId,
+      },
+    });
+
     // Subscribe this IG business account to our webhook so Meta starts
     // firing incoming DM events, then read the subscription back and verify
     // Meta accepted every canonical field (see
@@ -308,7 +321,7 @@ export async function GET(request) {
           `[ig-callback] webhook subscription incomplete: have=[${have.join(",")}] want=[${REQUIRED_WEBHOOK_FIELDS.join(",")}] igba=${igbaId} user=${user.id}`
         );
         getPostHogClient().capture({
-          distinctId: user.email || user.id,
+          distinctId: user.id,
           event: "webhook_subscription_incomplete",
           properties: {
             igba: igbaId,
@@ -366,13 +379,28 @@ export async function GET(request) {
   } catch (err) {
     console.error("Instagram callback error:", err);
     getPostHogClient().capture({
-      distinctId: "anonymous",
+      distinctId: (await sessionUserId()) || "anonymous",
       event: "instagram_connection_failed",
       properties: { reason: "callback_error" },
     });
     return redirectClearingAuthCookies(
       `${baseUrl}/onboarding?step=1&error=callback_failed`
     );
+  }
+}
+
+// Signed-in user's id for funnel events on the early exits (denied, bad
+// state, unexpected error), which used to log as "anonymous" and could
+// never be joined to the coach's other events. null when there's no session.
+async function sessionUserId() {
+  try {
+    const supabase = await createClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    return user?.id || null;
+  } catch {
+    return null;
   }
 }
 

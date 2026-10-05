@@ -13,6 +13,7 @@ import {
   ArrowRight,
 } from "lucide-react";
 
+import posthog from "posthog-js";
 import OnboardingFooter from "./OnboardingFooter";
 
 export default function Step1Connect({ instagramConnected, onNext }) {
@@ -83,6 +84,17 @@ export default function Step1Connect({ instagramConnected, onNext }) {
               <div className="pt-4">
                 <a
                   href="/api/auth/instagram"
+                  // Funnel: a click with no instagram_connected or
+                  // instagram_connection_failed after it means the coach
+                  // left on Instagram's side. send_instantly because the
+                  // page navigates away immediately.
+                  onClick={() =>
+                    posthog.capture(
+                      "instagram_connect_clicked",
+                      { source: "onboarding" },
+                      { send_instantly: true }
+                    )
+                  }
                   className="w-full py-5 rounded-[1.25rem] text-xl font-black shadow-2xl transition-all flex items-center justify-center gap-3 bg-[#ff7e67] text-white shadow-[#ff7e67]/20 hover:scale-[1.02] active:scale-[0.98] cursor-pointer"
                 >
                   <svg className="w-6 h-6" viewBox="0 0 24 24" fill="currentColor">

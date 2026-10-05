@@ -36,13 +36,13 @@ export async function GET(request) {
             trial_ends_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
           });
           getPostHogClient().capture({
-            distinctId: user.email,
+            distinctId: user.id,
             event: "user_signed_up",
             properties: { method: "google", email: user.email },
           });
         } else {
           getPostHogClient().capture({
-            distinctId: user.email,
+            distinctId: user.id,
             event: "user_logged_in",
             properties: { method: "google" },
           });

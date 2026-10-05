@@ -285,7 +285,7 @@ export async function processDrip(dripRow) {
 
     const { getPostHogClient } = await import("@/lib/posthog-server");
     getPostHogClient().capture({
-      distinctId: user.email || user.id,
+      distinctId: user.id,
       event: "drip_fired",
       properties: {
         conversation_id: dripRow.conversation_id,

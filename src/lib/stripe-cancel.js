@@ -70,7 +70,7 @@ export async function syncPendingCancel(supabase, customerId, { cancelAt, cancel
     .update({ cancel_at: cancelAt, canceled_at: canceledAt })
     .eq("stripe_customer_id", customerId)
     .is("cancel_at", null)
-    .select("email, instagram_username, plan");
+    .select("id, email, instagram_username, plan");
   if (claimError) throw claimError;
   if (claimed?.length) return { newRequest: true, row: claimed[0] };
 

@@ -60,6 +60,7 @@ describe("syncPendingCancel (M3)", () => {
   };
   const NONE = { cancelAt: null, canceledAt: null };
   const row = (extra = {}) => ({
+    id: "user-1",
     stripe_customer_id: "cus_1",
     email: "coach@example.com",
     instagram_username: "coachig",
@@ -74,7 +75,7 @@ describe("syncPendingCancel (M3)", () => {
     const r = await syncPendingCancel(db, "cus_1", PENDING);
     expect(r).toEqual({
       newRequest: true,
-      row: { email: "coach@example.com", instagram_username: "coachig", plan: "unlimited" },
+      row: { id: "user-1", email: "coach@example.com", instagram_username: "coachig", plan: "unlimited" },
     });
     expect(db.tables.users[0].cancel_at).toBe(PENDING.cancelAt);
   });

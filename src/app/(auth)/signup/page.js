@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import posthog from "posthog-js";
+import { identifyUser } from "@/lib/analytics-identify";
 
 export default function SignupPage() {
   const router = useRouter();
@@ -76,7 +77,10 @@ export default function SignupPage() {
         return;
       }
 
-      posthog.identify(email, { email, full_name: fullName });
+      // With a session (confirmation off) identify now so the signup event
+      // lands on the user's person; otherwise it stays anonymous and merges
+      // when they first sign in (PostHogIdentify).
+      if (data?.session) identifyUser(posthog, data.user);
       posthog.capture("user_signed_up", { email, full_name: fullName });
 
       // Signed in already (confirmation off): no email is coming.

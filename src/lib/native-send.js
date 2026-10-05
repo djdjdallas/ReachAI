@@ -63,7 +63,7 @@ export async function attachToConversation(admin, {
   }
 
   getPostHogClient().capture({
-    distinctId: userEmail || userId,
+    distinctId: userId,
     event: "native_send_backfilled",
     properties: { conversation_id: conversationId, native_send_id: nativeSendId },
   });

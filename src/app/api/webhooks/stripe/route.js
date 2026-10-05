@@ -398,7 +398,7 @@ export async function POST(request) {
             }).catch(console.error)
           );
           getPostHogClient().capture({
-            distinctId: canceling.email || customerId,
+            distinctId: canceling.id || customerId,
             event: "subscription_cancel_requested",
             properties: { cancel_at: pending.cancelAt, plan: canceling.plan },
           });
