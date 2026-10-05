@@ -259,11 +259,14 @@ export async function processDrip(dripRow) {
 
     const decryptedToken = decryptToken(user.meta_page_access_token);
     try {
+      // Condition 5 above already refused past 23h; the send function's
+      // own 24h guard is the backstop.
       await sendInstagramMessage(
         user.instagram_business_account_id,
         dripRow.recipient_psid,
         nudgeText,
-        decryptedToken
+        decryptedToken,
+        { lastInboundAt: lastLeadMessage.created_at }
       );
     } catch (sendErr) {
       // Undo the optimistic row so the inbox doesn't show an unsent nudge.

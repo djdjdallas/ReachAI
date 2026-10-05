@@ -9,6 +9,10 @@ import { sendInstagramMessage } from "@/lib/instagram";
 import { decryptToken } from "@/lib/token-utils";
 import { getPostHogClient } from "@/lib/posthog-server";
 import { enforceAiRateLimit } from "@/lib/rate-limit";
+import {
+  isWithinMessagingWindow,
+  WINDOW_CLOSED_MESSAGE,
+} from "@/lib/instagram/messaging-window";
 
 export async function POST(request) {
   try {
@@ -96,6 +100,35 @@ export async function POST(request) {
       return NextResponse.json(
         { error: "Conversation not found" },
         { status: 404 }
+      );
+    }
+
+    // Instagram's 24h messaging window, checked up front so a closed window
+    // costs no DM quota, no model call, and no saved-but-unsent row.
+    // sendInstagramMessage enforces it again below. Measured from the LEAD's
+    // last inbound message (messages has no user_id; the conversation was
+    // already scoped to this user above). This is the one path that could
+    // reach old threads: the coach can open any conversation in the inbox.
+    const { data: lastLead, error: lastLeadError } = await getSupabaseAdmin()
+      .from("messages")
+      .select("created_at")
+      .eq("conversation_id", conversation.id)
+      .eq("role", "user")
+      .eq("source", "lead")
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (lastLeadError) {
+      return NextResponse.json(
+        { error: "Failed to check the reply window" },
+        { status: 500 }
+      );
+    }
+    const lastInboundAt = lastLead?.created_at || null;
+    if (!isWithinMessagingWindow(lastInboundAt)) {
+      return NextResponse.json(
+        { error: "messaging_window_closed", message: WINDOW_CLOSED_MESSAGE },
+        { status: 409 }
       );
     }
 
@@ -253,7 +286,8 @@ export async function POST(request) {
       userProfile.instagram_business_account_id,
       conversation.instagram_sender_id,
       replyContent,
-      decryptToken(userProfile.meta_page_access_token)
+      decryptToken(userProfile.meta_page_access_token),
+      { lastInboundAt }
     );
 
     // Stamp the Meta mid so the echo of this send dedups in the webhook.
@@ -273,6 +307,13 @@ export async function POST(request) {
 
     return NextResponse.json({ message: savedMessage }, { status: 200 });
   } catch (error) {
+    // The window closed between the check above and the send (seconds).
+    if (error?.code === "messaging_window_closed") {
+      return NextResponse.json(
+        { error: "messaging_window_closed", message: WINDOW_CLOSED_MESSAGE },
+        { status: 409 }
+      );
+    }
     console.error("AI reply error:", error);
     getPostHogClient().capture({
       distinctId: "unknown",

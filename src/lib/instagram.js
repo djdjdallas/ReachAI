@@ -6,6 +6,7 @@
  */
 
 import { REQUIRED_WEBHOOK_FIELDS } from "@/lib/instagram-webhook-fields";
+import { assertWithinMessagingWindow } from "@/lib/instagram/messaging-window";
 
 const GRAPH_API_VERSION = "v21.0";
 const GRAPH_BASE = `https://graph.facebook.com/${GRAPH_API_VERSION}`;
@@ -215,8 +216,25 @@ export async function subscribePageToWebhooks(pageId, pageAccessToken) {
  * @param {string} recipientId - The Instagram-scoped user ID (IGSID) of the recipient
  * @param {string} text - The message text
  * @param {string} pageAccessToken - The Page Access Token
+ * @param {object} window
+ * @param {string|number|Date} window.lastInboundAt - when the LEAD last
+ *   messaged us. REQUIRED: Instagram only allows replies within 24h of it.
+ *   Missing means closed, so a caller that forgets it can't send.
+ * @throws {MessagingWindowClosedError} outside the window, before any request
  */
-export async function sendInstagramMessage(igAccountId, recipientId, text, pageAccessToken) {
+export async function sendInstagramMessage(
+  igAccountId,
+  recipientId,
+  text,
+  pageAccessToken,
+  { lastInboundAt } = {}
+) {
+  // Policy guard (src/lib/instagram/messaging-window.js). Lives here, not in
+  // callers, so every path that sends a DM (webhook reply, dashboard reply,
+  // drip nudges, anything added later) inherits it. No message tags are
+  // ever sent to get around it.
+  assertWithinMessagingWindow(lastInboundAt);
+
   const url = `https://graph.instagram.com/${GRAPH_API_VERSION}/${igAccountId}/messages`;
   const res = await fetch(url, {
     method: "POST",
@@ -290,8 +308,18 @@ export async function sendSenderAction(igAccountId, recipientId, action, pageAcc
  * @param {string} recipientId      - The recipient IGSID
  * @param {string} audioUrl         - Publicly fetchable URL to the audio file
  * @param {string} pageAccessToken  - Decrypted Page Access Token
+ * @param {object} window
+ * @param {string|number|Date} window.lastInboundAt - same 24h window guard
+ *   as sendInstagramMessage (required)
  */
-export async function sendInstagramAudio(igAccountId, recipientId, audioUrl, pageAccessToken) {
+export async function sendInstagramAudio(
+  igAccountId,
+  recipientId,
+  audioUrl,
+  pageAccessToken,
+  { lastInboundAt } = {}
+) {
+  assertWithinMessagingWindow(lastInboundAt);
   const url = `https://graph.instagram.com/${GRAPH_API_VERSION}/${igAccountId}/messages`;
   const res = await fetch(url, {
     method: "POST",

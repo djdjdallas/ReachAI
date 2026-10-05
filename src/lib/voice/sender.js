@@ -1,3 +1,4 @@
+import { assertWithinMessagingWindow } from "@/lib/instagram/messaging-window";
 import { decryptToken } from "@/lib/token-utils";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 
@@ -24,16 +25,22 @@ const GRAPH_API_VERSION = "v21.0";
  * @param {string} args.encryptedAccessToken   - encrypted Page Access Token from users.meta_page_access_token
  * @param {string} args.recipientPsid          - the lead's IGSID
  * @param {string} args.audioUrl               - publicly fetchable signed URL
+ * @param {string|number|Date} args.lastInboundAt - when the LEAD last
+ *   messaged us; REQUIRED, same 24h window guard as sendInstagramMessage
+ *   (src/lib/instagram/messaging-window.js)
  */
 export async function sendVoiceMessage({
   igUserId,
   encryptedAccessToken,
   recipientPsid,
   audioUrl,
+  lastInboundAt,
 }) {
   if (!igUserId || !recipientPsid || !audioUrl) {
     throw new Error("sendVoiceMessage: missing required arguments");
   }
+  // Voice notes go through the same Send API, so the same window applies.
+  assertWithinMessagingWindow(lastInboundAt);
 
   const accessToken = decryptToken(encryptedAccessToken);
   if (!accessToken) {
