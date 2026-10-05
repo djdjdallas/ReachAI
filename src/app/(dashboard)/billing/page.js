@@ -37,6 +37,7 @@ import {
   planButtonLabel,
 } from "@/lib/plans";
 import { SUPPORT_EMAIL, SUPPORT_MAILTO } from "@/lib/support";
+import { billingPageView } from "@/lib/billing/managed";
 
 // Plans come from the one catalog (src/lib/plans.js); price ids stay on the
 // server. No local copy of prices here.
@@ -69,6 +70,10 @@ export default function BillingPage() {
   // Each plan's offer line ("7-day free trial...", "charged today", ...),
   // decided on the server exactly as Checkout will (checkout-offer API).
   const [offerLines, setOfferLines] = useState(null);
+  // The server's access decision (kind: stripe | comped | legacy_trial |
+  // none). Awaited before first render so a comped account never flashes
+  // plan buttons.
+  const [access, setAccess] = useState(null);
 
   useEffect(() => {
     async function init() {
@@ -99,6 +104,11 @@ export default function BillingPage() {
         .then((res) => (res.ok ? res.json() : null))
         .then((data) => setOfferLines(data?.lines || null))
         .catch(() => {});
+
+      const accessData = await fetch("/api/billing/access")
+        .then((res) => (res.ok ? res.json() : null))
+        .catch(() => null);
+      setAccess(accessData);
 
       setLoading(false);
     }
@@ -194,6 +204,9 @@ export default function BillingPage() {
     subscriptionStatus === "active" ||
     (!!profile?.stripe_subscription_id && ["trialing", "past_due"].includes(subscriptionStatus));
   const planDisplayName = planDisplay.name;
+  // Comped (and future managed) accounts: no price, portal or plan buttons
+  // (src/lib/billing/managed.js).
+  const view = billingPageView({ access, hasStripeCustomer: !!profile?.stripe_customer_id });
   const planPrice =
     currentPlan === "free"
       ? planDisplay.price
@@ -252,8 +265,10 @@ export default function BillingPage() {
                 <CreditCard className="h-5 w-5" />
                 Current Plan
               </CardTitle>
-              <Badge variant={statusVariant}>
-                {subscriptionStatus === "active"
+              <Badge variant={view.managed ? "success" : statusVariant}>
+                {view.managed
+                  ? "Complimentary"
+                  : subscriptionStatus === "active"
                   ? "Active"
                   : subscriptionStatus === "trialing"
                   ? "Trial"
@@ -266,15 +281,31 @@ export default function BillingPage() {
             </div>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="flex items-baseline gap-2">
-              <span className="text-3xl font-bold">{planPrice}</span>
-              {currentPlan !== "free" && (
-                <span className="text-sm text-muted-foreground">
-                  billed monthly
-                </span>
-              )}
-            </div>
-            <p className="text-sm text-muted-foreground">{planDisplayName}</p>
+            {view.managed ? (
+              <>
+                <p className="text-3xl font-bold">Complimentary plan</p>
+                <p className="text-sm text-muted-foreground">{planDisplayName}</p>
+                <p className="text-sm text-muted-foreground">
+                  Nothing to pay. Questions? Email{" "}
+                  <a href={SUPPORT_MAILTO} className="font-semibold underline">
+                    {SUPPORT_EMAIL}
+                  </a>
+                  .
+                </p>
+              </>
+            ) : (
+              <>
+                <div className="flex items-baseline gap-2">
+                  <span className="text-3xl font-bold">{planPrice}</span>
+                  {currentPlan !== "free" && (
+                    <span className="text-sm text-muted-foreground">
+                      billed monthly
+                    </span>
+                  )}
+                </div>
+                <p className="text-sm text-muted-foreground">{planDisplayName}</p>
+              </>
+            )}
             {/* Pending cancellation (users.cancel_at, written by the
                 customer.subscription.updated webhook). Status stays
                 'active' until this date, so without it the plan looked
@@ -291,7 +322,7 @@ export default function BillingPage() {
               </p>
             )}
           </CardContent>
-          {profile?.stripe_customer_id && (
+          {view.showPortal && (
             <CardFooter>
               <Button
                 variant="outline"
@@ -359,6 +390,8 @@ export default function BillingPage() {
         </Card>
       </div>
 
+      {view.showPlanButtons && (
+      <>
       <Separator />
 
       {/* Plan Cards */}
@@ -434,6 +467,8 @@ export default function BillingPage() {
           })}
         </div>
       </div>
+      </>
+      )}
     </div>
   );
 }
