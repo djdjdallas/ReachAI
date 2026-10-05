@@ -277,7 +277,7 @@ export default function PrivacyPage() {
         <p>
           For privacy questions or to exercise your rights under this policy, contact us at{" "}
           <a href="mailto:privacy@clinchd.io">privacy@clinchd.io</a> or{" "}
-          <a href="mailto:support@clinchd.com">support@clinchd.com</a>.
+          <a href="mailto:dom@clinchd.io">dom@clinchd.io</a>.
         </p>
       </div>
     </div>

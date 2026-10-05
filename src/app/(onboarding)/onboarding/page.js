@@ -99,19 +99,19 @@ function OnboardingPage() {
       invalid_state:
         "Your connection attempt expired. Please click Connect Instagram to try again.",
       callback_failed:
-        "Instagram didn't return a successful response. Try reconnecting, or contact support@clinchd.io if it keeps failing.",
+        "Instagram didn't return a successful response. Try reconnecting, or contact dom@clinchd.io if it keeps failing.",
       auth_failed:
         "Authorization was denied. Click Connect Instagram to try again.",
       ig_switch_blocked:
         "That's a different Instagram account than the one already connected here. To switch accounts, finish setup first, then use Settings → Instagram Connection — or reconnect with the original account.",
       ig_already_connected:
-        "This Instagram account is already connected to another Clinchd account. Disconnect it there first, or contact support@clinchd.io.",
+        "This Instagram account is already connected to another Clinchd account. Disconnect it there first, or contact dom@clinchd.io.",
       ig_save_failed:
-        "Saving your Instagram connection failed. Try again, or contact support@clinchd.io if it keeps failing.",
+        "Saving your Instagram connection failed. Try again, or contact dom@clinchd.io if it keeps failing.",
     };
     const message =
       map[code] ||
-      "Something went wrong connecting your Instagram account. Try again, or contact support@clinchd.io.";
+      "Something went wrong connecting your Instagram account. Try again, or contact dom@clinchd.io.";
     setIgConnectError({ code, message });
     // Strip the error param so a refresh doesn't re-show the banner.
     const params = new URLSearchParams(searchParams.toString());

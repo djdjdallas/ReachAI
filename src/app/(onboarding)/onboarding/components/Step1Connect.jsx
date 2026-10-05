@@ -220,7 +220,7 @@ export default function Step1Connect({ instagramConnected, onNext }) {
                 Need Help?
               </h4>
               <a
-                href="mailto:support@clinchd.com?subject=Help%20with%20Instagram%20connection"
+                href="mailto:dom@clinchd.io?subject=Help%20with%20Instagram%20connection"
                 className="text-sm font-bold text-stone-500 hover:text-[#ff7e67] transition-colors flex items-center gap-2 mx-auto"
               >
                 <MessageSquareText className="w-4 h-4" />

@@ -67,7 +67,7 @@ export default function DataDeletionPage() {
           Email <a href="mailto:privacy@clinchd.io">privacy@clinchd.io</a> with any
           questions about data deletion or our privacy practices. For general support, you
           can also reach us at{" "}
-          <a href="mailto:support@clinchd.com">support@clinchd.com</a>.
+          <a href="mailto:dom@clinchd.io">dom@clinchd.io</a>.
         </p>
       </div>
     </div>

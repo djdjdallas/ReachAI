@@ -131,13 +131,13 @@ export default function SettingsPage() {
         invalid_state:
           "Your reconnect attempt expired. Click Reconnect to try again.",
         callback_failed:
-          "Instagram didn't return a successful response. Try reconnecting, or contact support@clinchd.io if it keeps failing.",
+          "Instagram didn't return a successful response. Try reconnecting, or contact dom@clinchd.io if it keeps failing.",
         auth_failed:
           "Authorization was denied. Click Reconnect to try again.",
         ig_already_connected:
-          "This Instagram account is already connected to another Clinchd account. Disconnect it there first, or contact support@clinchd.io.",
+          "This Instagram account is already connected to another Clinchd account. Disconnect it there first, or contact dom@clinchd.io.",
         ig_save_failed:
-          "Saving your Instagram connection failed. Try reconnecting, or contact support@clinchd.io if it keeps failing.",
+          "Saving your Instagram connection failed. Try reconnecting, or contact dom@clinchd.io if it keeps failing.",
       };
       setIgConnectError({ code: err, message: map[err] });
       router.replace("/settings", { scroll: false });
