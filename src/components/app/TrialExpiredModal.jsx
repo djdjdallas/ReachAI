@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Lock, ArrowRight, Loader2 } from "lucide-react";
+import { Lock, ArrowRight } from "lucide-react";
 import posthog from "posthog-js";
 import { signOutAndClearState } from "@/lib/sign-out";
 import {
@@ -12,21 +12,15 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { chargeTodayText } from "@/lib/checkout-trial";
 import { createClient } from "@/lib/supabase/client";
 import { countMissedLeads, missedLeadsText } from "@/lib/inactive-inbound";
 
-// This modal always checks out the Base plan. Keep in sync with
-// PLANS.base.price in src/lib/stripe.js (server-only module).
-const BASE_PRICE_CENTS = 9700;
-
-// Hard-block modal shown when the user's trial has expired and they have
-// no active subscription. Non-dismissible by intent — closing the dialog
-// would leave the dashboard usable behind it. The only ways out are
-// "Upgrade" (Stripe checkout) or "Sign out" (escape hatch so they can
-// switch accounts without being trapped).
+// Hard-block modal for a user without access who still reaches a dashboard
+// page (middleware normally sends them to /choose-plan first). Non-
+// dismissible by intent. The ways out are "Choose a plan" (the plan page,
+// which shows each plan's real offer from the server) or "Sign out". No
+// prices here: they live in src/lib/plans.js and the plan page.
 export default function TrialExpiredModal() {
-  const [checkoutLoading, setCheckoutLoading] = useState(false);
   // Leads who messaged since the trial ended. This modal covers the
   // dashboard for expired users, so the count is shown here too.
   const [missedLeads, setMissedLeads] = useState(0);
@@ -43,29 +37,6 @@ export default function TrialExpiredModal() {
       cancelled = true;
     };
   }, []);
-
-  const handleUpgrade = async () => {
-    setCheckoutLoading(true);
-    try {
-      const res = await fetch("/api/stripe/create-checkout", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ planId: "base" }),
-      });
-      const data = await res.json();
-      if (data.url) {
-        posthog.capture("checkout_started", {
-          plan_id: "base",
-          source: "trial_expired_modal",
-        });
-        window.location.href = data.url;
-      }
-    } catch (err) {
-      console.error("Trial-expired upgrade failed:", err);
-    } finally {
-      setCheckoutLoading(false);
-    }
-  };
 
   const handleSignOut = async () => {
     await signOutAndClearState();
@@ -96,23 +67,15 @@ export default function TrialExpiredModal() {
         )}
         <div className="flex flex-col gap-2 pt-2">
           <Button
-            onClick={handleUpgrade}
-            disabled={checkoutLoading}
+            onClick={() => {
+              posthog.capture("choose_plan_opened", { source: "trial_expired_modal" });
+              window.location.href = "/choose-plan";
+            }}
             className="gap-1.5 bg-[#ff7e67] hover:bg-[#ff7e67]/90 text-white"
           >
-            {checkoutLoading ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              <ArrowRight className="h-4 w-4" />
-            )}
-            Upgrade now
+            <ArrowRight className="h-4 w-4" />
+            Choose a plan
           </Button>
-          {/* The trial is over by definition here, so checkout charges
-              immediately. Say so before the click (create-checkout puts the
-              same line on the Stripe page). */}
-          <p className="text-xs text-stone-500 text-center">
-            {chargeTodayText(BASE_PRICE_CENTS)}
-          </p>
           <Button
             variant="ghost"
             onClick={handleSignOut}

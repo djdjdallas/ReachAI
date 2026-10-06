@@ -3,7 +3,7 @@ import { ArrowRight } from "lucide-react";
 
 export default function CTABanner({
   headline = "Ready to handle your DMs with AI assistance?",
-  subheadline = "Start your 7-day free trial — no credit card required.",
+  subheadline = "7-day free trial for new accounts. Card required, cancel anytime before day 7 and you won't be charged.",
   buttonText = "Start Free Trial",
   buttonHref = "/signup",
   variant = "dark",

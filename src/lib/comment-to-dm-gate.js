@@ -1,27 +1,18 @@
 import { hasCommentToDM } from "@/lib/plans";
-import { isFounder } from "@/lib/founder";
+import { hasActiveAccess } from "@/lib/billing/access";
 
-// Single source of truth for the comment-to-DM access gate. Used by the
-// webhook handler, the /api/admin/classify routes, and the /admin/classifier
-// page so a plan-tier or founder-list change only has to land in one place.
+// Single source of truth for the comment-to-DM gate. Used by the webhook
+// handler, the comment-to-DM pages and settings APIs, and the
+// /admin/classifier routes.
 //
-// The founder bypass is intentional — Dom needs to dogfood the feature on
-// his own account regardless of plan, and trial-tier coaches without a paid
-// plan still need a way to QA the pipeline during the rollout window.
+// Plan includes the feature AND the account has access (the single access
+// check, src/lib/billing/access.js). Callers must select ACCESS_COLUMNS
+// (src/lib/billing/status.js); a row without them is denied.
+//
+// No founder email bypass: founder accounts are comped rows, which
+// hasActiveAccess covers. (The old bypass was a second access path.)
 export function canUseCommentToDM(profile) {
   if (!profile) return false;
-  if (isFounder(profile.email)) return true;
   if (!hasCommentToDM(profile.plan)) return false;
-  // Callers that pass subscription_status (the webhook comment branch — the
-  // path that spends money) also require a live subscription. Callers that
-  // don't pass it keep plan-only behavior; plan is reset to 'base' on
-  // cancellation by the Stripe webhook, so this is defense in depth against
-  // missed/out-of-order Stripe events, not the primary gate.
-  if (
-    profile.subscription_status !== undefined &&
-    !["active", "trialing"].includes(profile.subscription_status)
-  ) {
-    return false;
-  }
-  return true;
+  return hasActiveAccess(profile);
 }

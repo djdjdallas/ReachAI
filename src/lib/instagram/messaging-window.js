@@ -56,3 +56,27 @@ export function assertWithinMessagingWindow(lastInboundAt, now = Date.now()) {
     throw new MessagingWindowClosedError(lastInboundAt);
   }
 }
+
+/**
+ * When the lead's message was sent, for measuring the window (audit LM1):
+ * the EARLIER of Meta's event timestamp and our receipt time.
+ *
+ * Receipt time alone is wrong for a delayed or retried webhook delivery:
+ * a message sent 23h59m ago and delivered now would look brand new, and a
+ * reply would go out after the real window closed. The event timestamp
+ * alone is wrong if it's in the future (sender clock, bad payload), which
+ * would stretch the window. The minimum is never later than either.
+ *
+ * Meta's messaging timestamp is ms since epoch; a value that looks like
+ * seconds is scaled. A missing or invalid timestamp falls back to receipt.
+ *
+ * @param {number|string|null|undefined} eventTimestamp - event.timestamp
+ * @param {number} receivedAtMs - Date.now() at webhook receipt
+ * @returns {number} ms since epoch
+ */
+export function inboundAtMs(eventTimestamp, receivedAtMs) {
+  let t = Number(eventTimestamp);
+  if (!Number.isFinite(t) || t <= 0) return receivedAtMs;
+  if (t < 1e12) t *= 1000;
+  return Math.min(t, receivedAtMs);
+}

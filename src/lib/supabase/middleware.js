@@ -1,5 +1,37 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse } from "next/server";
+import { hasActiveAccess } from "@/lib/billing/access";
+import { ACCESS_COLUMNS } from "@/lib/billing/status";
+
+// Reachable without access (paywall): plan selection, billing, their
+// Stripe/access APIs, and account deletion. Sign-out is a client-side Supabase call and the Help
+// link is a mailto, so neither needs a route here.
+export function reachableWithoutAccess(pathname) {
+  return (
+    pathname === "/choose-plan" ||
+    pathname === "/billing" ||
+    pathname.startsWith("/billing/") ||
+    pathname.startsWith("/api/stripe/") ||
+    pathname.startsWith("/api/billing/") ||
+    pathname === "/api/user/delete"
+  );
+}
+
+// What a request without access gets. Pages redirect to the paywall. APIs
+// get a 402 JSON, except browser navigations to /api/auth/* (the "Connect
+// Instagram" link is a plain GET the browser opens): those redirect to
+// /choose-plan too, instead of showing the coach a page of raw JSON.
+// Found in the 2026-10-05 sandbox run.
+/**
+ * @param {{method: string, pathname: string, accept: string|null}} req
+ * @returns {"redirect"|"json"}
+ */
+export function noAccessResponse({ method, pathname, accept }) {
+  if (!pathname.startsWith("/api/")) return "redirect";
+  const browserNavigation = method === "GET" && (accept || "").includes("text/html");
+  if (pathname.startsWith("/api/auth/") && browserNavigation) return "redirect";
+  return "json";
+}
 
 export async function updateSession(request) {
   let supabaseResponse = NextResponse.next({ request });
@@ -74,6 +106,9 @@ export async function updateSession(request) {
     // Both enforce their own token auth (CRON_SECRET / ALERT_TOKEN).
     pathname.startsWith("/api/cron") ||
     pathname.startsWith("/api/alerts") ||
+    // Called server-to-server by the Stripe webhook, no session cookie.
+    // Enforces its own secret (x-internal-secret, isAuthorizedInternal).
+    pathname === "/api/drip/enroll" ||
     pathname.startsWith("/compare") ||
     pathname.startsWith("/blog") ||
     pathname.startsWith("/for") ||
@@ -107,13 +142,45 @@ export async function updateSession(request) {
     return NextResponse.redirect(url);
   }
 
+  // ── Access gate (paywall) ────────────────────────────────────────────
+  // The single access check (src/lib/billing/access.js) on every protected
+  // page and API. No access: pages (and browser navigations to /api/auth/*)
+  // go to /choose-plan, other APIs get 402 (noAccessResponse). Never uses
+  // onboarding_completed (browser-writable). Fails OPEN on a read error:
+  // this is routing, and every send path enforces access on its own and
+  // fails closed, so a database blip can't lock every coach out.
+  if (!reachableWithoutAccess(pathname)) {
+    const { data: billingRow, error: billingError } = await supabase
+      .from("users")
+      .select(ACCESS_COLUMNS)
+      .eq("id", user.id)
+      .single();
+    if (billingError) {
+      console.error("[middleware] access check read failed:", billingError.code);
+    } else if (!hasActiveAccess(billingRow)) {
+      const kind = noAccessResponse({
+        method: request.method,
+        pathname,
+        accept: request.headers.get("accept"),
+      });
+      if (kind === "json") {
+        return NextResponse.json({ error: "no_access" }, { status: 402 });
+      }
+      const url = request.nextUrl.clone();
+      url.pathname = "/choose-plan";
+      url.search = "";
+      return NextResponse.redirect(url);
+    }
+  }
+
   // Onboarding guard — redirect to onboarding if not completed
   // Skip for onboarding routes themselves and API routes
   const isDashboardRoute =
     pathname.startsWith("/dashboard") ||
     pathname.startsWith("/conversations") ||
     pathname.startsWith("/analytics") ||
-    pathname.startsWith("/billing") ||
+    // /billing is deliberately NOT here: it's the paywall, reachable before
+    // onboarding (a new signup picks a plan first).
     pathname.startsWith("/settings") ||
     pathname.startsWith("/script-builder") ||
     pathname.startsWith("/playground") ||

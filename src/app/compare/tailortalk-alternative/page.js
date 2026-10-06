@@ -30,7 +30,7 @@ const comparisonRows = [
   { feature: "Built for", competitor: "Fashion brands, clinics, education", clinchd: "Coaches selling $500-$25K offers" },
   { feature: "Coaching-specific qualification", competitor: "General sales qualification", clinchd: "Coaching-tuned (BTFU framework)" },
   { feature: "Niche playbooks", competitor: "One general flow", clinchd: "12 coaching niches with distinct playbooks" },
-  { feature: "Trial without sales call", competitor: "Demo-required", clinchd: "Self-serve 7-day free trial" },
+  { feature: "Trial without sales call", competitor: "Demo-required", clinchd: "Self-serve 7-day free trial for new accounts" },
   { feature: "Calendly + Cal.com integration", competitor: "Generic handoff", clinchd: "AI sends link at the right moment" },
   { feature: "Crisis-language detection", competitor: "Not built in", clinchd: "Yes, for sensitive coaching niches" },
   { feature: "Setup time", competitor: "Sales-led implementation", clinchd: "Under 30 minutes self-serve" },
@@ -55,7 +55,7 @@ const faqs = [
   },
   {
     q: "Can I try Clinchd without a sales call?",
-    a: "Yes. Self-serve 7-day free trial. No credit card. No demo call. You sign up, connect Instagram, paste your offer details, and the AI is running within 30 minutes.",
+    a: "Yes. Self-serve 7-day free trial for new accounts. Card required, cancel anytime before day 7 and you won't be charged. No demo call. You sign up, connect Instagram, paste your offer details, and the AI is running within 30 minutes.",
   },
 ];
 
@@ -156,7 +156,7 @@ export default function TailorTalkAlternativePage() {
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
           <CTABanner
             headline="Try Clinchd without a sales call"
-            subheadline="Start your 7-day free trial. No credit card. Set up in under 30 minutes."
+            subheadline="7-day free trial for new accounts. Card required, cancel anytime before day 7 and you won't be charged. Set up in under 30 minutes."
             buttonText="Start Free Trial"
             buttonHref="/signup"
             variant="dark"

@@ -9,21 +9,10 @@
 // subscription from Stripe and decide on its LIVE status, never the event
 // payload, which is exactly what is stale in a late delivery.
 
-// Stripe subscription status → users.subscription_status
-export function mapSubscriptionStatus(stripeStatus) {
-  switch (stripeStatus) {
-    case "active":
-    case "trialing":
-      return "active";
-    case "past_due":
-      return "past_due";
-    case "canceled":
-    case "unpaid":
-      return "canceled";
-    default:
-      return stripeStatus;
-  }
-}
+// Statuses are stored as Stripe reports them (no mapping: 'trialing' was
+// once collapsed to 'active', which hid real trials from the access check).
+// These mean the subscription is over.
+const ENDED = new Set(["canceled", "incomplete_expired", "unpaid"]);
 
 /**
  * customer.subscription.updated.
@@ -49,7 +38,7 @@ export function decideSubscriptionUpdate({ row, subscriptionId, liveStatus }) {
     // Already canceled and Stripe agrees: customer.subscription.deleted owns
     // that state (plan reset, AI off). Re-writing here put plan back to the
     // canceled tier.
-    if (mapSubscriptionStatus(liveStatus) === "canceled") {
+    if (ENDED.has(liveStatus)) {
       return { apply: false, reason: "already_canceled" };
     }
     // Canceled row, live subscription serving again. Only trust that for the

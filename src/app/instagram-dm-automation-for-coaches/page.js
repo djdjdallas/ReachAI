@@ -315,7 +315,7 @@ export default function InstagramDmAutomationForCoachesPage() {
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
           <CTABanner
             headline="Ready to automate your DMs the right way?"
-            subheadline="Start your 7-day free trial. Built on the official Instagram API. Set up in under 30 minutes."
+            subheadline="7-day free trial for new accounts. Built on the official Instagram API. Set up in under 30 minutes."
             buttonText="Start Free Trial"
             buttonHref="/signup"
             variant="dark"

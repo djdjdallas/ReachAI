@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import { canUseCommentToDM } from "@/lib/comment-to-dm-gate";
 import { DEFAULT_ACTIONS_PER_CLASS } from "@/lib/comment-trigger-rules";
+import { ACCESS_COLUMNS } from "@/lib/billing/status";
 
 // POST /api/settings/dm-templates
 // Body: { intent_class, template }
@@ -30,11 +31,11 @@ export async function POST(request) {
 
     const { data: profile } = await supabase
       .from("users")
-      .select("plan, email")
+      .select(`email, ${ACCESS_COLUMNS}`)
       .eq("id", user.id)
       .maybeSingle();
 
-    if (!canUseCommentToDM({ plan: profile?.plan, email: user.email })) {
+    if (!canUseCommentToDM(profile)) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 

@@ -63,3 +63,20 @@ export function chargeTodayText(priceCents) {
 export function trialContinuesText(trialEndUnix, priceCents) {
   return `Your free trial continues until ${formatTrialDate(trialEndUnix)}. You won't be charged ${formatPrice(priceCents)} until then.`;
 }
+
+/** A brand-new card-required trial, e.g. "Your 7-day free trial starts today. ..." */
+export function newTrialText(trialDays, priceCents, now = Date.now()) {
+  const endUnix = Math.floor((now + trialDays * 24 * 60 * 60 * 1000) / 1000);
+  return `Your ${trialDays}-day free trial starts today. You won't be charged ${formatPrice(priceCents)} until ${formatTrialDate(endUnix)}. Cancel anytime before then.`;
+}
+
+/**
+ * The one line every surface shows for a checkout offer (plan page, billing
+ * page, Stripe's pay button). `offer` is decideCheckoutTrial's result
+ * (src/lib/billing/trial-policy.js), computed on the server.
+ */
+export function offerText(offer, priceCents, now = Date.now()) {
+  if (offer?.mode === "trial") return newTrialText(offer.trialPeriodDays, priceCents, now);
+  if (offer?.mode === "carry") return trialContinuesText(offer.trialEnd, priceCents);
+  return chargeTodayText(priceCents);
+}

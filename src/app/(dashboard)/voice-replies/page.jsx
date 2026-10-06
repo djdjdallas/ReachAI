@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import { canUseVoiceReplies } from "@/lib/plan";
 import VoiceRepliesClient from "./VoiceRepliesClient";
+import { ACCESS_COLUMNS } from "@/lib/billing/status";
 
 export const metadata = {
   title: "Voice Replies · Clinchd",
@@ -22,7 +23,7 @@ export default async function VoiceRepliesPage() {
 
   const { data: profile } = await supabase
     .from("users")
-    .select("id, email, plan, subscription_status, voice_replies_enabled")
+    .select(`id, email, voice_replies_enabled, ${ACCESS_COLUMNS}`)
     .eq("id", user.id)
     .maybeSingle();
 

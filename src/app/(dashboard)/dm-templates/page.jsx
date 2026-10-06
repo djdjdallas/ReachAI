@@ -5,6 +5,7 @@ import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import { canUseCommentToDM } from "@/lib/comment-to-dm-gate";
 import TemplateEditor from "./TemplateEditor";
 import PublicReplySection from "./PublicReplySection";
+import { ACCESS_COLUMNS } from "@/lib/billing/status";
 
 export const metadata = {
   title: "DM templates · Clinchd",
@@ -23,11 +24,11 @@ export default async function DmTemplatesPage() {
 
   const { data: profile } = await supabase
     .from("users")
-    .select("plan, email, calendly_url, comment_public_reply_enabled")
+    .select(`email, calendly_url, comment_public_reply_enabled, ${ACCESS_COLUMNS}`)
     .eq("id", user.id)
     .maybeSingle();
 
-  if (!canUseCommentToDM({ plan: profile?.plan, email: user.email })) {
+  if (!canUseCommentToDM(profile)) {
     return (
       <div className="max-w-3xl mx-auto p-6 md:p-10">
         <div

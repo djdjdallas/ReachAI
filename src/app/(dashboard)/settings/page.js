@@ -6,6 +6,11 @@ import { createClient } from "@/lib/supabase/client";
 import { signOutAndClearState } from "@/lib/sign-out";
 import posthog from "posthog-js";
 import { hasOpeningLine } from "@/lib/opening-line";
+import SubscriptionCards from "@/components/app/SubscriptionCards";
+
+// SMS sending isn't set up yet. The card (and its columns/code) stay; it's
+// just hidden until NEXT_PUBLIC_SMS_ENABLED is "true".
+const SMS_ENABLED = process.env.NEXT_PUBLIC_SMS_ENABLED === "true";
 import {
   Loader2,
   Save,
@@ -53,6 +58,7 @@ import {
 } from "@/components/ui/dialog";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { REQUIRED_WEBHOOK_FIELDS } from "@/lib/instagram-webhook-fields";
+import { SUPPORT_EMAIL } from "@/lib/support";
 
 // The blocked-switch banner receives either an Instagram username or a raw
 // numeric account id from the callback redirect — format accordingly.
@@ -132,13 +138,13 @@ export default function SettingsPage() {
         invalid_state:
           "Your reconnect attempt expired. Click Reconnect to try again.",
         callback_failed:
-          "Instagram didn't return a successful response. Try reconnecting, or contact dom@clinchd.io if it keeps failing.",
+          `Instagram didn't return a successful response. Try reconnecting, or contact ${SUPPORT_EMAIL} if it keeps failing.`,
         auth_failed:
           "Authorization was denied. Click Reconnect to try again.",
         ig_already_connected:
-          "This Instagram account is already connected to another Clinchd account. Disconnect it there first, or contact dom@clinchd.io.",
+          `This Instagram account is already connected to another Clinchd account. Disconnect it there first, or contact ${SUPPORT_EMAIL}.`,
         ig_save_failed:
-          "Saving your Instagram connection failed. Try reconnecting, or contact dom@clinchd.io if it keeps failing.",
+          `Saving your Instagram connection failed. Try reconnecting, or contact ${SUPPORT_EMAIL} if it keeps failing.`,
       };
       setIgConnectError({ code: err, message: map[err] });
       router.replace("/settings", { scroll: false });
@@ -1108,93 +1114,95 @@ export default function SettingsPage() {
         </CardContent>
       </Card>
 
-      {/* SMS Notifications */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-lg flex items-center gap-2">
-            <MessageSquare className="h-5 w-5" />
-            SMS Notifications
-          </CardTitle>
-          <CardDescription>
-            Get text message alerts for urgent lead activity.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="phoneNumber">Phone Number</Label>
-            <div className="flex gap-2">
-              <Input
-                id="phoneNumber"
-                type="tel"
-                value={phoneNumber}
-                onChange={(e) => setPhoneNumber(e.target.value)}
-                placeholder="+1 (555) 000-0000"
-                className="w-full sm:w-56"
-              />
-              <Button
-                onClick={handleSavePhone}
-                disabled={savingPhone}
-                variant="outline"
-                size="sm"
-              >
-                {savingPhone ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : phoneSaved ? (
-                  <Check className="h-4 w-4" />
-                ) : (
-                  <Save className="h-4 w-4" />
-                )}
-                {phoneSaved ? "Saved!" : "Save"}
-              </Button>
+      {/* SMS Notifications (hidden until SMS sending is set up) */}
+      {SMS_ENABLED && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-lg flex items-center gap-2">
+              <MessageSquare className="h-5 w-5" />
+              SMS Notifications
+            </CardTitle>
+            <CardDescription>
+              Get text message alerts for urgent lead activity.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="phoneNumber">Phone Number</Label>
+              <div className="flex gap-2">
+                <Input
+                  id="phoneNumber"
+                  type="tel"
+                  value={phoneNumber}
+                  onChange={(e) => setPhoneNumber(e.target.value)}
+                  placeholder="+1 (555) 000-0000"
+                  className="w-full sm:w-56"
+                />
+                <Button
+                  onClick={handleSavePhone}
+                  disabled={savingPhone}
+                  variant="outline"
+                  size="sm"
+                >
+                  {savingPhone ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : phoneSaved ? (
+                    <Check className="h-4 w-4" />
+                  ) : (
+                    <Save className="h-4 w-4" />
+                  )}
+                  {phoneSaved ? "Saved!" : "Save"}
+                </Button>
+              </div>
+              {phoneError ? (
+                <p className="text-xs text-destructive">{phoneError}</p>
+              ) : (
+                <p className="text-xs text-muted-foreground">
+                  Include country code (e.g. +15551234567). Required for SMS
+                  alerts.
+                </p>
+              )}
             </div>
-            {phoneError ? (
-              <p className="text-xs text-destructive">{phoneError}</p>
-            ) : (
-              <p className="text-xs text-muted-foreground">
-                Include country code (e.g. +15551234567). Required for SMS
-                alerts.
+            <Separator />
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium">Hot Lead SMS</p>
+                <p className="text-xs text-muted-foreground">
+                  Text me when a lead becomes interested.
+                </p>
+              </div>
+              <Switch
+                checked={notifyHotLeadsSms}
+                onCheckedChange={(v) =>
+                  handleToggleNotification("notify_hot_leads_sms", v)
+                }
+                disabled={!phoneNumber.trim()}
+              />
+            </div>
+            <Separator />
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium">Booking SMS</p>
+                <p className="text-xs text-muted-foreground">
+                  Text me when a lead books a discovery call.
+                </p>
+              </div>
+              <Switch
+                checked={notifyBookingsSms}
+                onCheckedChange={(v) =>
+                  handleToggleNotification("notify_bookings_sms", v)
+                }
+                disabled={!phoneNumber.trim()}
+              />
+            </div>
+            {!phoneNumber.trim() && (
+              <p className="text-xs text-muted-foreground italic">
+                Add a phone number above to enable SMS alerts.
               </p>
             )}
-          </div>
-          <Separator />
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium">Hot Lead SMS</p>
-              <p className="text-xs text-muted-foreground">
-                Text me when a lead becomes interested.
-              </p>
-            </div>
-            <Switch
-              checked={notifyHotLeadsSms}
-              onCheckedChange={(v) =>
-                handleToggleNotification("notify_hot_leads_sms", v)
-              }
-              disabled={!phoneNumber.trim()}
-            />
-          </div>
-          <Separator />
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium">Booking SMS</p>
-              <p className="text-xs text-muted-foreground">
-                Text me when a lead books a discovery call.
-              </p>
-            </div>
-            <Switch
-              checked={notifyBookingsSms}
-              onCheckedChange={(v) =>
-                handleToggleNotification("notify_bookings_sms", v)
-              }
-              disabled={!phoneNumber.trim()}
-            />
-          </div>
-          {!phoneNumber.trim() && (
-            <p className="text-xs text-muted-foreground italic">
-              Add a phone number above to enable SMS alerts.
-            </p>
-          )}
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Agent Settings */}
       <Card>
@@ -1393,6 +1401,9 @@ export default function SettingsPage() {
           )}
         </CardContent>
       </Card>
+
+      {/* Subscription + Help & support */}
+      <SubscriptionCards profile={profile} />
 
       {/* Danger Zone */}
       <Card className="border-destructive/50">

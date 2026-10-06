@@ -1,3 +1,4 @@
+import { SUPPORT_EMAIL, SUPPORT_MAILTO } from "@/lib/support";
 export const metadata = {
   title: "Terms of Service | Clinchd",
   description: "Clinchd terms of service — the rules and guidelines for using our platform.",
@@ -112,7 +113,7 @@ export default function TermsPage() {
           </li>
           <li>All payments are processed securely through Stripe.</li>
           <li>
-            Refunds are handled on a case-by-case basis. Contact dom@clinchd.io for
+            Refunds are handled on a case-by-case basis. Contact {SUPPORT_EMAIL} for
             refund requests.
           </li>
           <li>
@@ -161,7 +162,7 @@ export default function TermsPage() {
         <p>
           We reserve the right to suspend or terminate your account at any time for
           violation of these Terms. You may cancel your account at any time through your
-          account settings or by contacting dom@clinchd.io.
+          account settings or by contacting {SUPPORT_EMAIL}.
         </p>
 
         <h2>14. Changes to Terms</h2>
@@ -181,7 +182,7 @@ export default function TermsPage() {
         <h2>16. Contact Us</h2>
         <p>
           If you have questions about these Terms of Service, contact us at{" "}
-          <a href="mailto:dom@clinchd.io">dom@clinchd.io</a>.
+          <a href={SUPPORT_MAILTO}>{SUPPORT_EMAIL}</a>.
         </p>
       </div>
     </div>

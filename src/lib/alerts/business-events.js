@@ -1,4 +1,5 @@
 import { sendEmail, sendSms } from "@/lib/notifications";
+import { SUPPORT_EMAIL } from "@/lib/support";
 
 /**
  * Founder-facing business-event alerts: signup, Instagram connect (including
@@ -11,7 +12,8 @@ import { sendEmail, sendSms } from "@/lib/notifications";
  *   the whole body is wrapped again so even a template bug can't propagate
  *   into signup, OAuth, or Stripe webhook processing. Callers still invoke
  *   fire-and-forget with .catch(console.error) per convention.
- * - Email goes to the founder via the existing ALERT_EMAIL || ADMIN_EMAIL
+ * - Email goes to the founder at SUPPORT_EMAIL (src/lib/support.js). The
+ *   old ALERT_EMAIL / ADMIN_EMAIL env fallbacks are no longer read here.
  *   convention (src/lib/tokens/reconnect.js, /api/alerts/notify).
  * - SMS (existing sendSms helper) fires only for the two money events and
  *   only when ALERT_PHONE is set; silently skipped otherwise.
@@ -19,15 +21,14 @@ import { sendEmail, sendSms } from "@/lib/notifications";
  *   preserves line breaks — no templating.
  */
 
-const FOUNDER_EMAIL =
-  process.env.ALERT_EMAIL ||
-  process.env.ADMIN_EMAIL ||
-  "dominickjerell@gmail.com";
+const FOUNDER_EMAIL = SUPPORT_EMAIL;
 
 const FOUNDER_PHONE = process.env.ALERT_PHONE || null;
 
 const SMS_EVENTS = new Set([
   "subscription_started",
+  "duplicate_subscription_canceled",
+  "checkout_unlinked",
   "cancellation_requested",
   "subscription_canceled",
 ]);
@@ -170,13 +171,50 @@ function compose(event, p) {
       };
     }
 
+    // checkout.session.completed whose customer doesn't match the user row
+    // it names (audit L2): nothing was activated. Usually a Payment Link
+    // with a wrong client_reference_id. The customer may have paid, so this
+    // needs a human: link the row by hand or refund.
+    case "checkout_unlinked":
+      return {
+        subject: `[clinchd] ⚠️ checkout NOT linked to an account: ${p.stripeCustomerId || "unknown customer"}`,
+        body: [
+          "A Checkout completed but its customer does not match the user row it names. Nothing was activated.",
+          `session: ${p.sessionId || "unknown"}`,
+          `stripe customer: ${p.stripeCustomerId || "unknown"}`,
+          `user id: ${p.userId || "unknown"} (from ${p.userIdSource || "unknown"})`,
+          `user row found: ${p.rowFound ? "yes, different customer" : "no"}`,
+          `amount: ${formatAmount(p.amountTotal)}`,
+        ].join("\n"),
+      };
+
+    // Audit M3: a second live subscription for one customer was refunded
+    // and canceled automatically. Worth a personal note to the coach.
+    case "duplicate_subscription_canceled": {
+      const refunds = Array.isArray(p.refunds) ? p.refunds : [];
+      const refunded = refunds.length
+        ? refunds.map((r) => `${formatAmount(r.amount)} (${r.id})`).join(", ")
+        : "nothing charged yet (trial)";
+      return {
+        subject: `[clinchd] ⚠️ duplicate subscription canceled: ${p.email || "unknown email"}`,
+        body: [
+          `email: ${p.email || "unknown"}`,
+          `stripe customer: ${p.stripeCustomerId || "unknown"}`,
+          `canceled (newer): ${p.canceledSubscriptionId || "unknown"}`,
+          `kept (older): ${p.keptSubscriptionId || "unknown"} (${p.keptStatus || "unknown"})`,
+          `refunded: ${refunded}`,
+          `checkout session: ${p.sessionId || "unknown"}`,
+        ].join("\n"),
+      };
+    }
+
     default:
       return null;
   }
 }
 
 /**
- * @param {"signup"|"instagram_connected"|"subscription_started"|"cancellation_requested"|"subscription_canceled"|"account_deleted"} event
+ * @param {"signup"|"instagram_connected"|"subscription_started"|"cancellation_requested"|"subscription_canceled"|"account_deleted"|"checkout_unlinked"|"duplicate_subscription_canceled"} event
  * @param {object} payload - event-specific fields, see compose()
  * @returns {Promise<boolean>} true when the founder EMAIL was accepted by
  *   Resend. Still never throws; the boolean lets a caller with a retryable

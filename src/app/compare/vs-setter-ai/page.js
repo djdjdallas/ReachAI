@@ -263,7 +263,7 @@ export default function VsSetterAI() {
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
           <CTABanner
             headline="The AI setter built for Instagram."
-            subheadline="Start your 7-day free trial — no credit card required. Book your first call today."
+            subheadline="7-day free trial for new accounts. Card required, cancel anytime before day 7 and you won't be charged. Book your first call today."
             buttonText="Start Free Trial"
             buttonHref="/signup"
             variant="dark"

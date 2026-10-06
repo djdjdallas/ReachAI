@@ -83,9 +83,10 @@ export default function SignupPage() {
       if (data?.session) identifyUser(posthog, data.user);
       posthog.capture("user_signed_up", { email, full_name: fullName });
 
-      // Signed in already (confirmation off): no email is coming.
+      // Signed in already (confirmation off): no email is coming. Plan
+      // selection comes first (card-required trial), then onboarding.
       if (data?.session) {
-        router.replace("/onboarding");
+        router.replace("/choose-plan");
         return;
       }
 
@@ -311,7 +312,7 @@ export default function SignupPage() {
               <div className="mb-8 text-center">
                 <h2 className="text-3xl font-black mb-2">Create Account</h2>
                 <p className="text-sm text-stone-500 font-medium">
-                  Start your 7-day free trial — no credit card required
+                  7-day free trial for new accounts. Card required, cancel anytime before day 7 and you won&apos;t be charged.
                 </p>
               </div>
 

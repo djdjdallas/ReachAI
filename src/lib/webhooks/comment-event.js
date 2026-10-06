@@ -5,6 +5,7 @@ import { decideAction } from "@/lib/comment-trigger-rules";
 import { sendPrivateReplyToComment } from "@/lib/instagram";
 import { decryptToken } from "@/lib/token-utils";
 import { canUseCommentToDM } from "@/lib/comment-to-dm-gate";
+import { ACCESS_COLUMNS } from "@/lib/billing/status";
 import { maybePostPublicReply } from "@/lib/comment-public-reply";
 import { persistCommentDmConversation } from "@/lib/comment-dm-conversation";
 
@@ -72,7 +73,7 @@ async function processCommentEvent(entry, change) {
   const { data: ownerUser, error: ownerErr } = await admin
     .from("users")
     .select(
-      "id, email, plan, subscription_status, meta_page_access_token, instagram_business_account_id, comment_public_reply_enabled"
+      `id, email, meta_page_access_token, instagram_business_account_id, comment_public_reply_enabled, ${ACCESS_COLUMNS}`
     )
     .eq("instagram_business_account_id", igbaId)
     .maybeSingle();
@@ -88,13 +89,10 @@ async function processCommentEvent(entry, change) {
   const creatorId = ownerUser.id;
 
   // 4. Gate: skip classifier spend on coaches whose plan doesn't include
-  // the feature. Founder bypass kept so Dom can dogfood on his account.
+  // the feature, or without access. No founder bypass: founder accounts
+  // are comped rows (src/lib/billing/access.js).
   if (
-    !canUseCommentToDM({
-      plan: ownerUser.plan,
-      email: ownerUser.email,
-      subscription_status: ownerUser.subscription_status,
-    })
+    !canUseCommentToDM(ownerUser)
   ) {
     console.log("[comment-event] gate denied — skipping", { commentId, creatorId });
     return;

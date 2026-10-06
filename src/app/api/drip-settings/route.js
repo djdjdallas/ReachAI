@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import { canUseDripSequences } from "@/lib/plan";
 import { enforceAiRateLimit } from "@/lib/rate-limit";
+import { ACCESS_COLUMNS } from "@/lib/billing/status";
 
 const MIN_DELAY_HOURS = 6;
 const MAX_DELAY_HOURS = 22;
@@ -16,7 +17,7 @@ async function authedUser() {
 
   const { data: profile } = await supabase
     .from("users")
-    .select("id, email, plan, subscription_status, drip_enabled, drip_delay_hours")
+    .select(`id, email, drip_enabled, drip_delay_hours, ${ACCESS_COLUMNS}`)
     .eq("id", user.id)
     .maybeSingle();
 

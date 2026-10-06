@@ -73,18 +73,19 @@ vi.mock("@/lib/voice/sender", () => voice);
 vi.mock("@/lib/drip/queue", () => drip);
 
 const { POST } = await import("./route");
+const { lateDelivery, LATE_HOURS } = await import("@/lib/instagram/late-delivery.fixture");
 
 const IGBA = "17841400000000000";
 const LEAD = "lead-igsid-1";
 
-function inbound(text = "how much is coaching?", mid = "mid-1") {
+function inbound(text = "how much is coaching?", mid = "mid-1", timestamp = undefined) {
   const body = JSON.stringify({
     object: "instagram",
     entry: [
       {
         id: IGBA,
         messaging: [
-          { sender: { id: LEAD }, recipient: { id: IGBA }, message: { mid, text } },
+          { sender: { id: LEAD }, recipient: { id: IGBA }, timestamp, message: { mid, text } },
         ],
       },
     ],
@@ -103,7 +104,10 @@ function user(overrides = {}) {
     instagram_business_account_id: IGBA,
     meta_page_access_token: "enc",
     meta_reconnect_required: false,
+    // A paying Stripe-backed account (access via src/lib/billing/access.js).
     subscription_status: "active",
+    stripe_subscription_id: "sub_test",
+    current_period_end: new Date(Date.now() + 20 * 24 * 3_600_000).toISOString(),
     trial_ends_at: null,
     ai_mode: "active",
     response_delay: 0,
@@ -170,15 +174,19 @@ describe("inbound DM for a non-serving account (C1)", () => {
     expect(AI_AND_OUTBOUND()).toEqual(NONE);
   });
 
-  it("flips a lapsed trial to expired, saves the message, and still makes no AI or outbound call", async () => {
+  it("a lapsed legacy no-card trial: saves the message, no AI or outbound call, and no status flip", async () => {
     db.state.user = user({
       subscription_status: "trialing",
+      stripe_subscription_id: null,
+      current_period_end: null,
       trial_ends_at: new Date(Date.now() - 60_000).toISOString(),
     });
 
     await POST(inbound());
 
-    expect(db.userUpdates()).toContainEqual({ subscription_status: "expired", ai_mode: "off" });
+    // Access is computed (hasActiveAccess), never stored: the old lazy flip
+    // to 'expired' + ai_mode 'off' is gone.
+    expect(db.userUpdates().some((u) => "subscription_status" in u || "ai_mode" in u)).toBe(false);
     expect(db.inserted("messages")).toHaveLength(1);
     expect(db.conversationSkipReasons()).toContain("trial_expired");
     expect(AI_AND_OUTBOUND()).toEqual(NONE);
@@ -239,6 +247,72 @@ describe("inbound DM for a serving account (unchanged)", () => {
 
     expect(db.conversationSkipReasons()).not.toContain("subscription_inactive");
     expect(dmIntent.classifyDMIntent).toHaveBeenCalled();
+  });
+});
+
+describe("send-time checks (audit L6, LM1)", () => {
+  it("L6: access that ends during the reply delay stops the send", async () => {
+    db.state.user = user();
+    // Reply generation runs before the delay wait; the subscription ends
+    // in between (the post-delay recheck reads the row again).
+    ai.generateReply.mockImplementationOnce(async () => {
+      db.state.user = user({ subscription_status: "canceled" });
+      return "hey";
+    });
+
+    await POST(inbound());
+
+    expect(ai.generateReply).toHaveBeenCalled();
+    expect(ig.sendInstagramMessage).not.toHaveBeenCalled();
+    expect(db.conversationSkipReasons()).toContain("access_ended_during_delay");
+  });
+
+  it("LM1: the 24h window is measured from Meta's event timestamp when it is earlier", async () => {
+    db.state.user = user();
+    const sentAt = Date.now() - 3 * 3_600_000; // delivered 3h late
+    await POST(inbound("how much?", "mid-late", sentAt));
+    expect(ig.sendInstagramMessage.mock.calls[0][4]).toEqual({ lastInboundAt: sentAt });
+  });
+
+  it("LM1: a future event timestamp falls back to receipt time", async () => {
+    db.state.user = user();
+    const before = Date.now();
+    await POST(inbound("how much?", "mid-future", Date.now() + 3_600_000));
+    const { lastInboundAt } = ig.sendInstagramMessage.mock.calls[0][4];
+    expect(lastInboundAt).toBeGreaterThanOrEqual(before);
+    expect(lastInboundAt).toBeLessThanOrEqual(Date.now());
+  });
+});
+
+describe("late Meta delivery (stored with the lead's real send time)", () => {
+  it(`a message sent ${LATE_HOURS}h ago and delivered now is saved with its send time, and gets no AI turn`, async () => {
+    db.state.user = user();
+    const late = lateDelivery();
+    await POST(inbound("still interested?", "mid-30h", late.sentAtMs));
+
+    const saved = db.inserted("messages").find((m) => m.source === "lead");
+    expect(saved).toMatchObject({ role: "user", source: "lead" });
+    // Within a second of the fixture (the fixture's "now" is a hair earlier).
+    expect(Math.abs(Date.parse(saved.created_at) - Date.parse(late.storedCreatedAt))).toBeLessThan(1000);
+    expect(db.conversationSkipReasons()).toContain("messaging_window_closed");
+    expect(AI_AND_OUTBOUND()).toEqual(NONE);
+  });
+
+  it("an on-time message is saved with its send time too (no change in behavior)", async () => {
+    db.state.user = user();
+    const sentAt = Date.now() - 2000;
+    await POST(inbound("hi", "mid-ontime", sentAt));
+    const saved = db.inserted("messages").find((m) => m.source === "lead");
+    expect(saved.created_at).toBe(new Date(sentAt).toISOString());
+    expect(ig.sendInstagramMessage).toHaveBeenCalled();
+  });
+
+  it("inactive-account saves use the send time as well", async () => {
+    db.state.user = user({ subscription_status: "canceled", ai_mode: "off" });
+    const late = lateDelivery();
+    await POST(inbound("hello?", "mid-inactive", late.sentAtMs));
+    const saved = db.inserted("messages")[0];
+    expect(Math.abs(Date.parse(saved.created_at) - late.sentAtMs)).toBeLessThan(1000);
   });
 });
 

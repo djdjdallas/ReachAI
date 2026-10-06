@@ -28,8 +28,8 @@ export const objections = [
     objection: "What if it doesn't work for me?",
     generic: "It works for everyone who follows the process! \uD83D\uDCAA",
     clinchd:
-      "Fair concern, and the honest answer is: it doesn't work for people who don't show up. That's why we have a 14-day money-back guarantee. If after two weeks you've done the work and it's not for you, full refund, no awkwardness. Want me to grab a call so you can ask the harder questions?",
+      "Fair concern, and the honest answer is: it doesn't work for people who don't show up. So before you decide anything, let's get specific: what would \"working\" look like for you in the first month? Want me to grab a call so you can ask the harder questions?",
     shortClinchd:
-      "Fair concern. That's why there's a 14-day money-back guarantee. Do the work, not for you, full refund.",
+      "Fair concern. What would \"working\" look like for you? Let's map it on a quick call before you decide.",
   },
 ];

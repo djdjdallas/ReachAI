@@ -29,7 +29,7 @@ const comparisonRows = [
   { feature: "Objection handling", competitor: "Manual flow paths", clinchd: "AI-powered, dynamic" },
   { feature: "Calendar booking", competitor: "Manual link in flow", clinchd: "AI drops link at right moment" },
   { feature: "Human takeover", competitor: "Yes", clinchd: "Yes — with hot lead flagging" },
-  { feature: "Free trial", competitor: "Free plan (1K contacts)", clinchd: "7-day free trial" },
+  { feature: "Free trial", competitor: "Free plan (1K contacts)", clinchd: "7-day free trial for new accounts" },
 ];
 
 const faqs = [
@@ -280,7 +280,7 @@ export default function VsManyChat() {
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
           <CTABanner
             headline="Ready to switch from ManyChat?"
-            subheadline="Start your 7-day free trial — no credit card required. Set up in under 30 minutes."
+            subheadline="7-day free trial for new accounts. Card required, cancel anytime before day 7 and you won't be charged. Set up in under 30 minutes."
             buttonText="Start Free Trial"
             buttonHref="/signup"
             variant="dark"

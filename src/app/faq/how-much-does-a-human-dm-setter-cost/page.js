@@ -209,7 +209,7 @@ export default function FaqHowMuchDoesHumanSetterCost() {
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
           <CTABanner
             headline="Replace your setter for $197/mo"
-            subheadline="Start your 7-day free trial. The AI handles everything a human setter does, 24/7."
+            subheadline="7-day free trial for new accounts. The AI handles everything a human setter does, 24/7."
             buttonText="Start Free Trial"
             buttonHref="/signup"
             variant="dark"

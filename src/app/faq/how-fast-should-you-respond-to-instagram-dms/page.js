@@ -197,7 +197,7 @@ export default function FaqHowFastRespondToDms() {
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
           <CTABanner
             headline="Reply in seconds, every time"
-            subheadline="Start your 7-day free trial. The AI handles every DM in seconds, around the clock."
+            subheadline="7-day free trial for new accounts. The AI handles every DM in seconds, around the clock."
             buttonText="Start Free Trial"
             buttonHref="/signup"
             variant="dark"

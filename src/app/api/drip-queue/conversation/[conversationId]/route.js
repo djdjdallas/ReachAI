@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import { canUseDripSequences } from "@/lib/plan";
 import { cancelDripForConversation } from "@/lib/drip/queue";
+import { ACCESS_COLUMNS } from "@/lib/billing/status";
 
 async function authedUser() {
   const supabase = await createClient();
@@ -13,7 +14,7 @@ async function authedUser() {
 
   const { data: profile } = await supabase
     .from("users")
-    .select("id, email, plan, subscription_status")
+    .select(`id, email, ${ACCESS_COLUMNS}`)
     .eq("id", user.id)
     .maybeSingle();
 

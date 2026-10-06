@@ -8,28 +8,40 @@ import {
 
 const NOW = Date.parse("2026-10-01T12:00:00Z");
 
-describe("inactiveGate", () => {
-  it.each(["active", "past_due"])("serves %s", (subscription_status) => {
-    expect(inactiveGate({ subscription_status }, NOW)).toBeNull();
+describe("inactiveGate (delegates to hasActiveAccess)", () => {
+  const paying = (o) => ({
+    plan: "base",
+    subscription_status: "active",
+    stripe_subscription_id: "sub_1",
+    trial_ends_at: null,
+    current_period_end: "2026-10-20T00:00:00Z",
+    ...o,
   });
 
-  it("serves a trial that hasn't ended", () => {
+  it.each(["active", "trialing", "past_due"])("serves a Stripe-backed %s account", (subscription_status) => {
+    expect(inactiveGate(paying({ subscription_status }), NOW)).toBeNull();
+  });
+
+  it("serves a legacy no-card trial that hasn't ended", () => {
     expect(
-      inactiveGate({ subscription_status: "trialing", trial_ends_at: "2026-10-02T00:00:00Z" }, NOW)
+      inactiveGate(paying({ subscription_status: "trialing", stripe_subscription_id: null, trial_ends_at: "2026-10-02T00:00:00Z" }), NOW)
     ).toBeNull();
   });
 
-  it("blocks a lapsed trial and asks for the flip to expired", () => {
+  it("blocks a lapsed legacy trial with the trial_expired reason, and never asks for a flip", () => {
     expect(
-      inactiveGate({ subscription_status: "trialing", trial_ends_at: "2026-09-30T00:00:00Z" }, NOW)
-    ).toEqual({ reason: "trial_expired", flipToExpired: true });
+      inactiveGate(paying({ subscription_status: "trialing", stripe_subscription_id: null, trial_ends_at: "2026-09-30T00:00:00Z" }), NOW)
+    ).toEqual({ reason: "trial_expired" });
   });
 
-  it.each(["expired", "canceled", null, undefined])("blocks %s without a flip", (subscription_status) => {
-    expect(inactiveGate({ subscription_status }, NOW)).toEqual({
-      reason: "subscription_inactive",
-      flipToExpired: false,
-    });
+  it.each(["expired", "canceled", "unpaid", null])("blocks %s as subscription_inactive", (subscription_status) => {
+    expect(inactiveGate(paying({ subscription_status }), NOW)).toEqual({ reason: "subscription_inactive" });
+  });
+
+  it("serves a comped account", () => {
+    expect(
+      inactiveGate(paying({ stripe_subscription_id: null, trial_ends_at: "2099-12-31T00:00:00Z" }), NOW)
+    ).toBeNull();
   });
 });
 

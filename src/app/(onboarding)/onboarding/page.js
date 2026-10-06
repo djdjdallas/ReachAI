@@ -21,6 +21,7 @@ import Step2Script from "./components/Step2Script";
 import Step3Voice from "./components/Step3Voice";
 import Step4Preview from "./components/Step4Preview";
 import Step5GoLive from "./components/Step5GoLive";
+import { SUPPORT_EMAIL } from "@/lib/support";
 
 export default function OnboardingPageWrapper() {
   return (
@@ -152,19 +153,19 @@ function OnboardingPage() {
       invalid_state:
         "Your connection attempt expired. Please click Connect Instagram to try again.",
       callback_failed:
-        "Instagram didn't return a successful response. Try reconnecting, or contact dom@clinchd.io if it keeps failing.",
+        `Instagram didn't return a successful response. Try reconnecting, or contact ${SUPPORT_EMAIL} if it keeps failing.`,
       auth_failed:
         "Authorization was denied. Click Connect Instagram to try again.",
       ig_switch_blocked:
         "That's a different Instagram account than the one already connected here. To switch accounts, finish setup first, then use Settings → Instagram Connection, or reconnect with the original account.",
       ig_already_connected:
-        "This Instagram account is already connected to another Clinchd account. Disconnect it there first, or contact dom@clinchd.io.",
+        `This Instagram account is already connected to another Clinchd account. Disconnect it there first, or contact ${SUPPORT_EMAIL}.`,
       ig_save_failed:
-        "Saving your Instagram connection failed. Try again, or contact dom@clinchd.io if it keeps failing.",
+        `Saving your Instagram connection failed. Try again, or contact ${SUPPORT_EMAIL} if it keeps failing.`,
     };
     const message =
       map[code] ||
-      "Something went wrong connecting your Instagram account. Try again, or contact dom@clinchd.io.";
+      `Something went wrong connecting your Instagram account. Try again, or contact ${SUPPORT_EMAIL}.`;
     setIgConnectError({ code, message });
     // Strip the error param so a refresh doesn't re-show the banner.
     const params = new URLSearchParams(searchParams.toString());

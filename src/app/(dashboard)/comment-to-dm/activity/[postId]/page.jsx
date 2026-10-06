@@ -8,6 +8,7 @@ import {
 import { createClient } from "@/lib/supabase/server";
 import { canUseCommentToDM } from "@/lib/comment-to-dm-gate";
 import { CORAL, CARD_SHADOW, ActivityRow } from "../_components";
+import { ACCESS_COLUMNS } from "@/lib/billing/status";
 
 export const metadata = {
   title: "Post activity · Comment to DM · Clinchd",
@@ -82,11 +83,11 @@ export default async function PostActivityDrilldownPage({ params }) {
 
   const { data: profile } = await supabase
     .from("users")
-    .select("plan, email")
+    .select(`email, ${ACCESS_COLUMNS}`)
     .eq("id", user.id)
     .maybeSingle();
 
-  if (!canUseCommentToDM({ plan: profile?.plan, email: user.email })) {
+  if (!canUseCommentToDM(profile)) {
     redirect("/comment-to-dm");
   }
 

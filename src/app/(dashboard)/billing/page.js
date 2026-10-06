@@ -28,54 +28,31 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Separator } from "@/components/ui/separator";
-import { getDmLimit, getPlanDisplay } from "@/lib/plans";
 import {
-  planCheckoutTrial,
-  chargeTodayText,
-  trialContinuesText,
-} from "@/lib/checkout-trial";
+  getDmLimit,
+  getPlanDisplay,
+  PLAN_IDS,
+  PLAN_CATALOG,
+  formatPlanPrice,
+  planButtonLabel,
+} from "@/lib/plans";
+import { SUPPORT_EMAIL, SUPPORT_MAILTO } from "@/lib/support";
+import { billingPageView } from "@/lib/billing/managed";
 
-const PLANS = [
-  {
-    id: "base",
-    name: "Base Plan",
-    price: "$97",
-    // Keep in sync with PLANS.base.price in src/lib/stripe.js (that module
-    // pulls in the Stripe SDK, so it can't be imported client-side).
-    priceCents: 9700,
+// Plans come from the one catalog (src/lib/plans.js); price ids stay on the
+// server. No local copy of prices here.
+const PLANS = PLAN_IDS.map((id) => {
+  const p = PLAN_CATALOG[id];
+  return {
+    id,
+    name: p.displayName,
+    price: formatPlanPrice(p.priceCents),
     period: "/mo",
-    dmLimit: "1,500 qualified conversations/month",
-    features: [
-      "1,500 AI-assisted qualified conversations per month",
-      "AI-assisted lead qualification",
-      "Calendar-connected call booking",
-      "Script builder with AI generation",
-      "Conversation dashboard",
-      "Email support",
-    ],
-    popular: false,
-  },
-  {
-    id: "unlimited",
-    name: "Unlimited Plan",
-    price: "$197",
-    priceCents: 19700,
-    period: "/mo",
-    dmLimit: "Unlimited conversations",
-    features: [
-      "Unlimited AI-assisted conversations",
-      "AI-assisted lead qualification",
-      "Calendar-connected call booking",
-      "Script builder with AI generation",
-      "Conversation dashboard",
-      "Advanced analytics & reporting",
-      "Priority support",
-      "Custom AI personality tuning",
-      "Comment-to-DM with AI intent grading",
-    ],
-    popular: true,
-  },
-];
+    dmLimit: p.dmLimitLabel,
+    features: p.features,
+    popular: p.popular,
+  };
+});
 
 export default function BillingPage() {
   const router = useRouter();
@@ -90,6 +67,13 @@ export default function BillingPage() {
   // returned nothing / threw) or portal (manage-subscription link did the
   // same). Cleared the next time the user clicks either button.
   const [billingError, setBillingError] = useState(null);
+  // Each plan's offer line ("7-day free trial...", "charged today", ...),
+  // decided on the server exactly as Checkout will (checkout-offer API).
+  const [offerLines, setOfferLines] = useState(null);
+  // The server's access decision (kind: stripe | comped | legacy_trial |
+  // none). Awaited before first render so a comped account never flashes
+  // plan buttons.
+  const [access, setAccess] = useState(null);
 
   useEffect(() => {
     async function init() {
@@ -107,7 +91,7 @@ export default function BillingPage() {
       const { data: userProfile } = await supabase
         .from("users")
         .select(
-          "plan, subscription_status, stripe_customer_id, dm_count_this_month, trial_ends_at, cancel_at"
+          "plan, subscription_status, stripe_customer_id, stripe_subscription_id, dm_count_this_month, trial_ends_at, cancel_at"
         )
         .eq("id", authUser.id)
         .single();
@@ -115,6 +99,16 @@ export default function BillingPage() {
       if (userProfile) {
         setProfile(userProfile);
       }
+
+      fetch("/api/billing/checkout-offer")
+        .then((res) => (res.ok ? res.json() : null))
+        .then((data) => setOfferLines(data?.lines || null))
+        .catch(() => {});
+
+      const accessData = await fetch("/api/billing/access")
+        .then((res) => (res.ok ? res.json() : null))
+        .catch(() => null);
+      setAccess(accessData);
 
       setLoading(false);
     }
@@ -129,7 +123,7 @@ export default function BillingPage() {
       const res = await fetch("/api/stripe/create-checkout", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ planId }),
+        body: JSON.stringify({ planId, returnTo: "billing" }),
       });
 
       const data = await res.json().catch(() => ({}));
@@ -142,15 +136,16 @@ export default function BillingPage() {
         return;
       }
 
-      // No URL = server didn't return a Checkout session. Surface it.
+      // No URL = server didn't return a Checkout session. Surface it (the
+      // server's own message when it sent one, e.g. a comped account).
       setBillingError(
-        "Couldn't start checkout. Try again, or contact dom@clinchd.io."
+        data.message || `Couldn't start checkout. Try again, or contact ${SUPPORT_EMAIL}.`
       );
       setCheckoutLoading(null);
     } catch (err) {
       console.error("Error creating checkout:", err);
       setBillingError(
-        "Couldn't start checkout. Try again, or contact dom@clinchd.io."
+        `Couldn't start checkout. Try again, or contact ${SUPPORT_EMAIL}.`
       );
       setCheckoutLoading(null);
     }
@@ -174,13 +169,13 @@ export default function BillingPage() {
       }
 
       setBillingError(
-        "Couldn't open the billing portal. Try again, or contact dom@clinchd.io."
+        `Couldn't open the billing portal. Try again, or contact ${SUPPORT_EMAIL}.`
       );
       setPortalLoading(false);
     } catch (err) {
       console.error("Error creating portal:", err);
       setBillingError(
-        "Couldn't open the billing portal. Try again, or contact dom@clinchd.io."
+        `Couldn't open the billing portal. Try again, or contact ${SUPPORT_EMAIL}.`
       );
       setPortalLoading(false);
     }
@@ -203,7 +198,16 @@ export default function BillingPage() {
       : "muted";
 
   const planDisplay = getPlanDisplay(currentPlan);
+  // A Stripe subscription in any serving status (including a card-required
+  // trial), or a comped account. A legacy no-card trial is 'trialing'
+  // without a subscription and should still see Subscribe.
+  const hasLivePlan =
+    subscriptionStatus === "active" ||
+    (!!profile?.stripe_subscription_id && ["trialing", "past_due"].includes(subscriptionStatus));
   const planDisplayName = planDisplay.name;
+  // Comped (and future managed) accounts: no price, portal or plan buttons
+  // (src/lib/billing/managed.js).
+  const view = billingPageView({ access, hasStripeCustomer: !!profile?.stripe_customer_id });
   const planPrice =
     currentPlan === "free"
       ? planDisplay.price
@@ -225,6 +229,18 @@ export default function BillingPage() {
           Manage your subscription and track usage.
         </p>
       </div>
+
+      {subscriptionStatus === "past_due" && (
+        <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+          Your last payment didn&apos;t go through. Use{" "}
+          <span className="font-semibold">Manage Subscription</span> below to update your card
+          and keep your AI replying. Questions? Email{" "}
+          <a href={SUPPORT_MAILTO} className="font-semibold underline">
+            {SUPPORT_EMAIL}
+          </a>
+          .
+        </div>
+      )}
 
       {billingError && (
         <div className="flex items-start gap-3 rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-900 dark:border-red-900/40 dark:bg-red-950/30 dark:text-red-100">
@@ -250,8 +266,10 @@ export default function BillingPage() {
                 <CreditCard className="h-5 w-5" />
                 Current Plan
               </CardTitle>
-              <Badge variant={statusVariant}>
-                {subscriptionStatus === "active"
+              <Badge variant={view.managed ? "success" : statusVariant}>
+                {view.managed
+                  ? "Complimentary"
+                  : subscriptionStatus === "active"
                   ? "Active"
                   : subscriptionStatus === "trialing"
                   ? "Trial"
@@ -264,15 +282,31 @@ export default function BillingPage() {
             </div>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="flex items-baseline gap-2">
-              <span className="text-3xl font-bold">{planPrice}</span>
-              {currentPlan !== "free" && (
-                <span className="text-sm text-muted-foreground">
-                  billed monthly
-                </span>
-              )}
-            </div>
-            <p className="text-sm text-muted-foreground">{planDisplayName}</p>
+            {view.managed ? (
+              <>
+                <p className="text-3xl font-bold">Complimentary plan</p>
+                <p className="text-sm text-muted-foreground">{planDisplayName}</p>
+                <p className="text-sm text-muted-foreground">
+                  Nothing to pay. Questions? Email{" "}
+                  <a href={SUPPORT_MAILTO} className="font-semibold underline">
+                    {SUPPORT_EMAIL}
+                  </a>
+                  .
+                </p>
+              </>
+            ) : (
+              <>
+                <div className="flex items-baseline gap-2">
+                  <span className="text-3xl font-bold">{planPrice}</span>
+                  {currentPlan !== "free" && (
+                    <span className="text-sm text-muted-foreground">
+                      billed monthly
+                    </span>
+                  )}
+                </div>
+                <p className="text-sm text-muted-foreground">{planDisplayName}</p>
+              </>
+            )}
             {/* Pending cancellation (users.cancel_at, written by the
                 customer.subscription.updated webhook). Status stays
                 'active' until this date, so without it the plan looked
@@ -289,7 +323,7 @@ export default function BillingPage() {
               </p>
             )}
           </CardContent>
-          {profile?.stripe_customer_id && (
+          {view.showPortal && (
             <CardFooter>
               <Button
                 variant="outline"
@@ -357,6 +391,18 @@ export default function BillingPage() {
         </Card>
       </div>
 
+      {view.accessUnavailable && (
+        <p className="text-sm text-muted-foreground">
+          Couldn&apos;t load your plan options. Refresh the page, or email{" "}
+          <a href={SUPPORT_MAILTO} className="font-semibold underline">
+            {SUPPORT_EMAIL}
+          </a>
+          .
+        </p>
+      )}
+
+      {view.showPlanButtons && (
+      <>
       <Separator />
 
       {/* Plan Cards */}
@@ -364,23 +410,10 @@ export default function BillingPage() {
         <h2 className="text-lg font-semibold mb-4">Available Plans</h2>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {PLANS.map((plan) => {
-            const isCurrentPlan =
-              currentPlan === plan.id &&
-              subscriptionStatus === "active";
-            // Same decision create-checkout makes, shown before the click.
-            // Live subscribers are sent to the portal instead, so no line.
-            const hasLiveSubscription = ["active", "past_due"].includes(
-              subscriptionStatus
-            );
-            const checkoutTrial = planCheckoutTrial({
-              subscriptionStatus,
-              trialEndsAt: profile?.trial_ends_at,
-            });
-            const chargeNote = hasLiveSubscription
-              ? null
-              : checkoutTrial.chargeToday
-                ? chargeTodayText(plan.priceCents)
-                : trialContinuesText(checkoutTrial.trialEnd, plan.priceCents);
+            const isCurrentPlan = hasLivePlan && currentPlan === plan.id;
+            // Same decision create-checkout makes, from the server. Null for
+            // live subscribers (they're sent to the portal instead).
+            const chargeNote = offerLines?.[plan.id] || null;
             return (
               <Card
                 key={plan.id}
@@ -431,9 +464,7 @@ export default function BillingPage() {
                       {checkoutLoading === plan.id && (
                         <Loader2 className="h-4 w-4 animate-spin" />
                       )}
-                      {currentPlan !== "free" && !isCurrentPlan
-                        ? "Upgrade"
-                        : "Subscribe"}
+                      {planButtonLabel({ currentPlanId: currentPlan, hasLivePlan, targetPlanId: plan.id })}
                     </Button>
                   )}
                   {!isCurrentPlan && chargeNote && (
@@ -447,6 +478,8 @@ export default function BillingPage() {
           })}
         </div>
       </div>
+      </>
+      )}
     </div>
   );
 }

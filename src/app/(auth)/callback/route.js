@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
-import { createCustomer } from "@/lib/stripe";
+import { ensureStripeCustomer } from "@/lib/billing/customer";
 import { getPostHogClient } from "@/lib/posthog-server";
 
 export async function GET(request) {
@@ -28,12 +28,13 @@ export async function GET(request) {
           .single();
 
         if (!existing) {
+          // No trial here: like handle_new_user, a new row starts 'inactive'
+          // (column default) and the 7-day trial comes from card-required
+          // Stripe Checkout. This fallback used to grant a no-card trial.
           await admin.from("users").insert({
             id: user.id,
             email: user.email,
             full_name: user.user_metadata?.full_name || "",
-            subscription_status: "trialing",
-            trial_ends_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
           });
           getPostHogClient().capture({
             distinctId: user.id,
@@ -48,14 +49,11 @@ export async function GET(request) {
           });
         }
 
-        // Create Stripe customer if not exists
+        // Every user gets a Stripe customer (the same helper email signups
+        // use on the plan page). Best-effort: Checkout retries it.
         if (!existing?.stripe_customer_id) {
           try {
-            const customer = await createCustomer(user.email, user.id);
-            await admin
-              .from("users")
-              .update({ stripe_customer_id: customer.id })
-              .eq("id", user.id);
+            await ensureStripeCustomer(admin, user);
           } catch (err) {
             console.error("Failed to create Stripe customer:", err);
           }

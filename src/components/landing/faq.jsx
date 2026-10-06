@@ -52,7 +52,7 @@ const faqs = [
   {
     question: "Can I cancel anytime?",
     answer:
-      "Absolutely. No contracts, no commitments. Cancel with one click from your dashboard. You'll keep access through the end of your billing period. We also offer a 7-day free trial so you can test everything risk-free.",
+      "Absolutely. No contracts, no commitments. Cancel with one click from your dashboard. You'll keep access through the end of your billing period. We also offer new accounts a 7-day free trial so you can test everything risk-free.",
   },
   {
     question: "What if I have a VA already, can they use this too?",

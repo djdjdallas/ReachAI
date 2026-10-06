@@ -168,7 +168,7 @@ const faqPageSchema = {
       name: "Can I cancel anytime?",
       acceptedAnswer: {
         "@type": "Answer",
-        text: "Absolutely. No contracts, no commitments. Cancel with one click from your dashboard. You'll keep access through the end of your billing period. We also offer a 7-day free trial so you can test everything risk-free.",
+        text: "Absolutely. No contracts, no commitments. Cancel with one click from your dashboard. You'll keep access through the end of your billing period. We also offer new accounts a 7-day free trial so you can test everything risk-free.",
       },
     },
     {

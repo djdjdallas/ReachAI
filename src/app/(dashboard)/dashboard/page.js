@@ -354,7 +354,9 @@ export default function DashboardPage() {
         </div>
       )}
 
-      {profile?.subscription_status === "trialing" && (
+      {/* Legacy no-card trial only. A card-required Stripe trial is also
+          'trialing', but that coach already subscribed; nothing to upgrade. */}
+      {profile?.subscription_status === "trialing" && !profile?.stripe_subscription_id && (
         <div className="flex items-center gap-3 p-4 rounded-2xl border border-amber-200 bg-amber-50">
           <AlertTriangle className="h-5 w-5 text-amber-600 shrink-0" />
           <div className="flex-1">

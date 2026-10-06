@@ -18,6 +18,8 @@ import {
   Send,
   MessageCircleReply,
   Mic,
+  CreditCard,
+  LifeBuoy,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { signOutAndClearState } from "@/lib/sign-out";
@@ -28,6 +30,7 @@ import {
   SheetTrigger,
 } from "@/components/ui/sheet";
 import AccountUsageWidget from "@/components/app/AccountUsageWidget";
+import { SUPPORT_MAILTO } from "@/lib/support";
 
 const mainNavLinks = [
   { href: "/dashboard", label: "Inbox", icon: Inbox, showBadge: true },
@@ -52,7 +55,11 @@ const mainNavLinks = [
 const settingsNavLinks = [
   { href: "/script-builder", label: "Sales Script", icon: Cpu },
   { href: "/playground", label: "Playground", icon: FlaskConical },
+  { href: "/billing", label: "Billing", icon: CreditCard },
   { href: "/settings", label: "Settings", icon: Settings },
+  // Help opens the support inbox (dom@clinchd.io). A customer churned
+  // because they couldn't find a way to reach us.
+  { href: SUPPORT_MAILTO, label: "Help", icon: LifeBuoy, mailto: true },
 ];
 
 function SidebarContent({
@@ -156,10 +163,11 @@ function SidebarContent({
           <div className="my-3 mx-2 border-t border-stone-200" />
         )}
 
-        {settingsNavLinks.map(({ href, label, icon: Icon }) => {
-          const isActive = pathname === href || pathname.startsWith(href + "/");
+        {settingsNavLinks.map(({ href, label, icon: Icon, mailto }) => {
+          const isActive = !mailto && (pathname === href || pathname.startsWith(href + "/"));
+          const LinkTag = mailto ? "a" : Link;
           return (
-            <Link
+            <LinkTag
               key={href}
               href={href}
               onClick={onLinkClick}
@@ -174,7 +182,7 @@ function SidebarContent({
             >
               <Icon className="h-5 w-5 shrink-0" />
               {expanded && <span className="whitespace-nowrap">{label}</span>}
-            </Link>
+            </LinkTag>
           );
         })}
       </nav>

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import { canUseCommentToDM } from "@/lib/comment-to-dm-gate";
+import { ACCESS_COLUMNS } from "@/lib/billing/status";
 
 const VALID_FEEDBACK = new Set(["thumbs_up", "thumbs_down"]);
 
@@ -21,11 +22,11 @@ export async function POST(request) {
 
     const { data: profile } = await supabase
       .from("users")
-      .select("plan, email")
+      .select(`email, ${ACCESS_COLUMNS}`)
       .eq("id", user.id)
       .maybeSingle();
 
-    if (!canUseCommentToDM({ plan: profile?.plan, email: user.email })) {
+    if (!canUseCommentToDM(profile)) {
       return NextResponse.json({ error: "Not found" }, { status: 404 });
     }
 
