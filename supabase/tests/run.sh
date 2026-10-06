@@ -17,6 +17,7 @@ MIGRATIONS=(
   20261007120000_revoke_definer_execute.sql
   20261007130000_protect_lead_messages.sql
   20261007140000_ci_grant_reader.sql
+  20261008120000_knowledge_entries.sql
 )
 psql_() { psql -X -v ON_ERROR_STOP=1 -q "$@"; }
 
@@ -99,6 +100,29 @@ echo "# M2: stripe_webhook_events"
 expect "claims start as processing" "processing" "$(as_role service_role "insert into public.stripe_webhook_events(event_id,event_type) values ('evt_1','x') returning status")"
 expect "unknown status rejected" "violates check constraint" "$(as_role service_role "insert into public.stripe_webhook_events(event_id,event_type,status) values ('evt_2','x','weird')")"
 expect "browser cannot read events" "permission denied" "$(as_role authenticated "select * from public.stripe_webhook_events")"
+
+echo "# Knowledge base: knowledge_entries RLS"
+U1=11111111-1111-1111-1111-111111111111; U2=22222222-2222-2222-2222-222222222222
+q "insert into public.knowledge_entries(id,user_id,type,question,answer,enabled) values ('cccccccc-0000-0000-0000-000000000001','$U1','faq','Price?','\$300',true), ('cccccccc-0000-0000-0000-000000000002','$U2','faq','Hours?','9-5',true)" >/dev/null
+expect "user reads own entries" "1" "$(as_role authenticated "select count(*) from public.knowledge_entries")"
+expect "user cannot read another user's entry" "0" "$(as_role authenticated "select count(*) from public.knowledge_entries where user_id='$U2'")"
+expect "user's visible entry is their own" "Price?" "$(as_role authenticated "select question from public.knowledge_entries")"
+expect "browser insert rejected" "permission denied" "$(as_role authenticated "insert into public.knowledge_entries(user_id,question,answer) values ('$U1','q','a')")"
+expect "browser update rejected" "permission denied" "$(as_role authenticated "update public.knowledge_entries set answer='x'")"
+expect "browser delete rejected" "permission denied" "$(as_role authenticated "delete from public.knowledge_entries")"
+expect "anon read rejected" "permission denied" "$(as_role anon "select count(*) from public.knowledge_entries")"
+expect "service role insert works" "INSERT 0 1" "$(as_role service_role "insert into public.knowledge_entries(user_id,question,answer) values ('$U1','q','a')")"
+expect "enabled entry with empty answer rejected" "knowledge_entries_enabled_has_answer" "$(as_role service_role "insert into public.knowledge_entries(user_id,question,answer,enabled) values ('$U1','q','  ',true)")"
+expect "disabled empty draft allowed" "INSERT 0 1" "$(as_role service_role "insert into public.knowledge_entries(user_id,question,answer,enabled) values ('$U1','q','',false)")"
+expect "question over 300 chars rejected" "knowledge_entries_question_len" "$(as_role service_role "insert into public.knowledge_entries(user_id,question,answer) values ('$U1',repeat('x',301),'a')")"
+expect "answer over 2000 chars rejected" "knowledge_entries_answer_len" "$(as_role service_role "insert into public.knowledge_entries(user_id,question,answer) values ('$U1','q',repeat('x',2001))")"
+expect "unknown type rejected" "knowledge_entries_type_check" "$(as_role service_role "insert into public.knowledge_entries(user_id,type,question,answer) values ('$U1','secret','q','a')")"
+expect "template draft insert works" "INSERT 0 1" "$(as_role service_role "insert into public.knowledge_entries(user_id,template_key,question) values ('$U1','coaching:included','What is included?')")"
+expect "same template key twice rejected" "knowledge_entries_user_template_key" "$(as_role service_role "insert into public.knowledge_entries(user_id,template_key,question) values ('$U1','coaching:included','a'), ('$U1','coaching:included','dup')")"
+expect "the route's upsert skips a duplicate draft" "INSERT 0 2" "$(as_role service_role "insert into public.knowledge_entries(user_id,template_key,question) values ('$U1','coaching:refund','r'), ('$U1','coaching:refund','again'), ('$U1','coaching:faq2','f') on conflict (user_id, template_key) do nothing")"
+expect "another user can use the same key" "INSERT 0 1" "$(as_role service_role "insert into public.knowledge_entries(user_id,template_key,question) values ('$U2','coaching:included','q')")"
+expect "hand-written entries (null key) never collide" "INSERT 0 2" "$(as_role service_role "insert into public.knowledge_entries(user_id,question) values ('$U1','a'), ('$U1','b')")"
+expect "updated_at moves on update" "t" "$(as_role service_role "update public.knowledge_entries set answer='\$350' where id='cccccccc-0000-0000-0000-000000000001' returning updated_at >= created_at")"
 
 psql_ -d postgres -c "drop database $DB"
 echo

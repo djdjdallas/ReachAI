@@ -65,6 +65,37 @@ describe("lintReply", () => {
 
   it("leaves a clean reply untouched", () => {
     const clean = "yeah that makes sense. what does your training look like right now?";
-    expect(lintReply(clean)).toEqual({ text: clean, fixes: [], flags: [], blocked: false });
+    expect(lintReply(clean)).toEqual({ text: clean, fixes: [], flags: [], blocked: false, handoff: null });
+  });
+});
+
+describe("lintReply: knowledge handoff markers (fail-safe)", () => {
+  it.each([
+    ["<<HANDOFF:medical_question>>", "medical_question", false],
+    ["<<HANDOFF:missing_knowledge>>", "missing_knowledge", false],
+    ["  <<HANDOFF:missing_knowledge>>\n", "missing_knowledge", false],
+    ["Good question! <<HANDOFF:medical_question>>", "medical_question", true],
+    ["Totally, it's usually fine. <<HANDOFF:medical_question>> let me check", "medical_question", true],
+    ["<<HANDOFF>>", "missing_knowledge", true],
+    ["<<handoff: medical>>", "medical_question", true],
+    ["<< HANDOFF : missing_knowledge >>", "missing_knowledge", true],
+    ["HANDOFF:medical_question", "medical_question", true],
+  ])("%j is a handoff (%s), never sendable text", (raw, category, malformed) => {
+    const r = lintReply(raw);
+    expect(r.handoff).toEqual({ category, malformed });
+    expect(r.blocked).toBe(true);
+    expect(r.text).toBe("");
+  });
+
+  it.each([
+    "yeah the hand off to the coach happens on the call",
+    "we hand-off your plan every Monday",
+    "<<not a marker>> just brackets",
+    // Bare category words: a lead can ask the model to echo a word, so these
+    // must never pause a thread.
+    "medical_question",
+    "sure: missing_knowledge",
+  ])("ordinary text %j is not a handoff", (raw) => {
+    expect(lintReply(raw).handoff).toBeNull();
   });
 });

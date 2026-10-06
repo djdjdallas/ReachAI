@@ -3,7 +3,9 @@ import { createClient } from "@/lib/supabase/server";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import { generateReply } from "@/lib/anthropic";
 import { buildSystemPrompt } from "@/lib/prompts";
-import { getActiveOffer, ownerFromUser } from "@/lib/active-offer";
+import { ownerFromUser } from "@/lib/active-offer";
+import { loadReplyGrounding } from "@/lib/reply-grounding";
+import { holdingTextFor } from "@/lib/handoff-reply";
 import { lintReply } from "@/lib/reply-lint";
 import { enforceAiRateLimit } from "@/lib/rate-limit";
 
@@ -25,7 +27,8 @@ import { enforceAiRateLimit } from "@/lib/rate-limit";
  * Response:
  * {
  *   reply: string,
- *   hasBookingLink: boolean
+ *   hasBookingLink: boolean,
+ *   handoff?: "medical_question" | "missing_knowledge"  // reply is the holding text
  * }
  */
 export async function POST(request) {
@@ -83,10 +86,15 @@ export async function POST(request) {
       );
     }
 
+    const { activeOffer, knowledge } = await loadReplyGrounding(
+      getSupabaseAdmin(),
+      userProfile.id
+    );
     const systemPrompt = buildSystemPrompt(scriptConfig, calendlyUrl, {
       isPlayground: true,
       voiceProfile: userProfile.voice_profile,
-      activeOffer: await getActiveOffer(getSupabaseAdmin(), userProfile.id),
+      activeOffer,
+      knowledge,
       owner: ownerFromUser(userProfile),
     });
 
@@ -98,6 +106,15 @@ export async function POST(request) {
     const lint = lintReply(await generateReply(systemPrompt, cappedMessages), {
       bookingLink: calendlyUrl,
     });
+    // A knowledge handoff shows the owner exactly what a lead would get (the
+    // fixed holding text) plus why, so they can see the AI would hand off.
+    if (lint.handoff) {
+      return NextResponse.json({
+        reply: holdingTextFor(userProfile),
+        hasBookingLink: false,
+        handoff: lint.handoff.category,
+      });
+    }
     const reply = lint.text;
 
     const hasBookingLink = calendlyUrl
