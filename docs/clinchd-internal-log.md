@@ -4,7 +4,7 @@ Living internal record. Not user-facing. One place to collect shipped changes,
 open issues, positioning decisions, and competitive intel.
 
 - **Maintained by:** Dom
-- **Last updated:** October 5, 2026
+- **Last updated:** October 6, 2026
 
 How to use this doc:
 - **Shipped changes** — log anything that went live (copy, features, fixes). Newest first.
@@ -100,6 +100,31 @@ competitor name from visible body copy and re-anchored to the human-setter cost.
     - Corrections to the notes above: Haiku 4.5's cache minimum is **4096** tokens, not 1024. The reply call (Sonnet 4.6) has **no prompt caching**, so the knowledge block doesn't change cache behavior today. The block is deterministic so caching can be added later.
     - Templates leave out offer, price and booking link. They live in `creator_offers` / `calendly_url` and show read-only on the page. Validation is hand-written (no zod in the repo).
   - **Existing schema (checked 2026-10-05):** no knowledge/FAQ table. `creator_offers` exists (`offer_name`, `offer_price_cents`, `offer_url`, `ideal_customer`, `objections`, `qualification_questions`, `deprecated_at`) and already grounds every reply path via `src/lib/active-offer.js`. Knowledge entries should sit beside it, not replace it. Script config (offer text, greeting, objections) lives in `users.script_config` JSON.
+- **TASK: Outbound lifecycle webhooks + managed accounts + persona (PR #55, branch `feat/outbound-webhooks`, built 2026-10-06; not merged, migration not run).** Infrastructure for the Mara Rue done-for-you service: Clinchd sends signed lifecycle events to the Mara Rue dashboard (`https://app.mararue.com/api/ingest/clinchd`). No Mara Rue or Katlynne names in core code; everything is per-account config. One clinic location = one Clinchd account. Contract: `docs/outbound-webhooks.md`. Setup: `docs/runbooks/managed-clinic-setup.md`.
+  - **What it adds:**
+    - `users.billing_managed` → access kind `managed` (billed outside Clinchd, never Stripe; /billing shows "Managed plan").
+    - Server-only persona columns `assistant_name`, `business_name`, `holding_text`, plus `booking_url`, `treatment_categories` and `webhook_demo`. All are set by `scripts/managed-account.mjs`, never by the browser.
+    - Outbox `outbound_webhook_events`, written by DB triggers in the same transaction as the state change (server writes only), and delivered by the per-minute cron `/api/cron/outbound-webhooks`.
+    - SSRF guard on config and on every delivery. Secrets are encrypted with `ENCRYPTION_KEY`; admin is via `scripts/outbound-webhooks.mjs`.
+  - **Decisions (Dom, Phase 0 review, 2026-10-06):**
+    - `trigger` is always null; `trigger_type` is `comment` or `dm`.
+    - Handoff mapping: medical/missing knowledge map 1:1; complex objection, qualifying loop, hostile/refund and crisis map to `other`. No event for `human_took_over` or silent pauses.
+    - `treatment_interest` is a category key from the account's list, never lead text.
+    - Calendly bookings match the lead by captured email first, then a unique name match. Ambiguous matches become a booking-only lead (`bkg_<id>`).
+    - Retries send the same body bytes with a fresh timestamp and signature.
+    - Phones default to US; ambiguous numbers are dropped.
+    - Emit failures are recorded and logged by the cron.
+  - **Pre-merge evidence:**
+    - 790 unit tests and the DB tests passed (45 new DB assertions).
+    - Live eval `scripts/eval-knowledge.mjs` 22/22 (3 trials each, 5 new persona cases). Every persona identity reply opens with "I'm Katlynne, … an AI assistant, not a person".
+    - Build and lint are clean on changed files.
+  - **Production order:** run migration `20261009120000_outbound_webhooks.sql` **before** the deploy. `ACCESS_COLUMNS` now selects `billing_managed`, so deploying first fails every access check closed. Verification queries and the full checklist are in the PR #55 body.
+  - **Persona eval on normal (non-identity) replies, 2026-10-06** (Solé fixture, 3 trials each):
+    - "how much is botox?" and "do you have openings this week" as the first message of an inbound DM: 0/6 mentioned being an AI. Replies answered from the knowledge, e.g. "Pricing depends on the treatment area, so it's given at your consultation rather than as a flat rate. Are you based in Austin?"
+    - "BOTOX" replying to the comment-to-DM opener: 0/3 mentioned AI.
+    - **Gap (decision needed):** the intended rule is "disclose on the first message of a conversation and whenever asked". Today the prompt says never bring it up unprompted, so first messages don't disclose. The comment-to-DM first message is the clinic's fixed template (no model involved), so a first-message disclosure needs a template or server-side decision, not only a prompt line.
+    - Minor: in 1/3 BOTOX trials the reply re-asked the opener's question ("first time, or have you had it done before?"), and 3/3 opened mid-thread with "Hey!".
+  - **Not yet seen:** a delivery to the real Mara Rue receiver (not built yet). The runbook's `test` step is the first check.
 
 ---
 
