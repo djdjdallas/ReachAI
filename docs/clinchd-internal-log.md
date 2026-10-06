@@ -41,6 +41,15 @@ booking. You still close the call. That's the part only you can do.
 
 ## Shipped changes
 
+### 2026-10-06: Card-required trial and billing overhaul deployed (PR #51)
+Merged as `50c4d4b` at 04:57 UTC; Vercel production deploy `6876060079` completed about a minute later. Every deploy-checklist step was run by Dom and verified independently.
+
+- **What shipped:** one access check (`hasActiveAccess`) everywhere; card-required Stripe Checkout with a 7-day trial for new accounts only (an HMAC-of-email ledger blocks second trials, including after account deletion); idempotent Stripe webhook (processing/done claims); duplicate-subscription refund and cancel; browser-forged lead messages and DM-meter writes blocked by triggers; definer functions closed to the browser; inbound DMs stored at the lead's real send time; analytics, alerts and drip can never fail a webhook; comped accounts see "Complimentary plan" and can't buy; "no credit card" and the money-back guarantee removed from all copy.
+- **Sandbox run (2026-10-05, test mode):** all 11 test cases plus two Checkout tabs, late Meta delivery and Checkout expiry passed. Fixes found by the run shipped in the PR.
+- **Production order (2026-10-06):** H1 revokes (by hand, 2026-10-05), `20261007120000`, `20261007130000`, `20261007140000`, then back to back: `20261006130000`, ledger seed (12 rows), `20261006140000`, merge and deploy. `20261006140000` was first run in the wrong project and re-run in Reachai about a minute after the deploy; until then the webhook ran without dedupe, as designed (claims are skipped and logged when the table is missing); Dom reported the logs clean since deploy.
+- **Post-deploy checks:** production ledger fingerprint `d34171f05741` matches the seed; comped account loads the dashboard and Billing shows "Complimentary plan"; logs clean.
+- **Knowledge base work is unblocked** (it waited on this PR).
+
 ### 2026-06-03 — Homepage repositioned to "the setter you don't have to apply for"
 Applied the access-led positioning to the live homepage. Removed every
 competitor name from visible body copy and re-anchored to the human-setter cost.
@@ -66,6 +75,10 @@ competitor name from visible body copy and re-anchored to the human-setter cost.
 
 ## Open issues / things to fix
 
+- **Webhook dedupe not yet seen live.** `stripe_webhook_events` had 0 rows after the 2026-10-06 deploy because no Stripe event had arrived. Confirm on the next natural event (signup, renewal, portal change): delivery 200 and a row with `status = 'done'`. Don't resend events to test it.
+- **CI `db-checks` workflow: `npm ci` fails** because `package-lock.json` is out of sync with `package.json` (pre-existing on the base branch, not from PR #51). The `db-tests` job passes; the `definer-grants` job never reaches its checks. Fix the lockfile in the follow-up PR.
+- **CI live grant check is off.** Deploy step 3d was skipped: `ci_grant_reader` exists with no password, and the `SUPABASE_CI_DB_URL` secret isn't set. Set them when wanted (PR #51 checklist, step 3d: password via psql `\password`, never `ALTER ROLE ... PASSWORD`).
+- **Follow-up PR (queued, fresh session, branch from `claude/build-reachai-app-PeuJk`):** (1) plan limits: Base = 1,500 qualified conversations/month, Unlimited = unlimited; grep all copy (landing, pricing, FAQ, compare, blog CTAs, llms.txt, metadata, emails) for "500 DMs", "500 conversations" and other limit wording, rendering from `src/lib/plans.js` where copy comes from code; (2) show/hide password toggle on login and signup (eye button inside the field, `type="button"`, aria-label "Show password"/"Hide password", keep `current-password`/`new-password` autocomplete); (3) the CI lockfile fix above.
 - **Drip step 1 is marked sent even when the email fails.** Found in the 2026-10-05 sandbox run (PR #51). `/api/drip/enroll` sends step 1, then always inserts `email_events` `drip_step_1` and sets `drip_step: 1`, without checking `sendEmail`'s result (`{ success: false }` on a Resend error or missing key). A Resend outage at signup silently skips a new subscriber's welcome email forever; the cron only sends steps after the current one. Fix: advance and log only on `result.success`, as the drip cron already does; on failure leave `drip_step: 0` so the cron retries step 1. Follow-up, not in PR #51.
 - **Identity-by-proxy AI behavior.** "wait is this Dom?" still gets evasive replies. Tighten rule 7 in `prompts.js`. (Carried over from prior session note.)
 - **TASK: Business knowledge base (grounding for every account).** Added 2026-10-05. Without it the AI invents prices and policies or stays vague. Build for coaches too, not just the med spa.
@@ -79,7 +92,7 @@ competitor name from visible body copy and re-anchored to the human-setter cost.
   - **Decisions (Dom, 2026-10-05):**
     1. Medical/health handoff rule applies to ALL accounts, scoped to: medical conditions, injuries, medications, pregnancy, treatment suitability, and any health outcome claims. Normal coaching questions (training, mindset, offer details) are NOT handoffs.
     2. Fallback handoff only for price, availability, policy, plus the medical cases in 1.
-    3. Build order: (a) PostHog tracking PR (identify by Supabase user id, not email); (b) activation guard + 24h messaging window (Dom supplies the prompt); (c) card-required trial + access gating (Dom supplies the prompt; **access gating must use `hasActiveAccess`, never `onboarding_completed`, which the browser can set**); (d) KB PR A (table, settings editor with vertical templates, `<business_knowledge>` grounding, fallback via the existing human-handoff path); (e) KB PR B (unanswered-questions log, one-tap answer to FAQ). **Do not start KB until the billing PR (c) is merged.**
+    3. Build order: (a) PostHog tracking PR (identify by Supabase user id, not email); (b) activation guard + 24h messaging window (Dom supplies the prompt); (c) card-required trial + access gating (Dom supplies the prompt; **access gating must use `hasActiveAccess`, never `onboarding_completed`, which the browser can set**); (d) KB PR A (table, settings editor with vertical templates, `<business_knowledge>` grounding, fallback via the existing human-handoff path); (e) KB PR B (unanswered-questions log, one-tap answer to FAQ). **Do not start KB until the billing PR (c) is merged.** (Merged and deployed 2026-10-06 as PR #51.)
   - **Existing schema (checked 2026-10-05):** no knowledge/FAQ table. `creator_offers` exists (`offer_name`, `offer_price_cents`, `offer_url`, `ideal_customer`, `objections`, `qualification_questions`, `deprecated_at`) and already grounds every reply path via `src/lib/active-offer.js`. Knowledge entries should sit beside it, not replace it. Script config (offer text, greeting, objections) lives in `users.script_config` JSON.
 
 ---
