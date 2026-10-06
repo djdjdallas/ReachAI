@@ -216,6 +216,22 @@ expect "a phone emits once more" "2" "$(ev contact_captured)"
 expect "bad phone rejected by the table" "lead_profiles_phone_check" "$(as_role service_role "update public.lead_profiles set phone='555-0123' where conversation_id='$C1'")"
 expect "free-text treatment rejected by the table" "lead_profiles_treatment_interest_check" "$(as_role service_role "update public.lead_profiles set treatment_interest='I want botox for my migraines' where conversation_id='$C1'")"
 
+# Comment opener that Meta's echo saved first (staff message, native_send
+# thread), relabeled by the comment-to-DM path.
+C5=dddddddd-0000-0000-0000-000000000005
+srv "insert into public.conversations(id,user_id,origin) values ('$C5','$U1','native_send')" >/dev/null
+srv "insert into public.messages(id,conversation_id,role,content,source,provider_message_id) values ('eeeeeeee-0000-0000-0000-000000000005','$C5','assistant','Hi! I''m Katlynne, Solé Aesthetics'' AI concierge.','manual','mid-echo')" >/dev/null
+expect "echoed opener as a staff message emits nothing yet" "0" "$(ev dm_started "conversation_id='$C5'")"
+srv "update public.messages set source='agent' where id='eeeeeeee-0000-0000-0000-000000000005'" >/dev/null
+srv "update public.conversations set origin='clinchd_sent' where id='$C5'" >/dev/null
+expect "relabel to agent emits dm_started" "1" "$(ev dm_started "conversation_id='$C5'")"
+expect "relabel to clinchd_sent emits new_inquiry" "1" "$(ev new_inquiry "conversation_id='$C5'")"
+srv "update public.messages set source='agent' where id='eeeeeeee-0000-0000-0000-000000000005'" >/dev/null
+srv "update public.conversations set origin='clinchd_sent' where id='$C5'" >/dev/null
+expect "repeating the relabel emits nothing more" "1" "$(ev dm_started "conversation_id='$C5'")"
+srv "update public.conversations set origin='native_send' where id='$C1'" >/dev/null
+expect "a move to native_send emits nothing" "1" "$(ev new_inquiry "conversation_id='$C1'")"
+
 # A broken emit never fails the write it rides on, and is recorded.
 expect "write succeeds while the outbox is broken; failure recorded" "1" "$(q_last "begin; alter table public.outbound_webhook_events rename to owe_broken; set local role service_role; set local request.jwt.claims = '{\"role\":\"service_role\"}'; insert into public.conversations(user_id,origin) values ('$U1','inbound'); select count(*) from public.outbound_webhook_emit_failures where event_type='new_inquiry'; rollback;")"
 

@@ -27,6 +27,7 @@ import { ownerFromUser } from "@/lib/active-offer";
 import { loadReplyGrounding } from "@/lib/reply-grounding";
 import { holdingTextFor } from "@/lib/handoff-reply";
 import { captureLeadFacts } from "@/lib/outbound-webhooks/lead-capture";
+import { applyDisclosure, disclosureLine, needsFirstMessageDisclosure } from "@/lib/persona-disclosure";
 import { mentionsHealth } from "@/lib/health-keywords";
 import { lintReply } from "@/lib/reply-lint";
 import { findVoiceSnippetForIntent, getSendableAudioUrl } from "@/lib/voice/matcher";
@@ -1752,6 +1753,11 @@ async function processIncomingMessage({
         : null,
   });
 
+  // First-message AI disclosure (persona accounts only; null-op for coach
+  // accounts): the first message the lead receives says it's an AI. A voice
+  // memo can't carry it, so that turn goes out as text.
+  const discloseFirst = await needsFirstMessageDisclosure(supabase, user, conversation.id);
+
   // ── Voice routing ──────────────────────────────────────────────────
   // When the DM intent classifier returned a confident class AND the coach
   // has an active voice snippet for that class, send the audio and exit
@@ -1780,6 +1786,7 @@ async function processIncomingMessage({
   if (
     !handoff &&
     !healthKeyword &&
+    !discloseFirst &&
     dmIntent &&
     dmIntent.confidence >= VOICE_ROUTING_THRESHOLD
   ) {
@@ -1961,6 +1968,7 @@ async function processIncomingMessage({
     }
   }
   if (handoff) aiReply = holdingTextFor(user);
+  if (discloseFirst) aiReply = applyDisclosure(aiReply, disclosureLine(user));
 
   // Delay floor + pause re-check before the text send. Sits after generation
   // (so the sleep is only the remainder of the target) and BEFORE the reply

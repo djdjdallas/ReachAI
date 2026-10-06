@@ -72,10 +72,13 @@ export async function persistCommentDmConversation({
     if (providerMessageId) {
       const { data: existing } = await admin
         .from("messages")
-        .select("id")
+        .select("id, source, conversation_id")
         .eq("provider_message_id", providerMessageId)
         .maybeSingle();
-      if (existing) return;
+      if (existing) {
+        await reconcileEchoedOpener(admin, { message: existing, conversation });
+        return;
+      }
     }
 
     const { data: inserted, error: msgErr } = await admin
@@ -121,10 +124,44 @@ export async function persistCommentDmConversation({
   }
 }
 
+// Meta's echo of this DM can arrive before the send call returns. The echo
+// handler then saves the opener as a staff-typed message (source 'manual')
+// and, if the lead had no thread, creates one as origin 'native_send'. Both
+// are wrong for a DM the app sent: the opener would read as the owner's own
+// words, the disclosure check and the lifecycle webhooks would miss it, and
+// the thread would get cold-DM framing. Relabel them. The thread is only
+// relabeled when this opener is all it holds, so a real cold-DM thread the
+// clinic started by hand is never touched.
+async function reconcileEchoedOpener(admin, { message, conversation }) {
+  try {
+    if (message.conversation_id !== conversation.id) return;
+    if (message.source === "manual") {
+      await admin.from("messages").update({ source: "agent" }).eq("id", message.id).eq("source", "manual");
+    }
+    if (conversation.origin === "native_send") {
+      const { data: others } = await admin
+        .from("messages")
+        .select("id")
+        .eq("conversation_id", conversation.id)
+        .neq("id", message.id)
+        .limit(1);
+      if (!others?.length) {
+        await admin
+          .from("conversations")
+          .update({ origin: "clinchd_sent", missing_outbound_context: false })
+          .eq("id", conversation.id)
+          .eq("origin", "native_send");
+      }
+    }
+  } catch (err) {
+    console.error("[comment-dm-conversation] echo reconcile failed:", { conversationId: conversation.id, error: err?.message });
+  }
+}
+
 async function findOrCreateConversation(admin, { userId, recipientIgsid, senderName }) {
   const { data: existing } = await admin
     .from("conversations")
-    .select("id")
+    .select("id, origin")
     .eq("user_id", userId)
     .eq("instagram_sender_id", recipientIgsid)
     .maybeSingle();
@@ -149,7 +186,7 @@ async function findOrCreateConversation(admin, { userId, recipientIgsid, senderN
       // missing outbound context (no backfill banner).
       missing_outbound_context: false,
     })
-    .select("id")
+    .select("id, origin")
     .single();
 
   if (created) return created;
@@ -159,7 +196,7 @@ async function findOrCreateConversation(admin, { userId, recipientIgsid, senderN
   if (error?.code === "23505") {
     const { data: raced } = await admin
       .from("conversations")
-      .select("id")
+      .select("id, origin")
       .eq("user_id", userId)
       .eq("instagram_sender_id", recipientIgsid)
       .maybeSingle();

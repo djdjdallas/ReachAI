@@ -9,6 +9,7 @@ import { generateReply } from "@/lib/anthropic";
 import { ownerFromUser } from "@/lib/active-offer";
 import { loadReplyGrounding } from "@/lib/reply-grounding";
 import { lintReply } from "@/lib/reply-lint";
+import { discloseOnFirstMessage } from "@/lib/persona-disclosure";
 
 // The core engine. Re-verifies ALL 8 conditions at FIRE time (state changes
 // constantly between schedule and fire) and only then sends. Every skip path
@@ -224,6 +225,13 @@ export async function processDrip(dripRow) {
       });
     }
   }
+
+  // First-message AI disclosure (persona accounts only): normally the lead
+  // already got a disclosed reply, but if every earlier reply failed to send
+  // this nudge is the first thing they receive.
+  nudgeText = await discloseOnFirstMessage(admin, user, nudgeText, {
+    conversationId: dripRow.conversation_id,
+  });
 
   // ── ALL 8 CONDITIONS PASSED — send the nudge ──────────────────────────
   try {

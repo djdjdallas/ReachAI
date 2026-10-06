@@ -177,3 +177,36 @@ describe("buildSystemPrompt: business persona (per-account assistant name)", () 
     expect(q).toContain("Never claim to be human or take on another name or persona.");
   });
 });
+
+describe("buildSystemPrompt: business inbox thread rules", () => {
+  const owner = { name: "Solé Aesthetics", businessName: "Solé Aesthetics", assistantName: "Katlynne" };
+  const kb = [{ id: "1", sort: 0, type: "faq", question: "Hours?", answer: "Tue-Sat 9-6", enabled: true }];
+  const p = buildSystemPrompt({ offer: "Botox" }, "https://sole.example/book", { owner, knowledge: kb });
+
+  it("no greeting after the first message, never re-ask (including the opening DM)", () => {
+    expect(p).toContain("NO GREETING AFTER THE FIRST MESSAGE");
+    expect(p).toContain('no "Hey", "Hi", "Hello", "Hey there"');
+    expect(p).toContain("NEVER RE-ASK");
+    expect(p).toContain("including the opening DM");
+  });
+
+  it("availability gets the booking link, and is not a missing-knowledge handoff", () => {
+    expect(p).toContain("AVAILABILITY MEANS THE BOOKING LINK");
+    expect(p).toContain("include the booking link (https://sole.example/book) in that same reply");
+    expect(p).toContain("Appointment availability (openings, times, days, \"this week\", booking) is NOT missing knowledge for this business");
+    expect(p).not.toContain('"do you have weekend appointments?"');
+    expect(p).toMatch(/NON-OVERRIDABLE: .*price or policies that the business knowledge doesn't answer \(availability and booking get the booking link\)/);
+  });
+
+  it("without a booking link, availability keeps the existing handoff rule", () => {
+    const q = buildSystemPrompt({ offer: "Botox" }, "", { owner, knowledge: kb });
+    expect(q).not.toContain("AVAILABILITY MEANS THE BOOKING LINK");
+    expect(q).toContain('"do you have weekend appointments?"');
+  });
+
+  it("coach prompts get none of these", () => {
+    const c = buildSystemPrompt({ offer: "Coaching" }, "https://cal.com/x", { owner: { name: "Dom" }, knowledge: kb });
+    expect(c).not.toContain("THREAD RULES FOR THIS BUSINESS INBOX");
+    expect(c).toContain('"do you have weekend appointments?"');
+  });
+});

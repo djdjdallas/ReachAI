@@ -8,6 +8,7 @@ import { canUseCommentToDM } from "@/lib/comment-to-dm-gate";
 import { ACCESS_COLUMNS } from "@/lib/billing/status";
 import { maybePostPublicReply } from "@/lib/comment-public-reply";
 import { persistCommentDmConversation } from "@/lib/comment-dm-conversation";
+import { disclosureLine, discloseOnFirstMessage } from "@/lib/persona-disclosure";
 
 // Phase 2 of the comment-to-DM pipeline. Receives a single change object
 // from a Meta Instagram webhook payload (entry.changes[i] where
@@ -73,7 +74,7 @@ async function processCommentEvent(entry, change) {
   const { data: ownerUser, error: ownerErr } = await admin
     .from("users")
     .select(
-      `id, email, meta_page_access_token, instagram_business_account_id, comment_public_reply_enabled, ${ACCESS_COLUMNS}`
+      `id, email, meta_page_access_token, instagram_business_account_id, comment_public_reply_enabled, business_name, assistant_name, ${ACCESS_COLUMNS}`
     )
     .eq("instagram_business_account_id", igbaId)
     .maybeSingle();
@@ -337,10 +338,28 @@ async function processCommentEvent(entry, change) {
     return;
   }
 
+  // First-message AI disclosure (persona accounts only): when this DM is the
+  // first thing the lead gets from the app, the server prepends the
+  // disclosure and drops the template's own leading greeting.
+  let dmText = decision.rendered;
+  if (disclosureLine(ownerUser)) {
+    const { data: existingConv } = fromId
+      ? await admin
+          .from("conversations")
+          .select("id")
+          .eq("user_id", creatorId)
+          .eq("instagram_sender_id", fromId)
+          .maybeSingle()
+      : { data: null };
+    dmText = await discloseOnFirstMessage(admin, ownerUser, decision.rendered, {
+      conversationId: existingConv?.id || null,
+    });
+  }
+
   const result = await sendPrivateReplyToComment(
     ownerUser.instagram_business_account_id,
     commentId,
-    decision.rendered,
+    dmText,
     pageToken
   );
 
@@ -349,6 +368,7 @@ async function processCommentEvent(entry, change) {
       admin,
       {
         ...logFields,
+        rendered_dm: dmText,
         dispatched: true,
         dispatched_at: new Date().toISOString(),
         dispatched_message_id: result.messageId || null,
@@ -369,7 +389,7 @@ async function processCommentEvent(entry, change) {
       userId: creatorId,
       recipientIgsid: fromId,
       senderName: fromUsername,
-      renderedDm: decision.rendered,
+      renderedDm: dmText,
       providerMessageId: result.messageId || null,
       commentText,
     });

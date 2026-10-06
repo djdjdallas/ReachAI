@@ -589,9 +589,15 @@ function makeDb() {
                 return b;
               };
             }
-            if (prop === "eq" || prop === "is" || prop === "neq") {
+            if (prop === "eq" || prop === "is" || prop === "neq" || prop === "in" || prop === "ilike") {
               return (col, val) => {
                 q.filters.push([prop, col, val]);
+                return b;
+              };
+            }
+            if (prop === "not") {
+              return (col, op, val) => {
+                q.filters.push([`not.${op}`, col, val]);
                 return b;
               };
             }
@@ -623,9 +629,23 @@ function makeDb() {
       return { data: self.state.conversation, error: null };
     }
     if (table === "messages" && op === "select") {
-      const mid = filterVal(q, "provider_message_id");
+      const mid = q.filters.find(([op, c]) => op === "eq" && c === "provider_message_id")?.[2];
       if (mid !== undefined) {
         const hit = self.state.messages.find((m) => m.provider_message_id === mid) || null;
+        return { data: hit, error: null };
+      }
+      // Filtered reads (the first-message disclosure check) apply their
+      // filters; everything else keeps the old return-all behavior.
+      if (q.filters.some(([op]) => op === "in" || op === "ilike" || op.startsWith("not."))) {
+        const hit = self.state.messages.filter((m) =>
+          q.filters.every(([op, col, val]) => {
+            if (op === "eq") return m[col] === val;
+            if (op === "in") return val.includes(m[col]);
+            if (op === "not.is") return (m[col] ?? null) !== val;
+            if (op === "ilike") return new RegExp(`^${val.replace(/%/g, ".*")}$`, "i").test(m[col] || "");
+            return true;
+          })
+        );
         return { data: hit, error: null };
       }
       return { data: q.single ? null : self.state.messages.slice(), error: null };
@@ -650,3 +670,88 @@ function makeDb() {
   self.reset();
   return self;
 }
+
+describe("first-message AI disclosure (persona accounts)", () => {
+  const LINE = "Hi! I'm Katlynne, Solé Aesthetics' AI concierge.";
+  const persona = (o = {}) => user({ business_name: "Solé Aesthetics", assistant_name: "Katlynne", ...o });
+  const sentText = () => ig.sendInstagramMessage.mock.calls[0][2];
+
+  it("the first reply in a thread gets the disclosure, and the model's greeting is dropped", async () => {
+    db.state.user = persona();
+    ai.generateReply.mockResolvedValueOnce("Hey! Pricing is given at your consultation. What area are you thinking about?");
+
+    await POST(inbound("how much is botox?"));
+
+    expect(sentText()).toBe(`${LINE} Pricing is given at your consultation. What area are you thinking about?`);
+    // Saved exactly as sent, so the echo twin-matches it and later turns see it.
+    expect(db.inserted("messages").find((m) => m.role === "assistant").content).toBe(sentText());
+  });
+
+  it("never repeats once the lead has received an app-sent message", async () => {
+    db.state.user = persona();
+    db.state.conversation = { id: "conv-1", user_id: "user-1", instagram_sender_id: LEAD, status: "qualifying", ai_paused: false, origin: "clinchd_sent" };
+    db.state.messages.push(
+      { id: "m0", conversation_id: "conv-1", role: "assistant", source: "agent", provider_message_id: "out-0", content: `${LINE} Thanks for commenting. First time trying Botox?` },
+      { id: "m1", conversation_id: "conv-1", role: "user", source: "lead", provider_message_id: "in-0", content: "BOTOX" }
+    );
+    ai.generateReply.mockResolvedValueOnce("Love it. Are you looking to smooth existing lines or more preventative?");
+
+    await POST(inbound("yes first time", "mid-2"));
+
+    expect(sentText()).toBe("Love it. Are you looking to smooth existing lines or more preventative?");
+  });
+
+  it("an earlier reply that was never sent (no Meta id) doesn't count: the next one discloses", async () => {
+    db.state.user = persona();
+    db.state.conversation = { id: "conv-1", user_id: "user-1", instagram_sender_id: LEAD, status: "new", ai_paused: false, origin: "inbound" };
+    db.state.messages.push({ id: "m0", conversation_id: "conv-1", role: "assistant", source: "agent", provider_message_id: null, content: "rate-limited reply" });
+    ai.generateReply.mockResolvedValueOnce("We're open Tuesday to Saturday.");
+
+    await POST(inbound("do you have openings this week", "mid-3"));
+
+    expect(sentText()).toBe(`${LINE} We're open Tuesday to Saturday.`);
+  });
+
+  it("a comment opener Meta echoed as a staff message still counts as disclosed", async () => {
+    db.state.user = persona();
+    db.state.conversation = { id: "conv-1", user_id: "user-1", instagram_sender_id: LEAD, status: "new", ai_paused: false, origin: "native_send" };
+    db.state.messages.push({ id: "m0", conversation_id: "conv-1", role: "assistant", source: "manual", provider_message_id: "out-0", content: `${LINE} Thanks for commenting!` });
+    ai.generateReply.mockResolvedValueOnce("Nice, which area?");
+
+    await POST(inbound("BOTOX", "mid-4"));
+
+    expect(sentText()).toBe("Nice, which area?");
+  });
+
+  it("the holding text on a first-message handoff carries the disclosure too", async () => {
+    db.state.user = persona();
+    gate.decideIntentGate.mockReturnValueOnce({ action: "handoff", category: "medical_question" });
+
+    await POST(inbound("is botox safe while breastfeeding"));
+
+    expect(sentText()).toBe(`${LINE} Good question, let me check on that and get back to you.`);
+  });
+
+  it("a voice memo can't carry the disclosure, so the first turn is text", async () => {
+    db.state.user = persona();
+    dmIntent.classifyDMIntent.mockResolvedValueOnce({ class: "warm_intent", confidence: 0.95, signals: [] });
+    matcher.findVoiceSnippetForIntent.mockResolvedValue({ snippet: { id: "v1", label: "hi", storage_path: "x" }, reason: null });
+    ai.generateReply.mockResolvedValueOnce("Pricing is given at your consultation.");
+
+    await POST(inbound("how much is botox"));
+
+    expect(matcher.findVoiceSnippetForIntent).not.toHaveBeenCalled();
+    expect(voice.sendVoiceMessage).not.toHaveBeenCalled();
+    expect(sentText()).toBe(`${LINE} Pricing is given at your consultation.`);
+    matcher.findVoiceSnippetForIntent.mockResolvedValue({ snippet: null, reason: "no_snippet" });
+  });
+
+  it("coach accounts (no business_name) are unchanged", async () => {
+    db.state.user = user({ assistant_name: "Katlynne" });
+    ai.generateReply.mockResolvedValueOnce("Hey! Coaching is $550.");
+
+    await POST(inbound());
+
+    expect(sentText()).toBe("Hey! Coaching is $550.");
+  });
+});

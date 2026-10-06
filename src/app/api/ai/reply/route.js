@@ -6,6 +6,7 @@ import { buildSystemPrompt } from "@/lib/prompts";
 import { ownerFromUser } from "@/lib/active-offer";
 import { loadReplyGrounding } from "@/lib/reply-grounding";
 import { lintReply } from "@/lib/reply-lint";
+import { discloseOnFirstMessage } from "@/lib/persona-disclosure";
 import { sendInstagramMessage } from "@/lib/instagram";
 import { decryptToken } from "@/lib/token-utils";
 import { getPostHogClient } from "@/lib/posthog-server";
@@ -234,6 +235,11 @@ export async function POST(request) {
         );
       }
       replyContent = lint.text;
+      // First-message AI disclosure (persona accounts only), the same as
+      // the webhook's reply path.
+      replyContent = await discloseOnFirstMessage(getSupabaseAdmin(), userProfile, replyContent, {
+        conversationId,
+      });
     }
 
     // Save message to database

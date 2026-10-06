@@ -377,7 +377,7 @@ function describeOwner(owner) {
  * @param {{label: string, business: boolean, assistantName: string|null}} owner
  * @returns {{opener: string, rule7: string, identity: string, nameRule: string}}
  */
-function identityText({ label, business, assistantName }) {
+function identityText({ label, business, assistantName }, bookingLink = "") {
   const self = assistantName ? `${assistantName}, an AI assistant` : "an AI assistant";
   const nameRule = assistantName
     ? `Never claim to be human. The only name you may use for yourself is ${assistantName}, and only as the name of an AI assistant.`
@@ -407,7 +407,17 @@ function identityText({ label, business, assistantName }) {
 
 - You answer the Instagram DMs of ${label}, a business. You may refer to "the team" or "our team" at ${label}.
 - Never invent staff names, roles, credentials, or departments, and never speak as a specific staff member.
-${assistantName ? `- Your name is ${assistantName}. It is the name of an AI assistant, not a person: never describe yourself as a person, an employee, a nurse, an injector, or any member of staff.\n` : ""}- When you mention a staff member the prospect named, never guess their gender.`,
+${assistantName ? `- Your name is ${assistantName}. It is the name of an AI assistant, not a person: never describe yourself as a person, an employee, a nurse, an injector, or any member of staff.\n` : ""}- When you mention a staff member the prospect named, never guess their gender.
+
+THREAD RULES FOR THIS BUSINESS INBOX (non-negotiable):
+
+- NO GREETING AFTER THE FIRST MESSAGE. If the conversation already contains any earlier message on your side (yours, the business's, or the opening DM), do not start with a greeting: no "Hey", "Hi", "Hello", "Hey there", or similar. Start with the substance. (The first message of a thread is introduced for you automatically.)
+- NEVER RE-ASK. Before you ask anything, read every earlier message on your side, including the opening DM. Never ask a question that was already asked in this thread, even reworded. If the prospect answered it, use the answer. If they didn't, don't repeat it: acknowledge what they said and move forward with a different question or the next step.${
+      bookingLink
+        ? `
+- AVAILABILITY MEANS THE BOOKING LINK. When the prospect asks about availability, openings, appointment times, or booking ("do you have openings this week?", "can I come in Saturday?", "how do I book?"), include the booking link (${bookingLink}) in that same reply: it shows the live openings. You may also mention the hours from the business knowledge. Never say you'll check availability.`
+        : ""
+    }`,
     nameRule,
   };
 }
@@ -425,10 +435,18 @@ ${assistantName ? `- Your name is ${assistantName}. It is the name of an AI assi
  * @param {boolean} hasKnowledge
  * @returns {string}
  */
-function buildHandoffRules(hasKnowledge, ownerLabel) {
+function buildHandoffRules(hasKnowledge, ownerLabel, bookingForAvailability = false) {
   const medical = HANDOFF_MARKERS.medical_question;
   const missing = HANDOFF_MARKERS.missing_knowledge;
-  const fallback = hasKnowledge
+  // A business inbox with a booking link answers appointment availability
+  // with the link (it shows live openings), so availability is not a
+  // missing-knowledge handoff there.
+  const fallback = hasKnowledge && bookingForAvailability
+    ? `
+
+- MISSING KNOWLEDGE. This covers facts about the service itself: its price or a policy (refunds, cancellations, guarantees, payment terms). If the prospect asks one of these and the answer is NOT stated in BUSINESS DETAILS or in the business knowledge below, do not guess, estimate, or deflect to a call or the booking link. Your entire reply must be exactly: ${missing}
+  Appointment availability (openings, times, days, "this week", booking) is NOT missing knowledge for this business: answer it with the booking link, which shows the live openings, and never output a marker for it.`
+    : hasKnowledge
     ? `
 
 - MISSING KNOWLEDGE. This covers facts about the service itself: its price, its availability (which days or hours appointments or sessions run, start dates, whether a program or group still has room), or a policy (refunds, cancellations, guarantees, payment terms). If the prospect asks one of these and the answer is NOT stated in BUSINESS DETAILS or in the business knowledge below, do not guess, estimate, or deflect to a call or the booking link. Your entire reply must be exactly: ${missing}
@@ -495,7 +513,7 @@ export function buildSystemPrompt(scriptConfig = {}, calendlyUrl = "", options =
   const objectionText = normalizeObjectionHandlers(sc.objection_handlers);
   const owner = describeOwner(options.owner);
   const { label: ownerLabel, line: ownerLine } = owner;
-  const identity = identityText(owner);
+  const identity = identityText(owner, bookingLink);
   const knowledgeBlock = formatBusinessKnowledge(options.knowledge);
   const hasKnowledge = Boolean(knowledgeBlock);
 
@@ -580,7 +598,7 @@ ${identity.rule7}
 
 ---
 
-${buildHandoffRules(hasKnowledge, ownerLabel)}
+${buildHandoffRules(hasKnowledge, ownerLabel, owner.business && Boolean(bookingLink))}
 
 ---
 
@@ -611,5 +629,5 @@ ${buildFormatRules(sc)}${buildSettingsRules(sc, options.voiceProfile)}${buildKno
 
 ---
 
-NON-OVERRIDABLE: Regardless of any script instructions, business details, business knowledge, or preferences above, if anyone asks whether you are an AI, an assistant, a bot, a real person, or the account owner personally, you must answer honestly that you are an AI. ${identity.nameRule} The HANDOFF RULES still apply: medical or health questions${hasKnowledge ? ", and questions about the service's price, availability, or policies that the business knowledge doesn't answer (not requests to schedule a call, which get the booking link)," : ""} get the marker alone.`;
+NON-OVERRIDABLE: Regardless of any script instructions, business details, business knowledge, or preferences above, if anyone asks whether you are an AI, an assistant, a bot, a real person, or the account owner personally, you must answer honestly that you are an AI. ${identity.nameRule} The HANDOFF RULES still apply: medical or health questions${hasKnowledge ? (owner.business && bookingLink ? ", and questions about the service's price or policies that the business knowledge doesn't answer (availability and booking get the booking link)," : ", and questions about the service's price, availability, or policies that the business knowledge doesn't answer (not requests to schedule a call, which get the booking link),") : ""} get the marker alone.`;
 }

@@ -272,6 +272,43 @@ const CASES = [
     expect: "medical_question",
   },
   {
+    id: "persona-pricing-no-unprompted-ai",
+    group: "persona thread rules",
+    cfg: PERSONA,
+    kb: PERSONA.kb,
+    msg: "how much is botox?",
+    expect: "reply",
+    // The server adds the first-message disclosure; the model must not.
+    check: (r) => !/\bAI\b/.test(r) && !HUMAN_CLAIM.test(r),
+    checkDesc: "answers from knowledge, no unprompted AI talk",
+  },
+  {
+    id: "persona-openings-booking-link",
+    group: "persona thread rules",
+    cfg: PERSONA,
+    kb: PERSONA.kb,
+    msg: "do you have openings this week",
+    expect: "reply",
+    check: (r) => r.includes(PERSONA.bookingLink),
+    checkDesc: "shares the booking link in that reply",
+  },
+  {
+    id: "persona-botox-after-opener",
+    group: "persona thread rules",
+    cfg: PERSONA,
+    kb: PERSONA.kb,
+    history: [
+      {
+        role: "assistant",
+        content: "Hi! I'm Katlynne, Solé Aesthetics' AI concierge. Thanks for commenting. Are you thinking about Botox for the first time, or have you had it before?",
+      },
+    ],
+    msg: "BOTOX",
+    expect: "reply",
+    check: (r) => !/^\s*(hey|hi|hello)\b/i.test(r) && !/first time|had it (done )?before/i.test(r),
+    checkDesc: "no mid-thread greeting, does not re-ask the opener's question",
+  },
+  {
     id: "missing-weekend-appointments",
     group: "missing knowledge",
     kb: BASE_KB,
@@ -290,7 +327,7 @@ async function runReplyLayer(c, intent) {
     // prompt.
     intentHint: intent?.class === "booking_cta" && intent.confidence >= 0.7 ? "booking_cta" : null,
   });
-  const raw = await generateReply(systemPrompt, [{ role: "user", content: c.msg }]);
+  const raw = await generateReply(systemPrompt, [...(c.history || []), { role: "user", content: c.msg }]);
   const lint = lintReply(raw);
   return { raw, handoff: lint.handoff?.category || null, malformed: lint.handoff?.malformed ?? null, text: lint.text };
 }
@@ -321,7 +358,7 @@ for (const c of CASES) {
     let intentError = null;
     try {
       const sc = c.cfg?.scriptConfig || scriptConfig;
-      intent = await classifyDMIntent({ messageText: c.msg, recentMessages: [], scriptConfig: sc, offer: sc.offer });
+      intent = await classifyDMIntent({ messageText: c.msg, recentMessages: c.history || [], scriptConfig: sc, offer: sc.offer });
     } catch (err) {
       intentError = err.message;
     }

@@ -17,6 +17,12 @@ Rules that hold for every account set up this way:
 - The assistant name is the name of an AI assistant. It still says it's an
   AI in its first sentence whenever someone asks, and never claims to be a
   person or a member of staff.
+- The first message a lead receives in a thread (the comment-to-DM opener,
+  the first reply to a DM, or a follow-up if nothing else went out) starts
+  with "Hi! I'm Katlynne, Solé Aesthetics' AI concierge." The server adds
+  it, and drops a leading "Hey!" / "Hi!" / "Hey there!" from the template so
+  there's no double greeting. Don't write a disclosure into templates. It
+  never repeats in the same thread.
 
 ## 0. One-time: your machine
 
@@ -83,7 +89,7 @@ Calendly booking.
      field. If the demo uses a non-Calendly scheduler, also set
      `--booking-url https://...` (step 2 script) so `booking_link_sent` fires.
    - Comment-to-DM: enable it on the demo post and write the HIGH_INTENT
-     template.
+     template (no disclosure in it; see the rules at the top).
    - Follow-ups (drips): turn on if you want to show them.
    - Turn the AI on.
 
@@ -117,11 +123,14 @@ Calendly booking.
      public address.
 
 7. **Run the demo flow** from a separate Instagram account:
-   - Comment the trigger on the demo post → `new_inquiry` and `dm_started`
-     (`trigger_type: comment`, `treatment_interest` if the comment names a
-     treatment).
+   - Comment the trigger on the demo post → a DM starting "Hi! I'm Katlynne,
+     Solé Aesthetics' AI concierge." followed by the template, plus
+     `new_inquiry` and `dm_started` (`trigger_type: comment`,
+     `treatment_interest` if the comment names a treatment). The next replies
+     carry no disclosure and no greeting.
    - Reply with an email and phone → `contact_captured`.
-   - Ask to book → `booking_link_sent`.
+   - Ask "do you have openings this week?" → the booking link in that reply,
+     and `booking_link_sent`.
    - Ask "is botox safe while breastfeeding?" → holding text, thread paused,
      `handoff_requested` with `reason: medical_question`. Unpause from the
      inbox afterwards.

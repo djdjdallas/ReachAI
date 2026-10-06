@@ -279,7 +279,9 @@ $$;
 -- new_inquiry: a lead's conversation is created by the server. 'inbound' is
 -- an inbound-first DM; 'clinchd_sent' is the comment-to-DM path (the only
 -- server path that inserts that origin). 'native_send' (the clinic's own
--- typed cold DM) is not an inquiry.
+-- typed cold DM) is not an inquiry. Also fires when the comment-to-DM path
+-- relabels a thread that Meta's echo created as 'native_send' before the
+-- send returned (src/lib/comment-dm-conversation.js reconcileEchoedOpener).
 create or replace function public.outbound_on_conversation_insert()
 returns trigger
 language plpgsql
@@ -291,7 +293,8 @@ begin
                 current_setting('request.jwt.claim.role', true), '') in ('authenticated', 'anon') then
       return null;
     end if;
-    if new.origin in ('inbound', 'clinchd_sent') then
+    if new.origin in ('inbound', 'clinchd_sent')
+       and (tg_op = 'INSERT' or old.origin is distinct from new.origin) then
       perform public.outbound_emit(new.user_id, 'new_inquiry', 'new_inquiry:' || new.id, new.id, null, '{}'::jsonb);
     end if;
   exception when others then
@@ -307,7 +310,7 @@ $$;
 
 drop trigger if exists outbound_on_conversation_insert on public.conversations;
 create trigger outbound_on_conversation_insert
-  after insert on public.conversations
+  after insert or update of origin on public.conversations
   for each row execute function public.outbound_on_conversation_insert();
 
 -- handoff_requested: ai_paused goes false -> true. Only the pauses that
@@ -362,6 +365,9 @@ create trigger outbound_on_conversation_pause
 -- app wrote (source agent or drip) was actually delivered, i.e. its Meta
 -- message id is set. Reply rows are saved before the send and keep no id
 -- when the send fails or is rate-limited, so the id is the proof of send.
+-- Fires when a row first becomes "app-sent with an id": on insert, when the
+-- id is stamped, or when an echoed comment opener is relabeled from
+-- 'manual' to 'agent'.
 create or replace function public.outbound_on_message_sent()
 returns trigger
 language plpgsql
@@ -379,7 +385,7 @@ begin
        or new.role <> 'assistant'
        or new.source not in ('agent', 'drip')
        or new.provider_message_id is null
-       or (tg_op = 'UPDATE' and old.provider_message_id is not null) then
+       or (tg_op = 'UPDATE' and old.provider_message_id is not null and old.source in ('agent', 'drip')) then
       return null;
     end if;
 
@@ -419,7 +425,7 @@ $$;
 
 drop trigger if exists outbound_on_message_sent on public.messages;
 create trigger outbound_on_message_sent
-  after insert or update of provider_message_id on public.messages
+  after insert or update of provider_message_id, source on public.messages
   for each row execute function public.outbound_on_message_sent();
 
 -- consultation_booked: a real Calendly booking (source 'calendly' with an

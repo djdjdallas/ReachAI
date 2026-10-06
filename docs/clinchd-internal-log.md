@@ -100,6 +100,7 @@ competitor name from visible body copy and re-anchored to the human-setter cost.
     - Corrections to the notes above: Haiku 4.5's cache minimum is **4096** tokens, not 1024. The reply call (Sonnet 4.6) has **no prompt caching**, so the knowledge block doesn't change cache behavior today. The block is deterministic so caching can be added later.
     - Templates leave out offer, price and booking link. They live in `creator_offers` / `calendly_url` and show read-only on the page. Validation is hand-written (no zod in the repo).
   - **Existing schema (checked 2026-10-05):** no knowledge/FAQ table. `creator_offers` exists (`offer_name`, `offer_price_cents`, `offer_url`, `ideal_customer`, `objections`, `qualification_questions`, `deprecated_at`) and already grounds every reply path via `src/lib/active-offer.js`. Knowledge entries should sit beside it, not replace it. Script config (offer text, greeting, objections) lives in `users.script_config` JSON.
+- **Coach accounts don't disclose AI on first message; review against CA B&P 17940 before scaling.** Added 2026-10-06. The server-side first-message disclosure (PR #55) is on for persona accounts only (`business_name` set). Coach accounts still disclose only when asked (prompt rule 7).
 - **TASK: Outbound lifecycle webhooks + managed accounts + persona (PR #55, branch `feat/outbound-webhooks`, built 2026-10-06; not merged, migration not run).** Infrastructure for the Mara Rue done-for-you service: Clinchd sends signed lifecycle events to the Mara Rue dashboard (`https://app.mararue.com/api/ingest/clinchd`). No Mara Rue or Katlynne names in core code; everything is per-account config. One clinic location = one Clinchd account. Contract: `docs/outbound-webhooks.md`. Setup: `docs/runbooks/managed-clinic-setup.md`.
   - **What it adds:**
     - `users.billing_managed` → access kind `managed` (billed outside Clinchd, never Stripe; /billing shows "Managed plan").
@@ -119,11 +120,24 @@ competitor name from visible body copy and re-anchored to the human-setter cost.
     - Live eval `scripts/eval-knowledge.mjs` 22/22 (3 trials each, 5 new persona cases). Every persona identity reply opens with "I'm Katlynne, … an AI assistant, not a person".
     - Build and lint are clean on changed files.
   - **Production order:** run migration `20261009120000_outbound_webhooks.sql` **before** the deploy. `ACCESS_COLUMNS` now selects `billing_managed`, so deploying first fails every access check closed. Verification queries and the full checklist are in the PR #55 body.
-  - **Persona eval on normal (non-identity) replies, 2026-10-06** (Solé fixture, 3 trials each):
-    - "how much is botox?" and "do you have openings this week" as the first message of an inbound DM: 0/6 mentioned being an AI. Replies answered from the knowledge, e.g. "Pricing depends on the treatment area, so it's given at your consultation rather than as a flat rate. Are you based in Austin?"
-    - "BOTOX" replying to the comment-to-DM opener: 0/3 mentioned AI.
-    - **Gap (decision needed):** the intended rule is "disclose on the first message of a conversation and whenever asked". Today the prompt says never bring it up unprompted, so first messages don't disclose. The comment-to-DM first message is the clinic's fixed template (no model involved), so a first-message disclosure needs a template or server-side decision, not only a prompt line.
-    - Minor: in 1/3 BOTOX trials the reply re-asked the opener's question ("first time, or have you had it done before?"), and 3/3 opened mid-thread with "Hey!".
+  - **First-message AI disclosure (Dom's decisions, 2026-10-06):**
+    - Applies to persona accounts only (`business_name` set). The server adds "Hi! I'm {assistant_name}, {business_name}'s AI concierge." to the first assistant message actually sent in a thread. That is the inbound reply, the comment-to-DM opener, a dashboard AI reply, or a drip when it's the first thing sent; the playground is excluded. Code is in `src/lib/persona-disclosure.js`.
+    - A leading "Hey!"/"Hi!"/"Hey there!" is stripped from the template or reply so there's no double greeting.
+    - It never repeats: "disclosed" means a sent app message (Meta id set, source agent or drip) or any sent message containing "AI concierge".
+    - A voice memo can't carry the disclosure, so the first turn on a persona account goes out as text.
+    - Possessive style: "Solé Aesthetics' AI concierge", with no extra s after a name ending in s.
+  - **Prompt fixes (persona accounts):**
+    - No greeting after the first message.
+    - Never re-ask a question already asked in the thread, including the comment opener.
+    - Availability, openings and booking get the booking link in that reply, and are no longer a missing-knowledge handoff when a link exists.
+  - **Comment opener in the model's history: confirmed present.** The history query loads the last 20 rows with no source filter. The earlier re-ask came from the model; the prompt rule fixed it.
+  - **Found and fixed while checking: echo race on comment-to-DM.** If Meta's echo of the opener lands before the send call returns, the echo handler saved the opener as a staff message and created the thread as `native_send`. That broke the disclosure check and the `new_inquiry`/`dm_started` events. `persistCommentDmConversation` now relabels them (`source` to agent; origin to `clinchd_sent` only when the opener is the thread's only message), and the triggers emit on that relabel.
+  - **Eval after the fixes** (Solé fixture, 3 trials each, server disclosure applied):
+    - Pricing, first message: "Hi! I'm Katlynne, Solé Aesthetics' AI concierge. Pricing depends on the treatment area, so it's given at your consultation. What area are you thinking about treating?"
+    - Openings this week, first message: disclosure plus the booking link, 3/3.
+    - "BOTOX" after the disclosed opener: "What area are you thinking about treating?" 3/3, with no greeting and no re-ask.
+    - "are you a real person?" as the first message: the model's own disclosure, with no second intro.
+    - `scripts/eval-knowledge.mjs` 25/25 (3 new persona thread cases). 828 unit tests and the DB tests passed.
   - **Not yet seen:** a delivery to the real Mara Rue receiver (not built yet). The runbook's `test` step is the first check.
 
 ---
