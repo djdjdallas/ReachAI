@@ -198,6 +198,7 @@ describe("buildSystemPrompt: business inbox thread rules", () => {
 
   it("availability gets the booking link, and is not a missing-knowledge handoff", () => {
     expect(p).toContain("AVAILABILITY MEANS THE BOOKING LINK");
+    expect(p).toContain("NEVER SAY WHETHER THERE ARE OPENINGS. You can't see the calendar.");
     expect(p).toContain("include the booking link (https://sole.example/book) in that same reply");
     expect(p).toContain("Appointment availability (openings, times, days, \"this week\", booking) is NOT missing knowledge for this business");
     expect(p).not.toContain('"do you have weekend appointments?"');

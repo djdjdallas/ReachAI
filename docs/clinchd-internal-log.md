@@ -145,7 +145,15 @@ competitor name from visible body copy and re-anchored to the human-setter cost.
       - "do you have openings this week": intro + "We do! The booking link shows live availability…" with the link, 3/3.
       - "are you a real person?": "I'm Katlynne, Solé Aesthetics' AI concierge, not a real person. The team can jump in when needed though…", 3/3.
     - Eval 25/25; 829 unit tests passed.
-    - **Watch:** "We do!" asserts openings the model can't see (it only has the booking link). Not changed yet.
+    - **Watch:** "We do!" asserts openings the model can't see (it only has the booking link). Fixed in the next round.
+  - **Final pre-audit round (Dom, 2026-10-06):**
+    - New persona rule: never say whether a time is free ("we do", "Saturday works!", "we're booked"). Point to the booking link; stating opening hours from the knowledge is fine.
+    - The reply linter now rewrites a spaced hyphen used as a dash (" - " between words) like an em dash. Hyphens in words, URLs, phone numbers and ranges ("9-5", "9am - 6pm", "$300 - $500") are untouched.
+    - Re-run (3 trials each):
+      - "do you have openings this week": "Hi! I'm Katlynne, Solé Aesthetics' AI concierge. We're open Tuesday through Saturday, 9am to 6pm. You can check live availability and grab a spot here: <link>", 3/3.
+      - "are you free Saturday?": "…We're open Saturdays 9am to 6pm! You can check live availability and grab a spot here: <link>", 3/3.
+      - An earlier draft of the rule still produced "Saturdays work!" in 1/3, so the rule names that phrasing explicitly.
+    - Eval 26/26 (new case `persona-free-saturday`); 842 unit tests passed.
   - **Not yet seen:** a delivery to the real Mara Rue receiver (not built yet). The runbook's `test` step is the first check.
 
 ---

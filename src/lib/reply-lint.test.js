@@ -99,3 +99,32 @@ describe("lintReply: knowledge handoff markers (fail-safe)", () => {
     expect(lintReply(raw).handoff).toBeNull();
   });
 });
+
+describe("lintReply: spaced hyphen used as a dash", () => {
+  it.each([
+    ["grab a spot at https://sole.example/book - it shows the openings.", "grab a spot at https://sole.example/book, it shows the openings."],
+    ["not exactly - I'm an AI concierge", "not exactly, I'm an AI concierge"],
+    ["totally fine  -  no rush", "totally fine, no rush"],
+    ["worth it - .", "worth it."],
+  ])("rewrites %j", (input, expected) => {
+    const r = lintReply(input);
+    expect(r.text).toBe(expected);
+    expect(r.fixes).toContain("dash");
+  });
+
+  it.each([
+    "open 9-5, Tuesday to Saturday",
+    "a well-known, long-lasting result",
+    "call 512-555-0123 or +1 512-555-0123",
+    "book at https://sole.example/book-now?ref=ig-dm",
+    "hours are 9am - 6pm",
+    "that's 512 - 555 - 0123",
+    "it costs $300 - $500 depending on the area",
+    "- first point",
+    "ages 25 - 55",
+  ])("leaves %j alone", (input) => {
+    const r = lintReply(input);
+    expect(r.text).toBe(input.startsWith("- ") ? "first point" : input);
+    expect(r.fixes).not.toContain("dash");
+  });
+});

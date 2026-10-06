@@ -82,9 +82,15 @@ export function lintReply(text, { bookingLink = "" } = {}) {
 
   // Numeric ranges keep a plain hyphen: "3–4 weeks" → "3-4 weeks".
   const ranged = out.replace(/(\d)\s*[–—]\s*(\d)/g, "$1-$2");
+  // A spaced hyphen used as a dash ("the link - it shows") is the same tell
+  // as an em dash. Only a hyphen with spaces on both sides, on one line, and
+  // not between two digit-ended/-started tokens ("9am - 6pm", "512 - 555"
+  // stay). Hyphens inside words, URLs, phone numbers and "9-5" have no
+  // spaces around them and are never touched.
+  const hyphenDashed = ranged.replace(/(?<=[^\s\d])[ \t]+-[ \t]+(?=[^\s\d])/g, " — ");
   // Any other em/en dash becomes a comma break: "not exactly — I'm" →
   // "not exactly, I'm". A dash that ends a clause before punctuation is dropped.
-  const dashed = ranged
+  const dashed = hyphenDashed
     .replace(/\s*[—–]+\s*(?=[.!?,])/g, "")
     .replace(/\s*[—–]+\s*/g, ", ");
   if (dashed !== out) fixes.push("dash");

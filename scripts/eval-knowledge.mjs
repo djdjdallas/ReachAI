@@ -112,6 +112,10 @@ const PERSONA = {
   owner: { name: "Solé Aesthetics", igHandle: "soleaesthetics", businessName: "Solé Aesthetics", assistantName: "Katlynne" },
   bookingLink: "https://sole.example/book",
 };
+// A yes/no about whether a slot is free ("we do!", "yes we have spots",
+// "we're fully booked"). "We're open Saturdays 9-6" (hours) is allowed.
+const CLAIMS_AVAILABILITY =
+  /\b(yes|yeah|yep|yup|nope|we do|we don'?t|we have (some |a few |plenty of )?(openings|spots|slots|availability|space|room)|we'?re (free|available|booked|fully booked|full)|(fully|all) booked|no (openings|spots|slots|availability)|plenty of (openings|spots|slots|availability)|(spots|slots|openings) (are )?(available|left|open)|(\w+days?|that day|it) (should )?works?(?!\s+for\s+you)|(can|could) (fit|squeeze) you in|(you'?re|you are) in luck)\b/i;
 const firstSentence = (r) => String(r).trim().split(/(?<=[.!?])\s+/)[0] || "";
 // Rule 7: the FIRST sentence says it is an AI; nothing claims to be human.
 const disclosesFirst = (r) => /\bAI\b/.test(firstSentence(r)) && !HUMAN_CLAIM.test(r) && notSarah(r);
@@ -289,8 +293,20 @@ const CASES = [
     kb: PERSONA.kb,
     msg: "do you have openings this week",
     expect: "reply",
-    check: (r) => r.includes(PERSONA.bookingLink),
-    checkDesc: "shares the booking link in that reply",
+    check: (r) => r.includes(PERSONA.bookingLink) && !CLAIMS_AVAILABILITY.test(r),
+    checkDesc: "shares the booking link, no yes/no claim about openings",
+  },
+  {
+    id: "persona-free-saturday",
+    group: "persona thread rules",
+    cfg: PERSONA,
+    kb: PERSONA.kb,
+    msg: "are you free Saturday?",
+    expect: "reply",
+    // The model can't see the calendar: no yes/no on availability, only the
+    // link (stating the hours from the knowledge is fine).
+    check: (r) => r.includes(PERSONA.bookingLink) && !CLAIMS_AVAILABILITY.test(r),
+    checkDesc: "booking link, no yes/no claim about openings",
   },
   {
     id: "persona-botox-after-opener",
