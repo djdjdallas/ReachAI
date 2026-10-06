@@ -41,6 +41,26 @@ booking. You still close the call. That's the part only you can do.
 
 ## Shipped changes
 
+### 2026-10-06: Business knowledge base, PR A, deployed (PR #53)
+Merged as `494cfd1` at 08:44 UTC. Vercel production deploy `dpl_4EByLKAK56mFyvtMQ25uTNXnELpD` was ready at 08:45:11 UTC and serves clinchd.io and www.clinchd.io.
+
+- **What shipped:**
+  - **Data:** `knowledge_entries` (FAQ / policy / note). The browser can read its own rows only; every write goes through `/api/settings/knowledge`, with a 15,000-character cap that counts the rendered block. Starter drafts dedupe on a unique (user_id, template_key).
+  - **Settings > Business knowledge:** an editor with coaching and med spa starters and the "may be shown to leads" warning.
+  - **Grounding:** an escaped `<business_knowledge>` block after the system rules, on all four reply paths (`loadReplyGrounding`).
+  - **Handoffs:** medical for every account; missing knowledge only once an account has an enabled entry, and limited to the service's own price, availability and policies (scheduling a call gets the booking link). The lead gets the fixed holding text, the thread pauses (`medical_question` / `missing_knowledge`) and the owner is emailed. Medical emails never quote the lead.
+  - **Medical checks:** a classifier signal before the voice step, a health-keyword voice prefilter, and the reply-model marker. Any marker form counts as a handoff.
+  - **Analytics:** classifier reasoning and signals are no longer sent to PostHog.
+- **Pre-merge evidence:** live eval `scripts/eval-knowledge.mjs` 17/17 (3 trials each). Classifier replay prod 70/75 with 0 critical, synthetic 20/20. 622 unit tests and the DB tests passed. One audit round (P1 voice bypass, booking vs availability, signal list, plus P2 caps, markers, email and privacy) was fixed before merge.
+- **Production order (2026-10-06):** Dom ran migration `20261008120000_knowledge_entries.sql` in Reachai and verified it independently (RLS on, select-own policy only, no browser writes, 0 rows, no browser-callable definer functions), then merged.
+- **Post-deploy checks (08:45-08:48 UTC):**
+  - Logged out, `/settings/knowledge` and `/api/settings/knowledge` redirect to `/login`, the same as `/settings/offer`.
+  - Signed in as Dom, Settings > Business knowledge loads: empty list, 0 / 15,000 meter, and the offer card (Clinchd, $97.99, offer page, booking link).
+  - Playground "How much does it cost?" got a grounded reply quoting $97.99.
+  - Playground "i'm pregnant, is it safe for me to do this?" got the holding text and the "Handed to you: medical or health question" label.
+  - Runtime logs for the deployment: no 4xx/5xx and no errors. The only warning is a pre-existing Node `url.parse()` deprecation notice from the edge middleware.
+- **Not yet seen live:** a real inbound DM through the webhook on this deploy (none had arrived by 08:48), a real handoff email, and an account with enabled entries. Check the first `knowledge_handoff` PostHog event and its email when one happens.
+
 ### 2026-10-06: Card-required trial and billing overhaul deployed (PR #51)
 Merged as `50c4d4b` at 04:57 UTC; Vercel production deploy `6876060079` completed about a minute later. Every deploy-checklist step was run by Dom and verified independently.
 
@@ -93,7 +113,7 @@ competitor name from visible body copy and re-anchored to the human-setter cost.
     1. Medical/health handoff rule applies to ALL accounts, scoped to: medical conditions, injuries, medications, pregnancy, treatment suitability, and any health outcome claims. Normal coaching questions (training, mindset, offer details) are NOT handoffs.
     2. Fallback handoff only for price, availability, policy, plus the medical cases in 1.
     3. Build order: (a) PostHog tracking PR (identify by Supabase user id, not email); (b) activation guard + 24h messaging window (Dom supplies the prompt); (c) card-required trial + access gating (Dom supplies the prompt; **access gating must use `hasActiveAccess`, never `onboarding_completed`, which the browser can set**); (d) KB PR A (table, settings editor with vertical templates, `<business_knowledge>` grounding, fallback via the existing human-handoff path); (e) KB PR B (unanswered-questions log, one-tap answer to FAQ). **Do not start KB until the billing PR (c) is merged.** (Merged and deployed 2026-10-06 as PR #51.)
-  - **PR A built (branch `feat/business-knowledge-base`, 2026-10-05; not merged).** Run migration `20261008120000_knowledge_entries.sql` before the deploy. Decisions made in the Phase 0 review:
+  - **PR A shipped 2026-10-06 (PR #53, see Shipped changes).** PR B (unanswered-questions log, one-tap answer to FAQ) is next and not started; it reads the category from `messages.intent_classification.handoff`. Decisions made in the Phase 0 review:
     - Handoff is the **per-thread** pause (`ai_paused` + `ai_pause_reason` = `medical_question` | `missing_knowledge` + owner email), not account-wide `ai_mode 'handoff'`. The lead gets the fixed holding text "Good question, let me check on that and get back to you." (`src/lib/handoff-reply.js`, the seam for per-account overrides).
     - The model never writes the holding text: it outputs `<<HANDOFF:...>>` and the server swaps it. Any marker anywhere (mixed in, malformed) is a handoff (`detectHandoff`).
     - Medical is checked twice: a `medical_question` signal on the intent classifier hands off **before the voice step**, and the reply model's marker is the second net. If the classifier errors, there's no voice step. The missing-knowledge handoff applies only once an account has at least one enabled entry.
