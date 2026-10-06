@@ -206,6 +206,23 @@ srv "update public.users set webhook_demo=true where id='$U1'" >/dev/null
 srv "insert into public.bookings(user_id,source) values ('$U1','demo')" >/dev/null
 expect "demo booking on a demo account carries demo=true" "true" "$(q "select data->>'demo' from public.outbound_webhook_events where event_type='consultation_booked' and data ? 'demo'")"
 
+srv "update public.bookings set status='confirmed' where calendly_invitee_uri='https://api.calendly.com/inv/1'" >/dev/null
+expect "re-confirming a booking already confirmed emits nothing" "2" "$(ev consultation_booked)"
+srv "insert into public.bookings(id,user_id,conversation_id,source,calendly_invitee_uri,status) values ('ffffffff-0000-0000-0000-000000000001','$U1','$C2','calendly','https://api.calendly.com/inv/2','rescheduled')" >/dev/null
+expect "a booking inserted unconfirmed emits nothing" "2" "$(ev consultation_booked)"
+srv "update public.bookings set status='confirmed' where id='ffffffff-0000-0000-0000-000000000001'" >/dev/null
+expect "an update that confirms it emits" "3" "$(ev consultation_booked)"
+srv "update public.bookings set invitee_name='y', status='confirmed' where id='ffffffff-0000-0000-0000-000000000001'" >/dev/null
+expect "later updates of a confirmed booking emit nothing" "3" "$(ev consultation_booked)"
+
+# disclosed_at: server-only, claimed atomically
+expect "browser cannot set disclosed_at" "disclosed_at is written by the server only" "$(as_role authenticated "update public.conversations set disclosed_at=now() where id='$C2'")"
+expect "browser cannot insert with disclosed_at" "disclosed_at is written by the server only" "$(as_role authenticated "insert into public.conversations(user_id,disclosed_at) values ('$U1', now())")"
+expect "first claim wins" "1" "$(q "begin; set local role service_role; set local request.jwt.claims = '{\"role\":\"service_role\"}'; with c as (update public.conversations set disclosed_at=now() where id='$C2' and disclosed_at is null returning id) select count(*) from c; commit;")"
+expect "a second claim gets nothing" "0" "$(q "begin; set local role service_role; set local request.jwt.claims = '{\"role\":\"service_role\"}'; with c as (update public.conversations set disclosed_at=now() where id='$C2' and disclosed_at is null returning id) select count(*) from c; commit;")"
+expect "browser cannot clear it either" "disclosed_at is written by the server only" "$(as_role authenticated "update public.conversations set disclosed_at=null where id='$C2'")"
+expect "browser status updates still work" "UPDATE 1" "$(as_role authenticated "update public.conversations set status='qualifying' where id='$C2'")"
+
 # contact_captured
 srv "insert into public.lead_profiles(conversation_id,user_id,email) values ('$C1','$U1','jane@example.com')" >/dev/null
 expect "contact_captured on a new email" "1" "$(ev contact_captured)"

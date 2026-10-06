@@ -91,16 +91,20 @@ export function buildEnvelope({ event, user, conversation, profile, booking }) {
     const username = validUsername(profile?.instagram_username);
     if (username) lead.instagram_username = username;
 
-    if (type === "consultation_booked" && booking) {
+    // The invitee's name and email are attached only when the booking is
+    // known to be this lead's: matched on the email the lead typed in the
+    // DMs, or a booking-only lead (the invitee IS the lead). A conversation
+    // matched by name gets neither: if that match is wrong they would attach
+    // to the wrong person.
+    const inviteeEmail = booking ? cleanEmail(booking.invitee_email) : null;
+    const matchedByEmail = Boolean(inviteeEmail) && cleanEmail(profile?.email) === inviteeEmail;
+    if (type === "consultation_booked" && booking && (bookingOnly || matchedByEmail)) {
       const { first, last } = splitName(booking.invitee_name);
       if (first) lead.first_name = first;
       if (last) lead.last_name = last;
     }
 
-    // Booking-only leads take the invitee's email. A conversation matched by
-    // name does not: if the fuzzy match is wrong, the email would attach to
-    // the wrong lead. A conversation matched by email already has it below.
-    const email = cleanEmail(profile?.email) || (bookingOnly ? cleanEmail(booking.invitee_email) : null);
+    const email = cleanEmail(profile?.email) || (bookingOnly ? inviteeEmail : null);
     if (email) lead.email = email;
     const phone = cleanPhone(profile?.phone);
     if (phone) lead.phone = phone;

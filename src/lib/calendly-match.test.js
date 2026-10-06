@@ -10,9 +10,11 @@ const db = () =>
     ],
     conversations: [
       { id: "c-jane", user_id: "u1", sender_name: "Jane Doe" },
+      { id: "c-joanne", user_id: "u1", sender_name: "Joanne" },
       { id: "c-ann1", user_id: "u1", sender_name: "Ann Lee" },
-      { id: "c-ann2", user_id: "u1", sender_name: "Ann Lee Smith" },
+      { id: "c-ann2", user_id: "u1", sender_name: "ann lee" },
       { id: "c-pct", user_id: "u1", sender_name: "100% Real" },
+      { id: "c-star", user_id: "u1", sender_name: "Star*" },
     ],
   });
 
@@ -25,18 +27,25 @@ describe("matchBookingConversation", () => {
     expect(await matchBookingConversation(db(), "u1", { inviteeEmail: "sam@example.com", inviteeName: "" })).toBeNull();
   });
 
-  it("falls back to a unique name match", async () => {
-    expect(await matchBookingConversation(db(), "u1", { inviteeEmail: "nobody@example.com", inviteeName: "Jane Doe" })).toBe("c-jane");
+  it("falls back to an exact, case-insensitive full-name match", async () => {
+    expect(await matchBookingConversation(db(), "u1", { inviteeEmail: "nobody@example.com", inviteeName: "jane  DOE " })).toBe("c-jane");
   });
 
-  it("two or more name matches is no match (booking-only lead)", async () => {
+  it("a partial name never matches (audit: Ann vs Joanne)", async () => {
+    expect(await matchBookingConversation(db(), "u1", { inviteeEmail: null, inviteeName: "Ann" })).toBeNull();
+    expect(await matchBookingConversation(db(), "u1", { inviteeEmail: null, inviteeName: "Jane" })).toBeNull();
+  });
+
+  it("two or more exact matches is no match (booking-only lead)", async () => {
     expect(await matchBookingConversation(db(), "u1", { inviteeEmail: null, inviteeName: "Ann Lee" })).toBeNull();
   });
 
-  it("escapes LIKE wildcards in the invitee name", async () => {
-    // Unescaped, "%" would match all four conversations (ambiguous, null).
-    expect(await matchBookingConversation(db(), "u1", { inviteeEmail: null, inviteeName: "%" })).toBe("c-pct");
+  it("wildcards are literal: % and _ match only themselves, * matches nothing", async () => {
+    expect(await matchBookingConversation(db(), "u1", { inviteeEmail: null, inviteeName: "%" })).toBeNull();
+    expect(await matchBookingConversation(db(), "u1", { inviteeEmail: null, inviteeName: "100% Real" })).toBe("c-pct");
     expect(await matchBookingConversation(db(), "u1", { inviteeEmail: null, inviteeName: "_" })).toBeNull();
+    expect(await matchBookingConversation(db(), "u1", { inviteeEmail: null, inviteeName: "*" })).toBeNull();
+    expect(await matchBookingConversation(db(), "u1", { inviteeEmail: null, inviteeName: "Star*" })).toBeNull();
   });
 
   it("no name and no email: no match", async () => {

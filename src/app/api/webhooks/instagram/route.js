@@ -27,7 +27,7 @@ import { ownerFromUser } from "@/lib/active-offer";
 import { loadReplyGrounding } from "@/lib/reply-grounding";
 import { holdingTextFor } from "@/lib/handoff-reply";
 import { captureLeadFacts } from "@/lib/outbound-webhooks/lead-capture";
-import { applyDisclosure, disclosureLine, needsFirstMessageDisclosure } from "@/lib/persona-disclosure";
+import { disclosurePending, prepareFirstMessage, releaseFirstMessage } from "@/lib/persona-disclosure";
 import { mentionsHealth } from "@/lib/health-keywords";
 import { lintReply } from "@/lib/reply-lint";
 import { findVoiceSnippetForIntent, getSendableAudioUrl } from "@/lib/voice/matcher";
@@ -1753,10 +1753,11 @@ async function processIncomingMessage({
         : null,
   });
 
-  // First-message AI disclosure (persona accounts only; null-op for coach
+  // First-message AI disclosure (persona accounts only; no-op for coach
   // accounts): the first message the lead receives says it's an AI. A voice
-  // memo can't carry it, so that turn goes out as text.
-  const discloseFirst = await needsFirstMessageDisclosure(supabase, user, conversation.id);
+  // memo can't carry it, so while it's still due the turn goes out as text.
+  // Who prepends it is decided by the claim right before the save below.
+  const discloseFirst = disclosurePending(user, conversation);
 
   // ── Voice routing ──────────────────────────────────────────────────
   // When the DM intent classifier returned a confident class AND the coach
@@ -1968,7 +1969,6 @@ async function processIncomingMessage({
     }
   }
   if (handoff) aiReply = holdingTextFor(user);
-  if (discloseFirst) aiReply = applyDisclosure(aiReply, disclosureLine(user));
 
   // Delay floor + pause re-check before the text send. Sits after generation
   // (so the sleep is only the remainder of the target) and BEFORE the reply
@@ -1983,6 +1983,12 @@ async function processIncomingMessage({
     log.warn("[webhook] text reply skipped after delay:", textGate.reason);
     return;
   }
+
+  // First-message AI disclosure: claim conversations.disclosed_at right
+  // before the save and send. Only the claimer prepends; the claim is
+  // released below if this reply doesn't go out.
+  const disclosure = await prepareFirstMessage(supabase, user, aiReply, { conversationId: conversation.id });
+  aiReply = disclosure.text;
 
   // Save AI reply. The insert stays BEFORE the send (a rate-limited or failed
   // send must still leave the reply in the DB); the Meta mid is stamped onto
@@ -2093,6 +2099,9 @@ async function processIncomingMessage({
       // Reply is saved to DB but wasn't delivered — continue to status detection
     }
   }
+  // Not delivered (rate-limited or failed): the lead didn't see the
+  // disclosure, so the next send must carry it.
+  if (!replyDelivered) await releaseFirstMessage(supabase, disclosure.claim);
 
   // Knowledge handoff: the holding text was saved (and sent, unless rate
   // limited or the send failed). Pause the thread for the owner whatever the

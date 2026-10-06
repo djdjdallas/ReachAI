@@ -24,7 +24,16 @@ Rules that hold for every account set up this way:
   there's no double greeting. Don't write a disclosure into templates. It
   never repeats in the same thread.
 
-## 0. One-time: your machine
+## 0. One-time: the migration
+
+Before the first deploy of this feature, run
+`supabase/migrations/20261009120000_outbound_webhooks.sql` in the Supabase
+SQL editor (prod). It sets `lock_timeout = '3s'`: if a busy table makes it
+stop with "canceling statement due to lock timeout", run it again (ideally at
+a quiet moment). Statements before the timeout may already have applied;
+that's fine, every statement in it is re-runnable.
+
+## 0b. One-time: your machine
 
 The admin scripts run locally with production credentials:
 

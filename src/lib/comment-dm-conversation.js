@@ -34,6 +34,8 @@ export async function persistCommentDmConversation({
   renderedDm,
   providerMessageId,
   commentText,
+  // The DM that just went out carried the first-message AI disclosure.
+  disclosedNow = false,
 }) {
   try {
     // Without the recipient IGSID there is no key the inbound reply can match
@@ -54,8 +56,21 @@ export async function persistCommentDmConversation({
       userId,
       recipientIgsid,
       senderName,
+      disclosedNow,
     });
     if (!conversation) return;
+
+    // The disclosure went out, so record it on the thread. A new thread was
+    // created with disclosed_at set; one that already existed (Meta's echo
+    // created it first, or the lead DM'd at the same moment) is claimed here
+    // if nobody has.
+    if (disclosedNow && !conversation.created) {
+      await admin
+        .from("conversations")
+        .update({ disclosed_at: new Date().toISOString() })
+        .eq("id", conversation.id)
+        .is("disclosed_at", null);
+    }
 
     // Outbound webhooks: the commenter's username and a treatment category
     // matched in the comment (accounts with an enabled webhook only). Never
@@ -158,7 +173,7 @@ async function reconcileEchoedOpener(admin, { message, conversation }) {
   }
 }
 
-async function findOrCreateConversation(admin, { userId, recipientIgsid, senderName }) {
+async function findOrCreateConversation(admin, { userId, recipientIgsid, senderName, disclosedNow = false }) {
   const { data: existing } = await admin
     .from("conversations")
     .select("id, origin")
@@ -185,11 +200,12 @@ async function findOrCreateConversation(admin, { userId, recipientIgsid, senderN
       // We have the full opening DM as a message below, so the thread is not
       // missing outbound context (no backfill banner).
       missing_outbound_context: false,
+      ...(disclosedNow ? { disclosed_at: new Date().toISOString() } : {}),
     })
     .select("id, origin")
     .single();
 
-  if (created) return created;
+  if (created) return { ...created, created: true };
 
   // 23505 = a concurrent webhook created the row between our select and
   // insert. Re-select so we append rather than fail.

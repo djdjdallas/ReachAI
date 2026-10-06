@@ -117,7 +117,6 @@ describe("lintReply: spaced hyphen used as a dash", () => {
     "a well-known, long-lasting result",
     "call 512-555-0123 or +1 512-555-0123",
     "book at https://sole.example/book-now?ref=ig-dm",
-    "hours are 9am - 6pm",
     "that's 512 - 555 - 0123",
     "it costs $300 - $500 depending on the area",
     "- first point",
@@ -126,5 +125,27 @@ describe("lintReply: spaced hyphen used as a dash", () => {
     const r = lintReply(input);
     expect(r.text).toBe(input.startsWith("- ") ? "first point" : input);
     expect(r.fixes).not.toContain("dash");
+  });
+});
+
+describe("lintReply: word ranges are not dashes (audit)", () => {
+  it.each([
+    ["open Mon - Fri", "open Mon-Fri"],
+    ["Jan - Mar only", "Jan-Mar only"],
+    ["9am - noon on Saturdays", "9am to noon on Saturdays"],
+    ["flights LA - NYC", "flights LA to NYC"],
+    ["hours are 9am - 6pm", "hours are 9am to 6pm"],
+    ["Tuesday – Saturday", "Tuesday-Saturday"],
+    ["10am—2pm", "10am to 2pm"],
+    ["9:30 am - 6 pm", "9:30 am to 6 pm"],
+    ["open Mon - Fri - book any time", "open Mon-Fri, book any time"],
+  ])("%j → %j", (input, expected) => {
+    const r = lintReply(input);
+    expect(r.text).toBe(expected);
+    expect(r.text).not.toMatch(/Mon, Fri|Jan, Mar|9am, noon|LA, NYC/);
+  });
+
+  it("a lowercase word is not a month ('you may - if')", () => {
+    expect(lintReply("you may - if you want").text).toBe("you may, if you want");
   });
 });

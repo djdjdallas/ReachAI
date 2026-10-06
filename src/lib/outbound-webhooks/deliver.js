@@ -9,7 +9,7 @@
 // path or the payload.
 
 import { decrypt } from "@/lib/encryption";
-import { nextAttemptAt, publicEventId } from "./events";
+import { MAX_ATTEMPTS, nextAttemptAt, publicEventId } from "./events";
 import { buildEnvelope } from "./payload";
 import { webhookHeaders } from "./sign";
 import { postWebhook } from "./http";
@@ -50,7 +50,7 @@ function hostOf(url) {
 }
 
 async function loadEnvelopeInputs(admin, event) {
-  const [{ data: user }, conv, profile, booking] = await Promise.all([
+  const [userRes, conv, profile, booking] = await Promise.all([
     admin.from("users").select("id, business_name, full_name, instagram_username").eq("id", event.user_id).maybeSingle(),
     event.conversation_id
       ? admin.from("conversations").select("id, origin").eq("id", event.conversation_id).maybeSingle()
@@ -70,7 +70,11 @@ async function loadEnvelopeInputs(admin, event) {
           .maybeSingle()
       : { data: null },
   ]);
-  return { user, conversation: conv.data || null, profile: profile.data || null, booking: booking.data || null };
+  // A read error must not freeze an incomplete body: throw, and the caller
+  // retries the event later. (A missing row is fine: the lead was deleted.)
+  const failed = [userRes, conv, profile, booking].find((r) => r.error);
+  if (failed) throw new Error(`envelope read failed: ${failed.error.code || "error"}`);
+  return { user: userRes.data, conversation: conv.data || null, profile: profile.data || null, booking: booking.data || null };
 }
 
 /**
@@ -85,6 +89,23 @@ async function finish(admin, event, patch) {
     .eq("status", "processing")
     .eq("claimed_at", event.claimed_at);
   if (error) console.error("[outbound-webhooks] finish failed:", { event_id: publicEventId(event.id), code: error.code });
+}
+
+/**
+ * Put a claimed event back on the retry schedule after an error on our side
+ * (config read, body freeze, an unexpected throw), or fail it when its
+ * attempts are used up. Never leaves the row stuck in 'processing'.
+ */
+export async function retryLater(admin, event, error, { now = () => Date.now(), random } = {}) {
+  const next = nextAttemptAt(event.attempts, now(), random);
+  if (!next) {
+    await finish(admin, event, { status: "failed", last_error: error, finished_at: new Date(now()).toISOString() });
+    logAttempt({ event_id: publicEventId(event.id), user_id: event.user_id, type: event.event_type, attempts: event.attempts, outcome: "failed", error });
+    return "failed";
+  }
+  await finish(admin, event, { status: "pending", next_attempt_at: next.toISOString(), last_error: error });
+  logAttempt({ event_id: publicEventId(event.id), user_id: event.user_id, type: event.event_type, attempts: event.attempts, outcome: "retry", error, next_attempt_at: next.toISOString() });
+  return "retry";
 }
 
 /**
@@ -107,16 +128,16 @@ export async function deliverClaimedEvent(admin, event, { post = postWebhook, no
     return "failed";
   };
 
+  // A row re-claimed past its last attempt (stale takeovers count attempts
+  // too) is done.
+  if (event.attempts > MAX_ATTEMPTS) return failNow("max_attempts");
+
   const { data: hook, error: hookErr } = await admin
     .from("outbound_webhooks")
     .select("id, url, enabled, event_types, secret_encrypted")
     .eq("user_id", event.user_id)
     .maybeSingle();
-  if (hookErr) {
-    // Transient read error: leave the claim; the stale takeover retries it.
-    logAttempt({ ...base, outcome: "retry", error: "config_read_failed" });
-    return "retry";
-  }
+  if (hookErr) return retryLater(admin, event, "config_read_failed", { now, random });
   if (!hook) return failNow("webhook_missing");
   if (!hook.enabled) return failNow("webhook_disabled", hostOf(hook.url));
   const host = hostOf(hook.url);
@@ -133,7 +154,12 @@ export async function deliverClaimedEvent(admin, event, { post = postWebhook, no
   let body = event.payload;
   if (!body) {
     if (event.payload_purged_at) return failNow("payload_purged", host);
-    const inputs = await loadEnvelopeInputs(admin, event);
+    let inputs;
+    try {
+      inputs = await loadEnvelopeInputs(admin, event);
+    } catch {
+      return retryLater(admin, event, "envelope_read_failed", { now, random });
+    }
     body = JSON.stringify(buildEnvelope({ event, ...inputs }));
     const { data: frozen, error: freezeErr } = await admin
       .from("outbound_webhook_events")
@@ -143,7 +169,8 @@ export async function deliverClaimedEvent(admin, event, { post = postWebhook, no
       .eq("claimed_at", event.claimed_at)
       .is("payload", null)
       .select("id");
-    if (freezeErr || !frozen?.length) {
+    if (freezeErr) return retryLater(admin, event, "freeze_failed", { now, random });
+    if (!frozen?.length) {
       logAttempt({ ...base, host, outcome: "lost_claim" });
       return "lost_claim";
     }
@@ -254,9 +281,9 @@ export async function runOutboundDelivery(admin, { now = Date.now(), purge = fal
     for (let i = 0; i < rows.length; i += CONCURRENCY) {
       const outcomes = await Promise.all(
         rows.slice(i, i + CONCURRENCY).map((row) =>
-          deliverClaimedEvent(admin, row, post ? { post } : {}).catch((err) => {
+          deliverClaimedEvent(admin, row, post ? { post } : {}).catch(async (err) => {
             console.error("[outbound-webhooks] deliver threw:", { event_id: publicEventId(row.id), error: err?.message });
-            return "retry";
+            return retryLater(admin, row, "internal_error").catch(() => "retry");
           })
         )
       );

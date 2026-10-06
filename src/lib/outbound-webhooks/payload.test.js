@@ -73,13 +73,21 @@ describe("buildEnvelope", () => {
     expect(odd.data).toEqual({ reason: "other" });
   });
 
-  it("consultation_booked: scheduled_for, invitee names, demo only when flagged", () => {
+  it("consultation_booked matched by name: scheduled_for only, no invitee name or email", () => {
     const booking = { id: "b1", start_time: "2026-10-08T17:00:00Z", invitee_name: "Jane Q Doe", invitee_email: "other@example.com", conversation_id: "c1" };
     const e = buildEnvelope({ event: ev("consultation_booked", { booking_id: "b1" }), user, conversation, profile: { instagram_username: "jane.doe" }, booking });
     expect(e.data).toEqual({ scheduled_for: "2026-10-08T17:00:00.000Z" });
-    expect(e.lead).toMatchObject({ id: "c1", first_name: "Jane", last_name: "Q Doe" });
-    // Matched (possibly by name): the invitee's email is not attached.
-    expect(e.lead.email).toBeUndefined();
+    expect(e.lead).toEqual({ id: "c1", instagram_username: "jane.doe", source: "instagram_comment" });
+  });
+
+  it("consultation_booked matched by the lead's email: invitee names attached", () => {
+    const booking = { id: "b1", start_time: "2026-10-08T17:00:00Z", invitee_name: "Jane Q Doe", invitee_email: "Jane@Example.com", conversation_id: "c1" };
+    const e = buildEnvelope({ event: ev("consultation_booked", { booking_id: "b1" }), user, conversation, profile, booking });
+    expect(e.lead).toMatchObject({ id: "c1", first_name: "Jane", last_name: "Q Doe", email: "jane@example.com" });
+  });
+
+  it("consultation_booked demo flag", () => {
+    const booking = { id: "b1", start_time: "2026-10-08T17:00:00Z", invitee_name: "Jane Q Doe", invitee_email: "other@example.com", conversation_id: "c1" };
     const demo = buildEnvelope({ event: ev("consultation_booked", { booking_id: "b1", data: { demo: true } }), user, conversation, profile, booking });
     expect(demo.data).toEqual({ scheduled_for: "2026-10-08T17:00:00.000Z", demo: true });
   });

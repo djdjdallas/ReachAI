@@ -6,12 +6,21 @@
 // nudge when that happens to be the first thing sent. Coach accounts (no
 // business_name) are unchanged.
 //
-// "Already disclosed" means the lead has already received an app-written
-// message in this thread (an assistant row with a Meta message id and
-// source agent or drip) or any sent message containing "AI concierge" (the
-// comment opener, when Meta's echo stored it as a staff message before the
-// app saved it). A saved reply that was never sent (rate-limited, failed)
-// has no Meta id, so the next reply still discloses.
+// Who discloses is decided by an explicit, server-only claim, never by
+// reading message text: conversations.disclosed_at is set atomically
+// (update ... where disclosed_at is null returning) right before a send.
+// Only the caller that wins the claim prepends; if its send fails it
+// releases the claim, so the next send discloses. Two concurrent replies
+// disclose once.
+//
+// Send paths:
+//   const prepared = await prepareFirstMessage(admin, user, text, { conversationId });
+//   ... save and send prepared.text ...
+//   if (!sent) await releaseFirstMessage(admin, prepared.claim);
+// With no conversation yet (a comment-to-DM opener to a brand-new lead)
+// nothing can have been sent to this lead, so the text is disclosed and
+// claim.pendingInsert tells the caller to create the conversation with
+// disclosed_at set.
 
 import { cleanAssistantName, cleanBusinessName } from "./persona";
 
@@ -40,72 +49,86 @@ export function stripLeadingGreeting(text) {
   return out === s ? s : out.charAt(0).toUpperCase() + out.slice(1);
 }
 
-const firstSentence = (text) => String(text).trim().split(/(?<=[.!?])\s+/)[0] || "";
-
 /**
- * The text with the disclosure prepended (leading greeting removed). Left
- * as-is when it already discloses in its first sentence (e.g. the lead's
- * first message asked "are you a bot?" and rule 7 answered it).
+ * The text with the disclosure line in front (leading greeting removed).
+ * The only skip is text that already contains the exact line: mentioning
+ * "AI" is not a disclosure ("Yes, our AI skin scan..." still gets it).
  */
 export function applyDisclosure(text, line) {
   const s = String(text ?? "").trim();
-  if (!line) return s;
-  if (s.includes(line) || /\bAI\b/.test(firstSentence(s))) return s;
+  if (!line || s.includes(line)) return s;
   const rest = stripLeadingGreeting(s).trim();
   return rest ? `${line} ${rest}` : line;
 }
 
 /**
- * Whether the lead has already been told, in this conversation. Errors read
- * as "not yet": a repeated disclosure is better than a missing one.
+ * Whether the next message to this conversation is due the disclosure (no
+ * claim yet). For gating before any claim (e.g. skip a voice memo on that
+ * turn); the claim itself is what decides who prepends.
  */
-export async function conversationHasDisclosed(admin, conversationId) {
-  if (!conversationId) return false;
+export function disclosurePending(user, conversation) {
+  return Boolean(disclosureLine(user)) && !conversation?.disclosed_at;
+}
+
+/**
+ * Claim the disclosure for a conversation. Atomic: exactly one concurrent
+ * caller gets the row back.
+ *
+ * @returns {Promise<{claimed: boolean, at: string|null, error: boolean}>}
+ */
+export async function claimDisclosure(admin, conversationId) {
   try {
-    const [appSent, mentioned] = await Promise.all([
-      admin
-        .from("messages")
-        .select("id")
-        .eq("conversation_id", conversationId)
-        .eq("role", "assistant")
-        .in("source", ["agent", "drip"])
-        .not("provider_message_id", "is", null)
-        .limit(1),
-      admin
-        .from("messages")
-        .select("id")
-        .eq("conversation_id", conversationId)
-        .eq("role", "assistant")
-        .not("provider_message_id", "is", null)
-        .ilike("content", "%AI concierge%")
-        .limit(1),
-    ]);
-    if (appSent.error || mentioned.error) return false;
-    return Boolean(appSent.data?.length || mentioned.data?.length);
+    const { data, error } = await admin
+      .from("conversations")
+      .update({ disclosed_at: new Date().toISOString() })
+      .eq("id", conversationId)
+      .is("disclosed_at", null)
+      .select("id, disclosed_at");
+    if (error) return { claimed: false, at: null, error: true };
+    const row = Array.isArray(data) ? data[0] : data;
+    return row ? { claimed: true, at: row.disclosed_at, error: false } : { claimed: false, at: null, error: false };
   } catch {
-    return false;
+    return { claimed: false, at: null, error: true };
   }
 }
 
 /**
- * The text to send: with the disclosure if this is a persona account and the
- * lead hasn't been told yet in this conversation. Never throws.
+ * The text to save and send, plus the claim to release if the send fails.
+ * Never throws.
+ *
+ * A claim that errors (the database couldn't answer) errs toward
+ * disclosing: the text is disclosed with no claim to release.
  *
  * @param {object} admin - service-role client
  * @param {object} user - users row (business_name, assistant_name)
- * @param {string} text - the message about to be saved and sent
- * @param {{conversationId?: string|null}} opts - null/absent: no thread yet
- * @returns {Promise<string>}
+ * @param {string} text
+ * @param {{conversationId?: string|null}} opts - null: no conversation yet
+ * @returns {Promise<{text: string, claim: null | {conversationId: string, at: string} | {pendingInsert: true}}>}
  */
-export async function discloseOnFirstMessage(admin, user, text, { conversationId = null } = {}) {
+export async function prepareFirstMessage(admin, user, text, { conversationId = null } = {}) {
   const line = disclosureLine(user);
-  if (!line) return text;
-  if (await conversationHasDisclosed(admin, conversationId)) return text;
-  return applyDisclosure(text, line);
+  if (!line) return { text, claim: null };
+  if (!conversationId) return { text: applyDisclosure(text, line), claim: { pendingInsert: true } };
+  const result = await claimDisclosure(admin, conversationId);
+  if (result.claimed) return { text: applyDisclosure(text, line), claim: { conversationId, at: result.at } };
+  if (result.error) return { text: applyDisclosure(text, line), claim: null };
+  return { text, claim: null };
 }
 
-/** Whether the next message to this conversation would carry the disclosure. */
-export async function needsFirstMessageDisclosure(admin, user, conversationId) {
-  if (!disclosureLine(user)) return false;
-  return !(await conversationHasDisclosed(admin, conversationId));
+/**
+ * Undo a claim after a failed send, so the next send discloses. Only clears
+ * the value this caller set. Never throws.
+ */
+export async function releaseFirstMessage(admin, claim) {
+  if (!claim?.conversationId || !claim.at) return;
+  try {
+    const { error } = await admin
+      .from("conversations")
+      .update({ disclosed_at: null })
+      .eq("id", claim.conversationId)
+      .eq("disclosed_at", claim.at);
+    if (error) console.warn("[persona-disclosure] release failed:", error.code);
+  } catch (err) {
+    console.warn("[persona-disclosure] release threw:", err?.message);
+  }
 }

@@ -101,6 +101,12 @@ competitor name from visible body copy and re-anchored to the human-setter cost.
     - Templates leave out offer, price and booking link. They live in `creator_offers` / `calendly_url` and show read-only on the page. Validation is hand-written (no zod in the repo).
   - **Existing schema (checked 2026-10-05):** no knowledge/FAQ table. `creator_offers` exists (`offer_name`, `offer_price_cents`, `offer_url`, `ideal_customer`, `objections`, `qualification_questions`, `deprecated_at`) and already grounds every reply path via `src/lib/active-offer.js`. Knowledge entries should sit beside it, not replace it. Script config (offer text, greeting, objections) lives in `users.script_config` JSON.
 - **Coach accounts don't disclose AI on first message; review against CA B&P 17940 before scaling.** Added 2026-10-06. The server-side first-message disclosure (PR #55) is on for persona accounts only (`business_name` set). Coach accounts still disclose only when asked (prompt rule 7).
+- **PR #55 audit follow-ups (logged 2026-10-06, not fixed in #55):**
+  - Persona names: add a title deny-list for `assistant_name` ("Nurse", "Dr", "Doctor", "RN", "NP", "PA"…) and ban quotes and colons in `business_name` (`src/lib/persona.js`).
+  - Managed accounts see "missed leads" / paywall copy meant for lapsed subscribers: `src/app/(dashboard)/dashboard/page.js:205`, `src/app/(paywall)/choose-plan/page.js:65`.
+  - CI: add `20261005150000_users_write_allowlist.sql` to the migration list in `supabase/tests/run.sh`, so the users column grants are tested with the new server-only columns.
+  - Scrub Postgres error text before it reaches the emit-failure log (`outbound_webhook_emit_failures.message` and the cron's `emit failure` line). Keep the SQLSTATE; drop or redact the message.
+  - When `persistCommentDmConversation` relabels an echoed opener, also clear a `human_took_over` pause if the echo caused one.
 - **TASK: Outbound lifecycle webhooks + managed accounts + persona (PR #55, branch `feat/outbound-webhooks`, built 2026-10-06; not merged, migration not run).** Infrastructure for the Mara Rue done-for-you service: Clinchd sends signed lifecycle events to the Mara Rue dashboard (`https://app.mararue.com/api/ingest/clinchd`). No Mara Rue or Katlynne names in core code; everything is per-account config. One clinic location = one Clinchd account. Contract: `docs/outbound-webhooks.md`. Setup: `docs/runbooks/managed-clinic-setup.md`.
   - **What it adds:**
     - `users.billing_managed` → access kind `managed` (billed outside Clinchd, never Stripe; /billing shows "Managed plan").
@@ -154,6 +160,22 @@ competitor name from visible body copy and re-anchored to the human-setter cost.
       - "are you free Saturday?": "…We're open Saturdays 9am to 6pm! You can check live availability and grab a spot here: <link>", 3/3.
       - An earlier draft of the rule still produced "Saturdays work!" in 1/3, so the rule names that phrasing explicitly.
     - Eval 26/26 (new case `persona-free-saturday`); 842 unit tests passed.
+  - **Independent audit fixes (2026-10-06):**
+    - **Disclosure claim:** decided by an explicit, server-only `conversations.disclosed_at`, not inferred from text.
+      - It's claimed atomically right before every send (inbound reply, comment opener, dashboard AI reply, first-sent drip). Only the claimer prepends.
+      - A failed or rate-limited send releases it.
+      - A brand-new comment lead's thread is created already claimed.
+      - Browser writes to `disclosed_at` are rejected.
+      - The text check now only skips when the exact disclosure line is already there; "our AI skin scan" or an injected "AI is cool" still get it.
+    - **Calendly:** exact, case-insensitive full-name match (whitespace collapsed; `*` matches nothing). A name match attaches no invitee name or email.
+    - **Linter:** "Mon - Fri" → "Mon-Fri", "Jan - Mar" → "Jan-Mar", "9am - noon" → "9am to noon", "LA - NYC" → "LA to NYC", applied before the dash rules.
+    - **Migration:** `set lock_timeout = '3s'` at the top. Re-run it if it times out.
+    - **Booking trigger:** emits only on insert, or when an update moves the status to confirmed.
+    - **Delivery:**
+      - An event over 5 attempts is failed.
+      - Config-read, body-read and freeze errors and unexpected throws go back on the retry schedule instead of sitting in `processing`.
+      - A body is never frozen from a failed read.
+    - **Encryption:** `decrypt` requires the full 16-byte GCM tag (`authTagLength: 16`).
   - **Not yet seen:** a delivery to the real Mara Rue receiver (not built yet). The runbook's `test` step is the first check.
 
 ---

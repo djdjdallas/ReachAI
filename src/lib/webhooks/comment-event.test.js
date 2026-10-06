@@ -75,15 +75,41 @@ describe("comment-to-DM opener: first-message AI disclosure", () => {
     // Saved as sent: the AI sees exactly this opener as history.
     expect(db.tables.messages[0]).toMatchObject({ role: "assistant", source: "agent", content: sent, provider_message_id: "mid-opener" });
     expect(db.tables.comment_to_dm_log.at(-1)).toMatchObject({ dispatched: true, rendered_dm: sent });
+    // The new thread is created already claimed.
+    expect(db.tables.conversations[0]).toMatchObject({ origin: "clinchd_sent", disclosed_at: expect.any(String) });
   });
 
-  it("a lead who already got a disclosed DM in this thread gets the template as-is", async () => {
+  it("a lead whose thread is already claimed gets the template as-is", async () => {
     setup({}, {
-      conversations: [{ id: "conv-1", user_id: "u1", instagram_sender_id: LEAD, origin: "inbound" }],
-      messages: [{ id: "m0", conversation_id: "conv-1", role: "assistant", source: "agent", provider_message_id: "old", content: `${LINE} How can I help?` }],
+      conversations: [{ id: "conv-1", user_id: "u1", instagram_sender_id: LEAD, origin: "inbound", disclosed_at: "2026-10-06T10:00:00.000Z" }],
     });
     await handleCommentEvent(...comment());
     expect(sendPrivateReplyToComment.mock.calls[0][2]).toBe("Hey! Thanks for commenting. First time trying Botox?");
+  });
+
+  it("an open but unclaimed thread is claimed atomically before the send", async () => {
+    setup({}, {
+      conversations: [{ id: "conv-1", user_id: "u1", instagram_sender_id: LEAD, origin: "inbound", disclosed_at: null }],
+    });
+    await handleCommentEvent(...comment());
+    expect(sendPrivateReplyToComment.mock.calls[0][2]).toBe(`${LINE} Thanks for commenting. First time trying Botox?`);
+    expect(db.tables.conversations[0].disclosed_at).toEqual(expect.any(String));
+  });
+
+  it("a failed send releases the claim", async () => {
+    setup({}, {
+      conversations: [{ id: "conv-1", user_id: "u1", instagram_sender_id: LEAD, origin: "inbound", disclosed_at: null }],
+    });
+    sendPrivateReplyToComment.mockResolvedValueOnce({ success: false, error: "meta_error", retryable: true });
+    await handleCommentEvent(...comment());
+    expect(db.tables.conversations[0].disclosed_at).toBeNull();
+  });
+
+  it("a failed send to a brand-new lead leaves no thread behind", async () => {
+    setup();
+    sendPrivateReplyToComment.mockResolvedValueOnce({ success: false, error: "meta_error", retryable: true });
+    await handleCommentEvent(...comment());
+    expect(db.tables.conversations).toHaveLength(0);
   });
 
   it("coach accounts send the template unchanged", async () => {
@@ -103,6 +129,8 @@ describe("comment-to-DM opener: first-message AI disclosure", () => {
     expect(db.tables.messages).toHaveLength(1);
     expect(db.tables.messages[0].source).toBe("agent");
     expect(db.tables.conversations[0].origin).toBe("clinchd_sent");
+    // The echo-created thread had no claim: the disclosed opener is recorded.
+    expect(db.tables.conversations[0].disclosed_at).toEqual(expect.any(String));
   });
 
   it("a real cold-DM thread the clinic started by hand is not relabeled", async () => {

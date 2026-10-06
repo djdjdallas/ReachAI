@@ -51,6 +51,27 @@ export const AI_TELL_PHRASES = [
   "as an ai language model",
 ];
 
+// Word ranges written with a dash ("Mon - Fri", "Jan – Mar", "9am - noon",
+// "LA - NYC") are ranges, not asides: they must not become "Mon, Fri".
+// Days and months are matched capitalized only ("you may - if" is not May).
+const DAY_OR_MONTH =
+  "(?:Mon|Tue|Tues|Wed|Thu|Thur|Thurs|Fri|Sat|Sun|Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday|" +
+  "Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Sept|Oct|Nov|Dec|January|February|March|April|June|July|August|September|October|November|December)";
+const TIME = "(?:\\d{1,2}(?::\\d{2})?\\s?(?:[ap]\\.?m\\.?)|noon|midnight)";
+// A hyphen with spaces around it, or an en/em dash with or without.
+const RANGE_DASH = "(?:[ \\t]+-[ \\t]+|[ \\t]*[–—][ \\t]*)";
+const DAY_MONTH_RANGE_RE = new RegExp(`\\b(${DAY_OR_MONTH})\\.?${RANGE_DASH}(${DAY_OR_MONTH})\\b`, "g");
+const TIME_RANGE_RE = new RegExp(`(?<![\\w:])(${TIME})${RANGE_DASH}(${TIME})(?![\\w])`, "gi");
+const ABBREV_RANGE_RE = new RegExp(`\\b([A-Z]{2,5})${RANGE_DASH}([A-Z]{2,5})\\b`, "g");
+
+/** "Mon - Fri" → "Mon-Fri", "9am - noon" → "9am to noon", "LA - NYC" → "LA to NYC". */
+export function normalizeWordRanges(text) {
+  return String(text ?? "")
+    .replace(DAY_MONTH_RANGE_RE, "$1-$2")
+    .replace(TIME_RANGE_RE, "$1 to $2")
+    .replace(ABBREV_RANGE_RE, "$1 to $2");
+}
+
 function capitalizeLike(original, text) {
   if (!text) return text;
   const wasUpper = /^[A-Z]/.test(original);
@@ -79,6 +100,12 @@ export function lintReply(text, { bookingLink = "" } = {}) {
     fixes.push("booking_link_placeholder");
   }
   const blocked = /\{\{[^}]*\}\}/.test(out);
+
+  // Word ranges first (days, months, times, abbreviations), so the dash
+  // rules below never turn "Mon - Fri" into "Mon, Fri".
+  const wordRanged = normalizeWordRanges(out);
+  if (wordRanged !== out) fixes.push("range");
+  out = wordRanged;
 
   // Numeric ranges keep a plain hyphen: "3–4 weeks" → "3-4 weeks".
   const ranged = out.replace(/(\d)\s*[–—]\s*(\d)/g, "$1-$2");

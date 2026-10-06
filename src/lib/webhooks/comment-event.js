@@ -8,7 +8,7 @@ import { canUseCommentToDM } from "@/lib/comment-to-dm-gate";
 import { ACCESS_COLUMNS } from "@/lib/billing/status";
 import { maybePostPublicReply } from "@/lib/comment-public-reply";
 import { persistCommentDmConversation } from "@/lib/comment-dm-conversation";
-import { disclosureLine, discloseOnFirstMessage } from "@/lib/persona-disclosure";
+import { disclosureLine, prepareFirstMessage, releaseFirstMessage } from "@/lib/persona-disclosure";
 
 // Phase 2 of the comment-to-DM pipeline. Receives a single change object
 // from a Meta Instagram webhook payload (entry.changes[i] where
@@ -340,8 +340,13 @@ async function processCommentEvent(entry, change) {
 
   // First-message AI disclosure (persona accounts only): when this DM is the
   // first thing the lead gets from the app, the server prepends the
-  // disclosure and drops the template's own leading greeting.
+  // disclosure and drops the template's own leading greeting. With a thread
+  // already open, conversations.disclosed_at is claimed atomically here
+  // (released below if the send fails). With no thread yet nothing has been
+  // sent to this lead, and persistCommentDmConversation creates the thread
+  // with disclosed_at set.
   let dmText = decision.rendered;
+  let disclosureClaim = null;
   if (disclosureLine(ownerUser)) {
     const { data: existingConv } = fromId
       ? await admin
@@ -351,9 +356,11 @@ async function processCommentEvent(entry, change) {
           .eq("instagram_sender_id", fromId)
           .maybeSingle()
       : { data: null };
-    dmText = await discloseOnFirstMessage(admin, ownerUser, decision.rendered, {
+    const prepared = await prepareFirstMessage(admin, ownerUser, decision.rendered, {
       conversationId: existingConv?.id || null,
     });
+    dmText = prepared.text;
+    disclosureClaim = prepared.claim;
   }
 
   const result = await sendPrivateReplyToComment(
@@ -390,6 +397,7 @@ async function processCommentEvent(entry, change) {
       recipientIgsid: fromId,
       senderName: fromUsername,
       renderedDm: dmText,
+      disclosedNow: Boolean(disclosureLine(ownerUser)) && dmText.includes(disclosureLine(ownerUser)),
       providerMessageId: result.messageId || null,
       commentText,
     });
@@ -411,6 +419,9 @@ async function processCommentEvent(entry, change) {
     });
     return;
   }
+
+  // Not sent: the next message to this lead must carry the disclosure.
+  await releaseFirstMessage(admin, disclosureClaim);
 
   await logDecision(
     admin,

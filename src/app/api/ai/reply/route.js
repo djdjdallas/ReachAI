@@ -6,7 +6,7 @@ import { buildSystemPrompt } from "@/lib/prompts";
 import { ownerFromUser } from "@/lib/active-offer";
 import { loadReplyGrounding } from "@/lib/reply-grounding";
 import { lintReply } from "@/lib/reply-lint";
-import { discloseOnFirstMessage } from "@/lib/persona-disclosure";
+import { prepareFirstMessage, releaseFirstMessage } from "@/lib/persona-disclosure";
 import { sendInstagramMessage } from "@/lib/instagram";
 import { decryptToken } from "@/lib/token-utils";
 import { getPostHogClient } from "@/lib/posthog-server";
@@ -18,6 +18,8 @@ import {
 } from "@/lib/instagram/messaging-window";
 
 export async function POST(request) {
+  // First-message disclosure claim to release if the send doesn't happen.
+  let disclosureClaim = null;
   try {
     // Authenticate user
     const supabase = await createClient();
@@ -237,9 +239,11 @@ export async function POST(request) {
       replyContent = lint.text;
       // First-message AI disclosure (persona accounts only), the same as
       // the webhook's reply path.
-      replyContent = await discloseOnFirstMessage(getSupabaseAdmin(), userProfile, replyContent, {
+      const prepared = await prepareFirstMessage(getSupabaseAdmin(), userProfile, replyContent, {
         conversationId,
       });
+      replyContent = prepared.text;
+      disclosureClaim = prepared.claim;
     }
 
     // Save message to database
@@ -255,6 +259,7 @@ export async function POST(request) {
       .single();
 
     if (saveError) {
+      await releaseFirstMessage(getSupabaseAdmin(), disclosureClaim);
       return NextResponse.json(
         { error: "Failed to save message" },
         { status: 500 }
@@ -295,6 +300,8 @@ export async function POST(request) {
       decryptToken(userProfile.meta_page_access_token),
       { lastInboundAt }
     );
+    // Sent: the claim stands even if a later step throws.
+    disclosureClaim = null;
 
     // Stamp the Meta mid so the echo of this send dedups in the webhook.
     if (savedMessage?.id && sendResult?.message_id) {
@@ -313,6 +320,8 @@ export async function POST(request) {
 
     return NextResponse.json({ message: savedMessage }, { status: 200 });
   } catch (error) {
+    // Nothing went out: the next send must carry the disclosure.
+    await releaseFirstMessage(getSupabaseAdmin(), disclosureClaim);
     // The window closed between the check above and the send (seconds).
     if (error?.code === "messaging_window_closed") {
       return NextResponse.json(

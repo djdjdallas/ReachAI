@@ -32,7 +32,7 @@ Every event has the same shape:
 |---|---|
 | `id` | Stable lead id. The Clinchd conversation id (one lead = one Instagram thread per account), so it equals `conversation.id`. A Calendly booking that matched no conversation uses `bkg_<booking id>`. |
 | `instagram_username` | When known. |
-| `first_name`, `last_name` | Only from a Calendly booking (the invitee's name). Never guessed from Instagram display names. |
+| `first_name`, `last_name` | Only from a Calendly booking (the invitee's name), and only when the booking matched the lead by email or is a booking-only lead. Never guessed from Instagram display names. |
 | `email` | Validated format, lowercased. |
 | `phone` | E.164 (`+15125550123`). US is the default country; ambiguous numbers are dropped, never sent half-parsed. |
 | `treatment_interest` | A short category **key** from the account's configured service list (for example `botox`, `lip_filler`; max 40 chars, `a-z 0-9 _ -`). Never the lead's words. |
@@ -178,7 +178,8 @@ through a comment and `dm` for one who messaged first.
 ### `consultation_booked`
 
 `data.scheduled_for` is the appointment start (ISO 8601) or `null`.
-`first_name` / `last_name` come from the Calendly invitee.
+`first_name` / `last_name` come from the Calendly invitee, and are sent only
+when the booking matched the lead by email (as here) or is a booking-only lead.
 
 ```json
 {
@@ -212,9 +213,11 @@ through a comment and `dm` for one who messaged first.
 ```
 
 The booking is linked to a lead first by the invitee's email (if the lead
-typed it in the DMs), otherwise by a unique name match. If no lead matches,
-or more than one does, the booking arrives as a **booking-only lead** with
-the invitee's email and no conversation:
+typed it in the DMs), otherwise by an exact full-name match (case-insensitive,
+whitespace collapsed) when exactly one lead has that name. A name match sends
+no invitee name or email. If no lead matches, or more than one does, the
+booking arrives as a **booking-only lead** with the invitee's name and email
+and no conversation:
 
 ```json
 {
@@ -471,11 +474,13 @@ status, destination host, timestamps) is kept.
 - Secret rotation takes effect immediately, with no overlap window: rotate
   the secret in Clinchd and update the receiver together.
 - `trigger` is always `null`; there are no keyword triggers.
-- `first_name` / `last_name` only come from Calendly bookings.
+- `first_name` / `last_name` only come from Calendly bookings matched by
+  email, or booking-only leads.
 - Booking-to-lead matching uses the invitee's email (if the lead typed it in
-  the DMs), then a unique, fuzzy name match. A name match can still be wrong
-  when two people share a name and only one of them has a thread. Bookings
-  made outside Calendly (other schedulers) produce no `consultation_booked`.
+  the DMs), then an exact full-name match. A name match can still be wrong
+  when two people share a name and only one of them has a thread; it then
+  carries no invitee name or email. Bookings made outside Calendly (other
+  schedulers) produce no `consultation_booked`.
 - `booking_link_sent` matches the account's booking link (or Calendly link)
   in the message text. A shortened or reworded link won't match.
 - A lead's email or phone is taken only when a message (or the comment that

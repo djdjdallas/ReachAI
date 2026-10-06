@@ -3,7 +3,12 @@
 -- Run manually, BEFORE the deploy that ships the code (the code reads the
 -- new columns; the triggers emit nothing until an account has an enabled
 -- outbound_webhooks row, so running it early changes no behavior).
--- Re-runnable.
+-- Re-runnable. It takes short locks on users, conversations, messages and
+-- bookings (ALTER TABLE, CREATE TRIGGER); if one is busy it gives up after
+-- 3 seconds instead of queueing live traffic behind it. On
+-- "canceling statement due to lock timeout", just run it again.
+
+set lock_timeout = '3s';
 --
 -- 1. users: server-only columns. None is in the browser UPDATE allowlist
 --    (migration 20261005150000 grants named columns only), and
@@ -112,6 +117,42 @@ drop trigger if exists protect_server_user_columns on public.users;
 create trigger protect_server_user_columns
   before update on public.users
   for each row execute function public.protect_server_user_columns();
+
+-- ── conversations.disclosed_at ──────────────────────────────────────────
+-- When the first-message AI disclosure was claimed for this thread (persona
+-- accounts, src/lib/persona-disclosure.js). Claimed atomically right before
+-- a send (update ... where disclosed_at is null returning id); only the
+-- claimer prepends the disclosure; cleared again if that send fails.
+-- Server-only: a browser write could otherwise suppress the disclosure.
+
+alter table public.conversations add column if not exists disclosed_at timestamptz;
+
+create or replace function public.protect_conversation_disclosed_at()
+returns trigger
+language plpgsql
+as $$
+declare
+  jwt_role text := coalesce(
+    nullif(current_setting('request.jwt.claims', true), '')::jsonb ->> 'role',
+    current_setting('request.jwt.claim.role', true)
+  );
+begin
+  if jwt_role in ('authenticated', 'anon') then
+    if (tg_op = 'INSERT' and new.disclosed_at is not null)
+      or (tg_op = 'UPDATE' and new.disclosed_at is distinct from old.disclosed_at)
+    then
+      raise exception 'disclosed_at is written by the server only'
+        using errcode = '42501';
+    end if;
+  end if;
+  return new;
+end;
+$$;
+
+drop trigger if exists protect_conversation_disclosed_at on public.conversations;
+create trigger protect_conversation_disclosed_at
+  before insert or update on public.conversations
+  for each row execute function public.protect_conversation_disclosed_at();
 
 -- ── 2. lead_profiles ─────────────────────────────────────────────────────
 
@@ -430,7 +471,9 @@ create trigger outbound_on_message_sent
 
 -- consultation_booked: a real Calendly booking (source 'calendly' with an
 -- invitee URI, confirmed), or a demo booking on a webhook_demo account.
--- Manual bookings from the dashboard never emit.
+-- Manual bookings from the dashboard never emit. Only on insert, or when an
+-- update moves the status to 'confirmed'; other updates (a retried upsert,
+-- an invitee rename) emit nothing.
 create or replace function public.outbound_on_booking()
 returns trigger
 language plpgsql
@@ -441,7 +484,8 @@ declare
 begin
   begin
     if coalesce(nullif(current_setting('request.jwt.claims', true), '')::jsonb ->> 'role',
-                current_setting('request.jwt.claim.role', true), '') in ('authenticated', 'anon') or new.status is distinct from 'confirmed' then
+                current_setting('request.jwt.claim.role', true), '') in ('authenticated', 'anon') or new.status is distinct from 'confirmed'
+       or (tg_op = 'UPDATE' and old.status is not distinct from 'confirmed') then
       return null;
     end if;
     if new.source = 'calendly' and new.calendly_invitee_uri is not null then
@@ -554,6 +598,7 @@ revoke execute on function public.outbound_on_message_sent() from public, anon, 
 revoke execute on function public.outbound_on_booking() from public, anon, authenticated;
 revoke execute on function public.outbound_on_lead_profile() from public, anon, authenticated;
 revoke execute on function public.protect_server_user_columns() from public, anon, authenticated;
+revoke execute on function public.protect_conversation_disclosed_at() from public, anon, authenticated;
 revoke execute on function public.claim_outbound_webhook_events(integer, integer) from public, anon, authenticated;
 grant execute on function public.claim_outbound_webhook_events(integer, integer) to service_role;
 -- The triggers call these as the writer, which is the service role.

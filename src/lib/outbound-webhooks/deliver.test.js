@@ -257,3 +257,57 @@ describe("postWebhook", () => {
     expect(await postWebhook({ ...args, request, timeoutMs: 20 })).toEqual({ ok: false, status: null, error: "timeout" });
   });
 });
+
+describe("delivery: errors on our side never strand an event (audit)", () => {
+  it("an event re-claimed past its last attempt is failed", async () => {
+    const db = setup({ attempts: 6 });
+    vi.spyOn(console, "log").mockImplementation(() => {});
+    const post = vi.fn();
+    expect(await deliverClaimedEvent(db, { ...row(db) }, { post })).toBe("failed");
+    expect(post).not.toHaveBeenCalled();
+    expect(row(db)).toMatchObject({ status: "failed", last_error: "max_attempts" });
+  });
+
+  it("a config read error goes back on the schedule", async () => {
+    const db = setup();
+    vi.spyOn(console, "log").mockImplementation(() => {});
+    const failing = { ...db, from: (t) => (t === "outbound_webhooks" ? fakeDb({}, { failOn: { outbound_webhooks: { code: "57014" } } }).from(t) : db.from(t)) };
+    expect(await deliverClaimedEvent(failing, { ...row(db) }, { post: vi.fn(), random: () => 0.5, now: () => 0 })).toBe("retry");
+    expect(row(db)).toMatchObject({ status: "pending", last_error: "config_read_failed", next_attempt_at: new Date(60_000).toISOString() });
+  });
+
+  it("a read error while building the body retries instead of freezing an incomplete body", async () => {
+    const db = setup();
+    vi.spyOn(console, "log").mockImplementation(() => {});
+    const failing = { ...db, from: (t) => (t === "lead_profiles" ? fakeDb({}, { failOn: { lead_profiles: { code: "57014" } } }).from(t) : db.from(t)) };
+    const post = vi.fn();
+    expect(await deliverClaimedEvent(failing, { ...row(db) }, { post, random: () => 0.5 })).toBe("retry");
+    expect(post).not.toHaveBeenCalled();
+    expect(row(db)).toMatchObject({ status: "pending", last_error: "envelope_read_failed", payload: null });
+  });
+
+  it("a freeze write error retries", async () => {
+    const db = setup();
+    vi.spyOn(console, "log").mockImplementation(() => {});
+    let calls = 0;
+    const failing = {
+      ...db,
+      from: (t) => {
+        if (t === "outbound_webhook_events" && calls++ === 0) return fakeDb({}, { failOn: { outbound_webhook_events: { code: "40001" } } }).from(t);
+        return db.from(t);
+      },
+    };
+    expect(await deliverClaimedEvent(failing, { ...row(db) }, { post: vi.fn(), random: () => 0.5 })).toBe("retry");
+    expect(row(db)).toMatchObject({ status: "pending", last_error: "freeze_failed" });
+  });
+
+  it("an unexpected throw puts the event back on the schedule", async () => {
+    const db = setup();
+    vi.spyOn(console, "log").mockImplementation(() => {});
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    db.rpc = async () => ({ data: [{ ...row(db) }], error: null });
+    const summary = await runOutboundDelivery(db, { post: async () => { throw new Error("boom"); } });
+    expect(summary.retry).toBe(1);
+    expect(row(db)).toMatchObject({ status: "pending", last_error: "internal_error" });
+  });
+});
