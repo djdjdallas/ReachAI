@@ -8,6 +8,7 @@ import { canUseCommentToDM } from "@/lib/comment-to-dm-gate";
 import { ACCESS_COLUMNS } from "@/lib/billing/status";
 import { maybePostPublicReply } from "@/lib/comment-public-reply";
 import { persistCommentDmConversation } from "@/lib/comment-dm-conversation";
+import { disclosureLine, prepareFirstMessage, releaseFirstMessage } from "@/lib/persona-disclosure";
 
 // Phase 2 of the comment-to-DM pipeline. Receives a single change object
 // from a Meta Instagram webhook payload (entry.changes[i] where
@@ -73,7 +74,7 @@ async function processCommentEvent(entry, change) {
   const { data: ownerUser, error: ownerErr } = await admin
     .from("users")
     .select(
-      `id, email, meta_page_access_token, instagram_business_account_id, comment_public_reply_enabled, ${ACCESS_COLUMNS}`
+      `id, email, meta_page_access_token, instagram_business_account_id, comment_public_reply_enabled, business_name, assistant_name, ${ACCESS_COLUMNS}`
     )
     .eq("instagram_business_account_id", igbaId)
     .maybeSingle();
@@ -337,18 +338,51 @@ async function processCommentEvent(entry, change) {
     return;
   }
 
-  const result = await sendPrivateReplyToComment(
-    ownerUser.instagram_business_account_id,
-    commentId,
-    decision.rendered,
-    pageToken
-  );
+  // First-message AI disclosure (persona accounts only): when this DM is the
+  // first thing the lead gets from the app, the server prepends the
+  // disclosure and drops the template's own leading greeting. With a thread
+  // already open, conversations.disclosed_at is claimed atomically here
+  // (released below if the send fails). With no thread yet nothing has been
+  // sent to this lead, and persistCommentDmConversation creates the thread
+  // with disclosed_at set.
+  let dmText = decision.rendered;
+  let disclosureClaim = null;
+  if (disclosureLine(ownerUser)) {
+    const { data: existingConv } = fromId
+      ? await admin
+          .from("conversations")
+          .select("id")
+          .eq("user_id", creatorId)
+          .eq("instagram_sender_id", fromId)
+          .maybeSingle()
+      : { data: null };
+    const prepared = await prepareFirstMessage(admin, ownerUser, decision.rendered, {
+      conversationId: existingConv?.id || null,
+    });
+    dmText = prepared.text;
+    disclosureClaim = prepared.claim;
+  }
+
+  // The finally releases the disclosure claim whenever the DM didn't go out
+  // (a failed send or a throw); a successful send keeps it.
+  let result = { success: false, error: "send_threw" };
+  try {
+    result = await sendPrivateReplyToComment(
+      ownerUser.instagram_business_account_id,
+      commentId,
+      dmText,
+      pageToken
+    );
+  } finally {
+    if (!result?.success) await releaseFirstMessage(admin, disclosureClaim);
+  }
 
   if (result.success) {
     await logDecision(
       admin,
       {
         ...logFields,
+        rendered_dm: dmText,
         dispatched: true,
         dispatched_at: new Date().toISOString(),
         dispatched_message_id: result.messageId || null,
@@ -369,8 +403,10 @@ async function processCommentEvent(entry, change) {
       userId: creatorId,
       recipientIgsid: fromId,
       senderName: fromUsername,
-      renderedDm: decision.rendered,
+      renderedDm: dmText,
+      disclosedNow: Boolean(disclosureLine(ownerUser)) && dmText.includes(disclosureLine(ownerUser)),
       providerMessageId: result.messageId || null,
+      commentText,
     });
 
     // Optional public reply under the trigger comment ("sent! check your

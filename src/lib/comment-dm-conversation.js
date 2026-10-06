@@ -24,6 +24,8 @@
 // re-deliver the webhook and re-send the DM) and must never crash the job —
 // every failure path logs and returns.
 
+import { captureLeadFacts } from "@/lib/outbound-webhooks/lead-capture";
+
 export async function persistCommentDmConversation({
   admin,
   userId,
@@ -31,6 +33,9 @@ export async function persistCommentDmConversation({
   senderName,
   renderedDm,
   providerMessageId,
+  commentText,
+  // The DM that just went out carried the first-message AI disclosure.
+  disclosedNow = false,
 }) {
   try {
     // Without the recipient IGSID there is no key the inbound reply can match
@@ -51,18 +56,44 @@ export async function persistCommentDmConversation({
       userId,
       recipientIgsid,
       senderName,
+      disclosedNow,
     });
     if (!conversation) return;
+
+    // The disclosure went out, so record it on the thread. A new thread was
+    // created with disclosed_at set; one that already existed (Meta's echo
+    // created it first, or the lead DM'd at the same moment) is claimed here
+    // if nobody has.
+    if (disclosedNow && !conversation.created) {
+      await admin
+        .from("conversations")
+        .update({ disclosed_at: new Date().toISOString() })
+        .eq("id", conversation.id)
+        .is("disclosed_at", null);
+    }
+
+    // Outbound webhooks: the commenter's username and a treatment category
+    // matched in the comment (accounts with an enabled webhook only). Never
+    // throws.
+    await captureLeadFacts(admin, {
+      userId,
+      conversationId: conversation.id,
+      text: commentText,
+      instagramUsername: senderName,
+    });
 
     // Exactly one assistant message, idempotent on provider_message_id so a
     // retried dispatch never duplicates it.
     if (providerMessageId) {
       const { data: existing } = await admin
         .from("messages")
-        .select("id")
+        .select("id, source, conversation_id")
         .eq("provider_message_id", providerMessageId)
         .maybeSingle();
-      if (existing) return;
+      if (existing) {
+        await reconcileEchoedOpener(admin, { message: existing, conversation });
+        return;
+      }
     }
 
     const { data: inserted, error: msgErr } = await admin
@@ -108,10 +139,44 @@ export async function persistCommentDmConversation({
   }
 }
 
-async function findOrCreateConversation(admin, { userId, recipientIgsid, senderName }) {
+// Meta's echo of this DM can arrive before the send call returns. The echo
+// handler then saves the opener as a staff-typed message (source 'manual')
+// and, if the lead had no thread, creates one as origin 'native_send'. Both
+// are wrong for a DM the app sent: the opener would read as the owner's own
+// words, the disclosure check and the lifecycle webhooks would miss it, and
+// the thread would get cold-DM framing. Relabel them. The thread is only
+// relabeled when this opener is all it holds, so a real cold-DM thread the
+// clinic started by hand is never touched.
+async function reconcileEchoedOpener(admin, { message, conversation }) {
+  try {
+    if (message.conversation_id !== conversation.id) return;
+    if (message.source === "manual") {
+      await admin.from("messages").update({ source: "agent" }).eq("id", message.id).eq("source", "manual");
+    }
+    if (conversation.origin === "native_send") {
+      const { data: others } = await admin
+        .from("messages")
+        .select("id")
+        .eq("conversation_id", conversation.id)
+        .neq("id", message.id)
+        .limit(1);
+      if (!others?.length) {
+        await admin
+          .from("conversations")
+          .update({ origin: "clinchd_sent", missing_outbound_context: false })
+          .eq("id", conversation.id)
+          .eq("origin", "native_send");
+      }
+    }
+  } catch (err) {
+    console.error("[comment-dm-conversation] echo reconcile failed:", { conversationId: conversation.id, error: err?.message });
+  }
+}
+
+async function findOrCreateConversation(admin, { userId, recipientIgsid, senderName, disclosedNow = false }) {
   const { data: existing } = await admin
     .from("conversations")
-    .select("id")
+    .select("id, origin")
     .eq("user_id", userId)
     .eq("instagram_sender_id", recipientIgsid)
     .maybeSingle();
@@ -135,18 +200,19 @@ async function findOrCreateConversation(admin, { userId, recipientIgsid, senderN
       // We have the full opening DM as a message below, so the thread is not
       // missing outbound context (no backfill banner).
       missing_outbound_context: false,
+      ...(disclosedNow ? { disclosed_at: new Date().toISOString() } : {}),
     })
-    .select("id")
+    .select("id, origin")
     .single();
 
-  if (created) return created;
+  if (created) return { ...created, created: true };
 
   // 23505 = a concurrent webhook created the row between our select and
   // insert. Re-select so we append rather than fail.
   if (error?.code === "23505") {
     const { data: raced } = await admin
       .from("conversations")
-      .select("id")
+      .select("id, origin")
       .eq("user_id", userId)
       .eq("instagram_sender_id", recipientIgsid)
       .maybeSingle();

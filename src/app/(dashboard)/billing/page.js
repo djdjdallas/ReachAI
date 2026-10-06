@@ -37,7 +37,7 @@ import {
   planButtonLabel,
 } from "@/lib/plans";
 import { SUPPORT_EMAIL, SUPPORT_MAILTO } from "@/lib/support";
-import { billingPageView } from "@/lib/billing/managed";
+import { billingPageView, managedPlanTitle } from "@/lib/billing/managed";
 
 // Plans come from the one catalog (src/lib/plans.js); price ids stay on the
 // server. No local copy of prices here.
@@ -268,7 +268,7 @@ export default function BillingPage() {
               </CardTitle>
               <Badge variant={view.managed ? "success" : statusVariant}>
                 {view.managed
-                  ? "Complimentary"
+                  ? managedPlanTitle(access).replace(" plan", "")
                   : subscriptionStatus === "active"
                   ? "Active"
                   : subscriptionStatus === "trialing"
@@ -284,7 +284,7 @@ export default function BillingPage() {
           <CardContent className="space-y-4">
             {view.managed ? (
               <>
-                <p className="text-3xl font-bold">Complimentary plan</p>
+                <p className="text-3xl font-bold">{managedPlanTitle(access)}</p>
                 <p className="text-sm text-muted-foreground">{planDisplayName}</p>
                 <p className="text-sm text-muted-foreground">
                   Nothing to pay. Questions? Email{" "}

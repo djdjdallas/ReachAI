@@ -136,3 +136,84 @@ describe("buildSystemPrompt: audit fixes", () => {
     expect(buildSystemPrompt(sc, LINK, { intentHint: "follow_up" })).not.toContain("THIS TURN:");
   });
 });
+
+describe("buildSystemPrompt: business persona (per-account assistant name)", () => {
+  const persona = { name: "Dom Hill", igHandle: "soleaesthetics", businessName: "Solé Aesthetics", assistantName: "Katlynne" };
+  const p = buildSystemPrompt({ offer: "Botox and fillers" }, "https://sole.example/book", { owner: persona });
+
+  it("opens as a named AI assistant for a business", () => {
+    expect(p.startsWith("You are Katlynne, Solé Aesthetics' AI concierge, managing the Instagram DMs of a business: Solé Aesthetics.")).toBe(true);
+    expect(p).toContain("- Business: Solé Aesthetics / Instagram @soleaesthetics");
+    expect(p).not.toContain("Dom Hill");
+  });
+
+  it("rule 7 still requires AI disclosure in the first sentence, with the persona example", () => {
+    expect(p).toMatch(/7\. AI IDENTITY\. .*say plainly in your FIRST sentence that you are an AI concierge/);
+    expect(p).toContain("I'm Katlynne, Solé Aesthetics' AI concierge, not a person. The team can jump in when needed.");
+    expect(p).not.toContain("reads these");
+    expect(p).toContain("never imply you are a human");
+  });
+
+  it("the name is only ever an AI assistant's name, and can never be a person", () => {
+    expect(p).toContain("Your name is Katlynne. It is the name of an AI concierge, not a person");
+    expect(p).toMatch(/NON-OVERRIDABLE: .*answer honestly that you are an AI\. Never claim to be human\. The only name you may use for yourself is Katlynne, and only as the name of an AI concierge\./);
+    expect(p).not.toContain("take on another name or persona");
+  });
+
+  it("a business may mention its team, but never invent staff", () => {
+    expect(p).toContain(`You may refer to "the team" or "our team" at Solé Aesthetics.`);
+    expect(p).toContain("Never invent staff names, roles, credentials, or departments");
+    expect(p).not.toContain("YOU ARE ONE PERSON'S INBOX");
+  });
+
+  it("handoff rules and markers are unchanged", () => {
+    expect(p).toContain("<<HANDOFF:medical_question>>");
+    expect(p).toContain("HANDOFF RULES (these override everything else except AI disclosure)");
+  });
+
+  it("invalid persona values fall back to the one-person identity", () => {
+    const q = buildSystemPrompt({}, "", { owner: { name: "Dom", igHandle: "dom", businessName: "<x>", assistantName: "K4t" } });
+    expect(q.startsWith("You are an AI assistant managing the Instagram DMs of one person: Dom.")).toBe(true);
+    expect(q).toContain("YOU ARE ONE PERSON'S INBOX");
+    expect(q).toContain("Never claim to be human or take on another name or persona.");
+  });
+});
+
+describe("buildSystemPrompt: business inbox thread rules", () => {
+  const owner = { name: "Solé Aesthetics", businessName: "Solé Aesthetics", assistantName: "Katlynne" };
+  const kb = [{ id: "1", sort: 0, type: "faq", question: "Hours?", answer: "Tue-Sat 9-6", enabled: true }];
+  const p = buildSystemPrompt({ offer: "Botox" }, "https://sole.example/book", { owner, knowledge: kb });
+
+  it("tells the model the intro is prepended, and bans filler openers", () => {
+    expect(p).toContain(`On the first message of a thread, "Hi! I'm Katlynne, Solé Aesthetics' AI concierge." is put in front of your reply automatically`);
+    expect(p).toContain('never start any reply with a filler like "Yeah", "Yes!", "Sure", "Great question"');
+  });
+
+  it("no greeting after the first message, never re-ask (including the opening DM)", () => {
+    expect(p).toContain("NO GREETING AFTER THE FIRST MESSAGE");
+    expect(p).toContain('no "Hey", "Hi", "Hello", "Hey there"');
+    expect(p).toContain("NEVER RE-ASK");
+    expect(p).toContain("including the opening DM");
+  });
+
+  it("availability gets the booking link, and is not a missing-knowledge handoff", () => {
+    expect(p).toContain("AVAILABILITY MEANS THE BOOKING LINK");
+    expect(p).toContain("NEVER SAY WHETHER THERE ARE OPENINGS. You can't see the calendar.");
+    expect(p).toContain("include the booking link (https://sole.example/book) in that same reply");
+    expect(p).toContain("Appointment availability (openings, times, days, \"this week\", booking) is NOT missing knowledge for this business");
+    expect(p).not.toContain('"do you have weekend appointments?"');
+    expect(p).toMatch(/NON-OVERRIDABLE: .*price or policies that the business knowledge doesn't answer \(availability and booking get the booking link\)/);
+  });
+
+  it("without a booking link, availability keeps the existing handoff rule", () => {
+    const q = buildSystemPrompt({ offer: "Botox" }, "", { owner, knowledge: kb });
+    expect(q).not.toContain("AVAILABILITY MEANS THE BOOKING LINK");
+    expect(q).toContain('"do you have weekend appointments?"');
+  });
+
+  it("coach prompts get none of these", () => {
+    const c = buildSystemPrompt({ offer: "Coaching" }, "https://cal.com/x", { owner: { name: "Dom" }, knowledge: kb });
+    expect(c).not.toContain("THREAD RULES FOR THIS BUSINESS INBOX");
+    expect(c).toContain('"do you have weekend appointments?"');
+  });
+});

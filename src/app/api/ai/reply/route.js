@@ -6,6 +6,7 @@ import { buildSystemPrompt } from "@/lib/prompts";
 import { ownerFromUser } from "@/lib/active-offer";
 import { loadReplyGrounding } from "@/lib/reply-grounding";
 import { lintReply } from "@/lib/reply-lint";
+import { prepareFirstMessage, releaseFirstMessage } from "@/lib/persona-disclosure";
 import { sendInstagramMessage } from "@/lib/instagram";
 import { decryptToken } from "@/lib/token-utils";
 import { getPostHogClient } from "@/lib/posthog-server";
@@ -17,6 +18,10 @@ import {
 } from "@/lib/instagram/messaging-window";
 
 export async function POST(request) {
+  // First-message disclosure claim. Cleared once the send succeeds; the
+  // finally releases it on every other way out (save error, early return,
+  // send failure, any throw).
+  let disclosureClaim = null;
   try {
     // Authenticate user
     const supabase = await createClient();
@@ -234,6 +239,13 @@ export async function POST(request) {
         );
       }
       replyContent = lint.text;
+      // First-message AI disclosure (persona accounts only), the same as
+      // the webhook's reply path.
+      const prepared = await prepareFirstMessage(getSupabaseAdmin(), userProfile, replyContent, {
+        conversationId,
+      });
+      replyContent = prepared.text;
+      disclosureClaim = prepared.claim;
     }
 
     // Save message to database
@@ -289,6 +301,8 @@ export async function POST(request) {
       decryptToken(userProfile.meta_page_access_token),
       { lastInboundAt }
     );
+    // Sent: the claim stands even if a later step throws.
+    disclosureClaim = null;
 
     // Stamp the Meta mid so the echo of this send dedups in the webhook.
     if (savedMessage?.id && sendResult?.message_id) {
@@ -324,5 +338,8 @@ export async function POST(request) {
       { error: "Internal server error" },
       { status: 500 }
     );
+  } finally {
+    // Nothing went out: the next send must carry the disclosure.
+    if (disclosureClaim) await releaseFirstMessage(getSupabaseAdmin(), disclosureClaim);
   }
 }

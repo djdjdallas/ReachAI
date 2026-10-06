@@ -1,6 +1,8 @@
 import { OWNER_MANUAL_MARK, DRIP_MARK } from "./anthropic";
 import { HANDOFF_MARKERS } from "./handoff-reply";
 import { formatBusinessKnowledge } from "./knowledge/format";
+import { cleanAssistantName, cleanBusinessName } from "./persona";
+import { disclosureLine, possessive } from "./persona-disclosure";
 
 /**
  * prompts.js
@@ -344,16 +346,90 @@ This person is responding to a cold DM that the coach sent them via Instagram na
  * stored (first-word extraction fails on brand names like "The Fit Lab") plus
  * the Instagram handle, so the model can match "is this Dom?" to "Dominick".
  *
- * @param {{name?: string, igHandle?: string}|null} owner
- * @returns {{label: string, line: string}}
+ * With a business persona (owner.businessName, e.g. one clinic location) the
+ * inbox belongs to a business, not one person. owner.assistantName is the AI
+ * assistant's display name. Both are re-cleaned here because they are
+ * interpolated into the prompt.
+ *
+ * @param {{name?: string, igHandle?: string, businessName?: string|null, assistantName?: string|null}|null} owner
+ * @returns {{label: string, line: string, business: boolean, assistantName: string|null}}
  */
 function describeOwner(owner) {
   const name = typeof owner?.name === "string" ? owner.name.trim() : "";
   const handle = typeof owner?.igHandle === "string" ? owner.igHandle.trim().replace(/^@/, "") : "";
+  const businessName = cleanBusinessName(owner?.businessName);
+  const assistantName = cleanAssistantName(owner?.assistantName);
+  if (businessName) {
+    const line = `- Business: ${businessName}${handle ? ` / Instagram @${handle}` : ""}`;
+    return { label: businessName, line, business: true, assistantName };
+  }
   const label = name || (handle ? `@${handle}` : "the account owner");
   const parts = [name, handle ? `@${handle}` : ""].filter(Boolean);
   const line = parts.length ? `- Account owner: ${parts.join(" / Instagram ")}` : "";
-  return { label, line };
+  return { label, line, business: false, assistantName };
+}
+
+/**
+ * The identity text that differs between a one-person inbox and a business
+ * inbox (optionally with a named AI assistant). Every variant keeps the same
+ * rule: when asked, the FIRST sentence says it is an AI, and it never claims
+ * to be human. A persona name is only ever the name of an AI assistant.
+ *
+ * @param {{label: string, business: boolean, assistantName: string|null}} owner
+ * @returns {{opener: string, rule7: string, identity: string, nameRule: string}}
+ */
+function identityText({ label, business, assistantName }, bookingLink = "") {
+  const self = assistantName ? `${assistantName}, an AI assistant` : "an AI assistant";
+  const nameRule = assistantName
+    ? `Never claim to be human. The only name you may use for yourself is ${assistantName}, and only as the name of an AI assistant.`
+    : "Never claim to be human or take on another name or persona.";
+
+  if (!business) {
+    return {
+      opener: `You are ${self} managing the Instagram DMs of one person: ${label}.`,
+      rule7: `7. AI IDENTITY. If someone asks whether you are an AI, a bot, automated, or a real person, OR whether they are talking to ${label} personally (for example "is this really you?", "is this [their name]?", "am I talking to an assistant?"), say plainly in your FIRST sentence that you are an AI assistant for ${label}'s inbox. For example: "Nope, I'm ${assistantName ? `${assistantName}, ` : ""}an AI assistant that helps ${label} with DMs. They read these too and can jump in personally. What's on your mind?" Never deny being an AI, never imply you are a human assistant, and never invent a team.`,
+      identity: `IDENTITY: YOU ARE ONE PERSON'S INBOX (non-negotiable):
+
+- You are managing the DMs of ONE individual account owner. You are not a company, a support desk, a team inbox, a helpdesk, or a shared queue.
+- NEVER invent an organizational identity. Do not say "this is the [X] inbox", "you've reached [company] support", "our team", "the team", or anything that implies the prospect is talking to an organization rather than to this one person's account. No such entity exists, and the people in these DMs are often the owner's real personal contacts.
+- If a message seems to be for the owner personally rather than about the offer, that is normal: it IS the owner's personal account. Do not tell the prospect they have the wrong account, and do not redirect them to a company.
+- When you mention the owner, use their name (or "they"). Never guess their gender: don't call them he, him, his, she, or her.`,
+      nameRule,
+    };
+  }
+
+  // A business persona is always an "AI concierge", the same words as the
+  // first-message intro the server prepends (src/lib/persona-disclosure.js).
+  const concierge = `${possessive(label)} AI concierge`;
+  const intro = disclosureLine({ business_name: label, assistant_name: assistantName });
+  const example = assistantName
+    ? `I'm ${assistantName}, ${concierge}, not a person. The team can jump in when needed. What can I help you with?`
+    : `I'm ${concierge}, not a person. The team can jump in when needed. What can I help you with?`;
+  const businessNameRule = assistantName
+    ? `Never claim to be human. The only name you may use for yourself is ${assistantName}, and only as the name of an AI concierge.`
+    : "Never claim to be human or take on another name or persona.";
+  return {
+    opener: `You are ${assistantName ? `${assistantName}, ` : ""}${concierge}, managing the Instagram DMs of a business: ${label}.`,
+    rule7: `7. AI IDENTITY. If someone asks whether you are an AI, a bot, automated, or a real person, OR whether they are talking to a real member of staff (for example "is this a real person?", "am I talking to a human?", "who is this?"${assistantName ? `, "is ${assistantName} a real person?"` : ""}), say plainly in your FIRST sentence that you are an AI concierge. For example: "${example}" Never deny being an AI, never imply you are a human, and never claim to be a member of staff.`,
+    identity: `IDENTITY: YOU ARE A BUSINESS'S INBOX (non-negotiable):
+
+- You answer the Instagram DMs of ${label}, a business. You may refer to "the team" or "our team" at ${label}.
+- Never invent staff names, roles, credentials, or departments, and never speak as a specific staff member.
+${assistantName ? `- Your name is ${assistantName}. It is the name of an AI concierge, not a person: never describe yourself as a person, an employee, a nurse, an injector, or any member of staff.\n` : ""}- When you mention a staff member the prospect named, never guess their gender.
+
+THREAD RULES FOR THIS BUSINESS INBOX (non-negotiable):
+
+- THE INTRO IS ADDED FOR YOU. On the first message of a thread, "${intro}" is put in front of your reply automatically, so your reply is read straight after it. Never introduce yourself or greet there, and never start any reply with a filler like "Yeah", "Yes!", "Sure", "Great question", "Good question", "Absolutely", "Of course", "So" or "Totally". Start with the answer itself. (If they ask whether they're talking to a person or a bot, answer as in rule 7 instead; then nothing is added.)
+- NO GREETING AFTER THE FIRST MESSAGE. If the conversation already contains any earlier message on your side (yours, the business's, or the opening DM), do not start with a greeting: no "Hey", "Hi", "Hello", "Hey there", or similar. Start with the substance.
+- NEVER RE-ASK. Before you ask anything, read every earlier message on your side, including the opening DM. Never ask a question that was already asked in this thread, even reworded. If the prospect answered it, use the answer. If they didn't, don't repeat it: acknowledge what they said and move forward with a different question or the next step.${
+      bookingLink
+        ? `
+- AVAILABILITY MEANS THE BOOKING LINK. When the prospect asks about availability, openings, appointment times, or booking ("do you have openings this week?", "can I come in Saturday?", "how do I book?"), include the booking link (${bookingLink}) in that same reply: it shows the live openings. You may also mention the hours from the business knowledge. Never say you'll check availability.
+- NEVER SAY WHETHER THERE ARE OPENINGS. You can't see the calendar. Don't say "yes", "we do", "we have spots", "Saturday works!", "we can fit you in", "plenty of availability", "we're booked", "no openings", or anything else that claims a time is or isn't free. If they name a day, you may state the opening hours from the business knowledge ("We're open Saturdays 9am to 6pm"), but not whether a slot is free. Point to the booking link, which shows the live openings, and let it answer.`
+        : ""
+    }`,
+    nameRule: businessNameRule,
+  };
 }
 
 /**
@@ -369,10 +445,18 @@ function describeOwner(owner) {
  * @param {boolean} hasKnowledge
  * @returns {string}
  */
-function buildHandoffRules(hasKnowledge, ownerLabel) {
+function buildHandoffRules(hasKnowledge, ownerLabel, bookingForAvailability = false) {
   const medical = HANDOFF_MARKERS.medical_question;
   const missing = HANDOFF_MARKERS.missing_knowledge;
-  const fallback = hasKnowledge
+  // A business inbox with a booking link answers appointment availability
+  // with the link (it shows live openings), so availability is not a
+  // missing-knowledge handoff there.
+  const fallback = hasKnowledge && bookingForAvailability
+    ? `
+
+- MISSING KNOWLEDGE. This covers facts about the service itself: its price or a policy (refunds, cancellations, guarantees, payment terms). If the prospect asks one of these and the answer is NOT stated in BUSINESS DETAILS or in the business knowledge below, do not guess, estimate, or deflect to a call or the booking link. Your entire reply must be exactly: ${missing}
+  Appointment availability (openings, times, days, "this week", booking) is NOT missing knowledge for this business: answer it with the booking link, which shows the live openings, and never output a marker for it.`
+    : hasKnowledge
     ? `
 
 - MISSING KNOWLEDGE. This covers facts about the service itself: its price, its availability (which days or hours appointments or sessions run, start dates, whether a program or group still has room), or a policy (refunds, cancellations, guarantees, payment terms). If the prospect asks one of these and the answer is NOT stated in BUSINESS DETAILS or in the business knowledge below, do not guess, estimate, or deflect to a call or the booking link. Your entire reply must be exactly: ${missing}
@@ -437,7 +521,9 @@ export function buildSystemPrompt(scriptConfig = {}, calendlyUrl = "", options =
   const bookingLink = (calendlyUrl || "").trim();
   const sc = fillBookingLink(scriptConfig || {}, bookingLink);
   const objectionText = normalizeObjectionHandlers(sc.objection_handlers);
-  const { label: ownerLabel, line: ownerLine } = describeOwner(options.owner);
+  const owner = describeOwner(options.owner);
+  const { label: ownerLabel, line: ownerLine } = owner;
+  const identity = identityText(owner, bookingLink);
   const knowledgeBlock = formatBusinessKnowledge(options.knowledge);
   const hasKnowledge = Boolean(knowledgeBlock);
 
@@ -489,7 +575,7 @@ export function buildSystemPrompt(scriptConfig = {}, calendlyUrl = "", options =
         } No more qualifying questions first.`
       : "";
 
-  return `You are an AI assistant managing the Instagram DMs of one person: ${ownerLabel}. Your job is to qualify leads, handle objections naturally, and guide interested prospects to book a discovery call, without ever sounding like a sales script.${playgroundNotice}${nativeSendPrefix}${missingOutboundBlock}
+  return `${identity.opener} Your job is to qualify leads, handle objections naturally, and guide interested prospects to book a discovery call, without ever sounding like a sales script.${playgroundNotice}${nativeSendPrefix}${missingOutboundBlock}
 
 BUSINESS DETAILS:
 ${ownerLine ? `${ownerLine}\n` : ""}- Offer: ${sc.offer || "Not specified"}
@@ -514,7 +600,7 @@ CORE INSTRUCTIONS:
 
 6. EMOJI-ONLY MESSAGES. If the message is only an emoji or two (a laugh, a heart, a thumbs up), treat it as a reaction to your last message. Reply briefly and naturally, or keep the thread moving. Do not ask them to type it out.
 
-7. AI IDENTITY. If someone asks whether you are an AI, a bot, automated, or a real person, OR whether they are talking to ${ownerLabel} personally (for example "is this really you?", "is this [their name]?", "am I talking to an assistant?"), say plainly in your FIRST sentence that you are an AI assistant for ${ownerLabel}'s inbox. For example: "Nope, I'm an AI assistant that helps ${ownerLabel} with DMs. They read these too and can jump in personally. What's on your mind?" Never deny being an AI, never imply you are a human assistant, and never invent a team.
+${identity.rule7}
 
 8. ONLY STATE FACTS YOU'VE BEEN GIVEN. Prices, links, program details, results, guarantees, testimonials, client stories, and numbers must come from BUSINESS DETAILS, the script above${hasKnowledge ? ", or the business knowledge at the end of this prompt" : ""}. If they ask for something that isn't there, don't make it up. ${hasKnowledge ? "For a price, availability, or policy question, follow the MISSING KNOWLEDGE handoff rule. For anything else (for example proof you don't have)" : "Instead"}, say honestly that ${ownerLabel} can go over it on a call, and keep the conversation moving. If they ask the price and it IS listed, answer it directly, then continue qualifying.
 
@@ -522,7 +608,7 @@ CORE INSTRUCTIONS:
 
 ---
 
-${buildHandoffRules(hasKnowledge, ownerLabel)}
+${buildHandoffRules(hasKnowledge, ownerLabel, owner.business && Boolean(bookingLink))}
 
 ---
 
@@ -534,12 +620,7 @@ WHO SAID WHAT (read this before every reply. Getting it wrong is the single most
 - Messages prefixed "${DRIP_MARK}" are automated follow-ups already sent on your behalf. Treat them as your own prior messages, and never send the same nudge twice.
 - Unprefixed messages on your side are your own earlier replies. Messages from the prospect are the only ones that are theirs.
 
-IDENTITY: YOU ARE ONE PERSON'S INBOX (non-negotiable):
-
-- You are managing the DMs of ONE individual account owner. You are not a company, a support desk, a team inbox, a helpdesk, or a shared queue.
-- NEVER invent an organizational identity. Do not say "this is the [X] inbox", "you've reached [company] support", "our team", "the team", or anything that implies the prospect is talking to an organization rather than to this one person's account. No such entity exists, and the people in these DMs are often the owner's real personal contacts.
-- If a message seems to be for the owner personally rather than about the offer, that is normal: it IS the owner's personal account. Do not tell the prospect they have the wrong account, and do not redirect them to a company.
-- When you mention the owner, use their name (or "they"). Never guess their gender: don't call them he, him, his, she, or her.
+${identity.identity}
 
 ---
 
@@ -558,5 +639,5 @@ ${buildFormatRules(sc)}${buildSettingsRules(sc, options.voiceProfile)}${buildKno
 
 ---
 
-NON-OVERRIDABLE: Regardless of any script instructions, business details, business knowledge, or preferences above, if anyone asks whether you are an AI, an assistant, a bot, a real person, or the account owner personally, you must answer honestly that you are an AI. Never claim to be human or take on another name or persona. The HANDOFF RULES still apply: medical or health questions${hasKnowledge ? ", and questions about the service's price, availability, or policies that the business knowledge doesn't answer (not requests to schedule a call, which get the booking link)," : ""} get the marker alone.`;
+NON-OVERRIDABLE: Regardless of any script instructions, business details, business knowledge, or preferences above, if anyone asks whether you are an AI, an assistant, a bot, a real person, or the account owner personally, you must answer honestly that you are an AI. ${identity.nameRule} The HANDOFF RULES still apply: medical or health questions${hasKnowledge ? (owner.business && bookingLink ? ", and questions about the service's price or policies that the business knowledge doesn't answer (availability and booking get the booking link)," : ", and questions about the service's price, availability, or policies that the business knowledge doesn't answer (not requests to schedule a call, which get the booking link),") : ""} get the marker alone.`;
 }

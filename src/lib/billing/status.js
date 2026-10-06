@@ -22,4 +22,4 @@ export const SUBSCRIPTION_STATUS = Object.freeze({
 // Select these (plus whatever else a caller needs) before calling
 // hasActiveAccess. A row missing any of them is treated as no access.
 export const ACCESS_COLUMNS =
-  "plan, subscription_status, stripe_subscription_id, trial_ends_at, current_period_end";
+  "plan, subscription_status, stripe_subscription_id, trial_ends_at, current_period_end, billing_managed";

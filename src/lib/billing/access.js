@@ -38,7 +38,7 @@ const ms = (v) => {
  * @param {object|null} user - users row with ACCESS_COLUMNS
  * @param {number} [now] - ms since epoch, for tests
  * @returns {{hasAccess: boolean, kind: string, reason: string}}
- *   kind: 'stripe' | 'comped' | 'legacy_trial' | 'none'
+ *   kind: 'managed' | 'stripe' | 'comped' | 'legacy_trial' | 'none'
  */
 export function accessDecision(user, now = Date.now()) {
   if (!user) return { hasAccess: false, kind: "none", reason: "no_user" };
@@ -46,6 +46,13 @@ export function accessDecision(user, now = Date.now()) {
     // A caller forgot ACCESS_COLUMNS. Fail closed and make it loud.
     console.error("[billing/access] row is missing subscription_status; select ACCESS_COLUMNS");
     return { hasAccess: false, kind: "none", reason: "missing_fields" };
+  }
+
+  // ── Managed: billed outside Clinchd (e.g. a done-for-you service that
+  // invoices the clinic itself). Set only by an admin script; the column is
+  // server-only (migration 20261009120000). Ending it is flipping it off.
+  if (user.billing_managed === true) {
+    return { hasAccess: true, kind: "managed", reason: "managed" };
   }
 
   const status = user.subscription_status;

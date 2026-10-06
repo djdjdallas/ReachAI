@@ -4,7 +4,7 @@ Living internal record. Not user-facing. One place to collect shipped changes,
 open issues, positioning decisions, and competitive intel.
 
 - **Maintained by:** Dom
-- **Last updated:** October 5, 2026
+- **Last updated:** October 6, 2026
 
 How to use this doc:
 - **Shipped changes** — log anything that went live (copy, features, fixes). Newest first.
@@ -120,6 +120,89 @@ competitor name from visible body copy and re-anchored to the human-setter cost.
     - Corrections to the notes above: Haiku 4.5's cache minimum is **4096** tokens, not 1024. The reply call (Sonnet 4.6) has **no prompt caching**, so the knowledge block doesn't change cache behavior today. The block is deterministic so caching can be added later.
     - Templates leave out offer, price and booking link. They live in `creator_offers` / `calendly_url` and show read-only on the page. Validation is hand-written (no zod in the repo).
   - **Existing schema (checked 2026-10-05):** no knowledge/FAQ table. `creator_offers` exists (`offer_name`, `offer_price_cents`, `offer_url`, `ideal_customer`, `objections`, `qualification_questions`, `deprecated_at`) and already grounds every reply path via `src/lib/active-offer.js`. Knowledge entries should sit beside it, not replace it. Script config (offer text, greeting, objections) lives in `users.script_config` JSON.
+- **Coach accounts don't disclose AI on first message; review against CA B&P 17940 before scaling.** Added 2026-10-06. The server-side first-message disclosure (PR #55) is on for persona accounts only (`business_name` set). Coach accounts still disclose only when asked (prompt rule 7).
+- **PR #55 audit follow-ups (logged 2026-10-06, not fixed in #55):**
+  - Persona names: add a title deny-list for `assistant_name` ("Nurse", "Dr", "Doctor", "RN", "NP", "PA"…) and ban quotes and colons in `business_name` (`src/lib/persona.js`).
+  - Managed accounts see "missed leads" / paywall copy meant for lapsed subscribers: `src/app/(dashboard)/dashboard/page.js:205`, `src/app/(paywall)/choose-plan/page.js:65`.
+  - CI: add `20261005150000_users_write_allowlist.sql` to the migration list in `supabase/tests/run.sh`, so the users column grants are tested with the new server-only columns.
+  - Scrub Postgres error text before it reaches the emit-failure log (`outbound_webhook_emit_failures.message` and the cron's `emit failure` line). Keep the SQLSTATE; drop or redact the message.
+  - When `persistCommentDmConversation` relabels an echoed opener, also clear a `human_took_over` pause if the echo caused one.
+- **TASK: Outbound lifecycle webhooks + managed accounts + persona (PR #55, branch `feat/outbound-webhooks`, built 2026-10-06; not merged, migration not run).** Infrastructure for the Mara Rue done-for-you service: Clinchd sends signed lifecycle events to the Mara Rue dashboard (`https://app.mararue.com/api/ingest/clinchd`). No Mara Rue or Katlynne names in core code; everything is per-account config. One clinic location = one Clinchd account. Contract: `docs/outbound-webhooks.md`. Setup: `docs/runbooks/managed-clinic-setup.md`.
+  - **What it adds:**
+    - `users.billing_managed` → access kind `managed` (billed outside Clinchd, never Stripe; /billing shows "Managed plan").
+    - Server-only persona columns `assistant_name`, `business_name`, `holding_text`, plus `booking_url`, `treatment_categories` and `webhook_demo`. All are set by `scripts/managed-account.mjs`, never by the browser.
+    - Outbox `outbound_webhook_events`, written by DB triggers in the same transaction as the state change (server writes only), and delivered by the per-minute cron `/api/cron/outbound-webhooks`.
+    - SSRF guard on config and on every delivery. Secrets are encrypted with `ENCRYPTION_KEY`; admin is via `scripts/outbound-webhooks.mjs`.
+  - **Decisions (Dom, Phase 0 review, 2026-10-06):**
+    - `trigger` is always null; `trigger_type` is `comment` or `dm`.
+    - Handoff mapping: medical/missing knowledge map 1:1; complex objection, qualifying loop, hostile/refund and crisis map to `other`. No event for `human_took_over` or silent pauses.
+    - `treatment_interest` is a category key from the account's list, never lead text.
+    - Calendly bookings match the lead by captured email first, then a unique name match. Ambiguous matches become a booking-only lead (`bkg_<id>`).
+    - Retries send the same body bytes with a fresh timestamp and signature.
+    - Phones default to US; ambiguous numbers are dropped.
+    - Emit failures are recorded and logged by the cron.
+  - **Pre-merge evidence:**
+    - 790 unit tests and the DB tests passed (45 new DB assertions).
+    - Live eval `scripts/eval-knowledge.mjs` 22/22 (3 trials each, 5 new persona cases). Every persona identity reply opens with "I'm Katlynne, … an AI assistant, not a person".
+    - Build and lint are clean on changed files.
+  - **Production order:** run migration `20261009120000_outbound_webhooks.sql` **before** the deploy. `ACCESS_COLUMNS` now selects `billing_managed`, so deploying first fails every access check closed. Verification queries and the full checklist are in the PR #55 body.
+  - **First-message AI disclosure (Dom's decisions, 2026-10-06):**
+    - Applies to persona accounts only (`business_name` set). The server adds "Hi! I'm {assistant_name}, {business_name}'s AI concierge." to the first assistant message actually sent in a thread. That is the inbound reply, the comment-to-DM opener, a dashboard AI reply, or a drip when it's the first thing sent; the playground is excluded. Code is in `src/lib/persona-disclosure.js`.
+    - A leading "Hey!"/"Hi!"/"Hey there!" is stripped from the template or reply so there's no double greeting.
+    - It never repeats: "disclosed" means a sent app message (Meta id set, source agent or drip) or any sent message containing "AI concierge".
+    - A voice memo can't carry the disclosure, so the first turn on a persona account goes out as text.
+    - Possessive style: "Solé Aesthetics' AI concierge", with no extra s after a name ending in s.
+  - **Prompt fixes (persona accounts):**
+    - No greeting after the first message.
+    - Never re-ask a question already asked in the thread, including the comment opener.
+    - Availability, openings and booking get the booking link in that reply, and are no longer a missing-knowledge handoff when a link exists.
+  - **Comment opener in the model's history: confirmed present.** The history query loads the last 20 rows with no source filter. The earlier re-ask came from the model; the prompt rule fixed it.
+  - **Found and fixed while checking: echo race on comment-to-DM.** If Meta's echo of the opener lands before the send call returns, the echo handler saved the opener as a staff message and created the thread as `native_send`. That broke the disclosure check and the `new_inquiry`/`dm_started` events. `persistCommentDmConversation` now relabels them (`source` to agent; origin to `clinchd_sent` only when the opener is the thread's only message), and the triggers emit on that relabel.
+  - **Eval after the fixes** (Solé fixture, 3 trials each, server disclosure applied):
+    - Pricing, first message: "Hi! I'm Katlynne, Solé Aesthetics' AI concierge. Pricing depends on the treatment area, so it's given at your consultation. What area are you thinking about treating?"
+    - Openings this week, first message: disclosure plus the booking link, 3/3.
+    - "BOTOX" after the disclosed opener: "What area are you thinking about treating?" 3/3, with no greeting and no re-ask.
+    - "are you a real person?" as the first message: the model's own disclosure, with no second intro.
+    - `scripts/eval-knowledge.mjs` 25/25 (3 new persona thread cases). 828 unit tests and the DB tests passed.
+  - **Wording polish (Dom, 2026-10-06):**
+    - Persona accounts always say "AI concierge", including the identity answer ("I'm Katlynne, Solé Aesthetics' AI concierge, not a person. The team can jump in when needed.").
+    - The model is told the intro is prepended on first messages, so it never starts a reply with "Yeah", "Sure", "Great question" or similar.
+    - Re-run (3 trials each):
+      - "do you have openings this week": intro + "We do! The booking link shows live availability…" with the link, 3/3.
+      - "are you a real person?": "I'm Katlynne, Solé Aesthetics' AI concierge, not a real person. The team can jump in when needed though…", 3/3.
+    - Eval 25/25; 829 unit tests passed.
+    - **Watch:** "We do!" asserts openings the model can't see (it only has the booking link). Fixed in the next round.
+  - **Final pre-audit round (Dom, 2026-10-06):**
+    - New persona rule: never say whether a time is free ("we do", "Saturday works!", "we're booked"). Point to the booking link; stating opening hours from the knowledge is fine.
+    - The reply linter now rewrites a spaced hyphen used as a dash (" - " between words) like an em dash. Hyphens in words, URLs, phone numbers and ranges ("9-5", "9am - 6pm", "$300 - $500") are untouched.
+    - Re-run (3 trials each):
+      - "do you have openings this week": "Hi! I'm Katlynne, Solé Aesthetics' AI concierge. We're open Tuesday through Saturday, 9am to 6pm. You can check live availability and grab a spot here: <link>", 3/3.
+      - "are you free Saturday?": "…We're open Saturdays 9am to 6pm! You can check live availability and grab a spot here: <link>", 3/3.
+      - An earlier draft of the rule still produced "Saturdays work!" in 1/3, so the rule names that phrasing explicitly.
+    - Eval 26/26 (new case `persona-free-saturday`); 842 unit tests passed.
+  - **Independent audit fixes (2026-10-06):**
+    - **Disclosure claim:** decided by an explicit, server-only `conversations.disclosed_at`, not inferred from text.
+      - It's claimed atomically right before every send (inbound reply, comment opener, dashboard AI reply, first-sent drip). Only the claimer prepends.
+      - A failed or rate-limited send releases it.
+      - A brand-new comment lead's thread is created already claimed.
+      - Browser writes to `disclosed_at` are rejected.
+      - The text check now only skips when the exact disclosure line is already there; "our AI skin scan" or an injected "AI is cool" still get it.
+    - **Calendly:** exact, case-insensitive full-name match (whitespace collapsed; `*` matches nothing). A name match attaches no invitee name or email.
+    - **Linter:** "Mon - Fri" → "Mon-Fri", "Jan - Mar" → "Jan-Mar", "9am - noon" → "9am to noon", applied before the dash rules. An all-caps rule ("LA - NYC" → "LA to NYC") was dropped in the re-audit because it rewrote asides ("PRP - DM me" → "PRP to DM me"); all-caps words now take the comma.
+    - **Migration:** `set lock_timeout = '3s'` at the top. Re-run it if it times out.
+    - **Booking trigger:** emits only on insert, or when an update moves the status to confirmed.
+    - **Delivery:**
+      - An event over 5 attempts is failed.
+      - Config-read, body-read and freeze errors and unexpected throws go back on the retry schedule instead of sitting in `processing`.
+      - A body is never frozen from a failed read.
+    - **Encryption:** `decrypt` requires the full 16-byte GCM tag (`authTagLength: 16`).
+  - **Re-audit of 1f70b84 (2026-10-06):** every send path (inbound reply, comment opener, dashboard AI reply, drip) now releases the disclosure claim in a `finally` keyed on "sent", so any throw between the claim and a successful send releases it (decrypt, insert, failure handling).
+  - **Accepted residuals (re-audit, 2026-10-06):**
+    - A platform timeout that kills the function mid-send (after the claim, before the finally runs) can leave `disclosed_at` set without the lead having seen the disclosure.
+    - A voice memo sent concurrently with a text reply can reach the lead first without the disclosure line (voice is skipped only while the claim is visibly unset).
+    - Calendly name matching normalizes the invitee's name but not the stored `sender_name`, so extra whitespace there means no match: a safe miss (booking-only lead).
+    - The linter's time-range rule rewrites "4pm — 5pm is booked" as "4pm to 5pm is booked".
+  - **Not yet seen:** a delivery to the real Mara Rue receiver (not built yet). The runbook's `test` step is the first check.
 
 ---
 

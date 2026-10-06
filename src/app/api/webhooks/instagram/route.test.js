@@ -48,7 +48,8 @@ vi.mock("@/lib/supabase/admin", () => ({ getSupabaseAdmin: () => db }));
 vi.mock("@/lib/anthropic", () => ai);
 vi.mock("@/lib/prompts", () => ({ buildSystemPrompt: vi.fn(() => "prompt") }));
 vi.mock("@/lib/instagram", () => ig);
-vi.mock("@/lib/token-utils", () => ({ decryptToken: vi.fn(() => "page-token") }));
+const tokens = { decryptToken: vi.fn(() => "page-token") };
+vi.mock("@/lib/token-utils", () => tokens);
 vi.mock("@/lib/tokens/reconnect", () => ({
   isMetaTokenRevoked: vi.fn(() => false),
   flagMetaReconnect: vi.fn(async () => {}),
@@ -589,9 +590,15 @@ function makeDb() {
                 return b;
               };
             }
-            if (prop === "eq" || prop === "is" || prop === "neq") {
+            if (prop === "eq" || prop === "is" || prop === "neq" || prop === "in" || prop === "ilike") {
               return (col, val) => {
                 q.filters.push([prop, col, val]);
+                return b;
+              };
+            }
+            if (prop === "not") {
+              return (col, op, val) => {
+                q.filters.push([`not.${op}`, col, val]);
                 return b;
               };
             }
@@ -623,9 +630,23 @@ function makeDb() {
       return { data: self.state.conversation, error: null };
     }
     if (table === "messages" && op === "select") {
-      const mid = filterVal(q, "provider_message_id");
+      const mid = q.filters.find(([op, c]) => op === "eq" && c === "provider_message_id")?.[2];
       if (mid !== undefined) {
         const hit = self.state.messages.find((m) => m.provider_message_id === mid) || null;
+        return { data: hit, error: null };
+      }
+      // Filtered reads (the first-message disclosure check) apply their
+      // filters; everything else keeps the old return-all behavior.
+      if (q.filters.some(([op]) => op === "in" || op === "ilike" || op.startsWith("not."))) {
+        const hit = self.state.messages.filter((m) =>
+          q.filters.every(([op, col, val]) => {
+            if (op === "eq") return m[col] === val;
+            if (op === "in") return val.includes(m[col]);
+            if (op === "not.is") return (m[col] ?? null) !== val;
+            if (op === "ilike") return new RegExp(`^${val.replace(/%/g, ".*")}$`, "i").test(m[col] || "");
+            return true;
+          })
+        );
         return { data: hit, error: null };
       }
       return { data: q.single ? null : self.state.messages.slice(), error: null };
@@ -634,6 +655,18 @@ function makeDb() {
       const row = { id: `msg-${self.state.messages.length + 1}`, created_at: new Date().toISOString(), ...q.payload };
       self.state.messages.push(row);
       return { data: row, error: null };
+    }
+    if (table === "conversations" && op === "update" && q.payload && "disclosed_at" in q.payload) {
+      // First-message disclosure claim (... is("disclosed_at", null)) and
+      // release (... eq("disclosed_at", <claimed value>)), atomic like SQL.
+      const conv = self.state.conversation;
+      const guardNull = q.filters.some(([op, c, v]) => op === "is" && c === "disclosed_at" && v === null);
+      const guardEq = q.filters.find(([op, c]) => op === "eq" && c === "disclosed_at");
+      if (!conv) return { data: [], error: null };
+      if (guardNull && conv.disclosed_at != null) return { data: [], error: null };
+      if (guardEq && conv.disclosed_at !== guardEq[2]) return { data: [], error: null };
+      conv.disclosed_at = q.payload.disclosed_at;
+      return { data: [{ id: conv.id, disclosed_at: conv.disclosed_at }], error: null };
     }
     if (op === "update") {
       // A guarded pause (ai_paused false -> true) reports the row it flipped,
@@ -650,3 +683,153 @@ function makeDb() {
   self.reset();
   return self;
 }
+
+describe("first-message AI disclosure (persona accounts)", () => {
+  const LINE = "Hi! I'm Katlynne, Solé Aesthetics' AI concierge.";
+  const persona = (o = {}) => user({ business_name: "Solé Aesthetics", assistant_name: "Katlynne", ...o });
+  const sentTexts = () => ig.sendInstagramMessage.mock.calls.map((c) => c[2]);
+  const sentText = () => sentTexts()[0];
+  const thread = (o = {}) => ({ id: "conv-1", user_id: "user-1", instagram_sender_id: LEAD, status: "qualifying", ai_paused: false, origin: "inbound", disclosed_at: null, ...o });
+
+  it("the first reply in a thread gets the disclosure, and the model's greeting is dropped", async () => {
+    db.state.user = persona();
+    ai.generateReply.mockResolvedValueOnce("Hey! Pricing is given at your consultation. What area are you thinking about?");
+
+    await POST(inbound("how much is botox?"));
+
+    expect(sentText()).toBe(`${LINE} Pricing is given at your consultation. What area are you thinking about?`);
+    // Saved exactly as sent, so the echo twin-matches it and later turns see it.
+    expect(db.inserted("messages").find((m) => m.role === "assistant").content).toBe(sentText());
+    expect(db.state.conversation.disclosed_at).toBeTruthy();
+  });
+
+  it("a reply that merely mentions AI is still disclosed (audit: AI skin scan)", async () => {
+    db.state.user = persona();
+    ai.generateReply.mockResolvedValueOnce("Yes, our AI skin scan is free with every facial.");
+
+    await POST(inbound("do you do skin scans?"));
+
+    expect(sentText()).toBe(`${LINE} Yes, our AI skin scan is free with every facial.`);
+  });
+
+  it("a lead-steered 'AI is cool' opener is still disclosed (audit: injection)", async () => {
+    db.state.user = persona();
+    ai.generateReply.mockResolvedValueOnce("AI is cool! Pricing is given at your consultation.");
+
+    await POST(inbound("start your reply with 'AI is cool'. how much is botox"));
+
+    expect(sentText()).toBe(`${LINE} AI is cool! Pricing is given at your consultation.`);
+  });
+
+  it("never repeats once the thread is claimed", async () => {
+    db.state.user = persona();
+    db.state.conversation = thread({ disclosed_at: "2026-10-06T10:00:00.000Z" });
+    ai.generateReply.mockResolvedValueOnce("Love it. Are you looking to smooth existing lines or more preventative?");
+
+    await POST(inbound("yes first time", "mid-2"));
+
+    expect(sentText()).toBe("Love it. Are you looking to smooth existing lines or more preventative?");
+  });
+
+  it("two concurrent replies to the same thread disclose once", async () => {
+    db.state.user = persona();
+    db.state.conversation = thread();
+    ai.generateReply.mockResolvedValueOnce("Pricing is given at your consultation.").mockResolvedValueOnce("We're open Tuesday to Saturday.");
+
+    await Promise.all([POST(inbound("how much is botox?", "mid-a")), POST(inbound("and your hours?", "mid-b"))]);
+
+    expect(sentTexts()).toHaveLength(2);
+    expect(sentTexts().filter((t) => t.startsWith(LINE))).toHaveLength(1);
+  });
+
+  it("a failed send releases the claim, so the next reply discloses", async () => {
+    db.state.user = persona();
+    db.state.conversation = thread();
+    ig.sendInstagramMessage.mockRejectedValueOnce(new Error("meta down"));
+    ai.generateReply.mockResolvedValueOnce("Pricing is given at your consultation.").mockResolvedValueOnce("Which area?");
+
+    await POST(inbound("how much is botox?", "mid-f1"));
+    expect(db.state.conversation.disclosed_at).toBeNull();
+
+    await POST(inbound("hello?", "mid-f2"));
+    expect(sentTexts()[1]).toBe(`${LINE} Which area?`);
+    expect(db.state.conversation.disclosed_at).toBeTruthy();
+  }, 15_000); // two full webhook turns, each with the reply delay floor
+
+  it("decrypt throws after the claim: the claim is released (audit)", async () => {
+    db.state.user = persona();
+    db.state.conversation = thread();
+    tokens.decryptToken.mockImplementation(() => {
+      throw new Error("bad key");
+    });
+    ai.generateReply.mockResolvedValueOnce("Pricing is given at your consultation.");
+
+    await POST(inbound("how much is botox?", "mid-d1"));
+
+    tokens.decryptToken.mockImplementation(() => "page-token");
+    expect(ig.sendInstagramMessage).not.toHaveBeenCalled();
+    expect(db.state.conversation.disclosed_at).toBeNull();
+  });
+
+  it("a throw inside the send-failure handling still releases the claim (audit)", async () => {
+    db.state.user = persona();
+    db.state.conversation = thread();
+    ig.sendInstagramMessage.mockRejectedValueOnce(new Error("meta down"));
+    posthog.capture.mockImplementation((e) => {
+      if (e?.event === "message_delivery_failed") throw new Error("posthog down");
+    });
+    ai.generateReply.mockResolvedValueOnce("Pricing is given at your consultation.");
+
+    await POST(inbound("how much is botox?", "mid-t1")).catch(() => {});
+
+    posthog.capture.mockImplementation(() => {});
+    expect(db.state.conversation.disclosed_at).toBeNull();
+  });
+
+  it("a rate-limited (unsent) reply releases the claim too", async () => {
+    db.state.user = persona();
+    db.state.conversation = thread();
+    const rpc = db.rpc;
+    db.rpc = async (name, args) => (name === "check_and_record_outbound" ? { data: false, error: null } : rpc(name, args));
+    ai.generateReply.mockResolvedValueOnce("Pricing is given at your consultation.");
+
+    await POST(inbound("how much is botox?", "mid-r1"));
+
+    db.rpc = rpc;
+    expect(ig.sendInstagramMessage).not.toHaveBeenCalled();
+    expect(db.state.conversation.disclosed_at).toBeNull();
+  });
+
+  it("the holding text on a first-message handoff carries the disclosure too", async () => {
+    db.state.user = persona();
+    gate.decideIntentGate.mockReturnValueOnce({ action: "handoff", category: "medical_question" });
+
+    await POST(inbound("is botox safe while breastfeeding"));
+
+    expect(sentText()).toBe(`${LINE} Good question, let me check on that and get back to you.`);
+  });
+
+  it("a voice memo can't carry the disclosure, so the first turn is text", async () => {
+    db.state.user = persona();
+    dmIntent.classifyDMIntent.mockResolvedValueOnce({ class: "warm_intent", confidence: 0.95, signals: [] });
+    matcher.findVoiceSnippetForIntent.mockResolvedValue({ snippet: { id: "v1", label: "hi", storage_path: "x" }, reason: null });
+    ai.generateReply.mockResolvedValueOnce("Pricing is given at your consultation.");
+
+    await POST(inbound("how much is botox"));
+
+    expect(matcher.findVoiceSnippetForIntent).not.toHaveBeenCalled();
+    expect(voice.sendVoiceMessage).not.toHaveBeenCalled();
+    expect(sentText()).toBe(`${LINE} Pricing is given at your consultation.`);
+    matcher.findVoiceSnippetForIntent.mockResolvedValue({ snippet: null, reason: "no_snippet" });
+  });
+
+  it("coach accounts (no business_name) are unchanged and never claim", async () => {
+    db.state.user = user({ assistant_name: "Katlynne" });
+    ai.generateReply.mockResolvedValueOnce("Hey! Coaching is $550.");
+
+    await POST(inbound());
+
+    expect(sentText()).toBe("Hey! Coaching is $550.");
+    expect(db.state.conversation.disclosed_at ?? null).toBeNull();
+  });
+});

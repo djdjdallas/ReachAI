@@ -24,7 +24,10 @@ export function decrypt(encryptedText) {
   const iv = Buffer.from(parts[0], "hex");
   const tag = Buffer.from(parts[1], "hex");
   const encrypted = parts[2];
-  const decipher = crypto.createDecipheriv(ALGORITHM, getKey(), iv);
+  // GCM accepts shorter tags unless told otherwise, and a truncated tag is
+  // easier to forge. Only the full 16-byte tag this module writes is valid.
+  if (tag.length !== TAG_LENGTH) throw new Error("invalid auth tag length");
+  const decipher = crypto.createDecipheriv(ALGORITHM, getKey(), iv, { authTagLength: TAG_LENGTH });
   decipher.setAuthTag(tag);
   let decrypted = decipher.update(encrypted, "hex", "utf8");
   decrypted += decipher.final("utf8");
