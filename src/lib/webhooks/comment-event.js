@@ -363,12 +363,19 @@ async function processCommentEvent(entry, change) {
     disclosureClaim = prepared.claim;
   }
 
-  const result = await sendPrivateReplyToComment(
-    ownerUser.instagram_business_account_id,
-    commentId,
-    dmText,
-    pageToken
-  );
+  // The finally releases the disclosure claim whenever the DM didn't go out
+  // (a failed send or a throw); a successful send keeps it.
+  let result = { success: false, error: "send_threw" };
+  try {
+    result = await sendPrivateReplyToComment(
+      ownerUser.instagram_business_account_id,
+      commentId,
+      dmText,
+      pageToken
+    );
+  } finally {
+    if (!result?.success) await releaseFirstMessage(admin, disclosureClaim);
+  }
 
   if (result.success) {
     await logDecision(
@@ -419,9 +426,6 @@ async function processCommentEvent(entry, change) {
     });
     return;
   }
-
-  // Not sent: the next message to this lead must carry the disclosure.
-  await releaseFirstMessage(admin, disclosureClaim);
 
   await logDecision(
     admin,

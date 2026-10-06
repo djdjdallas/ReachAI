@@ -261,46 +261,53 @@ export async function processDrip(dripRow) {
     // First-message AI disclosure (persona accounts only): normally the lead
     // already got a disclosed reply, but if every earlier reply failed to
     // send this nudge is the first thing they receive. Claimed right before
-    // the save and send; released below if the send fails.
+    // the save and send; the finally below releases it whenever the send
+    // didn't happen, whatever threw.
     const disclosure = await prepareFirstMessage(admin, user, nudgeText, {
       conversationId: dripRow.conversation_id,
     });
     nudgeText = disclosure.text;
 
-    // Save the visible row BEFORE sending so the echo webhook's twin-match
-    // finds it — a sub-second echo arriving before this insert used to be
-    // captured as a human takeover and permanently pause the AI on its own
-    // nudge. source='drip' distinguishes it from a regular AI reply.
-    const { data: nudgeRow } = await admin
-      .from("messages")
-      .insert({
-        conversation_id: dripRow.conversation_id,
-        role: "assistant",
-        content: nudgeText,
-        source: "drip",
-      })
-      .select("id")
-      .single();
-
-    const decryptedToken = decryptToken(user.meta_page_access_token);
+    let sent = false;
+    let nudgeRow = null;
     let sendResult;
     try {
-      // Condition 5 above already refused past 23h; the send function's
-      // own 24h guard is the backstop.
-      sendResult = await sendInstagramMessage(
-        user.instagram_business_account_id,
-        dripRow.recipient_psid,
-        nudgeText,
-        decryptedToken,
-        { lastInboundAt: lastLeadMessage.created_at }
-      );
-    } catch (sendErr) {
-      // Undo the optimistic row so the inbox doesn't show an unsent nudge.
-      if (nudgeRow?.id) {
-        await admin.from("messages").delete().eq("id", nudgeRow.id);
+      // Save the visible row BEFORE sending so the echo webhook's twin-match
+      // finds it — a sub-second echo arriving before this insert used to be
+      // captured as a human takeover and permanently pause the AI on its own
+      // nudge. source='drip' distinguishes it from a regular AI reply.
+      const { data: inserted } = await admin
+        .from("messages")
+        .insert({
+          conversation_id: dripRow.conversation_id,
+          role: "assistant",
+          content: nudgeText,
+          source: "drip",
+        })
+        .select("id")
+        .single();
+      nudgeRow = inserted;
+
+      try {
+        // Condition 5 above already refused past 23h; the send function's
+        // own 24h guard is the backstop.
+        sendResult = await sendInstagramMessage(
+          user.instagram_business_account_id,
+          dripRow.recipient_psid,
+          nudgeText,
+          decryptToken(user.meta_page_access_token),
+          { lastInboundAt: lastLeadMessage.created_at }
+        );
+        sent = true;
+      } catch (sendErr) {
+        // Undo the optimistic row so the inbox doesn't show an unsent nudge.
+        if (nudgeRow?.id) {
+          await admin.from("messages").delete().eq("id", nudgeRow.id);
+        }
+        throw sendErr;
       }
-      await releaseFirstMessage(admin, disclosure.claim);
-      throw sendErr;
+    } finally {
+      if (!sent) await releaseFirstMessage(admin, disclosure.claim);
     }
 
     // Stamp the Meta mid, as the AI reply path does: the echo of this send

@@ -168,7 +168,7 @@ competitor name from visible body copy and re-anchored to the human-setter cost.
       - Browser writes to `disclosed_at` are rejected.
       - The text check now only skips when the exact disclosure line is already there; "our AI skin scan" or an injected "AI is cool" still get it.
     - **Calendly:** exact, case-insensitive full-name match (whitespace collapsed; `*` matches nothing). A name match attaches no invitee name or email.
-    - **Linter:** "Mon - Fri" → "Mon-Fri", "Jan - Mar" → "Jan-Mar", "9am - noon" → "9am to noon", "LA - NYC" → "LA to NYC", applied before the dash rules.
+    - **Linter:** "Mon - Fri" → "Mon-Fri", "Jan - Mar" → "Jan-Mar", "9am - noon" → "9am to noon", applied before the dash rules. An all-caps rule ("LA - NYC" → "LA to NYC") was dropped in the re-audit because it rewrote asides ("PRP - DM me" → "PRP to DM me"); all-caps words now take the comma.
     - **Migration:** `set lock_timeout = '3s'` at the top. Re-run it if it times out.
     - **Booking trigger:** emits only on insert, or when an update moves the status to confirmed.
     - **Delivery:**
@@ -176,6 +176,12 @@ competitor name from visible body copy and re-anchored to the human-setter cost.
       - Config-read, body-read and freeze errors and unexpected throws go back on the retry schedule instead of sitting in `processing`.
       - A body is never frozen from a failed read.
     - **Encryption:** `decrypt` requires the full 16-byte GCM tag (`authTagLength: 16`).
+  - **Re-audit of 1f70b84 (2026-10-06):** every send path (inbound reply, comment opener, dashboard AI reply, drip) now releases the disclosure claim in a `finally` keyed on "sent", so any throw between the claim and a successful send releases it (decrypt, insert, failure handling).
+  - **Accepted residuals (re-audit, 2026-10-06):**
+    - A platform timeout that kills the function mid-send (after the claim, before the finally runs) can leave `disclosed_at` set without the lead having seen the disclosure.
+    - A voice memo sent concurrently with a text reply can reach the lead first without the disclosure line (voice is skipped only while the claim is visibly unset).
+    - Calendly name matching normalizes the invitee's name but not the stored `sender_name`, so extra whitespace there means no match: a safe miss (booking-only lead).
+    - The linter's time-range rule rewrites "4pm — 5pm is booked" as "4pm to 5pm is booked".
   - **Not yet seen:** a delivery to the real Mara Rue receiver (not built yet). The runbook's `test` step is the first check.
 
 ---

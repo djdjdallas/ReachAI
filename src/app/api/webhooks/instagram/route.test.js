@@ -48,7 +48,8 @@ vi.mock("@/lib/supabase/admin", () => ({ getSupabaseAdmin: () => db }));
 vi.mock("@/lib/anthropic", () => ai);
 vi.mock("@/lib/prompts", () => ({ buildSystemPrompt: vi.fn(() => "prompt") }));
 vi.mock("@/lib/instagram", () => ig);
-vi.mock("@/lib/token-utils", () => ({ decryptToken: vi.fn(() => "page-token") }));
+const tokens = { decryptToken: vi.fn(() => "page-token") };
+vi.mock("@/lib/token-utils", () => tokens);
 vi.mock("@/lib/tokens/reconnect", () => ({
   isMetaTokenRevoked: vi.fn(() => false),
   flagMetaReconnect: vi.fn(async () => {}),
@@ -754,6 +755,36 @@ describe("first-message AI disclosure (persona accounts)", () => {
     expect(sentTexts()[1]).toBe(`${LINE} Which area?`);
     expect(db.state.conversation.disclosed_at).toBeTruthy();
   }, 15_000); // two full webhook turns, each with the reply delay floor
+
+  it("decrypt throws after the claim: the claim is released (audit)", async () => {
+    db.state.user = persona();
+    db.state.conversation = thread();
+    tokens.decryptToken.mockImplementation(() => {
+      throw new Error("bad key");
+    });
+    ai.generateReply.mockResolvedValueOnce("Pricing is given at your consultation.");
+
+    await POST(inbound("how much is botox?", "mid-d1"));
+
+    tokens.decryptToken.mockImplementation(() => "page-token");
+    expect(ig.sendInstagramMessage).not.toHaveBeenCalled();
+    expect(db.state.conversation.disclosed_at).toBeNull();
+  });
+
+  it("a throw inside the send-failure handling still releases the claim (audit)", async () => {
+    db.state.user = persona();
+    db.state.conversation = thread();
+    ig.sendInstagramMessage.mockRejectedValueOnce(new Error("meta down"));
+    posthog.capture.mockImplementation((e) => {
+      if (e?.event === "message_delivery_failed") throw new Error("posthog down");
+    });
+    ai.generateReply.mockResolvedValueOnce("Pricing is given at your consultation.");
+
+    await POST(inbound("how much is botox?", "mid-t1")).catch(() => {});
+
+    posthog.capture.mockImplementation(() => {});
+    expect(db.state.conversation.disclosed_at).toBeNull();
+  });
 
   it("a rate-limited (unsent) reply releases the claim too", async () => {
     db.state.user = persona();

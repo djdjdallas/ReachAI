@@ -4,7 +4,8 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 // Meta delivered late. The webhook stores the lead's real send time, so a
 // message sent 30h ago is 30h old here too and the nudge must not go out.
 
-const state = { messages: [] };
+const state = { messages: [], persona: false, conv: { id: "conv-1", disclosed_at: null } };
+const decryptToken = vi.fn(() => "token");
 const markDripStatus = vi.fn(async (id, status, extra) => ({ status, ...extra }));
 const sendInstagramMessage = vi.fn(async () => ({ message_id: "mid.drip" }));
 
@@ -32,9 +33,16 @@ function admin() {
                       trial_ends_at: null,
                       meta_page_access_token: "enc",
                       instagram_business_account_id: "igba",
+                      ...(state.persona ? { business_name: "Solé Aesthetics", assistant_name: "Katlynne" } : {}),
                     },
                     error: null,
                   });
+                }
+                if (table === "conversations" && q.op === "update" && q.payload && "disclosed_at" in q.payload) {
+                  // Disclosure claim (sets a value only while null) and release.
+                  if (q.payload.disclosed_at !== null && state.conv.disclosed_at !== null) return resolve({ data: [], error: null });
+                  state.conv.disclosed_at = q.payload.disclosed_at;
+                  return resolve({ data: [{ id: "conv-1", disclosed_at: state.conv.disclosed_at }], error: null });
                 }
                 if (table === "conversations" && q.op === "select") {
                   return resolve({ data: { id: "conv-1", ai_paused: false, status: "qualifying" }, error: null });
@@ -48,7 +56,7 @@ function admin() {
                 return resolve({ data: null, error: null });
               };
             }
-            if (["insert", "update", "delete"].includes(prop)) return () => ((q.op = prop), b);
+            if (["insert", "update", "delete"].includes(prop)) return (payload) => ((q.op = prop), (q.payload = payload), b);
             return () => b;
           },
         }
@@ -61,7 +69,7 @@ function admin() {
 vi.mock("@/lib/supabase/admin", () => ({ getSupabaseAdmin: () => admin() }));
 vi.mock("@/lib/drip/queue", () => ({ markDripStatus }));
 vi.mock("@/lib/instagram", () => ({ sendInstagramMessage }));
-vi.mock("@/lib/token-utils", () => ({ decryptToken: () => "token" }));
+vi.mock("@/lib/token-utils", () => ({ decryptToken }));
 vi.mock("@/lib/prompts", () => ({ buildSystemPrompt: () => "prompt" }));
 vi.mock("@/lib/anthropic", () => ({ generateReply: vi.fn(async () => "nudge") }));
 vi.mock("@/lib/active-offer", () => ({ getActiveOffer: async () => null, ownerFromUser: () => ({}) }));
@@ -97,5 +105,33 @@ describe("processDrip window check", () => {
     const result = await processDrip(dripRow);
     expect(result).toEqual({ status: "fired" });
     expect(sendInstagramMessage).toHaveBeenCalledWith("igba", "lead", "Still keen?", "token", { lastInboundAt: at });
+  });
+});
+
+describe("processDrip first-message disclosure claim", () => {
+  const at = () => new Date(Date.now() - 2 * 3_600_000).toISOString();
+
+  it("a drip that is the first thing sent on a persona account carries the disclosure", async () => {
+    state.persona = true;
+    state.conv.disclosed_at = null;
+    state.messages = thread(at());
+    await processDrip(dripRow);
+    expect(sendInstagramMessage.mock.calls[0][2]).toBe("Hi! I'm Katlynne, Solé Aesthetics' AI concierge. Still keen?");
+    expect(state.conv.disclosed_at).toBeTruthy();
+    state.persona = false;
+  });
+
+  it("decrypt throws after the claim: the claim is released (audit)", async () => {
+    state.persona = true;
+    state.conv.disclosed_at = null;
+    state.messages = thread(at());
+    decryptToken.mockImplementationOnce(() => {
+      throw new Error("bad key");
+    });
+    const result = await processDrip(dripRow);
+    expect(result.status).toBe("error");
+    expect(sendInstagramMessage).not.toHaveBeenCalled();
+    expect(state.conv.disclosed_at).toBeNull();
+    state.persona = false;
   });
 });

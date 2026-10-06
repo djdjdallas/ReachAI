@@ -18,7 +18,9 @@ import {
 } from "@/lib/instagram/messaging-window";
 
 export async function POST(request) {
-  // First-message disclosure claim to release if the send doesn't happen.
+  // First-message disclosure claim. Cleared once the send succeeds; the
+  // finally releases it on every other way out (save error, early return,
+  // send failure, any throw).
   let disclosureClaim = null;
   try {
     // Authenticate user
@@ -259,7 +261,6 @@ export async function POST(request) {
       .single();
 
     if (saveError) {
-      await releaseFirstMessage(getSupabaseAdmin(), disclosureClaim);
       return NextResponse.json(
         { error: "Failed to save message" },
         { status: 500 }
@@ -320,8 +321,6 @@ export async function POST(request) {
 
     return NextResponse.json({ message: savedMessage }, { status: 200 });
   } catch (error) {
-    // Nothing went out: the next send must carry the disclosure.
-    await releaseFirstMessage(getSupabaseAdmin(), disclosureClaim);
     // The window closed between the check above and the send (seconds).
     if (error?.code === "messaging_window_closed") {
       return NextResponse.json(
@@ -339,5 +338,8 @@ export async function POST(request) {
       { error: "Internal server error" },
       { status: 500 }
     );
+  } finally {
+    // Nothing went out: the next send must carry the disclosure.
+    if (disclosureClaim) await releaseFirstMessage(getSupabaseAdmin(), disclosureClaim);
   }
 }

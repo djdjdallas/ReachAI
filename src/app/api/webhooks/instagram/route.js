@@ -1985,123 +1985,128 @@ async function processIncomingMessage({
   }
 
   // First-message AI disclosure: claim conversations.disclosed_at right
-  // before the save and send. Only the claimer prepends; the claim is
-  // released below if this reply doesn't go out.
+  // before the save and send. Only the claimer prepends; the finally around
+  // the save and send releases the claim if this reply doesn't go out.
   const disclosure = await prepareFirstMessage(supabase, user, aiReply, { conversationId: conversation.id });
   aiReply = disclosure.text;
 
-  // Save AI reply. The insert stays BEFORE the send (a rate-limited or failed
-  // send must still leave the reply in the DB); the Meta mid is stamped onto
-  // this row after a successful send so its echo dedups in handleEchoEvent.
-  const { data: savedReply, error: aiInsertError } = await supabase
-    .from("messages")
-    .insert({
-      conversation_id: conversation.id,
-      role: "assistant",
-      content: aiReply,
-      source: "agent",
-    })
-    .select("id")
-    .single();
-  if (aiInsertError) log.error("[webhook] AI reply insert failed:", aiInsertError.code);
-  await supabase
-    .from("conversations")
-    .update({ last_message_at: new Date().toISOString(), last_skip_reason: null })
-    .eq("id", conversation.id);
-
-  // Check Meta's 200/hr outbound DM cap before sending. If we're over, the
-  // reply stays saved to DB (the owner can send it manually from the dashboard)
-  // but we skip the API call so we don't burn the rate limit.
-  let canSend = true;
-  try {
-    const { data: allowed, error: rlErr } = await supabase.rpc(
-      "check_and_record_outbound",
-      { uid: user.id }
-    );
-    if (rlErr) {
-      console.error("outbound rate-limit RPC failed:", rlErr);
-    } else if (allowed === false) {
-      canSend = false;
-      fireSenderAction(user, senderId, "typing_off");
-      console.warn("[webhook] outbound rate-limit hit for user:", user.id);
-      // Runs after the success path cleared last_skip_reason above, so this
-      // re-marks the turn as suppressed. The reply row stays in the DB for
-      // the owner to send by hand.
-      await markSkip(supabase, conversation.id, SKIP.RATE_LIMITED);
-      getPostHogClient().capture({
-        distinctId: user.id,
-        event: "ai_reply_rate_limited",
-        properties: { conversation_id: conversation.id },
-      });
-    }
-  } catch (err) {
-    console.error("outbound rate-limit threw:", err?.message);
-  }
-
   // Whether the lead actually received this turn's text (the handoff email
-  // only says "it told them you'd get back to them" when it did).
+  // only says "it told them you'd get back to them" when it did). Also what
+  // the finally below keys on: whatever happens between the claim and a
+  // successful send (a failed insert, a rate limit, a failed send, a throw
+  // in the failure handling), the claim is released so the next send
+  // discloses.
   let replyDelivered = false;
-  if (canSend) {
-    // Send reply via Meta Instagram API
+  try {
+    // Save AI reply. The insert stays BEFORE the send (a rate-limited or failed
+    // send must still leave the reply in the DB); the Meta mid is stamped onto
+    // this row after a successful send so its echo dedups in handleEchoEvent.
+    const { data: savedReply, error: aiInsertError } = await supabase
+      .from("messages")
+      .insert({
+        conversation_id: conversation.id,
+        role: "assistant",
+        content: aiReply,
+        source: "agent",
+      })
+      .select("id")
+      .single();
+    if (aiInsertError) log.error("[webhook] AI reply insert failed:", aiInsertError.code);
+    await supabase
+      .from("conversations")
+      .update({ last_message_at: new Date().toISOString(), last_skip_reason: null })
+      .eq("id", conversation.id);
+
+    // Check Meta's 200/hr outbound DM cap before sending. If we're over, the
+    // reply stays saved to DB (the owner can send it manually from the dashboard)
+    // but we skip the API call so we don't burn the rate limit.
+    let canSend = true;
     try {
-      // Measured from when the lead sent the message (leadSentAtMs), not
-      // when the webhook arrived. sendInstagramMessage refuses a send outside
-      // the window.
-      const sendResult = await sendInstagramMessage(
-        user.instagram_business_account_id,
-        senderId,
-        aiReply,
-        decryptToken(user.meta_page_access_token),
-        { lastInboundAt: leadSentAtMs }
+      const { data: allowed, error: rlErr } = await supabase.rpc(
+        "check_and_record_outbound",
+        { uid: user.id }
       );
-      replyDelivered = true;
-      // Stamp the Meta mid so the echo of this send dedups. If the echo
-      // webhook won the race, handleEchoEvent already stamped this same mid
-      // on this row (twin reconciliation) and this update is a no-op.
-      if (savedReply?.id && sendResult?.message_id) {
-        const { error: midError } = await supabase
-          .from("messages")
-          .update({ provider_message_id: sendResult.message_id })
-          .eq("id", savedReply.id);
-        if (midError) log.warn("[webhook] mid stamp failed:", midError.code);
+      if (rlErr) {
+        console.error("outbound rate-limit RPC failed:", rlErr);
+      } else if (allowed === false) {
+        canSend = false;
+        fireSenderAction(user, senderId, "typing_off");
+        console.warn("[webhook] outbound rate-limit hit for user:", user.id);
+        // Runs after the success path cleared last_skip_reason above, so this
+        // re-marks the turn as suppressed. The reply row stays in the DB for
+        // the owner to send by hand.
+        await markSkip(supabase, conversation.id, SKIP.RATE_LIMITED);
+        getPostHogClient().capture({
+          distinctId: user.id,
+          event: "ai_reply_rate_limited",
+          properties: { conversation_id: conversation.id },
+        });
       }
-      getPostHogClient().capture({
-        distinctId: user.id,
-        event: "ai_reply_sent",
-        properties: {
-          conversation_id: conversation.id,
-          reply_length: aiReply.length,
-          lint_fixes: lint?.fixes ?? [],
-          lint_flags: lint?.flags ?? [],
-          knowledge_handoff: handoff?.category ?? null,
-        },
-      });
     } catch (err) {
-      console.error("sendInstagramMessage failed for conversation:", conversation.id, err.message);
-      fireSenderAction(user, senderId, "typing_off");
-      // last_skip_reason was cleared optimistically before the send; the send
-      // failed, so restore a suppression marker rather than leaving NULL
-      // (which reads as "delivered fine").
-      await markSkip(supabase, conversation.id, SKIP.SEND_FAILED);
-      // A dead token (OAuth 190 + dead-session subcode/message) is not a
-      // transient send failure: flag the account so the coach is told to
-      // reconnect and later inbound DMs short-circuit at the dead-token gate.
-      // Strict rule on purpose — a 551 (lead blocked the coach) or a 10
-      // (outside the 24h window) is also an OAuthException and must NOT flag.
-      if (isMetaTokenRevoked(err)) {
-        await flagMetaReconnect(supabase, user.id, err, "webhook:send");
-      }
-      getPostHogClient().capture({
-        distinctId: user.id,
-        event: "message_delivery_failed",
-        properties: { conversation_id: conversation.id, error: err.message },
-      });
-      // Reply is saved to DB but wasn't delivered — continue to status detection
+      console.error("outbound rate-limit threw:", err?.message);
     }
+
+    if (canSend) {
+      // Send reply via Meta Instagram API
+      try {
+        // Measured from when the lead sent the message (leadSentAtMs), not
+        // when the webhook arrived. sendInstagramMessage refuses a send outside
+        // the window.
+        const sendResult = await sendInstagramMessage(
+          user.instagram_business_account_id,
+          senderId,
+          aiReply,
+          decryptToken(user.meta_page_access_token),
+          { lastInboundAt: leadSentAtMs }
+        );
+        replyDelivered = true;
+        // Stamp the Meta mid so the echo of this send dedups. If the echo
+        // webhook won the race, handleEchoEvent already stamped this same mid
+        // on this row (twin reconciliation) and this update is a no-op.
+        if (savedReply?.id && sendResult?.message_id) {
+          const { error: midError } = await supabase
+            .from("messages")
+            .update({ provider_message_id: sendResult.message_id })
+            .eq("id", savedReply.id);
+          if (midError) log.warn("[webhook] mid stamp failed:", midError.code);
+        }
+        getPostHogClient().capture({
+          distinctId: user.id,
+          event: "ai_reply_sent",
+          properties: {
+            conversation_id: conversation.id,
+            reply_length: aiReply.length,
+            lint_fixes: lint?.fixes ?? [],
+            lint_flags: lint?.flags ?? [],
+            knowledge_handoff: handoff?.category ?? null,
+          },
+        });
+      } catch (err) {
+        console.error("sendInstagramMessage failed for conversation:", conversation.id, err.message);
+        fireSenderAction(user, senderId, "typing_off");
+        // last_skip_reason was cleared optimistically before the send; the send
+        // failed, so restore a suppression marker rather than leaving NULL
+        // (which reads as "delivered fine").
+        await markSkip(supabase, conversation.id, SKIP.SEND_FAILED);
+        // A dead token (OAuth 190 + dead-session subcode/message) is not a
+        // transient send failure: flag the account so the coach is told to
+        // reconnect and later inbound DMs short-circuit at the dead-token gate.
+        // Strict rule on purpose — a 551 (lead blocked the coach) or a 10
+        // (outside the 24h window) is also an OAuthException and must NOT flag.
+        if (isMetaTokenRevoked(err)) {
+          await flagMetaReconnect(supabase, user.id, err, "webhook:send");
+        }
+        getPostHogClient().capture({
+          distinctId: user.id,
+          event: "message_delivery_failed",
+          properties: { conversation_id: conversation.id, error: err.message },
+        });
+        // Reply is saved to DB but wasn't delivered — continue to status detection
+      }
+    }
+  } finally {
+    if (!replyDelivered) await releaseFirstMessage(supabase, disclosure.claim);
   }
-  // Not delivered (rate-limited or failed): the lead didn't see the
-  // disclosure, so the next send must carry it.
-  if (!replyDelivered) await releaseFirstMessage(supabase, disclosure.claim);
 
   // Knowledge handoff: the holding text was saved (and sent, unless rate
   // limited or the send failed). Pause the thread for the owner whatever the

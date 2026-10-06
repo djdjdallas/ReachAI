@@ -133,7 +133,6 @@ describe("lintReply: word ranges are not dashes (audit)", () => {
     ["open Mon - Fri", "open Mon-Fri"],
     ["Jan - Mar only", "Jan-Mar only"],
     ["9am - noon on Saturdays", "9am to noon on Saturdays"],
-    ["flights LA - NYC", "flights LA to NYC"],
     ["hours are 9am - 6pm", "hours are 9am to 6pm"],
     ["Tuesday – Saturday", "Tuesday-Saturday"],
     ["10am—2pm", "10am to 2pm"],
@@ -142,7 +141,15 @@ describe("lintReply: word ranges are not dashes (audit)", () => {
   ])("%j → %j", (input, expected) => {
     const r = lintReply(input);
     expect(r.text).toBe(expected);
-    expect(r.text).not.toMatch(/Mon, Fri|Jan, Mar|9am, noon|LA, NYC/);
+    expect(r.text).not.toMatch(/Mon, Fri|Jan, Mar|9am, noon/);
+  });
+
+  it.each([
+    ["PRP - DM me for details", "PRP, DM me for details"],
+    ["Reply YES - OK?", "Reply YES, OK?"],
+    ["flights LA - NYC", "flights LA, NYC"],
+  ])("all-caps words are not ranges: %j → %j (re-audit)", (input, expected) => {
+    expect(lintReply(input).text).toBe(expected);
   });
 
   it("a lowercase word is not a month ('you may - if')", () => {
