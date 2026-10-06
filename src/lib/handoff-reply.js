@@ -23,14 +23,24 @@ export const HANDOFF_MARKERS = {
 export const HANDOFF_HOLDING_TEXT =
   "Good question, let me check on that and get back to you.";
 
+// Bounds for a per-account override (users.holding_text, set by the admin
+// script after src/lib/persona.js validateHoldingText). Re-checked here at
+// send time so a bad row falls back to the default instead of sending.
+const HOLDING_TEXT_MAX = 300;
+const HOLDING_TEXT_FORBIDDEN = /[\u2013\u2014]|\{\{|<<|>>|\bhandoff\b/i;
+
 /**
- * The holding text for an account. One constant today; this is the seam for
- * per-account overrides (Mara Rue accounts) later.
+ * The holding text for an account: users.holding_text when it is set and
+ * safe, otherwise the default.
  *
- * @param {object} [_user]
+ * @param {{holding_text?: string|null}} [user]
  * @returns {string}
  */
-export function holdingTextFor(_user) {
+export function holdingTextFor(user) {
+  const custom = typeof user?.holding_text === "string" ? user.holding_text.trim() : "";
+  if (custom && custom.length <= HOLDING_TEXT_MAX && !HOLDING_TEXT_FORBIDDEN.test(custom)) {
+    return custom;
+  }
   return HANDOFF_HOLDING_TEXT;
 }
 

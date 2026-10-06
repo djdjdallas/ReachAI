@@ -50,7 +50,7 @@ export async function processDrip(dripRow) {
   const { data: user } = await admin
     .from("users")
     .select(
-      `id, email, drip_enabled, ai_mode, script_config, voice_profile, calendly_url, meta_page_access_token, instagram_business_account_id, full_name, instagram_username, ${ACCESS_COLUMNS}`
+      `id, email, drip_enabled, ai_mode, script_config, voice_profile, calendly_url, meta_page_access_token, instagram_business_account_id, full_name, instagram_username, business_name, assistant_name, ${ACCESS_COLUMNS}`
     )
     .eq("id", dripRow.user_id)
     .single();
@@ -273,10 +273,11 @@ export async function processDrip(dripRow) {
       .single();
 
     const decryptedToken = decryptToken(user.meta_page_access_token);
+    let sendResult;
     try {
       // Condition 5 above already refused past 23h; the send function's
       // own 24h guard is the backstop.
-      await sendInstagramMessage(
+      sendResult = await sendInstagramMessage(
         user.instagram_business_account_id,
         dripRow.recipient_psid,
         nudgeText,
@@ -289,6 +290,20 @@ export async function processDrip(dripRow) {
         await admin.from("messages").delete().eq("id", nudgeRow.id);
       }
       throw sendErr;
+    }
+
+    // Stamp the Meta mid, as the AI reply path does: the echo of this send
+    // dedups on it, and a delivered drip (mid set) is what emits the
+    // follow_up_sent webhook. If the echo already stamped it, this is a no-op.
+    if (nudgeRow?.id && sendResult?.message_id) {
+      const { error: midErr } = await admin
+        .from("messages")
+        .update({ provider_message_id: sendResult.message_id })
+        .eq("id", nudgeRow.id)
+        .is("provider_message_id", null);
+      if (midErr && midErr.code !== "23505") {
+        console.warn("[drip/processor] mid stamp failed:", midErr.code);
+      }
     }
 
     await admin

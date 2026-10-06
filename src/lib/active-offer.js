@@ -4,6 +4,8 @@
 // Other features (settings, comment-to-DM, classifier playground) still run
 // the same query inline.
 
+import { personaFromUser } from "./persona";
+
 const OFFER_FIELDS =
   "offer_name, offer_price_cents, offer_url, ideal_customer, objections";
 
@@ -36,14 +38,17 @@ export async function getActiveOffer(supabase, userId) {
 }
 
 /**
- * The account owner as the prompt's identity rules need it.
+ * The account owner as the prompt's identity rules need it. businessName and
+ * assistantName are the per-account persona (users.business_name /
+ * users.assistant_name, server-only); null for an ordinary account.
  *
- * @param {{full_name?: string, instagram_username?: string}} user
- * @returns {{name: string, igHandle: string}}
+ * @param {{full_name?: string, instagram_username?: string, business_name?: string, assistant_name?: string}} user
+ * @returns {{name: string, igHandle: string, businessName: string|null, assistantName: string|null}}
  */
 export function ownerFromUser(user) {
   return {
     name: user?.full_name || "",
     igHandle: user?.instagram_username || "",
+    ...personaFromUser(user),
   };
 }

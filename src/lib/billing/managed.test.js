@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { billingPageView, isManagedAccount, MANAGED_ACCESS_KINDS } from "./managed";
+import { billingPageView, isManagedAccount, managedPlanTitle, MANAGED_ACCESS_KINDS } from "./managed";
 
 describe("billingPageView (/billing)", () => {
   it("comped: complimentary, no price, no portal, no plan buttons, even with a Stripe customer", () => {
@@ -47,10 +47,20 @@ describe("billingPageView (/billing)", () => {
     expect(billingPageView({ access: ended, hasStripeCustomer: false })).toMatchObject({ managed: false, showPlanButtons: true });
   });
 
-  it("future managed kinds are one entry away", () => {
-    expect(isManagedAccount({ kind: "managed", hasAccess: true })).toBe(false);
-    MANAGED_ACCESS_KINDS.add("managed");
-    expect(isManagedAccount({ kind: "managed", hasAccess: true })).toBe(true);
-    MANAGED_ACCESS_KINDS.delete("managed");
+  it("managed (billed outside Clinchd) is a managed kind: no price, portal or plan buttons", () => {
+    expect([...MANAGED_ACCESS_KINDS]).toEqual(["comped", "managed"]);
+    const access = { kind: "managed", hasAccess: true, reason: "managed" };
+    expect(isManagedAccount(access)).toBe(true);
+    expect(billingPageView({ access, hasStripeCustomer: true })).toMatchObject({
+      managed: true,
+      showPrice: false,
+      showPortal: false,
+      showPlanButtons: false,
+    });
+  });
+
+  it("titles: managed plan vs complimentary plan", () => {
+    expect(managedPlanTitle({ kind: "managed", hasAccess: true })).toBe("Managed plan");
+    expect(managedPlanTitle({ kind: "comped", hasAccess: true })).toBe("Complimentary plan");
   });
 });

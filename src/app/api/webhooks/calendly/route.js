@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import { decryptToken } from "@/lib/token-utils";
+import { matchBookingConversation } from "@/lib/calendly-match";
 import crypto from "crypto";
 
 /**
@@ -127,18 +128,10 @@ async function handleInviteeCreated(payload, owner) {
     return;
   }
 
-  let conversationId = null;
-  if (inviteeName) {
-    const { data: conv } = await supabase
-      .from("conversations")
-      .select("id")
-      .eq("user_id", owner.id)
-      .ilike("sender_name", `%${inviteeName}%`)
-      .order("updated_at", { ascending: false })
-      .limit(1)
-      .single();
-    conversationId = conv?.id || null;
-  }
+  const conversationId = await matchBookingConversation(supabase, owner.id, {
+    inviteeEmail,
+    inviteeName,
+  });
 
   const { error } = await supabase
     .from("bookings")

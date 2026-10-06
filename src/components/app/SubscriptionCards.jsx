@@ -6,7 +6,7 @@ import { CreditCard, LifeBuoy, AlertTriangle } from "lucide-react";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { getPlanDisplay } from "@/lib/plans";
 import { SUPPORT_EMAIL, SUPPORT_MAILTO } from "@/lib/support";
-import { isManagedAccount } from "@/lib/billing/managed";
+import { isManagedAccount, managedPlanTitle } from "@/lib/billing/managed";
 
 // Settings: where coaches find their plan and how to reach us. Display
 // only; the access decision and its kind ('stripe' | 'comped' |
@@ -34,7 +34,7 @@ export function subscriptionSummary(profile, access) {
   if (!access) return null;
 
   if (isManagedAccount(access)) {
-    return { title: "Complimentary plan", detail: plan, showManage: false };
+    return { title: managedPlanTitle(access), detail: plan, showManage: false };
   }
   if (access.kind === "legacy_trial") {
     return {

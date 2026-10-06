@@ -136,3 +136,44 @@ describe("buildSystemPrompt: audit fixes", () => {
     expect(buildSystemPrompt(sc, LINK, { intentHint: "follow_up" })).not.toContain("THIS TURN:");
   });
 });
+
+describe("buildSystemPrompt: business persona (per-account assistant name)", () => {
+  const persona = { name: "Dom Hill", igHandle: "soleaesthetics", businessName: "Solé Aesthetics", assistantName: "Katlynne" };
+  const p = buildSystemPrompt({ offer: "Botox and fillers" }, "https://sole.example/book", { owner: persona });
+
+  it("opens as a named AI assistant for a business", () => {
+    expect(p.startsWith("You are Katlynne, an AI assistant managing the Instagram DMs of a business: Solé Aesthetics.")).toBe(true);
+    expect(p).toContain("- Business: Solé Aesthetics / Instagram @soleaesthetics");
+    expect(p).not.toContain("Dom Hill");
+  });
+
+  it("rule 7 still requires AI disclosure in the first sentence, with the persona example", () => {
+    expect(p).toMatch(/7\. AI IDENTITY\. .*say plainly in your FIRST sentence that you are an AI assistant/);
+    expect(p).toContain("I'm Katlynne, the virtual concierge for Solé Aesthetics, and I'm an AI assistant, not a person.");
+    expect(p).toContain("never imply you are a human");
+  });
+
+  it("the name is only ever an AI assistant's name, and can never be a person", () => {
+    expect(p).toContain("Your name is Katlynne. It is the name of an AI assistant, not a person");
+    expect(p).toMatch(/NON-OVERRIDABLE: .*answer honestly that you are an AI\. Never claim to be human\. The only name you may use for yourself is Katlynne, and only as the name of an AI assistant\./);
+    expect(p).not.toContain("take on another name or persona");
+  });
+
+  it("a business may mention its team, but never invent staff", () => {
+    expect(p).toContain(`You may refer to "the team" or "our team" at Solé Aesthetics.`);
+    expect(p).toContain("Never invent staff names, roles, credentials, or departments");
+    expect(p).not.toContain("YOU ARE ONE PERSON'S INBOX");
+  });
+
+  it("handoff rules and markers are unchanged", () => {
+    expect(p).toContain("<<HANDOFF:medical_question>>");
+    expect(p).toContain("HANDOFF RULES (these override everything else except AI disclosure)");
+  });
+
+  it("invalid persona values fall back to the one-person identity", () => {
+    const q = buildSystemPrompt({}, "", { owner: { name: "Dom", igHandle: "dom", businessName: "<x>", assistantName: "K4t" } });
+    expect(q.startsWith("You are an AI assistant managing the Instagram DMs of one person: Dom.")).toBe(true);
+    expect(q).toContain("YOU ARE ONE PERSON'S INBOX");
+    expect(q).toContain("Never claim to be human or take on another name or persona.");
+  });
+});

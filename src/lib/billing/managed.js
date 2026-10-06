@@ -1,13 +1,12 @@
 // Accounts whose plan is set by Clinchd, not bought through Stripe:
-// comped founders and friends today, managed (invoiced) accounts later.
+// comped founders and friends, and managed accounts (billed outside
+// Clinchd, users.billing_managed).
 // They see "Complimentary plan" and never a Subscribe / Upgrade / Switch
 // button or the Stripe portal: there is nothing for them to buy, and a
 // click would start a paid Checkout. Keyed on the server's access kind
 // (GET /api/billing/access, src/lib/billing/access.js), never on columns
 // the browser reads directly.
-//
-// Adding a managed kind later (e.g. 'managed') is one entry here.
-export const MANAGED_ACCESS_KINDS = new Set(["comped"]);
+export const MANAGED_ACCESS_KINDS = new Set(["comped", "managed"]);
 
 /**
  * A managed account whose plan is in effect. An ended comp
@@ -17,6 +16,15 @@ export const MANAGED_ACCESS_KINDS = new Set(["comped"]);
  */
 export function isManagedAccount(access) {
   return !!access && access.hasAccess === true && MANAGED_ACCESS_KINDS.has(access.kind);
+}
+
+/**
+ * Title for a managed account's plan: "Managed plan" for an account billed
+ * outside Clinchd, "Complimentary plan" for a comp.
+ * @param {{kind?: string}|null} access
+ */
+export function managedPlanTitle(access) {
+  return access?.kind === "managed" ? "Managed plan" : "Complimentary plan";
 }
 
 /**

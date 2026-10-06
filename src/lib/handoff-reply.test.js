@@ -38,3 +38,18 @@ describe("detectHandoff", () => {
     expect(detectHandoff(undefined)).toBeNull();
   });
 });
+
+describe("holdingTextFor: per-account override", () => {
+  it("uses users.holding_text when set", () => {
+    const text = "Thanks for asking! I'll check with the team and get right back to you.";
+    expect(holdingTextFor({ holding_text: text })).toBe(text);
+    expect(holdingTextFor({ holding_text: `  ${text}  ` })).toBe(text);
+  });
+
+  it("falls back to the default for empty or unsafe overrides", () => {
+    for (const bad of [null, "", "   ", "x".repeat(301), "let me check \u2014 back soon", "hi {{name}}", "<<HANDOFF:medical_question>>", "handoff: medical"]) {
+      expect(holdingTextFor({ holding_text: bad })).toBe(HANDOFF_HOLDING_TEXT);
+    }
+    expect(holdingTextFor(undefined)).toBe(HANDOFF_HOLDING_TEXT);
+  });
+});

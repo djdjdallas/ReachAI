@@ -371,6 +371,7 @@ async function processCommentEvent(entry, change) {
       senderName: fromUsername,
       renderedDm: decision.rendered,
       providerMessageId: result.messageId || null,
+      commentText,
     });
 
     // Optional public reply under the trigger comment ("sent! check your

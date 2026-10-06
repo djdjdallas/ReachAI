@@ -62,7 +62,7 @@ export async function POST(request) {
 
     const { data: userProfile, error: profileError } = await getSupabaseAdmin()
       .from("users")
-      .select("id, script_config, calendly_url, voice_profile, full_name, instagram_username")
+      .select("id, script_config, calendly_url, voice_profile, full_name, instagram_username, business_name, assistant_name, holding_text")
       .eq("id", user.id)
       .single();
 

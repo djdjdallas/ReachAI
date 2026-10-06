@@ -24,6 +24,8 @@
 // re-deliver the webhook and re-send the DM) and must never crash the job —
 // every failure path logs and returns.
 
+import { captureLeadFacts } from "@/lib/outbound-webhooks/lead-capture";
+
 export async function persistCommentDmConversation({
   admin,
   userId,
@@ -31,6 +33,7 @@ export async function persistCommentDmConversation({
   senderName,
   renderedDm,
   providerMessageId,
+  commentText,
 }) {
   try {
     // Without the recipient IGSID there is no key the inbound reply can match
@@ -53,6 +56,16 @@ export async function persistCommentDmConversation({
       senderName,
     });
     if (!conversation) return;
+
+    // Outbound webhooks: the commenter's username and a treatment category
+    // matched in the comment (accounts with an enabled webhook only). Never
+    // throws.
+    await captureLeadFacts(admin, {
+      userId,
+      conversationId: conversation.id,
+      text: commentText,
+      instagramUsername: senderName,
+    });
 
     // Exactly one assistant message, idempotent on provider_message_id so a
     // retried dispatch never duplicates it.

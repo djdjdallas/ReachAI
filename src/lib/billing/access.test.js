@@ -154,3 +154,26 @@ describe("accessDecision: everything else", () => {
     expect(hasActiveAccess(null, NOW)).toBe(false);
   });
 });
+
+describe("accessDecision: managed accounts (billed outside Clinchd)", () => {
+  it("billing_managed grants access with kind managed, whatever the status", () => {
+    for (const o of [{}, { subscription_status: "canceled" }, { subscription_status: "expired", trial_ends_at: iso(NOW - DAY) }]) {
+      expect(accessDecision(row({ billing_managed: true, ...o }), NOW)).toEqual({ hasAccess: true, kind: "managed", reason: "managed" });
+    }
+  });
+
+  it("managed wins over a Stripe subscription in any state", () => {
+    expect(accessDecision(row({ billing_managed: true, stripe_subscription_id: "sub_1", subscription_status: "unpaid" }), NOW).kind).toBe("managed");
+  });
+
+  it("false, null or a missing column is not managed", () => {
+    expect(accessDecision(row({ billing_managed: false }), NOW).hasAccess).toBe(false);
+    expect(accessDecision(row({ billing_managed: null }), NOW).hasAccess).toBe(false);
+    expect(accessDecision(row({ billing_managed: "true" }), NOW).hasAccess).toBe(false);
+  });
+
+  it("ACCESS_COLUMNS selects billing_managed", async () => {
+    const { ACCESS_COLUMNS } = await import("./status");
+    expect(ACCESS_COLUMNS).toMatch(/\bbilling_managed\b/);
+  });
+});

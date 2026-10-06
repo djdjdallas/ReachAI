@@ -26,6 +26,7 @@ import { decideIntentGate } from "@/lib/dm-intent-gate";
 import { ownerFromUser } from "@/lib/active-offer";
 import { loadReplyGrounding } from "@/lib/reply-grounding";
 import { holdingTextFor } from "@/lib/handoff-reply";
+import { captureLeadFacts } from "@/lib/outbound-webhooks/lead-capture";
 import { mentionsHealth } from "@/lib/health-keywords";
 import { lintReply } from "@/lib/reply-lint";
 import { findVoiceSnippetForIntent, getSendableAudioUrl } from "@/lib/voice/matcher";
@@ -1080,6 +1081,19 @@ async function processIncomingMessage({
     } else if (result?.missing) {
       conversation.missing_outbound_context = true;
     }
+  }
+
+  // Outbound webhooks: validated lead facts (Instagram username, an email or
+  // phone the lead typed, a treatment category) for accounts with an enabled
+  // outbound webhook. A no-op for every other account. Never throws.
+  if (!inactive) {
+    await captureLeadFacts(supabase, {
+      userId: user.id,
+      conversationId: conversation.id,
+      text: messageText,
+      instagramUsername: senderUsername,
+      treatmentCategories: user.treatment_categories ?? null,
+    });
   }
 
   // ── Non-serving account: save the inbound, nothing else ─────────────

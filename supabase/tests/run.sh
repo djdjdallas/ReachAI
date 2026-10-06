@@ -18,6 +18,7 @@ MIGRATIONS=(
   20261007130000_protect_lead_messages.sql
   20261007140000_ci_grant_reader.sql
   20261008120000_knowledge_entries.sql
+  20261009120000_outbound_webhooks.sql
 )
 psql_() { psql -X -v ON_ERROR_STOP=1 -q "$@"; }
 
@@ -123,6 +124,108 @@ expect "the route's upsert skips a duplicate draft" "INSERT 0 2" "$(as_role serv
 expect "another user can use the same key" "INSERT 0 1" "$(as_role service_role "insert into public.knowledge_entries(user_id,template_key,question) values ('$U2','coaching:included','q')")"
 expect "hand-written entries (null key) never collide" "INSERT 0 2" "$(as_role service_role "insert into public.knowledge_entries(user_id,question) values ('$U1','a'), ('$U1','b')")"
 expect "updated_at moves on update" "t" "$(as_role service_role "update public.knowledge_entries set answer='\$350' where id='cccccccc-0000-0000-0000-000000000001' returning updated_at >= created_at")"
+
+echo "# Outbound webhooks: config, outbox triggers, claim"
+U1=11111111-1111-1111-1111-111111111111; U2=22222222-2222-2222-2222-222222222222
+q "insert into public.outbound_webhooks(user_id,url,enabled,secret_encrypted) values ('$U1','https://hooks.example.com/in',true,'x:y:z')" >/dev/null
+q "update public.users set calendly_url='https://calendly.com/sole/consult', booking_url='https://book.sole.example/now' where id='$U1'" >/dev/null
+ev() { q "select count(*) from public.outbound_webhook_events where event_type='$1'${2:+ and $2}"; }
+# Runs a whole transaction and prints the LAST line (for checks after a write).
+q_last() { psql -X -d $DB -tA -c "$1" 2>&1 | grep -vE '^(BEGIN|SET|ROLLBACK|COMMIT)$' | tail -1; }
+srv() { # sql as service role, committed
+  q "begin; set local role service_role; set local request.jwt.claims = '{\"role\":\"service_role\"}'; $1; commit;"
+}
+expect "browser cannot read outbound_webhooks" "permission denied" "$(as_role authenticated "select * from public.outbound_webhooks")"
+expect "browser cannot read the outbox" "permission denied" "$(as_role authenticated "select * from public.outbound_webhook_events")"
+expect "browser cannot read lead_profiles" "permission denied" "$(as_role authenticated "select * from public.lead_profiles")"
+expect "browser cannot read emit failures" "permission denied" "$(as_role authenticated "select * from public.outbound_webhook_emit_failures")"
+expect "anon cannot read the outbox" "permission denied" "$(as_role anon "select * from public.outbound_webhook_events")"
+expect "browser cannot set billing_managed" "server-managed columns are read-only" "$(as_role authenticated "update public.users set billing_managed=true where id='$U1'")"
+expect "browser cannot set assistant_name" "server-managed columns are read-only" "$(as_role authenticated "update public.users set assistant_name='Sarah' where id='$U1'")"
+expect "browser cannot set webhook_demo" "server-managed columns are read-only" "$(as_role authenticated "update public.users set webhook_demo=true where id='$U1'")"
+expect "service role sets billing_managed" "UPDATE 1" "$(as_role service_role "update public.users set billing_managed=true where id='$U1'")"
+expect "http webhook url rejected" "outbound_webhooks_url_check" "$(as_role service_role "insert into public.outbound_webhooks(user_id,url,secret_encrypted) values ('$U2','http://x.example','s')")"
+expect "unknown event type in config rejected" "outbound_webhooks_event_types_check" "$(as_role service_role "insert into public.outbound_webhooks(user_id,url,secret_encrypted,event_types) values ('$U2','https://x.example','s','{lead_deleted}')")"
+expect "browser cannot claim events" "permission denied" "$(as_role authenticated "select * from public.claim_outbound_webhook_events(10, 120)")"
+expect "anon cannot claim events" "permission denied" "$(as_role anon "select * from public.claim_outbound_webhook_events(10, 120)")"
+
+# new_inquiry
+srv "insert into public.conversations(id,user_id,origin) values ('dddddddd-0000-0000-0000-000000000001','$U1','inbound')" >/dev/null
+srv "insert into public.conversations(id,user_id,origin) values ('dddddddd-0000-0000-0000-000000000002','$U1','clinchd_sent')" >/dev/null
+srv "insert into public.conversations(id,user_id,origin) values ('dddddddd-0000-0000-0000-000000000003','$U1','native_send')" >/dev/null
+srv "insert into public.conversations(id,user_id,origin) values ('dddddddd-0000-0000-0000-000000000009','$U2','inbound')" >/dev/null
+q "begin; set local role authenticated; set local request.jwt.claims = '{\"role\":\"authenticated\",\"sub\":\"$U1\"}'; insert into public.conversations(id,user_id,origin) values ('dddddddd-0000-0000-0000-000000000004','$U1','inbound'); commit;" >/dev/null
+expect "new_inquiry for inbound and comment conversations only" "2" "$(ev new_inquiry)"
+expect "no events for an account without a webhook" "0" "$(q "select count(*) from public.outbound_webhook_events where user_id='$U2'")"
+expect "browser-created conversation emits nothing" "0" "$(ev new_inquiry "conversation_id='dddddddd-0000-0000-0000-000000000004'")"
+
+# dm_started / booking_link_sent / follow_up_sent
+C1=dddddddd-0000-0000-0000-000000000001; C2=dddddddd-0000-0000-0000-000000000002
+srv "insert into public.messages(conversation_id,role,content,source) values ('$C1','assistant','hi there','agent')" >/dev/null
+expect "unsent reply (no Meta id) emits nothing" "0" "$(ev dm_started)"
+srv "update public.messages set provider_message_id='mid-1' where conversation_id='$C1' and content='hi there'" >/dev/null
+expect "dm_started once the Meta id is stamped" "1" "$(ev dm_started)"
+srv "insert into public.messages(conversation_id,role,content,source,provider_message_id) values ('$C1','assistant','grab a time: https://calendly.com/sole/consult/','agent','mid-2')" >/dev/null
+expect "dm_started still once per conversation" "1" "$(ev dm_started)"
+expect "booking_link_sent on the Calendly link" "1" "$(ev booking_link_sent)"
+srv "insert into public.messages(conversation_id,role,content,source,provider_message_id) values ('$C2','assistant','Book here: HTTPS://Book.Sole.Example/now','agent','mid-3')" >/dev/null
+expect "booking_link_sent on booking_url (case and scheme ignored)" "2" "$(ev booking_link_sent)"
+srv "insert into public.messages(conversation_id,role,content,source,provider_message_id) values ('$C2','assistant','still keen?','drip','mid-4')" >/dev/null
+expect "follow_up_sent for a delivered drip" "1" "$(ev follow_up_sent)"
+srv "insert into public.messages(conversation_id,role,content,source,provider_message_id) values ('$C2','assistant','typed by staff','manual','mid-5')" >/dev/null
+expect "staff-typed messages emit nothing new" "2" "$(ev dm_started)"
+q "begin; set local role authenticated; set local request.jwt.claims = '{\"role\":\"authenticated\",\"sub\":\"$U1\"}'; insert into public.messages(conversation_id,role,content,source,provider_message_id) values ('$C2','assistant','https://calendly.com/sole/consult','drip','mid-6'); commit;" >/dev/null
+expect "browser message insert emits nothing" "1" "$(ev follow_up_sent)"
+
+# handoff_requested
+srv "update public.conversations set ai_paused=true, ai_pause_reason='medical_question' where id='$C1'" >/dev/null
+expect "handoff on medical pause" "medical_question" "$(q "select data->>'reason' from public.outbound_webhook_events where event_type='handoff_requested' and conversation_id='$C1'")"
+srv "update public.conversations set ai_pause_reason='hostile_or_refund' where id='$C1'" >/dev/null
+expect "no second event without a new false->true transition" "1" "$(ev handoff_requested)"
+srv "update public.conversations set ai_paused=false where id='$C1'" >/dev/null
+srv "update public.conversations set ai_paused=true, ai_pause_reason='complex_objection' where id='$C1'" >/dev/null
+expect "a new pause cycle emits again, mapped to other" "other" "$(q "select data->>'reason' from public.outbound_webhook_events where event_type='handoff_requested' order by created_at desc, id limit 1")"
+srv "update public.conversations set ai_paused=true, ai_pause_reason='human_took_over' where id='$C2'" >/dev/null
+expect "human_took_over emits nothing" "0" "$(ev handoff_requested "conversation_id='$C2'")"
+srv "update public.conversations set ai_paused=false where id='$C2'" >/dev/null
+q "begin; set local role authenticated; set local request.jwt.claims = '{\"role\":\"authenticated\",\"sub\":\"$U1\"}'; update public.conversations set ai_paused=true, ai_pause_reason='medical_question' where id='$C2'; commit;" >/dev/null
+expect "browser pause emits nothing" "0" "$(ev handoff_requested "conversation_id='$C2'")"
+
+# consultation_booked
+srv "insert into public.bookings(user_id,conversation_id,source,calendly_invitee_uri,start_time) values ('$U1','$C1','calendly','https://api.calendly.com/inv/1', now())" >/dev/null
+expect "consultation_booked on a Calendly booking" "1" "$(ev consultation_booked)"
+srv "update public.bookings set invitee_name='x' where calendly_invitee_uri='https://api.calendly.com/inv/1'" >/dev/null
+expect "an upsert of the same booking does not re-emit" "1" "$(ev consultation_booked)"
+srv "insert into public.bookings(user_id,conversation_id,source) values ('$U1','$C1','manual')" >/dev/null
+expect "manual booking emits nothing" "1" "$(ev consultation_booked)"
+q "begin; set local role authenticated; set local request.jwt.claims = '{\"role\":\"authenticated\",\"sub\":\"$U1\"}'; insert into public.bookings(user_id,source,calendly_invitee_uri) values ('$U1','calendly','https://forged'); commit;" >/dev/null
+expect "browser-forged Calendly booking emits nothing" "1" "$(ev consultation_booked)"
+srv "insert into public.bookings(user_id,source) values ('$U1','demo')" >/dev/null
+expect "demo booking without webhook_demo emits nothing" "1" "$(ev consultation_booked)"
+srv "update public.users set webhook_demo=true where id='$U1'" >/dev/null
+srv "insert into public.bookings(user_id,source) values ('$U1','demo')" >/dev/null
+expect "demo booking on a demo account carries demo=true" "true" "$(q "select data->>'demo' from public.outbound_webhook_events where event_type='consultation_booked' and data ? 'demo'")"
+
+# contact_captured
+srv "insert into public.lead_profiles(conversation_id,user_id,email) values ('$C1','$U1','jane@example.com')" >/dev/null
+expect "contact_captured on a new email" "1" "$(ev contact_captured)"
+srv "update public.lead_profiles set email='jane@example.com', treatment_interest='botox' where conversation_id='$C1'" >/dev/null
+expect "same email again emits nothing" "1" "$(ev contact_captured)"
+srv "update public.lead_profiles set phone='+15125550123' where conversation_id='$C1'" >/dev/null
+expect "a phone emits once more" "2" "$(ev contact_captured)"
+expect "bad phone rejected by the table" "lead_profiles_phone_check" "$(as_role service_role "update public.lead_profiles set phone='555-0123' where conversation_id='$C1'")"
+expect "free-text treatment rejected by the table" "lead_profiles_treatment_interest_check" "$(as_role service_role "update public.lead_profiles set treatment_interest='I want botox for my migraines' where conversation_id='$C1'")"
+
+# A broken emit never fails the write it rides on, and is recorded.
+expect "write succeeds while the outbox is broken; failure recorded" "1" "$(q_last "begin; alter table public.outbound_webhook_events rename to owe_broken; set local role service_role; set local request.jwt.claims = '{\"role\":\"service_role\"}'; insert into public.conversations(user_id,origin) values ('$U1','inbound'); select count(*) from public.outbound_webhook_emit_failures where event_type='new_inquiry'; rollback;")"
+
+# Claim
+expect "claim takes due events" "t" "$(as_role service_role "select count(*) > 0 from public.claim_outbound_webhook_events(100, 120)")"
+srv "select count(*) from public.claim_outbound_webhook_events(100, 120)" >/dev/null
+expect "claimed events are not re-claimed while fresh" "0" "$(q "begin; set local role service_role; select count(*) from public.claim_outbound_webhook_events(100, 120); rollback;")"
+q "update public.outbound_webhook_events set claimed_at = now() - interval '10 minutes'" >/dev/null
+expect "stale claims are taken over and count an attempt" "2" "$(q "begin; set local role service_role; select max(attempts) from public.claim_outbound_webhook_events(100, 120); rollback;")"
+expect "still no browser-executable definer functions" "0" "$(as_role service_role "select count(*) from public.browser_executable_definer_functions()")"
 
 psql_ -d postgres -c "drop database $DB"
 echo
