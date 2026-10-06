@@ -36,11 +36,12 @@ export function holdingTextFor(_user) {
 
 // Fail-safe detection. Anything that looks like a marker is a handoff:
 //   <<HANDOFF:medical_question>> alone, mixed into text, lowercased, with
-//   spaces, malformed (<<HANDOFF>>, <<HANDOFF: medical>>), or the bare
-//   snake_case category tokens, which never occur in a real DM.
+//   spaces, malformed (<<HANDOFF>>, <<HANDOFF: medical>>), or HANDOFF:<word>
+//   without the brackets. The bare category words (medical_question,
+//   missing_knowledge) are NOT a marker on their own: a lead could otherwise
+//   pause a thread by asking the model to repeat a word.
 const MARKER_RE = /<<\s*hand\s*_?\s*off\b[^>]*>{0,2}/i;
 const LOOSE_RE = /\bhandoff\s*:\s*[a-z_]+/i;
-const TOKEN_RE = /\b(medical_question|missing_knowledge)\b/i;
 
 /**
  * @param {string} text - raw model output
@@ -50,7 +51,7 @@ const TOKEN_RE = /\b(medical_question|missing_knowledge)\b/i;
  */
 export function detectHandoff(text) {
   const s = String(text ?? "");
-  const hit = s.match(MARKER_RE) || s.match(LOOSE_RE) || s.match(TOKEN_RE);
+  const hit = s.match(MARKER_RE) || s.match(LOOSE_RE);
   if (!hit) return null;
   const around = hit[0].toLowerCase();
   const category = around.includes("medical")

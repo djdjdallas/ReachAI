@@ -3,6 +3,8 @@ import {
   KNOWLEDGE_TOTAL_CAP,
   ANSWER_MAX,
   QUESTION_MAX,
+  BLOCK_OVERHEAD,
+  entryChars,
   totalChars,
   validateEntry,
 } from "./limits";
@@ -64,8 +66,25 @@ describe("validateEntry", () => {
 });
 
 describe("totalChars", () => {
-  it("counts question + answer of enabled entries only", () => {
-    expect(totalChars([entry({ question: "ab", answer: "cde" }), entry({ enabled: false })])).toBe(5);
+  it("counts enabled entries only, as rendered (tags included)", () => {
+    const on = entry({ question: "ab", answer: "cde" });
+    expect(totalChars([on, entry({ enabled: false })])).toBe(entryChars(on) + BLOCK_OVERHEAD);
+    expect(totalChars([entry({ enabled: false })])).toBe(0);
+  });
+
+  it("is never less than the real block it describes", () => {
+    for (const rows of [
+      [entry({ question: "Price?", answer: "$300 & up" })],
+      [entry({ answer: "<b>a</b>" }), entry({ type: "note", question: "", answer: "x" })],
+    ]) {
+      expect(totalChars(rows)).toBeGreaterThanOrEqual(formatBusinessKnowledge(rows).length);
+    }
+  });
+
+  it("escaped characters cost what they cost in the prompt", () => {
+    const plain = entry({ question: "q", answer: "a x b" });
+    const amp = entry({ question: "q", answer: "a & b" }); // same length; "&" renders as "&amp;"
+    expect(entryChars(amp) - entryChars(plain)).toBe("&amp;".length - 1);
   });
 });
 
@@ -115,6 +134,7 @@ describe("formatBusinessKnowledge", () => {
     const rows = Array.from({ length: 10 }, (_, i) => big(i)); // ~20k chars
     const kept = promptEntries(rows);
     expect(totalChars(kept)).toBeLessThanOrEqual(KNOWLEDGE_TOTAL_CAP);
+    expect(formatBusinessKnowledge(rows).length).toBeLessThanOrEqual(KNOWLEDGE_TOTAL_CAP);
     expect(kept.length).toBe(7);
     expect(formatBusinessKnowledge(rows)).not.toContain("Q7");
   });

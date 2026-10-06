@@ -26,6 +26,7 @@ import { decideIntentGate } from "@/lib/dm-intent-gate";
 import { ownerFromUser } from "@/lib/active-offer";
 import { loadReplyGrounding } from "@/lib/reply-grounding";
 import { holdingTextFor } from "@/lib/handoff-reply";
+import { mentionsHealth } from "@/lib/health-keywords";
 import { lintReply } from "@/lib/reply-lint";
 import { findVoiceSnippetForIntent, getSendableAudioUrl } from "@/lib/voice/matcher";
 import { sendVoiceMessage, logVoiceSend } from "@/lib/voice/sender";
@@ -411,12 +412,15 @@ async function checkEscalation(messageText, messages, sc) {
 // and records the handoff CATEGORY (never the lead's text) on the inbound
 // row's intent_classification.handoff for the unanswered-questions log
 // (knowledge base PR B). Guarded on ai_paused=false like every other pause,
-// so a redelivered webhook can't email twice. Never throws.
+// so a redelivered webhook can't email twice. If the pause write itself
+// fails, the owner is still emailed: the lead may already have the holding
+// text and someone has to follow up. Never throws.
 async function finishKnowledgeHandoff({
   supabase,
   user,
   conversation,
   handoff,
+  holdingSent,
   leadMessage,
   inboundMessageId,
   classificationPayload,
@@ -430,12 +434,16 @@ async function finishKnowledgeHandoff({
       .eq("ai_paused", false)
       .select("id");
     if (error) log.error("[webhook] knowledge handoff pause failed:", error.code);
-    if (pausedRows?.length) {
+    // Email on the false→true transition, or when the write failed and we
+    // can't tell (better a possible duplicate than a silent handoff).
+    const ownerEmailed = Boolean(error) || Boolean(pausedRows?.length);
+    if (ownerEmailed) {
       sendHandoffEmail({
         user,
         conversation,
         reason: handoff.category,
         leadMessage,
+        holdingSent,
       }).catch(console.error);
     }
     await recordClassification(supabase, inboundMessageId, {
@@ -455,7 +463,9 @@ async function finishKnowledgeHandoff({
         source: handoff.source,
         malformed: handoff.malformed === true,
         intent_class: intentClass,
-        owner_emailed: Boolean(pausedRows?.length),
+        holding_sent: holdingSent === true,
+        pause_failed: Boolean(error),
+        owner_emailed: ownerEmailed,
       },
     });
   } catch (err) {
@@ -1640,9 +1650,11 @@ async function processIncomingMessage({
       getPostHogClient().capture({
         distinctId: user.id,
         event: "human_in_loop_triggered",
+        // Category only: the escalation `reason` is model-written prose about
+        // the lead's message and stays out of analytics (it's on the inbound
+        // row's intent_classification.escalation).
         properties: {
           conversation_id: conversation.id,
-          reason: escalationOutcome?.reason,
           category: escalationOutcome?.category,
           intent_class: dmIntent?.class ?? null,
         },
@@ -1659,12 +1671,14 @@ async function processIncomingMessage({
       getPostHogClient().capture({
         distinctId: user.id,
         event: "dm_paused_do_not_send",
+        // Category and confidence only. Classifier reasoning and signals
+        // describe the lead's message (they can name a health condition) and
+        // stay on the inbound row's intent_classification, not in analytics.
         properties: {
           conversation_id: conversation.id,
           pause_reason: gate.pauseReason,
+          confidence: dmIntent.confidence,
           owner_emailed: ownerEmailed,
-          signals: dmIntent.signals,
-          reasoning: dmIntent.reasoning,
         },
       });
     }
@@ -1685,7 +1699,6 @@ async function processIncomingMessage({
       properties: {
         conversation_id: conversation.id,
         confidence: dmIntent.confidence,
-        signals: dmIntent.signals,
       },
     });
     return;
@@ -1736,7 +1749,26 @@ async function processIncomingMessage({
   // (dmIntent null) the medical signal is unknown, so no voice memo goes out
   // and the reply model's handoff marker is the medical check. A
   // classifier-detected handoff skips voice too.
-  if (!handoff && dmIntent && dmIntent.confidence >= VOICE_ROUTING_THRESHOLD) {
+  //
+  // Health-keyword prefilter (src/lib/health-keywords.js): the classifier can
+  // miss a medical question ("I have a herniated disc, how do I start?" as
+  // warm_intent with no signal), and a voice memo goes out before the reply
+  // model's marker check. A keyword match skips voice only; the text reply
+  // below still runs and still checks for the marker.
+  const healthKeyword = mentionsHealth(messageText);
+  if (healthKeyword && !handoff && dmIntent) {
+    getPostHogClient().capture({
+      distinctId: user.id,
+      event: "voice_skipped_health_keyword",
+      properties: { conversation_id: conversation.id, intent_class: dmIntent.class },
+    });
+  }
+  if (
+    !handoff &&
+    !healthKeyword &&
+    dmIntent &&
+    dmIntent.confidence >= VOICE_ROUTING_THRESHOLD
+  ) {
     const { snippet: voiceSnippet, reason: voiceSkipReason } =
       await findVoiceSnippetForIntent(user.id, dmIntent.class);
 
@@ -1978,6 +2010,9 @@ async function processIncomingMessage({
     console.error("outbound rate-limit threw:", err?.message);
   }
 
+  // Whether the lead actually received this turn's text (the handoff email
+  // only says "it told them you'd get back to them" when it did).
+  let replyDelivered = false;
   if (canSend) {
     // Send reply via Meta Instagram API
     try {
@@ -1991,6 +2026,7 @@ async function processIncomingMessage({
         decryptToken(user.meta_page_access_token),
         { lastInboundAt: leadSentAtMs }
       );
+      replyDelivered = true;
       // Stamp the Meta mid so the echo of this send dedups. If the echo
       // webhook won the race, handleEchoEvent already stamped this same mid
       // on this row (twin reconciliation) and this update is a no-op.
@@ -2046,6 +2082,7 @@ async function processIncomingMessage({
       user,
       conversation,
       handoff,
+      holdingSent: replyDelivered,
       leadMessage: messageText,
       inboundMessageId,
       classificationPayload,

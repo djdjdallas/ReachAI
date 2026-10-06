@@ -346,7 +346,7 @@ describe("knowledge handoff (business knowledge PR A)", () => {
       expect.objectContaining({ payload: { ai_paused: true, ai_pause_reason: "medical_question" } }),
     ]);
     expect(handoff.sendHandoffEmail).toHaveBeenCalledWith(
-      expect.objectContaining({ reason: "medical_question" })
+      expect.objectContaining({ reason: "medical_question", holdingSent: true })
     );
     // Category for PR B's log, never the lead's words.
     const [rec] = handoffRecords();
@@ -418,6 +418,53 @@ describe("knowledge handoff (business knowledge PR A)", () => {
     }
     expect(ig.sendInstagramMessage).not.toHaveBeenCalled();
     expect(pauses()[0].payload.ai_pause_reason).toBe("medical_question");
+    // The lead got nothing, so the email must not claim the AI told them.
+    expect(handoff.sendHandoffEmail).toHaveBeenCalledWith(
+      expect.objectContaining({ reason: "medical_question", holdingSent: false })
+    );
+  });
+
+  it("a failed pause write after the holding text still emails the owner", async () => {
+    db.state.user = user();
+    db.state.failPause = true;
+    gate.decideIntentGate.mockReturnValueOnce({ action: "handoff", category: "medical_question" });
+
+    await POST(inbound("is this safe with my meds?"));
+
+    expect(ig.sendInstagramMessage.mock.calls[0][2]).toBe(HOLDING);
+    expect(handoff.sendHandoffEmail).toHaveBeenCalledWith(
+      expect.objectContaining({ reason: "medical_question", holdingSent: true })
+    );
+    expect(posthog.capture).toHaveBeenCalledWith(
+      expect.objectContaining({
+        event: "knowledge_handoff",
+        properties: expect.objectContaining({ pause_failed: true, owner_emailed: true }),
+      })
+    );
+  });
+
+  it("health keyword the classifier missed: no voice note, the text reply still runs", async () => {
+    db.state.user = user();
+    dmIntent.classifyDMIntent.mockResolvedValueOnce({ class: "warm_intent", confidence: 0.9, signals: ["first_touch"] });
+    matcher.findVoiceSnippetForIntent.mockResolvedValue({ snippet: { id: "snip-1", label: "intro", storage_path: "x" } });
+    try {
+      await POST(inbound("I have a herniated disc, how do I start?"));
+    } finally {
+      matcher.findVoiceSnippetForIntent.mockResolvedValue({ snippet: null, reason: "no_snippet" });
+    }
+    expect(voice.sendVoiceMessage).not.toHaveBeenCalled();
+    expect(matcher.findVoiceSnippetForIntent).not.toHaveBeenCalled();
+    expect(ai.generateReply).toHaveBeenCalled();
+    expect(ig.sendInstagramMessage).toHaveBeenCalledTimes(1);
+    expect(posthog.capture).toHaveBeenCalledWith(expect.objectContaining({ event: "voice_skipped_health_keyword" }));
+  });
+
+  it("control: the same classification without a health word gets the voice note", async () => {
+    db.state.user = user();
+    dmIntent.classifyDMIntent.mockResolvedValueOnce({ class: "warm_intent", confidence: 0.9, signals: ["first_touch"] });
+    matcher.findVoiceSnippetForIntent.mockResolvedValueOnce({ snippet: { id: "snip-1", label: "intro", storage_path: "x" } });
+    await POST(inbound("how do I start?"));
+    expect(voice.sendVoiceMessage).toHaveBeenCalledTimes(1);
   });
 
   it("classifier failure: no voice step (medical signal unknown); the reply model still runs", async () => {
@@ -436,6 +483,47 @@ describe("knowledge handoff (business knowledge PR A)", () => {
     await POST(inbound("how many days a week do we train"));
     expect(matcher.findVoiceSnippetForIntent).toHaveBeenCalled();
     expect(pauses()).toHaveLength(0);
+  });
+});
+
+describe("analytics carry no classifier text", () => {
+  it.each([
+    [{ action: "pause", pauseReason: "hostile_or_refund", emailOwner: true }, "dm_paused_do_not_send"],
+    [{ action: "hold" }, "dm_held_do_not_send"],
+    [{ action: "skip_not_a_lead" }, "dm_skipped_not_a_lead"],
+  ])("%j → %s has category/confidence only", async (gateResult, event) => {
+    db.state.user = user();
+    dmIntent.classifyDMIntent.mockResolvedValueOnce({
+      class: "do_not_send",
+      confidence: 0.95,
+      signals: ["refund_demand", "medical_question"],
+      reasoning: "Lead says their back surgery failed and wants a refund.",
+    });
+    gate.decideIntentGate.mockReturnValueOnce(gateResult);
+
+    await POST(inbound("refund me, my back surgery failed"));
+
+    const call = posthog.capture.mock.calls.find(([e]) => e.event === event);
+    expect(call).toBeTruthy();
+    const props = JSON.stringify(call[0].properties);
+    expect(props).not.toMatch(/reasoning|signals|surgery|refund_demand/);
+    expect(call[0].properties).toHaveProperty("confidence", 0.95);
+  });
+
+  it("human_in_loop_triggered sends the category, not the escalation reason", async () => {
+    db.state.user = user({ script_config: { ...user().script_config, human_in_loop: true } });
+    ai.classifyIncomingMessage.mockResolvedValueOnce({
+      needs_human: true,
+      category: "owner_decision",
+      reason: "Lead asks for a custom discount because of their divorce.",
+    });
+    gate.decideIntentGate.mockReturnValueOnce({ action: "pause", pauseReason: "complex_objection", emailOwner: true });
+
+    await POST(inbound("can i get a discount, going through a divorce"));
+
+    const call = posthog.capture.mock.calls.find(([e]) => e.event === "human_in_loop_triggered");
+    expect(call[0].properties).toMatchObject({ category: "owner_decision" });
+    expect(JSON.stringify(call[0].properties)).not.toMatch(/divorce|reason/);
   });
 });
 
@@ -551,6 +639,7 @@ function makeDb() {
       // A guarded pause (ai_paused false -> true) reports the row it flipped,
       // which is what tells the route to email the owner.
       if (table === "conversations" && q.payload?.ai_paused === true) {
+        if (self.state.failPause) return { data: null, error: { code: "57014" } };
         return { data: [{ id: filterVal(q, "id") }], error: null };
       }
       return { data: q.single ? null : [], error: null };

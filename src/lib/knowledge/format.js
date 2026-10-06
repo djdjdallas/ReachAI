@@ -7,14 +7,7 @@
 // (stable order, no timestamps) so the prompt prefix stays byte-identical
 // between edits.
 
-import { KNOWLEDGE_TOTAL_CAP, entryChars } from "./limits";
-
-function xmlEscape(s) {
-  return String(s ?? "")
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;");
-}
+import { BLOCK_OVERHEAD, KNOWLEDGE_TOTAL_CAP, entryChars, renderEntry } from "./limits";
 
 function byOrder(a, b) {
   const s = (a.sort ?? 0) - (b.sort ?? 0);
@@ -34,7 +27,7 @@ function byOrder(a, b) {
  */
 export function promptEntries(entries) {
   const out = [];
-  let used = 0;
+  let used = BLOCK_OVERHEAD;
   for (const e of [...(entries || [])].filter((e) => e?.enabled).sort(byOrder)) {
     const answer = (e.answer || "").trim();
     if (!answer) continue;
@@ -53,19 +46,6 @@ export function promptEntries(entries) {
 export function formatBusinessKnowledge(entries) {
   const rows = promptEntries(entries);
   if (!rows.length) return "";
-  const body = rows
-    .map((e) => {
-      const type = ["faq", "policy", "note"].includes(e.type) ? e.type : "note";
-      const q = (e.question || "").trim();
-      return [
-        `<entry type="${type}">`,
-        q ? `<question>${xmlEscape(q)}</question>` : null,
-        `<answer>${xmlEscape(e.answer.trim())}</answer>`,
-        `</entry>`,
-      ]
-        .filter(Boolean)
-        .join("\n");
-    })
-    .join("\n");
+  const body = rows.map(renderEntry).join("\n");
   return `<business_knowledge>\n${body}\n</business_knowledge>`;
 }

@@ -28,12 +28,19 @@ create table if not exists public.knowledge_entries (
   answer text not null default '',
   enabled boolean not null default false,
   sort integer not null default 0,
+  -- "<vertical>:<key>" for rows created from a starter template
+  -- (src/lib/knowledge/templates.js), null otherwise. Unique per user, so a
+  -- double click or a second "Add starter" can't duplicate drafts. NULLs
+  -- don't collide, so hand-written entries are unaffected.
+  template_key text,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
   constraint knowledge_entries_type_check check (type in ('faq', 'policy', 'note')),
   constraint knowledge_entries_question_len check (char_length(question) <= 300),
   constraint knowledge_entries_answer_len check (char_length(answer) <= 2000),
   constraint knowledge_entries_sort_range check (sort between 0 and 10000),
+  constraint knowledge_entries_template_key_len check (char_length(template_key) <= 100),
+  constraint knowledge_entries_user_template_key unique (user_id, template_key),
   -- Drafts (disabled) may be empty; an enabled entry must say something.
   constraint knowledge_entries_enabled_has_answer
     check (not enabled or char_length(btrim(answer)) > 0)

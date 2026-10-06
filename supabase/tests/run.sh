@@ -117,6 +117,11 @@ expect "disabled empty draft allowed" "INSERT 0 1" "$(as_role service_role "inse
 expect "question over 300 chars rejected" "knowledge_entries_question_len" "$(as_role service_role "insert into public.knowledge_entries(user_id,question,answer) values ('$U1',repeat('x',301),'a')")"
 expect "answer over 2000 chars rejected" "knowledge_entries_answer_len" "$(as_role service_role "insert into public.knowledge_entries(user_id,question,answer) values ('$U1','q',repeat('x',2001))")"
 expect "unknown type rejected" "knowledge_entries_type_check" "$(as_role service_role "insert into public.knowledge_entries(user_id,type,question,answer) values ('$U1','secret','q','a')")"
+expect "template draft insert works" "INSERT 0 1" "$(as_role service_role "insert into public.knowledge_entries(user_id,template_key,question) values ('$U1','coaching:included','What is included?')")"
+expect "same template key twice rejected" "knowledge_entries_user_template_key" "$(as_role service_role "insert into public.knowledge_entries(user_id,template_key,question) values ('$U1','coaching:included','a'), ('$U1','coaching:included','dup')")"
+expect "the route's upsert skips a duplicate draft" "INSERT 0 2" "$(as_role service_role "insert into public.knowledge_entries(user_id,template_key,question) values ('$U1','coaching:refund','r'), ('$U1','coaching:refund','again'), ('$U1','coaching:faq2','f') on conflict (user_id, template_key) do nothing")"
+expect "another user can use the same key" "INSERT 0 1" "$(as_role service_role "insert into public.knowledge_entries(user_id,template_key,question) values ('$U2','coaching:included','q')")"
+expect "hand-written entries (null key) never collide" "INSERT 0 2" "$(as_role service_role "insert into public.knowledge_entries(user_id,question) values ('$U1','a'), ('$U1','b')")"
 expect "updated_at moves on update" "t" "$(as_role service_role "update public.knowledge_entries set answer='\$350' where id='cccccccc-0000-0000-0000-000000000001' returning updated_at >= created_at")"
 
 psql_ -d postgres -c "drop database $DB"

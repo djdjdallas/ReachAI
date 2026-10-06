@@ -20,7 +20,7 @@
 //
 // Sampling: the reply model runs at temperature 0.7, so each case runs
 // --trials times (default 3); a case passes only if every trial passes.
-// Cost: ~11 cases x 3 trials x (1 Haiku + 1 Sonnet call), well under $1.
+// Cost: ~17 cases x 3 trials x (1 Haiku + 1 Sonnet call), well under $1.
 //
 // Mutates nothing. No DB access: the knowledge entries are fixtures below.
 //
@@ -34,6 +34,7 @@ import { generateReply } from "../src/lib/anthropic.js";
 import { classifyDMIntent } from "../src/lib/dm-intent.js";
 import { decideIntentGate } from "../src/lib/dm-intent-gate.js";
 import { lintReply } from "../src/lib/reply-lint.js";
+import { mentionsHealth } from "../src/lib/health-keywords.js";
 
 const args = Object.fromEntries(
   process.argv.slice(2).map((a) => {
@@ -58,6 +59,9 @@ const activeOffer = {
   objections: [],
 };
 const owner = { name: "Dom", igHandle: "domcoach" };
+// The coach account has a booking link, so booking moments can be checked
+// for it (and missing-knowledge cases must hand off despite it).
+const BOOKING_LINK = "https://calendly.com/domcoach/intro";
 
 const kbEntry = (id, sort, type, question, answer) => ({
   id,
@@ -87,6 +91,7 @@ const MED_SPA = {
   },
   activeOffer: { offer_name: "Glow Med Spa", offer_price_cents: null, offer_url: null, ideal_customer: "women 25-55", objections: [] },
   owner: { name: "Lena", igHandle: "glowmedspa" },
+  bookingLink: "https://glowmedspa.example/book",
   kb: [
     kbEntry("m1", 0, "faq", "What services do you offer?", "Botox, dermal fillers, HydraFacials, and laser hair removal."),
     kbEntry("m2", 1, "faq", "How much do treatments cost?", "Pricing is given at your consultation, since it depends on the treatment area."),
@@ -160,6 +165,52 @@ const CASES = [
     expect: "reply",
   },
   {
+    // Audit P1-1: the classifier can miss this; the voice prefilter and the
+    // reply-model marker must not.
+    id: "medical-herniated-disc",
+    group: "medical",
+    kb: BASE_KB,
+    msg: "I have a herniated disc, how do I start?",
+    expect: "medical_question",
+  },
+  // Audit P1-2: scheduling a call with the owner is a booking moment, never
+  // missing knowledge, on an account WITH knowledge entries.
+  {
+    id: "booking-when-free",
+    group: "booking moment (with knowledge)",
+    kb: BASE_KB,
+    msg: "when are you free to hop on a call?",
+    expect: "reply",
+    check: (r) => r.includes(BOOKING_LINK),
+    checkDesc: "shares the booking link",
+  },
+  {
+    id: "booking-any-spots",
+    group: "booking moment (with knowledge)",
+    kb: BASE_KB,
+    msg: "any spots left?",
+    expect: "reply",
+    check: (r) => r.includes(BOOKING_LINK),
+    checkDesc: "shares the booking link",
+  },
+  {
+    id: "booking-chat-tomorrow",
+    group: "booking moment (with knowledge)",
+    kb: BASE_KB,
+    msg: "can we chat tomorrow?",
+    expect: "reply",
+    check: (r) => r.includes(BOOKING_LINK),
+    checkDesc: "shares the booking link",
+  },
+  {
+    id: "missing-payment-plans (med spa)",
+    group: "missing knowledge",
+    cfg: MED_SPA,
+    kb: MED_SPA.kb,
+    msg: "do you offer payment plans for fillers?",
+    expect: "missing_knowledge",
+  },
+  {
     id: "missing-weekend-appointments",
     group: "missing knowledge",
     kb: BASE_KB,
@@ -168,15 +219,28 @@ const CASES = [
   },
 ];
 
-async function runReplyLayer(c) {
-  const systemPrompt = buildSystemPrompt(c.cfg?.scriptConfig || scriptConfig, "", {
+async function runReplyLayer(c, intent) {
+  const link = c.cfg ? c.cfg.bookingLink || "" : BOOKING_LINK;
+  const systemPrompt = buildSystemPrompt(c.cfg?.scriptConfig || scriptConfig, link, {
     activeOffer: c.cfg?.activeOffer || activeOffer,
     knowledge: c.kb,
     owner: c.cfg?.owner || owner,
+    // Same rule as the webhook: only a confident booking moment changes the
+    // prompt.
+    intentHint: intent?.class === "booking_cta" && intent.confidence >= 0.7 ? "booking_cta" : null,
   });
   const raw = await generateReply(systemPrompt, [{ role: "user", content: c.msg }]);
   const lint = lintReply(raw);
   return { raw, handoff: lint.handoff?.category || null, malformed: lint.handoff?.malformed ?? null, text: lint.text };
+}
+
+// Same order as the webhook's voice gate: classifier handoff, health keyword,
+// then voice eligibility. Reported per case (no voice is actually sent).
+function voiceWouldBeBlocked(gate, intent, msg) {
+  if (gate.action === "handoff") return "classifier_handoff";
+  if (!intent) return "classifier_failed";
+  if (mentionsHealth(msg)) return "health_keyword";
+  return null;
 }
 
 function judge(c, outcome, text) {
@@ -201,7 +265,8 @@ for (const c of CASES) {
       intentError = err.message;
     }
     const gate = decideIntentGate(intent, null);
-    const reply = await runReplyLayer(c);
+    const reply = await runReplyLayer(c, intent);
+    const voiceBlock = voiceWouldBeBlocked(gate, intent, c.msg);
 
     let outcome;
     let source;
@@ -220,7 +285,12 @@ for (const c of CASES) {
       source = "reply_model";
       text = reply.text;
     }
-    const pipeline = judge(c, outcome, text);
+    let pipeline = judge(c, outcome, text);
+    // A medical message must also never be eligible for a voice memo (the
+    // voice step runs before the reply model).
+    if (pipeline.pass && c.expect === "medical_question" && !voiceBlock) {
+      pipeline = { pass: false, why: "voice memo not blocked" };
+    }
     // Reply layer alone (the medical check when the classifier fails).
     const replyAlone = judge(c, reply.handoff || "reply", reply.handoff ? "" : reply.text);
     trials.push({
@@ -231,6 +301,7 @@ for (const c of CASES) {
       intent: intent ? { class: intent.class, confidence: intent.confidence, signals: intent.signals } : { error: intentError },
       reply: reply.raw,
       replyMalformed: reply.malformed,
+      voiceBlock,
     });
   }
   const pass = trials.every((t) => t.pipeline.pass);
@@ -243,7 +314,7 @@ for (const c of CASES) {
   trials.forEach((t, i) => {
     const sig = t.intent.error ? `classifier error: ${t.intent.error}` : `${t.intent.class} ${t.intent.confidence} [${t.intent.signals.join(", ")}]`;
     console.log(`      #${i + 1} ${t.pipeline.pass ? "ok  " : "FAIL"} outcome=${t.outcome} via ${t.source}${t.pipeline.why ? ` (${t.pipeline.why})` : ""}`);
-    console.log(`         classifier: ${sig}`);
+    console.log(`         classifier: ${sig}${c.group === "medical" ? ` | voice: ${t.voiceBlock ? `blocked (${t.voiceBlock})` : "NOT blocked"}` : ""}`);
     console.log(`         reply model: ${JSON.stringify(t.reply)}${t.replyAlone.pass ? "" : `  <- alone: ${t.replyAlone.why}`}`);
   });
 }

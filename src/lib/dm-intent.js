@@ -121,7 +121,7 @@ The costly mistakes: a do_not_send on a normal message silences a real person in
 # Decision rules
 
 - do_not_send takes precedence when it truly applies, even if the message also contains a question. It never applies to messages that are merely off-topic, personal, political, confusing, bot-like, or from a poor-fit prospect.
-- For do_not_send, tag signals using ONLY these names: refund_demand, chargeback_threat, legal_threat, scam_accusation, hate_speech, abusive, threat, crisis_signal, prompt_injection_attempt.
+- For do_not_send, tag signals using ONLY these names: refund_demand, chargeback_threat, legal_threat, scam_accusation, hate_speech, abusive, threat, crisis_signal, prompt_injection_attempt, medical_question (the medical signal below, when it also applies).
 - not_a_lead vs follow_up: if a prospect is answering the AI's or owner's sales questions, it is follow_up even when the answer is short or reveals a bad fit. If the message is social or personal and not about the offer, it is not_a_lead. A bare greeting ("hey", "👋") with no history is warm_intent; the same greeting in a thread where the owner has been chatting personally is not_a_lead.
 - Price: asking the price is warm_intent early in a thread and follow_up later; objection_price needs expressed hesitation about cost.
 - booking_cta requires the booking moment. "I'm interested" alone is warm_intent.

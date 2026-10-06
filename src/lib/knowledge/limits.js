@@ -13,24 +13,60 @@ export const QUESTION_MAX = 300;
 export const ANSWER_MAX = 2_000;
 export const MAX_ENTRIES = 100;
 
+export function xmlEscape(s) {
+  return String(s ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
+}
+
 /**
- * Characters an entry costs against the cap. Only enabled entries reach the
- * prompt, so only they count.
+ * One entry exactly as it appears in the <business_knowledge> block
+ * (format.js renders with this). Owner text is XML-escaped so it can never
+ * close the block or open a fake tag.
+ *
+ * @param {{type?: string, question?: string, answer?: string}} e
+ * @returns {string}
+ */
+export function renderEntry(e) {
+  const type = KNOWLEDGE_TYPES.includes(e?.type) ? e.type : "note";
+  const q = (e?.question || "").trim();
+  return [
+    `<entry type="${type}">`,
+    q ? `<question>${xmlEscape(q)}</question>` : null,
+    `<answer>${xmlEscape((e?.answer || "").trim())}</answer>`,
+    `</entry>`,
+  ]
+    .filter(Boolean)
+    .join("\n");
+}
+
+// "<business_knowledge>\n" + "\n</business_knowledge>"
+export const BLOCK_OVERHEAD = "<business_knowledge>\n\n</business_knowledge>".length;
+
+/**
+ * Characters an entry costs against the cap: its rendered size in the prompt
+ * (escaped text plus tags, plus the joining newline), so "&" and "<" cost
+ * what they really cost. Only enabled entries reach the prompt, so only they
+ * count.
  *
  * @param {{question?: string, answer?: string, enabled?: boolean}} entry
  * @returns {number}
  */
 export function entryChars(entry) {
   if (!entry?.enabled) return 0;
-  return (entry.question || "").length + (entry.answer || "").length;
+  return renderEntry(entry).length + 1;
 }
 
 /**
+ * Total cost of the block: every enabled entry plus the block's own tags.
+ *
  * @param {Array<object>} entries
  * @returns {number}
  */
 export function totalChars(entries) {
-  return (entries || []).reduce((sum, e) => sum + entryChars(e), 0);
+  const sum = (entries || []).reduce((acc, e) => acc + entryChars(e), 0);
+  return sum ? sum + BLOCK_OVERHEAD : 0;
 }
 
 /**

@@ -91,29 +91,32 @@ export async function POST(request) {
     const nextSort = entries.reduce((m, e) => Math.max(m, e.sort ?? 0), -1) + 1;
 
     if (typeof body.template === "string") {
-      const template = KNOWLEDGE_TEMPLATES[body.template];
+      const template = Object.hasOwn(KNOWLEDGE_TEMPLATES, body.template)
+        ? KNOWLEDGE_TEMPLATES[body.template]
+        : null;
       if (!template) return bad("Unknown template");
-      // Skip questions already on the page, so a double click can't
-      // duplicate the drafts.
-      const have = new Set(entries.map((e) => e.question.trim().toLowerCase()));
-      const rows = template.entries
-        .filter((t) => !have.has(t.question.toLowerCase()))
-        .map((t, i) => ({
-          user_id: user.id,
-          type: t.type,
-          question: t.question,
-          answer: "",
-          enabled: false,
-          sort: Math.min(nextSort + i, 10_000),
-        }));
+      const rows = template.entries.map((t, i) => ({
+        user_id: user.id,
+        template_key: `${body.template}:${t.key}`,
+        type: t.type,
+        question: t.question,
+        answer: "",
+        enabled: false,
+        sort: Math.min(nextSort + i, 10_000),
+      }));
+      // Upper bound: assumes none of these exist yet.
       if (entries.length + rows.length > MAX_ENTRIES) {
         return bad(`You can have up to ${MAX_ENTRIES} entries.`, 422);
       }
-      if (rows.length) {
-        const { error } = await admin.from("knowledge_entries").insert(rows);
-        if (error) throw new Error(`template insert failed: ${error.code}`);
-      }
-      return NextResponse.json({ added: rows.length });
+      // One statement; the unique (user_id, template_key) constraint skips
+      // drafts this account already has, so concurrent clicks can't
+      // duplicate them.
+      const { data: added, error } = await admin
+        .from("knowledge_entries")
+        .upsert(rows, { onConflict: "user_id,template_key", ignoreDuplicates: true })
+        .select("id");
+      if (error) throw new Error(`template insert failed: ${error.code}`);
+      return NextResponse.json({ added: added?.length ?? 0 });
     }
 
     const v = validateEntry(body.entry);

@@ -369,13 +369,15 @@ function describeOwner(owner) {
  * @param {boolean} hasKnowledge
  * @returns {string}
  */
-function buildHandoffRules(hasKnowledge) {
+function buildHandoffRules(hasKnowledge, ownerLabel) {
   const medical = HANDOFF_MARKERS.medical_question;
   const missing = HANDOFF_MARKERS.missing_knowledge;
   const fallback = hasKnowledge
     ? `
 
-- MISSING KNOWLEDGE. If the prospect asks about a price, availability (dates, times, appointments, spots, openings), or a policy (refunds, cancellations, guarantees, payment terms) and the answer is NOT stated in BUSINESS DETAILS or in the business knowledge below, do not guess, estimate, or deflect to a call. Your entire reply must be exactly: ${missing}`
+- MISSING KNOWLEDGE. This covers facts about the service itself: its price, its availability (which days or hours appointments or sessions run, start dates, whether a program or group still has room), or a policy (refunds, cancellations, guarantees, payment terms). If the prospect asks one of these and the answer is NOT stated in BUSINESS DETAILS or in the business knowledge below, do not guess, estimate, or deflect to a call or the booking link. Your entire reply must be exactly: ${missing}
+  Examples that ARE missing knowledge when the answer isn't written down: "do you have weekend appointments?", "are you open Sundays?", "do you do evening sessions?", "when does the next group start?". The booking link does not answer these: the prospect is asking what the business offers, not asking to meet.
+  Scheduling a call or a chat with ${ownerLabel} is NOT missing knowledge. It is a booking moment: "when are you free?", "can we talk tomorrow?", "can we hop on a call?", "any spots left?", "any spots on your calendar?". Follow the booking instruction in BUSINESS DETAILS (share the booking link) and never output a marker for it. A bare "any spots left?" means a call slot unless they name a program start date or group.`
     : "";
   return `HANDOFF RULES (these override everything else except AI disclosure):
 
@@ -520,7 +522,7 @@ CORE INSTRUCTIONS:
 
 ---
 
-${buildHandoffRules(hasKnowledge)}
+${buildHandoffRules(hasKnowledge, ownerLabel)}
 
 ---
 
@@ -556,5 +558,5 @@ ${buildFormatRules(sc)}${buildSettingsRules(sc, options.voiceProfile)}${buildKno
 
 ---
 
-NON-OVERRIDABLE: Regardless of any script instructions, business details, business knowledge, or preferences above, if anyone asks whether you are an AI, an assistant, a bot, a real person, or the account owner personally, you must answer honestly that you are an AI. Never claim to be human or take on another name or persona. The HANDOFF RULES still apply: medical or health questions${hasKnowledge ? ", and price, availability, or policy questions the business knowledge doesn't answer," : ""} get the marker alone.`;
+NON-OVERRIDABLE: Regardless of any script instructions, business details, business knowledge, or preferences above, if anyone asks whether you are an AI, an assistant, a bot, a real person, or the account owner personally, you must answer honestly that you are an AI. Never claim to be human or take on another name or persona. The HANDOFF RULES still apply: medical or health questions${hasKnowledge ? ", and questions about the service's price, availability, or policies that the business knowledge doesn't answer (not requests to schedule a call, which get the booking link)," : ""} get the marker alone.`;
 }

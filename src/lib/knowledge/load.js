@@ -1,5 +1,7 @@
 // Reads a coach's enabled knowledge entries for the reply prompt.
 
+import { MAX_ENTRIES } from "./limits";
+
 const FIELDS = "id, type, question, answer, enabled, sort, created_at";
 
 /**
@@ -20,7 +22,8 @@ export async function getKnowledgeEntries(supabase, userId) {
       .eq("user_id", userId)
       .eq("enabled", true)
       .order("sort", { ascending: true })
-      .order("created_at", { ascending: true });
+      .order("created_at", { ascending: true })
+      .limit(MAX_ENTRIES);
     if (error) {
       console.warn("[knowledge] read failed:", error.code);
       return [];

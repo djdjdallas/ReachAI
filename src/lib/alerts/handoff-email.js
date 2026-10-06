@@ -36,11 +36,24 @@ const REASON_COPY = {
     "this message looked hostile or mentioned a refund, chargeback, or legal issue, so the AI stopped replying",
   crisis_signal:
     "this message may be from someone going through something hard, so the AI stopped replying. Please check in personally",
-  medical_question:
-    "they asked a medical or health question, which the AI never answers. It told them you'd get back to them",
-  missing_knowledge:
-    "they asked about a price, availability, or a policy that isn't in your business knowledge. The AI told them you'd get back to them. Add the answer in Settings > Business knowledge so it can answer next time",
 };
+
+// Knowledge handoffs. What the lead was told depends on whether the holding
+// text actually went out (it can be rate limited, or the send can fail).
+const KNOWLEDGE_REASON_COPY = {
+  medical_question: {
+    sent: "they asked a health-related question, which the AI never answers. It told them you'd get back to them",
+    notSent: "they asked a health-related question, which the AI never answers. The AI stopped replying, so please reply to them yourself",
+  },
+  missing_knowledge: {
+    sent: "they asked about a price, availability, or a policy that isn't in your business knowledge. The AI told them you'd get back to them. Add the answer in Settings > Business knowledge so it can answer next time",
+    notSent: "they asked about a price, availability, or a policy that isn't in your business knowledge. The AI stopped replying, so please reply to them yourself. Add the answer in Settings > Business knowledge so it can answer next time",
+  },
+};
+
+// Health questions are sensitive: the email never quotes them. The owner
+// reads the message in the app.
+const NO_EXCERPT_REASONS = new Set(["medical_question"]);
 
 function escapeHtml(s) {
   return String(s ?? "").replace(
@@ -63,13 +76,17 @@ function snippet(text, max = 200) {
  * @param {object} params.user - public.users row (needs email)
  * @param {object} params.conversation - conversations row (needs id, sender_name)
  * @param {"complex_objection"|"qualifying_loop_detected"|"hostile_or_refund"|"crisis_signal"|"medical_question"|"missing_knowledge"} params.reason
- * @param {string} params.leadMessage - the lead's latest message text
+ * @param {string} params.leadMessage - the lead's latest message text (never
+ *   included for medical_question)
+ * @param {boolean} [params.holdingSent] - knowledge handoffs only: whether
+ *   the holding text reached the lead
  */
-export async function sendHandoffEmail({ user, conversation, reason, leadMessage }) {
+export async function sendHandoffEmail({ user, conversation, reason, leadMessage, holdingSent = false }) {
   try {
     if (!user?.email || !conversation?.id) return;
 
-    const why = REASON_COPY[reason];
+    const knowledge = KNOWLEDGE_REASON_COPY[reason];
+    const why = knowledge ? (holdingSent ? knowledge.sent : knowledge.notSent) : REASON_COPY[reason];
     if (!why) {
       console.error("[handoff-email] unknown reason, not sending:", reason);
       return;
@@ -81,8 +98,9 @@ export async function sendHandoffEmail({ user, conversation, reason, leadMessage
     const body = [
       `The AI just handed you a conversation with ${senderName} — ${why}.`,
       "",
-      "Their last message:",
-      `"${snippet(leadMessage)}"`,
+      ...(NO_EXCERPT_REASONS.has(reason)
+        ? ["They asked a health-related question. Open the conversation to read it."]
+        : ["Their last message:", `"${snippet(leadMessage)}"`]),
       "",
       "Pick up the conversation here:",
       conversationUrl,

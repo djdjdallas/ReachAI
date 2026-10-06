@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import { totalChars } from "@/lib/knowledge/limits";
 
 // /api/settings/knowledge: the only write path for knowledge_entries.
 // Validation, the 15k per-account cap, and per-user scoping are all enforced
@@ -18,6 +19,9 @@ function admin() {
             if (prop === "then") return (resolve) => resolve(run(q));
             if (["insert", "update", "delete"].includes(prop)) {
               return (payload) => ((q.op = prop), (q.payload = payload), b);
+            }
+            if (prop === "upsert") {
+              return (payload, opts) => ((q.op = "upsert"), (q.payload = payload), (q.opts = opts), b);
             }
             if (prop === "eq") return (c, v) => (q.filters.push([c, v]), b);
             if (prop === "single" || prop === "maybeSingle") return () => ((q.single = true), b);
@@ -50,6 +54,19 @@ function run(q) {
     }));
     store.rows.push(...list);
     return { data: q.single ? list[0] : list, error: null };
+  }
+  if (q.op === "upsert") {
+    // Mirrors unique (user_id, template_key) with ignoreDuplicates.
+    expect(q.opts).toEqual({ onConflict: "user_id,template_key", ignoreDuplicates: true });
+    const added = [];
+    for (const r of q.payload) {
+      const dup = store.rows.some((x) => x.user_id === r.user_id && x.template_key === r.template_key);
+      if (dup) continue;
+      const row = { id: `new-${store.rows.length}`, created_at: new Date().toISOString(), ...r };
+      store.rows.push(row);
+      added.push({ id: row.id });
+    }
+    return { data: added, error: null };
   }
   if (q.op === "update") {
     const hit = store.rows.filter((r) => matches(r, q.filters));
@@ -125,7 +142,7 @@ describe("GET", () => {
     ];
     const data = await (await GET()).json();
     expect(data.entries.map((e) => e.id)).toEqual(["mine"]);
-    expect(data.totalChars).toBe(4);
+    expect(data.totalChars).toBe(totalChars([store.rows[0]]));
     expect(data.cap).toBe(15000);
     expect(data.offer.offer_name).toBe("12 weeks");
     expect(data.bookingLink).toBe("https://cal.test/me");
@@ -173,16 +190,29 @@ describe("POST create", () => {
 
 describe("POST template", () => {
   it("adds the vertical's questions as disabled empty drafts, once", async () => {
-    await POST(req("POST", { template: "med_spa" }));
-    expect(store.rows.length).toBe(6);
+    const first = await (await POST(req("POST", { template: "med_spa" }))).json();
+    expect(first.added).toBe(6);
     expect(store.rows.every((r) => r.enabled === false && r.answer === "" && r.user_id === "user-1")).toBe(true);
+    expect(store.rows.map((r) => r.template_key)).toContain("med_spa:pricing");
+    // Even after the owner edits a draft's question, re-adding skips it.
+    store.rows[0].question = "Edited question";
     const again = await (await POST(req("POST", { template: "med_spa" }))).json();
     expect(again.added).toBe(0);
     expect(store.rows.length).toBe(6);
   });
 
-  it("rejects an unknown template", async () => {
-    expect((await POST(req("POST", { template: "dentist" }))).status).toBe(400);
+  it("two clicks at once still add each draft once (one upsert per click)", async () => {
+    await Promise.all([POST(req("POST", { template: "coaching" })), POST(req("POST", { template: "coaching" }))]);
+    expect(store.rows.length).toBe(6);
+  });
+
+  it("an entry body can't set template_key", async () => {
+    await POST(req("POST", { entry: { type: "faq", question: "q", answer: "a", template_key: "coaching:included" } }));
+    expect(store.rows[0].template_key).toBeUndefined();
+  });
+
+  it.each(["dentist", "__proto__", "toString"])("rejects unknown template %j", async (t) => {
+    expect((await POST(req("POST", { template: t }))).status).toBe(400);
   });
 });
 
