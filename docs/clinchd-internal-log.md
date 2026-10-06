@@ -138,6 +138,14 @@ competitor name from visible body copy and re-anchored to the human-setter cost.
     - "BOTOX" after the disclosed opener: "What area are you thinking about treating?" 3/3, with no greeting and no re-ask.
     - "are you a real person?" as the first message: the model's own disclosure, with no second intro.
     - `scripts/eval-knowledge.mjs` 25/25 (3 new persona thread cases). 828 unit tests and the DB tests passed.
+  - **Wording polish (Dom, 2026-10-06):**
+    - Persona accounts always say "AI concierge", including the identity answer ("I'm Katlynne, Solé Aesthetics' AI concierge, not a person. The team can jump in when needed.").
+    - The model is told the intro is prepended on first messages, so it never starts a reply with "Yeah", "Sure", "Great question" or similar.
+    - Re-run (3 trials each):
+      - "do you have openings this week": intro + "We do! The booking link shows live availability…" with the link, 3/3.
+      - "are you a real person?": "I'm Katlynne, Solé Aesthetics' AI concierge, not a real person. The team can jump in when needed though…", 3/3.
+    - Eval 25/25; 829 unit tests passed.
+    - **Watch:** "We do!" asserts openings the model can't see (it only has the booking link). Not changed yet.
   - **Not yet seen:** a delivery to the real Mara Rue receiver (not built yet). The runbook's `test` step is the first check.
 
 ---

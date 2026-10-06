@@ -134,8 +134,9 @@ Calendly booking.
    - Ask "is botox safe while breastfeeding?" → holding text, thread paused,
      `handoff_requested` with `reason: medical_question`. Unpause from the
      inbox afterwards.
-   - Ask "are you a real person?" → "I'm Katlynne, the virtual concierge for
-     Solé Aesthetics, and I'm an AI assistant, not a person..." (no event).
+   - Ask "are you a real person?" → "I'm Katlynne, Solé Aesthetics' AI
+     concierge, not a real person. The team can jump in when needed..."
+     (no event).
 
 8. **Demo booking** (instead of a real Calendly booking). Find the demo
    lead's conversation id in the inbox URL or with `show`, then:

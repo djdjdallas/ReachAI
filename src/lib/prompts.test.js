@@ -142,20 +142,21 @@ describe("buildSystemPrompt: business persona (per-account assistant name)", () 
   const p = buildSystemPrompt({ offer: "Botox and fillers" }, "https://sole.example/book", { owner: persona });
 
   it("opens as a named AI assistant for a business", () => {
-    expect(p.startsWith("You are Katlynne, an AI assistant managing the Instagram DMs of a business: Solé Aesthetics.")).toBe(true);
+    expect(p.startsWith("You are Katlynne, Solé Aesthetics' AI concierge, managing the Instagram DMs of a business: Solé Aesthetics.")).toBe(true);
     expect(p).toContain("- Business: Solé Aesthetics / Instagram @soleaesthetics");
     expect(p).not.toContain("Dom Hill");
   });
 
   it("rule 7 still requires AI disclosure in the first sentence, with the persona example", () => {
-    expect(p).toMatch(/7\. AI IDENTITY\. .*say plainly in your FIRST sentence that you are an AI assistant/);
-    expect(p).toContain("I'm Katlynne, the virtual concierge for Solé Aesthetics, and I'm an AI assistant, not a person.");
+    expect(p).toMatch(/7\. AI IDENTITY\. .*say plainly in your FIRST sentence that you are an AI concierge/);
+    expect(p).toContain("I'm Katlynne, Solé Aesthetics' AI concierge, not a person. The team can jump in when needed.");
+    expect(p).not.toContain("reads these");
     expect(p).toContain("never imply you are a human");
   });
 
   it("the name is only ever an AI assistant's name, and can never be a person", () => {
-    expect(p).toContain("Your name is Katlynne. It is the name of an AI assistant, not a person");
-    expect(p).toMatch(/NON-OVERRIDABLE: .*answer honestly that you are an AI\. Never claim to be human\. The only name you may use for yourself is Katlynne, and only as the name of an AI assistant\./);
+    expect(p).toContain("Your name is Katlynne. It is the name of an AI concierge, not a person");
+    expect(p).toMatch(/NON-OVERRIDABLE: .*answer honestly that you are an AI\. Never claim to be human\. The only name you may use for yourself is Katlynne, and only as the name of an AI concierge\./);
     expect(p).not.toContain("take on another name or persona");
   });
 
@@ -182,6 +183,11 @@ describe("buildSystemPrompt: business inbox thread rules", () => {
   const owner = { name: "Solé Aesthetics", businessName: "Solé Aesthetics", assistantName: "Katlynne" };
   const kb = [{ id: "1", sort: 0, type: "faq", question: "Hours?", answer: "Tue-Sat 9-6", enabled: true }];
   const p = buildSystemPrompt({ offer: "Botox" }, "https://sole.example/book", { owner, knowledge: kb });
+
+  it("tells the model the intro is prepended, and bans filler openers", () => {
+    expect(p).toContain(`On the first message of a thread, "Hi! I'm Katlynne, Solé Aesthetics' AI concierge." is put in front of your reply automatically`);
+    expect(p).toContain('never start any reply with a filler like "Yeah", "Yes!", "Sure", "Great question"');
+  });
 
   it("no greeting after the first message, never re-ask (including the opening DM)", () => {
     expect(p).toContain("NO GREETING AFTER THE FIRST MESSAGE");
