@@ -90,6 +90,14 @@ function MessageBubble({ message }) {
           )}
         </div>
 
+        {message.handoff && (
+          <span className="text-[11px] text-amber-700 bg-amber-50 border border-amber-200 rounded-md px-2 py-1">
+            {message.handoff === "medical_question"
+              ? "Handed to you: medical or health question. A real lead gets this reply and you get an email."
+              : "Handed to you: your business knowledge doesn't cover this. A real lead gets this reply and you get an email."}
+          </span>
+        )}
+
         <span className="text-[10px] text-stone-400 px-1">
           {isUser ? "You (test lead)" : "AI Agent"} &middot;{" "}
           {formatTime(new Date(message.timestamp))}
@@ -225,6 +233,7 @@ export default function PlaygroundPage() {
           content: data.reply,
           timestamp: Date.now(),
           hasBookingLink: data.hasBookingLink,
+          handoff: data.handoff || null,
         };
 
         setMessages([...updatedMessages, aiMessage]);

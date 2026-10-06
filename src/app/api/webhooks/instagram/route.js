@@ -23,7 +23,9 @@ import {
 } from "@/lib/dm-intent";
 import { statusForIntent } from "@/lib/intent-status";
 import { decideIntentGate } from "@/lib/dm-intent-gate";
-import { getActiveOffer, ownerFromUser } from "@/lib/active-offer";
+import { ownerFromUser } from "@/lib/active-offer";
+import { loadReplyGrounding } from "@/lib/reply-grounding";
+import { holdingTextFor } from "@/lib/handoff-reply";
 import { lintReply } from "@/lib/reply-lint";
 import { findVoiceSnippetForIntent, getSendableAudioUrl } from "@/lib/voice/matcher";
 import { sendVoiceMessage, logVoiceSend } from "@/lib/voice/sender";
@@ -402,6 +404,62 @@ async function checkEscalation(messageText, messages, sc) {
         : err?.message || "classifyIncomingMessage failed",
       failed_open: true,
     };
+  }
+}
+
+// Pauses a thread after a knowledge handoff's holding text, emails the owner,
+// and records the handoff CATEGORY (never the lead's text) on the inbound
+// row's intent_classification.handoff for the unanswered-questions log
+// (knowledge base PR B). Guarded on ai_paused=false like every other pause,
+// so a redelivered webhook can't email twice. Never throws.
+async function finishKnowledgeHandoff({
+  supabase,
+  user,
+  conversation,
+  handoff,
+  leadMessage,
+  inboundMessageId,
+  classificationPayload,
+  intentClass,
+}) {
+  try {
+    const { data: pausedRows, error } = await supabase
+      .from("conversations")
+      .update({ ai_paused: true, ai_pause_reason: handoff.category })
+      .eq("id", conversation.id)
+      .eq("ai_paused", false)
+      .select("id");
+    if (error) log.error("[webhook] knowledge handoff pause failed:", error.code);
+    if (pausedRows?.length) {
+      sendHandoffEmail({
+        user,
+        conversation,
+        reason: handoff.category,
+        leadMessage,
+      }).catch(console.error);
+    }
+    await recordClassification(supabase, inboundMessageId, {
+      ...(classificationPayload || {}),
+      handoff: {
+        category: handoff.category,
+        source: handoff.source,
+        malformed: handoff.malformed === true,
+      },
+    });
+    getPostHogClient().capture({
+      distinctId: user.id,
+      event: "knowledge_handoff",
+      properties: {
+        conversation_id: conversation.id,
+        category: handoff.category,
+        source: handoff.source,
+        malformed: handoff.malformed === true,
+        intent_class: intentClass,
+        owner_emailed: Boolean(pausedRows?.length),
+      },
+    });
+  } catch (err) {
+    log.error("[webhook] knowledge handoff finish failed:", err?.message);
   }
 }
 
@@ -1412,6 +1470,7 @@ async function processIncomingMessage({
   //    could be audited after the fact. A failure now writes a sentinel
   //    recording that we replied anyway (failed_open), which is the existing
   //    fail-open behaviour, unchanged.
+  let classificationPayload;
   {
     const payload = dmIntent
       ? {
@@ -1431,6 +1490,7 @@ async function processIncomingMessage({
     // The escalation check is a separate classifier that does not own this
     // column — carried alongside so its timeouts are recorded too.
     if (escalationOutcome) payload.escalation = escalationOutcome;
+    classificationPayload = payload;
     await recordClassification(supabase, inboundMessageId, payload);
   }
 
@@ -1631,15 +1691,31 @@ async function processIncomingMessage({
     return;
   }
 
-  // Active offer grounds prices and links for every thread (and the
-  // missing-outbound-context block). Best-effort: null on any failure.
-  const activeOffer = await getActiveOffer(supabase, user.id);
+  // Knowledge handoff (business knowledge PR A). Two sources:
+  //   - classifier: the gate saw the medical_question signal. Decided here,
+  //     BEFORE the voice step, so a medical question never gets a voice memo.
+  //   - reply_model: the reply model emitted a handoff marker (medical, or a
+  //     price/availability/policy question the knowledge doesn't cover);
+  //     detected by lintReply after generation, below.
+  // Either way the lead gets the fixed holding text through the normal send
+  // path below, then the thread pauses and the owner is emailed
+  // (finishKnowledgeHandoff). The model's own text is never sent.
+  let handoff =
+    gate.action === "handoff" ? { category: gate.category, source: "classifier", malformed: false } : null;
+
+  // Active offer + business knowledge ground prices, links and policies for
+  // every thread (and the missing-outbound-context block). Best-effort:
+  // empty on any failure.
+  const { activeOffer, knowledge } = handoff
+    ? { activeOffer: null, knowledge: [] }
+    : await loadReplyGrounding(supabase, user.id);
 
   // Build prompt and generate reply
   const systemPrompt = buildSystemPrompt(sc, user.calendly_url, {
     voiceProfile: user.voice_profile,
     conversation,
     activeOffer,
+    knowledge,
     owner: ownerFromUser(user),
     // Only a confident booking moment changes the prompt; see
     // buildSystemPrompt's bookingNowBlock.
@@ -1655,7 +1731,12 @@ async function processIncomingMessage({
   // before generateReply. Falls through to the text path on ANY failure
   // (rate limit, signed-URL error, Meta send error) so the lead is never
   // ghosted by a misfiring voice path.
-  if (dmIntent && dmIntent.confidence >= VOICE_ROUTING_THRESHOLD) {
+  //
+  // Requires a classification: when the classifier errored or timed out
+  // (dmIntent null) the medical signal is unknown, so no voice memo goes out
+  // and the reply model's handoff marker is the medical check. A
+  // classifier-detected handoff skips voice too.
+  if (!handoff && dmIntent && dmIntent.confidence >= VOICE_ROUTING_THRESHOLD) {
     const { snippet: voiceSnippet, reason: voiceSkipReason } =
       await findVoiceSnippetForIntent(user.id, dmIntent.class);
 
@@ -1788,43 +1869,52 @@ async function processIncomingMessage({
   }
 
   let aiReply;
-  try {
-    // 20s + 1 retry: worst case ~41s, which leaves room inside maxDuration=60
-    // for the 8s classifier cap, the insert, the outbound RPC, and the
-    // 10s-capped Meta send — the 30s default could blow the budget after the
-    // reply insert but before the send (orphaned assistant row).
-    aiReply = await generateReply(systemPrompt, messages, {
-      timeout: 20_000,
-      maxRetries: 1,
-    });
-  } catch (err) {
-    console.error("generateReply failed for conversation:", conversation.id, err.message);
-    fireSenderAction(user, senderId, "typing_off");
-    await markSkip(supabase, conversation.id, SKIP.GENERATION_FAILED);
-    getPostHogClient().capture({
-      distinctId: user.id,
-      event: "ai_reply_failed",
-      properties: { conversation_id: conversation.id, error: err.message },
-    });
-    return;
-  }
+  let lint = null;
+  if (!handoff) {
+    try {
+      // 20s + 1 retry: worst case ~41s, which leaves room inside maxDuration=60
+      // for the 8s classifier cap, the insert, the outbound RPC, and the
+      // 10s-capped Meta send — the 30s default could blow the budget after the
+      // reply insert but before the send (orphaned assistant row).
+      aiReply = await generateReply(systemPrompt, messages, {
+        timeout: 20_000,
+        maxRetries: 1,
+      });
+    } catch (err) {
+      console.error("generateReply failed for conversation:", conversation.id, err.message);
+      fireSenderAction(user, senderId, "typing_off");
+      await markSkip(supabase, conversation.id, SKIP.GENERATION_FAILED);
+      getPostHogClient().capture({
+        distinctId: user.id,
+        event: "ai_reply_failed",
+        properties: { conversation_id: conversation.id, error: err.message },
+      });
+      return;
+    }
 
-  // Pre-send filter: rewrites mechanical AI tells (dashes, semicolons,
-  // markdown, filler openers) and blocks leftover {{placeholders}}. See
-  // src/lib/reply-lint.js.
-  const lint = lintReply(aiReply, { bookingLink: user.calendly_url || "" });
-  if (lint.blocked) {
-    fireSenderAction(user, senderId, "typing_off");
-    await markSkip(supabase, conversation.id, SKIP.REPLY_BLOCKED);
-    log.warn("[webhook] reply blocked by lint (placeholder) for conversation:", conversation.id);
-    getPostHogClient().capture({
-      distinctId: user.id,
-      event: "ai_reply_blocked",
-      properties: { conversation_id: conversation.id, reason: "placeholder" },
-    });
-    return;
+    // Pre-send filter: rewrites mechanical AI tells (dashes, semicolons,
+    // markdown, filler openers) and blocks leftover {{placeholders}}. See
+    // src/lib/reply-lint.js.
+    lint = lintReply(aiReply, { bookingLink: user.calendly_url || "" });
+    if (lint.handoff) {
+      // Fail-safe: any marker, well-formed or not, alone or mixed into text,
+      // is a handoff. Never a silent drop, never the model's text.
+      handoff = { ...lint.handoff, source: "reply_model" };
+    } else if (lint.blocked) {
+      fireSenderAction(user, senderId, "typing_off");
+      await markSkip(supabase, conversation.id, SKIP.REPLY_BLOCKED);
+      log.warn("[webhook] reply blocked by lint (placeholder) for conversation:", conversation.id);
+      getPostHogClient().capture({
+        distinctId: user.id,
+        event: "ai_reply_blocked",
+        properties: { conversation_id: conversation.id, reason: "placeholder" },
+      });
+      return;
+    } else {
+      aiReply = lint.text;
+    }
   }
-  aiReply = lint.text;
+  if (handoff) aiReply = holdingTextFor(user);
 
   // Delay floor + pause re-check before the text send. Sits after generation
   // (so the sleep is only the remainder of the target) and BEFORE the reply
@@ -1917,8 +2007,9 @@ async function processIncomingMessage({
         properties: {
           conversation_id: conversation.id,
           reply_length: aiReply.length,
-          lint_fixes: lint.fixes,
-          lint_flags: lint.flags,
+          lint_fixes: lint?.fixes ?? [],
+          lint_flags: lint?.flags ?? [],
+          knowledge_handoff: handoff?.category ?? null,
         },
       });
     } catch (err) {
@@ -1943,6 +2034,24 @@ async function processIncomingMessage({
       });
       // Reply is saved to DB but wasn't delivered — continue to status detection
     }
+  }
+
+  // Knowledge handoff: the holding text was saved (and sent, unless rate
+  // limited or the send failed). Pause the thread for the owner whatever the
+  // send outcome, and skip status detection and the drip: the lead is
+  // waiting on the owner, not on a nudge.
+  if (handoff) {
+    await finishKnowledgeHandoff({
+      supabase,
+      user,
+      conversation,
+      handoff,
+      leadMessage: messageText,
+      inboundMessageId,
+      classificationPayload,
+      intentClass: dmIntent?.class ?? null,
+    });
+    return;
   }
 
   // Status detection — check both AI reply and lead's message

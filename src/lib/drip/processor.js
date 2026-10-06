@@ -6,7 +6,8 @@ import { sendInstagramMessage } from "@/lib/instagram";
 import { markDripStatus } from "@/lib/drip/queue";
 import { buildSystemPrompt } from "@/lib/prompts";
 import { generateReply } from "@/lib/anthropic";
-import { getActiveOffer, ownerFromUser } from "@/lib/active-offer";
+import { ownerFromUser } from "@/lib/active-offer";
+import { loadReplyGrounding } from "@/lib/reply-grounding";
 import { lintReply } from "@/lib/reply-lint";
 
 // The core engine. Re-verifies ALL 8 conditions at FIRE time (state changes
@@ -169,13 +170,16 @@ export async function processDrip(dripRow) {
   // pay generation latency for a row that was going to be skipped anyway.
   let nudgeText = template?.content || null;
   const contentSource = template ? "template" : "generated";
+  let handoffCategory = null;
   if (!nudgeText) {
     try {
+      const { activeOffer, knowledge } = await loadReplyGrounding(admin, user.id);
       const systemPrompt =
         buildSystemPrompt(user.script_config || {}, user.calendly_url, {
           voiceProfile: user.voice_profile,
           conversation: conv,
-          activeOffer: await getActiveOffer(admin, user.id),
+          activeOffer,
+          knowledge,
           owner: ownerFromUser(user),
         }) + DRIP_NUDGE_MODE;
       // `source` must survive this map. It is already selected above, and
@@ -198,9 +202,19 @@ export async function processDrip(dripRow) {
       const lint = lintReply(await generateReply(systemPrompt, history), {
         bookingLink: user.calendly_url || "",
       });
+      // A handoff marker means the last open question needs the owner (the
+      // live reply path already handed it off, or should have). A nudge
+      // would talk over that, so skip it. Never send the marker or holding
+      // text from here.
+      if (lint.handoff) handoffCategory = lint.handoff.category;
       nudgeText = lint.blocked ? null : lint.text;
     } catch (err) {
       console.error("[drip/processor] nudge compose failed:", err?.message);
+    }
+    if (handoffCategory) {
+      return markDripStatus(dripRow.id, "skipped", {
+        skipReason: "handoff_required",
+      });
     }
     // A 900+ char "1-2 sentence nudge" is a failed generation, and truncating
     // could sever a booking link mid-URL — skip rather than send a mangled DM.

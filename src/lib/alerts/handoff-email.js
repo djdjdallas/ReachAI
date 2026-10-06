@@ -13,7 +13,9 @@ import { sendEmail } from "@/lib/notifications";
  *   body is wrapped again, so a Resend outage is invisible to webhook
  *   processing. Callers invoke fire-and-forget with .catch(console.error).
  * - Fires only for pauses a human must act on: the two hands-to-human
- *   reasons, plus do_not_send pauses for hostility/refund/legal and crisis
+ *   reasons, the two knowledge handoffs (medical_question,
+ *   missing_knowledge: the lead was told the owner will get back to them),
+ *   plus do_not_send pauses for hostility/refund/legal and crisis
  *   (see OWNER_ALERT_PAUSE_REASONS in src/lib/dm-intent-gate.js). Injection
  *   and spam do_not_send pauses stay silent, and manual takeover was the
  *   human's own action — neither should email.
@@ -34,6 +36,10 @@ const REASON_COPY = {
     "this message looked hostile or mentioned a refund, chargeback, or legal issue, so the AI stopped replying",
   crisis_signal:
     "this message may be from someone going through something hard, so the AI stopped replying. Please check in personally",
+  medical_question:
+    "they asked a medical or health question, which the AI never answers. It told them you'd get back to them",
+  missing_knowledge:
+    "they asked about a price, availability, or a policy that isn't in your business knowledge. The AI told them you'd get back to them. Add the answer in Settings > Business knowledge so it can answer next time",
 };
 
 function escapeHtml(s) {
@@ -56,7 +62,7 @@ function snippet(text, max = 200) {
  * @param {object} params
  * @param {object} params.user - public.users row (needs email)
  * @param {object} params.conversation - conversations row (needs id, sender_name)
- * @param {"complex_objection"|"qualifying_loop_detected"|"hostile_or_refund"|"crisis_signal"} params.reason
+ * @param {"complex_objection"|"qualifying_loop_detected"|"hostile_or_refund"|"crisis_signal"|"medical_question"|"missing_knowledge"} params.reason
  * @param {string} params.leadMessage - the lead's latest message text
  */
 export async function sendHandoffEmail({ user, conversation, reason, leadMessage }) {

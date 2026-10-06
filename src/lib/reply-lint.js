@@ -1,18 +1,27 @@
 // Pre-send filter for AI-written DMs. Every reply path runs the model's text
-// through lintReply() before it is saved or sent. Leaf module, no imports.
+// through lintReply() before it is saved or sent.
 //
 // Why: prompt rules alone did not hold. 28 of 30 prod replies in the 60 days
 // before 2026-09-28 contained em dashes despite a "NO em dashes" rule
 // (audits/dm-classifier-prompt-audit-2026-09-28.md P1-10). The rule from Dom:
 // replies must never carry em dashes or other tells that a machine wrote them.
 //
-// Three tiers:
+// Four outcomes:
 //   fixes   — mechanical tells rewritten deterministically (dashes,
 //             semicolons, ellipsis character, markdown, filler openers)
 //   flags   — stock AI phrasing we can't safely rewrite; logged for
 //             measurement, text left as-is
 //   blocked — a leftover {{placeholder}}; sending it would be broken, so the
 //             caller must not send
+//   handoff — the model emitted a knowledge-handoff marker (well-formed,
+//             mixed into text, or malformed). Also sets blocked. Callers
+//             must check handoff FIRST and run the handoff path (fixed
+//             holding text, pause, owner email): a marker is never a
+//             silent drop and the model's text is never sent.
+//
+// The only import is handoff-reply.js, itself a leaf.
+
+import { detectHandoff } from "./handoff-reply";
 
 const FILLER_OPENERS = [
   /^(?:great|good|awesome|fair|love (?:this|that)) question[!.,]*\s+/i,
@@ -51,12 +60,18 @@ function capitalizeLike(original, text) {
 /**
  * @param {string} text - raw model output
  * @param {{bookingLink?: string}} [options]
- * @returns {{text: string, fixes: string[], flags: string[], blocked: boolean}}
+ * @returns {{text: string, fixes: string[], flags: string[], blocked: boolean,
+ *   handoff: {category: string, malformed: boolean} | null}}
  */
 export function lintReply(text, { bookingLink = "" } = {}) {
   const fixes = [];
   const flags = [];
   let out = String(text ?? "").trim();
+
+  const handoff = detectHandoff(out);
+  if (handoff) {
+    return { text: "", fixes, flags, blocked: true, handoff };
+  }
 
   // Placeholders: fill the booking link, block anything else left over.
   if (out.includes("{{BOOKING_LINK}}") && bookingLink) {
@@ -116,5 +131,5 @@ export function lintReply(text, { bookingLink = "" } = {}) {
     if (lower.includes(phrase)) flags.push(phrase);
   }
 
-  return { text: out, fixes, flags, blocked };
+  return { text: out, fixes, flags, blocked, handoff: null };
 }

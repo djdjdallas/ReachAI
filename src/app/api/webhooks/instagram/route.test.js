@@ -31,6 +31,13 @@ const notifications = {
   sendBookingAlert: vi.fn(async () => ({})),
 };
 const handoff = { sendHandoffEmail: vi.fn(async () => ({})) };
+const gate = { decideIntentGate: vi.fn(() => ({ action: "reply" })) };
+const lint = { lintReply: vi.fn((t) => ({ text: t, handoff: null })) };
+const matcher = {
+  findVoiceSnippetForIntent: vi.fn(async () => ({ snippet: null, reason: "no_snippet" })),
+  getSendableAudioUrl: vi.fn(async () => null),
+};
+const posthog = { capture: vi.fn() };
 const drip = { cancelDripForConversation: vi.fn(async () => 0) };
 
 vi.mock("next/server", async (importOriginal) => ({
@@ -49,7 +56,7 @@ vi.mock("@/lib/tokens/reconnect", () => ({
 vi.mock("@/lib/notifications", () => notifications);
 vi.mock("@/lib/alerts/handoff-email", () => handoff);
 vi.mock("@/lib/posthog-server", () => ({
-  getPostHogClient: () => ({ capture: vi.fn() }),
+  getPostHogClient: () => posthog,
 }));
 vi.mock("@/lib/logger", () => ({
   log: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
@@ -57,18 +64,13 @@ vi.mock("@/lib/logger", () => ({
 vi.mock("@/lib/webhooks/comment-event", () => ({ handleCommentEvent: vi.fn() }));
 vi.mock("@/lib/dm-intent", () => dmIntent);
 vi.mock("@/lib/intent-status", () => ({ statusForIntent: vi.fn(() => null) }));
-vi.mock("@/lib/dm-intent-gate", () => ({
-  decideIntentGate: vi.fn(() => ({ action: "reply" })),
-}));
+vi.mock("@/lib/dm-intent-gate", () => gate);
 vi.mock("@/lib/active-offer", () => ({
   getActiveOffer: vi.fn(async () => null),
   ownerFromUser: vi.fn(() => ({})),
 }));
-vi.mock("@/lib/reply-lint", () => ({ lintReply: vi.fn((t) => ({ text: t })) }));
-vi.mock("@/lib/voice/matcher", () => ({
-  findVoiceSnippetForIntent: vi.fn(async () => ({ snippet: null, reason: "no_snippet" })),
-  getSendableAudioUrl: vi.fn(async () => null),
-}));
+vi.mock("@/lib/reply-lint", () => lint);
+vi.mock("@/lib/voice/matcher", () => matcher);
 vi.mock("@/lib/voice/sender", () => voice);
 vi.mock("@/lib/drip/queue", () => drip);
 
@@ -316,6 +318,127 @@ describe("late Meta delivery (stored with the lead's real send time)", () => {
   });
 });
 
+describe("knowledge handoff (business knowledge PR A)", () => {
+  const HOLDING = "Good question, let me check on that and get back to you.";
+  const pauses = () =>
+    db.ops.filter((o) => o.table === "conversations" && o.op === "update" && o.payload?.ai_paused === true);
+  const handoffRecords = () =>
+    db.ops
+      .filter((o) => o.table === "messages" && o.op === "update" && o.payload?.intent_classification?.handoff)
+      .map((o) => o.payload.intent_classification);
+
+  it("medical signal from the classifier: holding text, no generation, no voice, paused, owner emailed", async () => {
+    db.state.user = user();
+    gate.decideIntentGate.mockReturnValueOnce({ action: "handoff", category: "medical_question" });
+
+    await POST(inbound("can i get botox while breastfeeding"));
+
+    expect(ai.generateReply).not.toHaveBeenCalled();
+    expect(matcher.findVoiceSnippetForIntent).not.toHaveBeenCalled();
+    expect(voice.sendVoiceMessage).not.toHaveBeenCalled();
+    expect(ig.sendInstagramMessage).toHaveBeenCalledTimes(1);
+    expect(ig.sendInstagramMessage.mock.calls[0][2]).toBe(HOLDING);
+    expect(db.inserted("messages").find((m) => m.role === "assistant")).toMatchObject({
+      content: HOLDING,
+      source: "agent",
+    });
+    expect(pauses()).toEqual([
+      expect.objectContaining({ payload: { ai_paused: true, ai_pause_reason: "medical_question" } }),
+    ]);
+    expect(handoff.sendHandoffEmail).toHaveBeenCalledWith(
+      expect.objectContaining({ reason: "medical_question" })
+    );
+    // Category for PR B's log, never the lead's words.
+    const [rec] = handoffRecords();
+    expect(rec.handoff).toEqual({ category: "medical_question", source: "classifier", malformed: false });
+    expect(JSON.stringify(rec)).not.toContain("breastfeeding");
+    expect(posthog.capture).toHaveBeenCalledWith(
+      expect.objectContaining({
+        event: "knowledge_handoff",
+        properties: expect.objectContaining({ category: "medical_question", source: "classifier" }),
+      })
+    );
+  });
+
+  it("reply-model marker mixed into text: the holding text goes out, never the model's text", async () => {
+    db.state.user = user();
+    ai.generateReply.mockResolvedValueOnce("Usually it's fine! <<HANDOFF:medical_question>>");
+    lint.lintReply.mockReturnValueOnce({
+      text: "",
+      blocked: true,
+      fixes: [],
+      flags: [],
+      handoff: { category: "medical_question", malformed: true },
+    });
+
+    await POST(inbound("i have a bad knee, is your program ok for me"));
+
+    expect(ai.generateReply).toHaveBeenCalled();
+    const sent = ig.sendInstagramMessage.mock.calls.map((c) => c[2]);
+    expect(sent).toEqual([HOLDING]);
+    expect(db.inserted("messages").some((m) => /usually it's fine|HANDOFF/i.test(m.content))).toBe(false);
+    expect(pauses()[0].payload).toEqual({ ai_paused: true, ai_pause_reason: "medical_question" });
+    expect(handoffRecords()[0].handoff).toEqual({
+      category: "medical_question",
+      source: "reply_model",
+      malformed: true,
+    });
+    expect(db.conversationSkipReasons()).not.toContain("reply_blocked");
+  });
+
+  it("missing knowledge: holding text, paused as missing_knowledge, owner emailed", async () => {
+    db.state.user = user();
+    lint.lintReply.mockReturnValueOnce({
+      text: "",
+      blocked: true,
+      fixes: [],
+      flags: [],
+      handoff: { category: "missing_knowledge", malformed: false },
+    });
+
+    await POST(inbound("do you have weekend appointments"));
+
+    expect(ig.sendInstagramMessage.mock.calls[0][2]).toBe(HOLDING);
+    expect(pauses()[0].payload.ai_pause_reason).toBe("missing_knowledge");
+    expect(handoff.sendHandoffEmail).toHaveBeenCalledWith(
+      expect.objectContaining({ reason: "missing_knowledge" })
+    );
+  });
+
+  it("a rate-limited holding reply still pauses the thread for the owner", async () => {
+    db.state.user = user();
+    gate.decideIntentGate.mockReturnValueOnce({ action: "handoff", category: "medical_question" });
+    const rpc = db.rpc;
+    db.rpc = async (name, args) =>
+      name === "check_and_record_outbound" ? { data: false, error: null } : rpc(name, args);
+    try {
+      await POST(inbound("will this fix my anxiety"));
+    } finally {
+      db.rpc = rpc;
+    }
+    expect(ig.sendInstagramMessage).not.toHaveBeenCalled();
+    expect(pauses()[0].payload.ai_pause_reason).toBe("medical_question");
+  });
+
+  it("classifier failure: no voice step (medical signal unknown); the reply model still runs", async () => {
+    db.state.user = user();
+    dmIntent.classifyDMIntent.mockRejectedValueOnce(new Error("classifyDMIntent timed out after 8000ms"));
+
+    await POST(inbound("is this safe while pregnant?"));
+
+    expect(matcher.findVoiceSnippetForIntent).not.toHaveBeenCalled();
+    expect(voice.sendVoiceMessage).not.toHaveBeenCalled();
+    expect(ai.generateReply).toHaveBeenCalled();
+  });
+
+  it("control: a classified message still reaches the voice step", async () => {
+    db.state.user = user();
+    await POST(inbound("how many days a week do we train"));
+    expect(matcher.findVoiceSnippetForIntent).toHaveBeenCalled();
+    expect(pauses()).toHaveLength(0);
+  });
+});
+
 // ── Permissive supabase-js stand-in ──────────────────────────────────────
 // Any chain resolves; the tables the inbound path reads get canned rows, and
 // every write is recorded for assertions.
@@ -425,6 +548,11 @@ function makeDb() {
       return { data: row, error: null };
     }
     if (op === "update") {
+      // A guarded pause (ai_paused false -> true) reports the row it flipped,
+      // which is what tells the route to email the owner.
+      if (table === "conversations" && q.payload?.ai_paused === true) {
+        return { data: [{ id: filterVal(q, "id") }], error: null };
+      }
       return { data: q.single ? null : [], error: null };
     }
     return { data: q.single ? null : [], error: null };

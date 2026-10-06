@@ -72,7 +72,8 @@ vi.mock("@/lib/supabase/admin", () => ({ getSupabaseAdmin: () => admin() }));
 vi.mock("@/lib/anthropic", () => ({ generateReply }));
 vi.mock("@/lib/prompts", () => ({ buildSystemPrompt: () => "prompt" }));
 vi.mock("@/lib/active-offer", () => ({ getActiveOffer: async () => null, ownerFromUser: () => ({}) }));
-vi.mock("@/lib/reply-lint", () => ({ lintReply: (t) => ({ text: t }) }));
+const lintReply = vi.fn((t) => ({ text: t, handoff: null }));
+vi.mock("@/lib/reply-lint", () => ({ lintReply }));
 vi.mock("@/lib/instagram", () => ({ sendInstagramMessage }));
 vi.mock("@/lib/token-utils", () => ({ decryptToken: () => "token" }));
 vi.mock("@/lib/posthog-server", () => ({ getPostHogClient: () => ({ capture: vi.fn() }) }));
@@ -124,5 +125,23 @@ describe("POST /api/ai/reply messaging window", () => {
     expect(res.status).toBe(200);
     expect(sendInstagramMessage).toHaveBeenCalledTimes(1);
     expect(sendInstagramMessage.mock.calls[0][4]).toEqual({ lastInboundAt: at });
+  });
+});
+
+describe("POST /api/ai/reply knowledge handoff", () => {
+  it.each([
+    ["medical_question", /medical or health/],
+    ["missing_knowledge", /business knowledge doesn't cover/],
+  ])("an AI reply that hands off (%s) is refused: 409, nothing saved or sent", async (category, msg) => {
+    state.lastLeadAt = new Date(Date.now() - 3_600_000).toISOString();
+    lintReply.mockReturnValueOnce({ text: "", blocked: true, handoff: { category, malformed: false } });
+    const res = await POST(req({ conversationId: "conv-1", message: "is botox ok while pregnant?", manual: false }));
+    expect(res.status).toBe(409);
+    const body = await res.json();
+    expect(body).toMatchObject({ error: "knowledge_handoff", category });
+    expect(body.message).toMatch(msg);
+    expect(generateReply).toHaveBeenCalledTimes(1);
+    expect(sendInstagramMessage).not.toHaveBeenCalled();
+    expect(ops.some((o) => o.table === "messages" && o.op === "insert")).toBe(false);
   });
 });

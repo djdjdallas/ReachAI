@@ -167,8 +167,22 @@ const SMART_REPLIES = [
 ];
 
 // do_not_send pause reasons (src/lib/dm-pause-reason.js). Before these, a
-// thread paused by the DM classifier showed no chip or banner at all.
+// thread paused by the DM classifier showed no chip or banner at all. The
+// knowledge handoffs (medical_question, missing_knowledge) render the same
+// way: the lead got the holding reply and the owner was emailed.
 const FLAGGED_PAUSES = {
+  medical_question: {
+    chip: "Needs You",
+    chipClass: "bg-amber-50 text-amber-700 border-amber-200",
+    banner:
+      "they asked a medical or health question. The AI told them you'd get back to them. We emailed you. Reply personally.",
+  },
+  missing_knowledge: {
+    chip: "Needs You",
+    chipClass: "bg-amber-50 text-amber-700 border-amber-200",
+    banner:
+      "they asked something your business knowledge doesn't cover. The AI told them you'd get back to them. Reply personally, and add the answer in Settings > Business knowledge.",
+  },
   crisis_signal: {
     chip: "Check In",
     chipClass: "bg-red-50 text-red-600 border-red-200",
@@ -199,7 +213,13 @@ const FLAGGED_PAUSES = {
 };
 
 // Pauses a human has to act on — shown under the "Needs Review" filter.
-const NEEDS_REVIEW_PAUSES = ["complex_objection", "hostile_or_refund", "crisis_signal"];
+const NEEDS_REVIEW_PAUSES = [
+  "complex_objection",
+  "hostile_or_refund",
+  "crisis_signal",
+  "medical_question",
+  "missing_knowledge",
+];
 
 export default function ConversationsPageWrapper() {
   return (

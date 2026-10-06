@@ -3,7 +3,8 @@ import { createClient } from "@/lib/supabase/server";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import { generateReply } from "@/lib/anthropic";
 import { buildSystemPrompt } from "@/lib/prompts";
-import { getActiveOffer, ownerFromUser } from "@/lib/active-offer";
+import { ownerFromUser } from "@/lib/active-offer";
+import { loadReplyGrounding } from "@/lib/reply-grounding";
 import { lintReply } from "@/lib/reply-lint";
 import { sendInstagramMessage } from "@/lib/instagram";
 import { decryptToken } from "@/lib/token-utils";
@@ -184,13 +185,18 @@ export async function POST(request) {
 
       const messages = (messagesDesc || []).reverse();
 
+      const { activeOffer, knowledge } = await loadReplyGrounding(
+        getSupabaseAdmin(),
+        userProfile.id
+      );
       const systemPrompt = buildSystemPrompt(
         userProfile.script_config,
         userProfile.calendly_url,
         {
           voiceProfile: userProfile.voice_profile,
           conversation,
-          activeOffer: await getActiveOffer(getSupabaseAdmin(), userProfile.id),
+          activeOffer,
+          knowledge,
           owner: ownerFromUser(userProfile),
         }
       );
@@ -205,6 +211,22 @@ export async function POST(request) {
       const lint = lintReply(await generateReply(systemPrompt, allMessages), {
         bookingLink: userProfile.calendly_url || "",
       });
+      // Knowledge handoff (medical, or a price/availability/policy question
+      // the knowledge doesn't cover). The coach is the one asking here, so
+      // nothing is sent: they answer it themselves.
+      if (lint.handoff) {
+        return NextResponse.json(
+          {
+            error: "knowledge_handoff",
+            category: lint.handoff.category,
+            message:
+              lint.handoff.category === "medical_question"
+                ? "This is a medical or health question. The AI won't answer it, so reply yourself."
+                : "Your business knowledge doesn't cover this. Reply yourself, or add the answer in Settings > Business knowledge.",
+          },
+          { status: 409 }
+        );
+      }
       if (lint.blocked) {
         return NextResponse.json(
           { error: "The AI reply contained an unfilled placeholder. Try again." },

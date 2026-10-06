@@ -17,6 +17,9 @@ grant usage on schema public to anon, authenticated, service_role;
 -- Supabase's defaults: new functions/tables in public are granted to the browser roles
 alter default privileges in schema public grant execute on functions to anon, authenticated, service_role;
 alter default privileges in schema public grant all on tables to anon, authenticated, service_role;
+create table public.users (id uuid primary key);
+create function public.update_updated_at() returns trigger language plpgsql as $f$ begin new.updated_at = now(); return new; end $f$;
+insert into public.users (id) values ('11111111-1111-1111-1111-111111111111'), ('22222222-2222-2222-2222-222222222222');
 create table public.conversations (id uuid primary key default gen_random_uuid(), user_id uuid not null, status text, dm_counted_at timestamptz, updated_at timestamptz default now());
 create table public.messages (id uuid primary key default gen_random_uuid(), conversation_id uuid not null references public.conversations(id), role text not null, content text not null, created_at timestamptz default now(), provider_message_id text, source text not null default 'agent');
 alter table public.conversations enable row level security; alter table public.messages enable row level security;

@@ -32,6 +32,7 @@ import {
   X,
   Package,
   ChevronRight,
+  BookOpen,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -851,6 +852,30 @@ export default function SettingsPage() {
             <a href="/settings/offer" className="flex items-center gap-2">
               <Package className="h-4 w-4" />
               {activeOffer ? "Edit offer" : "Set up offer"}
+              <ChevronRight className="h-4 w-4" />
+            </a>
+          </Button>
+        </CardFooter>
+      </Card>
+
+      {/* Business knowledge */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-lg flex items-center gap-2">
+            <BookOpen className="h-5 w-5" />
+            Business knowledge
+          </CardTitle>
+          <CardDescription>
+            FAQs, policies and details the AI answers from: what&apos;s
+            included, payment plans, hours, cancellations. Questions it
+            can&apos;t answer from here come to you.
+          </CardDescription>
+        </CardHeader>
+        <CardFooter>
+          <Button asChild variant="outline">
+            <a href="/settings/knowledge" className="flex items-center gap-2">
+              <BookOpen className="h-4 w-4" />
+              Edit business knowledge
               <ChevronRight className="h-4 w-4" />
             </a>
           </Button>
