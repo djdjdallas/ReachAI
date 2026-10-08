@@ -18,6 +18,8 @@ export const INTENT_BADGE_STYLES = {
   NOT_A_LEAD: "bg-stone-100 text-stone-600",
   CRITICAL_NEGATIVE: "bg-red-100 text-red-800",
   SPAM: "bg-stone-100 text-stone-500",
+  // The AI couldn't be reached to classify it (src/lib/ai-unavailable.js).
+  error: "bg-red-100 text-red-800",
 };
 
 export const INTENT_LABELS = {
@@ -28,6 +30,15 @@ export const INTENT_LABELS = {
   NOT_A_LEAD: "Not a lead",
   CRITICAL_NEGATIVE: "Negative",
   SPAM: "Spam",
+  error: "Not classified (AI unavailable)",
+};
+
+// Why a comment DM was skipped for a lead already in a conversation
+// (comment_to_dm_log.dispatch_error, src/lib/comment-open-thread.js).
+const OPEN_THREAD_COPY = {
+  "open_thread:paused": "Their conversation is paused or handed to you, so no comment DM was added to it.",
+  "open_thread:active": "They messaged you in the last 6 hours, so no comment DM was added to the conversation.",
+  "open_thread:awaiting_reply": "You already sent them a message in the last 24 hours and they haven't replied yet, so no second DM was sent.",
 };
 
 export function relativeTime(iso) {
@@ -135,8 +146,22 @@ export function Outcome({ log }) {
           DM skipped
         </Pill>
         <p className="text-xs text-stone-500 mt-1">
-          They&apos;re already in a conversation with you (messaging in the last
-          6 hours, or handed to you), so no comment DM was added to it.
+          {OPEN_THREAD_COPY[log.dispatch_error] ||
+            "They're already in a conversation with you, so no comment DM was added to it."}
+        </p>
+      </div>
+    );
+  }
+
+  if (log.decided_action === "ai_unavailable") {
+    return (
+      <div className="flex items-start gap-2">
+        <Pill tone="red" icon={XCircle}>
+          AI unavailable, needs a reply
+        </Pill>
+        <p className="text-xs text-stone-500 mt-1">
+          The AI couldn&apos;t be reached, so nothing was sent. It&apos;s in
+          Needs attention: reply to them yourself.
         </p>
       </div>
     );

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { findLeadThread, ACTIVE_LEAD_WINDOW_MS } from "./comment-open-thread";
+import { findLeadThread, ACTIVE_LEAD_WINDOW_MS, AWAITING_REPLY_WINDOW_MS } from "./comment-open-thread";
 import { fakeDb } from "@/lib/test-utils/fake-db";
 
 const NOW = Date.parse("2026-10-08T12:00:00.000Z");
@@ -23,14 +23,36 @@ describe("findLeadThread", () => {
     expect(await state(setup({}, [lead(ACTIVE_LEAD_WINDOW_MS + 1000)]))).toBe("quiet");
     expect(await state(setup({}, [lead(2 * 86_400_000)]))).toBe("quiet");
   });
-  it("our own recent messages, the owner's, or another thread's don't make it active", async () => {
-    const db = setup({}, [
-      { id: "a", conversation_id: "c1", role: "assistant", source: "agent", created_at: at(1000) },
-      { id: "b", conversation_id: "c1", role: "assistant", source: "manual", created_at: at(1000) },
-      lead(1000, "c-other"),
-    ]);
-    expect(await state(db)).toBe("quiet");
+  it("only the lead's own messages make it active; another thread's don't count", async () => {
+    expect(await state(setup({}, [lead(1000, "c-other")]))).toBe("quiet");
   });
+
+  describe("awaiting_reply: we sent something in the last 24h and they haven't replied since", () => {
+    const out = (msAgo, source = "agent") => ({ id: `o${msAgo}${source}`, conversation_id: "c1", role: "assistant", source, created_at: at(msAgo) });
+    const H = 3_600_000;
+    it.each([
+      ["our comment DM 4 minutes ago, no reply (the 2026-10-08 double DM)", [out(4 * 60_000)]],
+      ["a drip 20h ago", [out(20 * H, "drip")]],
+      ["the owner's own message 2h ago", [out(2 * H, "manual")]],
+      ["they wrote 30h ago, we answered 20h ago", [lead(30 * H), out(20 * H)]],
+    ])("%s", async (_l, messages) => {
+      expect(await state(setup({}, messages))).toBe("awaiting_reply");
+    });
+    it("they replied after our message, more than 6h ago: quiet", async () => {
+      expect(await state(setup({}, [out(20 * H), lead(10 * H)]))).toBe("quiet");
+    });
+    it("they replied after our message within 6h: active", async () => {
+      expect(await state(setup({}, [out(3 * H), lead(2 * H)]))).toBe("active");
+    });
+    it("our last message over 24h ago: quiet", async () => {
+      expect(await state(setup({}, [out(25 * H)]))).toBe("quiet");
+      expect(await state(setup({}, [out(AWAITING_REPLY_WINDOW_MS + 1000)]))).toBe("quiet");
+    });
+    it("paused wins over awaiting_reply", async () => {
+      expect(await state(setup({ ai_paused: true }, [out(60_000)]))).toBe("paused");
+    });
+  });
+
   it("returns the conversation", async () => {
     expect((await check(setup({}))).conversation).toMatchObject({ id: "c1", ai_paused: false });
   });

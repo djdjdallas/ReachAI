@@ -64,8 +64,15 @@ function setup(userOverrides = {}, extra = {}) {
       outbound_webhook_events: [],
       lead_profiles: [],
       dm_drip_queue: extra.drips || [],
+      email_events: extra.emailEvents || [],
     },
-    { unique: { conversations: "instagram_sender_id", lead_profiles: "conversation_id", posts: "ig_media_id" }, failOn: extra.failOn }
+    {
+      unique: { conversations: "instagram_sender_id", lead_profiles: "conversation_id", posts: "ig_media_id" },
+      failOn: extra.failOn,
+      // Column defaults the pipeline relies on (the open-thread check reads
+      // our messages' created_at).
+      defaults: { messages: () => ({ created_at: new Date().toISOString() }) },
+    }
   );
   db.rpc = async () => ({ data: true, error: null });
 }
@@ -485,7 +492,9 @@ describe("comment-to-DM: managed-account auto-watch", () => {
   it("the second comment uses the row the first one created", async () => {
     setup(MANAGED, { templates: tpl, monitoringRows: [] });
     await handleCommentEvent(...onNewPost("c-1"));
-    await handleCommentEvent(...onNewPost("c-2"));
+    // A different commenter (the same one would now be awaiting a reply).
+    const [entry, change] = onNewPost("c-2");
+    await handleCommentEvent(entry, { ...change, value: { ...change.value, from: { id: "other-igsid", username: "kim" } } });
     expect(monitoring()).toHaveLength(1);
     expect(sendPrivateReplyToComment).toHaveBeenCalledTimes(2);
     expect(getOwnMedia).toHaveBeenCalledTimes(1);
@@ -653,8 +662,15 @@ describe("comment-to-DM: lead with an existing thread (managed accounts)", () =>
     expect(db.tables.comment_to_dm_log.at(-1)).toMatchObject({ decided_action: "dm_skipped_open_thread", dispatch_error: "open_thread:active", dispatched: false });
   });
 
-  it("only the lead's own messages count: an AI message 1 hour ago with the lead last seen 7 hours ago is quiet", async () => {
+  it("our message 1 hour ago, the lead last seen 7 hours ago (before it): awaiting their reply, skipped", async () => {
     setup(MANAGED, { templates: tpl, conversations: [thread()], messages: [leadMsg(ago(7)), aiMsg(ago(1))] });
+    await handleCommentEvent(...comment());
+    expect(sendPrivateReplyToComment).not.toHaveBeenCalled();
+    expect(db.tables.comment_to_dm_log.at(-1)).toMatchObject({ decided_action: "dm_skipped_open_thread", dispatch_error: "open_thread:awaiting_reply" });
+  });
+
+  it("the lead replied 7 hours ago, after our message 30 hours ago: quiet, contextual reply", async () => {
+    setup(MANAGED, { templates: tpl, conversations: [thread()], messages: [aiMsg(ago(30)), leadMsg(ago(7))] });
     await handleCommentEvent(...comment());
     expect(sent()).toEqual(["Contextual reply."]);
   });
@@ -958,5 +974,147 @@ describe("comment-to-DM: AI-written first DM (managed accounts)", () => {
     await handleCommentEvent(...comment("c-1", "how much?"));
     expect(generateCommentReply).not.toHaveBeenCalled();
     expect(db.tables.comment_to_dm_log.at(-1)).toMatchObject({ decided_action: "queue_review" });
+  });
+});
+
+describe("comment-to-DM: two comments minutes apart (live 2026-10-08, comments 18059428940796919 / 17964457908197950)", () => {
+  beforeEach(() => decideAction.mockImplementation(actual.decideAction));
+
+  const CLINIC = { billing_managed: true, calendly_url: "https://calendly.com/x", treatment_categories: TREATMENTS };
+  const tpl = [{ creator_id: "u1", intent_class: "HIGH_INTENT", template: "Hey! Book: {{BOOKING_LINK}}" }];
+  const onPost = (id, media, text) => {
+    const [entry, change] = comment(id, text);
+    return [entry, { ...change, value: { ...change.value, media: { id: media } } }];
+  };
+  const posts = [{ id: "p2", creator_id: "u1", caption: "Lip filler week", ig_media_id: "media-2" }];
+  const monitoringRows = [
+    { creator_id: "u1", post_id: "p1", enabled: true, actions_per_class: null },
+    { creator_id: "u1", post_id: "p2", enabled: true, actions_per_class: null },
+  ];
+
+  it("the second comment, before any reply, gets no second DM (awaiting_reply); both are recorded", async () => {
+    setup(CLINIC, { templates: tpl, posts, monitoringRows });
+    await handleCommentEvent(...onPost("18059428940796919", "media-1", "how much?"));
+    await handleCommentEvent(...onPost("17964457908197950", "media-2", "and this one?"));
+    expect(sendPrivateReplyToComment).toHaveBeenCalledTimes(1);
+    expect(generateCommentReply).toHaveBeenCalledTimes(1);
+    expect(db.tables.comment_classifications.map((c) => c.ig_comment_id)).toEqual(["18059428940796919", "17964457908197950"]);
+    expect(db.tables.comment_to_dm_log.map((l) => [l.decided_action, l.dispatch_error ?? null])).toEqual([
+      ["dm", null],
+      ["dm_skipped_open_thread", "open_thread:awaiting_reply"],
+    ]);
+  });
+
+  it("the second comment names another treatment: the lead's treatment is updated and lead_updated emitted", async () => {
+    setup(CLINIC, { templates: tpl, posts, monitoringRows, webhooks: [WEBHOOK] });
+    await handleCommentEvent(...onPost("c-a", "media-1", "how much is botox?"));
+    expect(db.tables.lead_profiles[0].treatment_interest).toBe("botox");
+    await handleCommentEvent(...onPost("c-b", "media-2", "actually how much for lip filler?"));
+    expect(sendPrivateReplyToComment).toHaveBeenCalledTimes(1);
+    const conv = db.tables.conversations[0].id;
+    expect(db.tables.lead_profiles).toEqual([expect.objectContaining({ conversation_id: conv, treatment_interest: "lip_filler" })]);
+    expect(db.tables.outbound_webhook_events).toEqual([
+      expect.objectContaining({ event_type: "lead_updated", conversation_id: conv, dedupe_key: `lead_updated:${conv}:treatment:lip_filler` }),
+    ]);
+  });
+
+  it("a second comment naming no treatment keeps the first one", async () => {
+    setup(CLINIC, { templates: tpl, posts, monitoringRows, webhooks: [WEBHOOK] });
+    await handleCommentEvent(...onPost("c-a", "media-1", "how much is botox?"));
+    await handleCommentEvent(...onPost("c-b", "media-2", "so cute"));
+    expect(db.tables.lead_profiles[0].treatment_interest).toBe("botox");
+    expect(db.tables.outbound_webhook_events).toHaveLength(0);
+  });
+
+  it("once they reply to the DM, a later comment is judged by their reply (active within 6h)", async () => {
+    setup(CLINIC, { templates: tpl, posts, monitoringRows });
+    await handleCommentEvent(...onPost("c-a", "media-1", "how much?"));
+    // Their DM reply, as the inbound webhook stores it on the same thread.
+    db.tables.messages.push({ id: "m-in", conversation_id: db.tables.conversations[0].id, role: "user", source: "lead", content: "yes please", created_at: new Date().toISOString() });
+    await handleCommentEvent(...onPost("c-b", "media-2", "how much?"));
+    expect(sendPrivateReplyToComment).toHaveBeenCalledTimes(1);
+    expect(db.tables.comment_to_dm_log.at(-1)).toMatchObject({ dispatch_error: "open_thread:active" });
+  });
+});
+
+describe("comment-to-DM: AI unavailable (Anthropic call fails)", () => {
+  beforeEach(() => decideAction.mockImplementation(actual.decideAction));
+
+  const CLINIC = { billing_managed: true, calendly_url: "https://calendly.com/x" };
+  const tpl = [{ creator_id: "u1", intent_class: "HIGH_INTENT", template: "Hey! Book: {{BOOKING_LINK}}" }];
+  const credit = () => Object.assign(new Error("Your credit balance is too low to access the Anthropic API."), { status: 400 });
+  const alerts = () => sendEmail.mock.calls.filter(([m]) => /AI unavailable/.test(m.subject));
+
+  it("classification fails: saved as class 'error', shown in Comment Activity, handed off, operator alerted, nothing sent", async () => {
+    setup(CLINIC, { templates: tpl, webhooks: [WEBHOOK] });
+    classifyComment.mockRejectedValueOnce(credit());
+    await handleCommentEvent(...comment("c-1", "how much?"));
+    expect(sendPrivateReplyToComment).not.toHaveBeenCalled();
+    const row = db.tables.comment_classifications[0];
+    expect(row).toMatchObject({ ig_comment_id: "c-1", comment_text: "how much?", class: "error", confidence: 0, signals: ["ai_unavailable"] });
+    expect(row.reasoning).toBe("AI unavailable, needs a reply: 400 Your credit balance is too low to access the Anthropic API.");
+    expect(db.tables.comment_to_dm_log).toEqual([
+      expect.objectContaining({
+        comment_classification_id: row.id,
+        decided_action: "ai_unavailable",
+        dispatched: false,
+        dispatch_error: "AI unavailable, needs a reply (400 Your credit balance is too low to access the Anthropic API.)",
+      }),
+    ]);
+    expect(db.tables.outbound_webhook_events).toEqual([
+      expect.objectContaining({
+        event_type: "handoff_requested",
+        conversation_id: null,
+        data: { reason: "other", comment_lead: { id: row.id, instagram_username: "jane" } },
+      }),
+    ]);
+    expect(alerts()).toHaveLength(1);
+    expect(alerts()[0][0].html).toContain("failed at: comment_classification");
+  });
+
+  it("the operator is alerted at most once an hour per account", async () => {
+    setup(CLINIC, { templates: tpl });
+    classifyComment.mockRejectedValueOnce(credit()).mockRejectedValueOnce(credit());
+    await handleCommentEvent(...comment("c-1", "how much?"));
+    await handleCommentEvent(...comment("c-2", "price?"));
+    expect(db.tables.comment_classifications.map((c) => c.class)).toEqual(["error", "error"]);
+    expect(alerts()).toHaveLength(1);
+    expect(db.tables.email_events).toEqual([expect.objectContaining({ user_id: "u1", event_type: "ai_unavailable_alert" })]);
+  });
+
+  it("an alert sent over an hour ago doesn't hold back a new one", async () => {
+    setup(CLINIC, { templates: tpl, emailEvents: [{ id: "e0", user_id: "u1", event_type: "ai_unavailable_alert", sent_at: new Date(Date.now() - 61 * 60_000).toISOString() }] });
+    classifyComment.mockRejectedValueOnce(credit());
+    await handleCommentEvent(...comment("c-1", "how much?"));
+    expect(alerts()).toHaveLength(1);
+  });
+
+  it("the reply fails: no template goes out, the comment is handed off with the reason", async () => {
+    setup(CLINIC, { templates: tpl, webhooks: [WEBHOOK] });
+    generateCommentReply.mockResolvedValueOnce({ kind: "failed", reason: "ai_unavailable", error: credit() });
+    await handleCommentEvent(...comment("c-1", "how much?"));
+    expect(sendPrivateReplyToComment).not.toHaveBeenCalled();
+    expect(db.tables.comment_classifications[0].class).toBe("HIGH_INTENT");
+    expect(db.tables.comment_to_dm_log.at(-1)).toMatchObject({ decided_action: "ai_unavailable", dispatched: false });
+    expect(db.tables.outbound_webhook_events).toEqual([expect.objectContaining({ event_type: "handoff_requested", data: expect.objectContaining({ reason: "other" }) })]);
+    expect(alerts()[0][0].html).toContain("failed at: comment_reply");
+  });
+
+  it("a reply blocked for content (not an outage) still falls back to the template", async () => {
+    setup(CLINIC, { templates: tpl });
+    generateCommentReply.mockResolvedValueOnce({ kind: "failed", reason: "lint_blocked" });
+    await handleCommentEvent(...comment("c-1", "how much?"));
+    expect(sendPrivateReplyToComment.mock.calls[0][2]).toBe(`${LINE} Book: https://calendly.com/x`);
+    expect(alerts()).toHaveLength(0);
+  });
+
+  it("coach accounts unchanged: a classifier failure saves nothing and alerts no one", async () => {
+    setup({ business_name: null, billing_managed: false }, { templates: tpl, webhooks: [WEBHOOK] });
+    classifyComment.mockRejectedValueOnce(credit());
+    await handleCommentEvent(...comment("c-1", "how much?"));
+    expect(db.tables.comment_classifications).toHaveLength(0);
+    expect(db.tables.comment_to_dm_log).toHaveLength(0);
+    expect(db.tables.outbound_webhook_events).toHaveLength(0);
+    expect(alerts()).toHaveLength(0);
   });
 });

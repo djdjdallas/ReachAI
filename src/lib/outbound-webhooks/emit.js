@@ -62,3 +62,65 @@ export async function emitCommentHandoff(admin, { userId, classificationId, conv
     return { emitted: false };
   }
 }
+
+// One outbox row, as public.outbound_emit writes it. Never throws.
+async function emitEvent(admin, { userId, type, dedupeKey, conversationId = null, data = {} }) {
+  try {
+    const { data: hook, error: hookErr } = await admin
+      .from("outbound_webhooks")
+      .select("enabled, event_types")
+      .eq("user_id", userId)
+      .maybeSingle();
+    if (hookErr || !hook?.enabled || !(hook.event_types || []).includes(type)) return { emitted: false };
+    const { error } = await admin
+      .from("outbound_webhook_events")
+      .upsert(
+        { user_id: userId, event_type: type, dedupe_key: dedupeKey, conversation_id: conversationId, data },
+        { onConflict: "user_id,dedupe_key", ignoreDuplicates: true }
+      );
+    if (error) {
+      console.warn("[outbound-emit] insert failed:", { type, code: error.code });
+      return { emitted: false };
+    }
+    return { emitted: true };
+  } catch (err) {
+    console.warn("[outbound-emit] threw:", { type, error: err?.message });
+    return { emitted: false };
+  }
+}
+
+/**
+ * handoff_requested for a DM thread with no pause behind it (the AI was
+ * unreachable, src/lib/ai-unavailable.js). One per thread per hour, keyed
+ * by the caller.
+ *
+ * @param {object} admin
+ * @param {{userId: string, conversationId: string, dedupeKey: string, reason?: string}} args
+ */
+export function emitThreadHandoff(admin, { userId, conversationId, dedupeKey, reason = "other" }) {
+  return emitEvent(admin, {
+    userId,
+    type: "handoff_requested",
+    dedupeKey,
+    conversationId,
+    data: { reason: HANDOFF_REASONS.includes(reason) ? reason : "other" },
+  });
+}
+
+/**
+ * lead_updated for a treatment_interest that CHANGED (the database trigger
+ * only emits when it goes from null to a value). Same dedupe key as the
+ * trigger, 'lead_updated:<conversation id>:treatment:<key>', so the two
+ * never double up.
+ *
+ * @param {object} admin
+ * @param {{userId: string, conversationId: string, treatmentKey: string}} args
+ */
+export function emitTreatmentUpdated(admin, { userId, conversationId, treatmentKey }) {
+  return emitEvent(admin, {
+    userId,
+    type: "lead_updated",
+    dedupeKey: `lead_updated:${conversationId}:treatment:${treatmentKey}`,
+    conversationId,
+  });
+}

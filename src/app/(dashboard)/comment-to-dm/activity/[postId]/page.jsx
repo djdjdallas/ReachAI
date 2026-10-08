@@ -198,7 +198,7 @@ function summarize(activity) {
       s.failed += 1;
     } else if (log.decided_action === "skip" || log.decided_action === "dm_skipped_open_thread") {
       s.skipped += 1;
-    } else if (log.decided_action === "queue_review") {
+    } else if (log.decided_action === "queue_review" || log.decided_action === "ai_unavailable") {
       s.pending += 1;
     }
   }

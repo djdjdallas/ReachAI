@@ -18,7 +18,9 @@ import { isBillingManaged } from "@/lib/billing/managed";
 import { findLeadThread } from "@/lib/comment-open-thread";
 import { generateCommentReply } from "@/lib/comment-contextual-reply";
 import { cancelDripForConversation } from "@/lib/drip/queue";
-import { captureLeadFacts, matchTreatment, normalizeTreatmentCategories } from "@/lib/outbound-webhooks/lead-capture";
+import { captureLeadFacts, matchTreatment, normalizeTreatmentCategories, setTreatmentInterest } from "@/lib/outbound-webhooks/lead-capture";
+import { emitTreatmentUpdated } from "@/lib/outbound-webhooks/emit";
+import { AI_UNAVAILABLE_NOTE, alertAiUnavailable, describeAiError, handOffCommentAiUnavailable } from "@/lib/ai-unavailable";
 
 // Phase 2 of the comment-to-DM pipeline. Receives a single change object
 // from a Meta Instagram webhook payload (entry.changes[i] where
@@ -121,6 +123,9 @@ async function processCommentEvent(entry, change) {
   // Managed accounts auto-watch posts with no monitoring row
   // (src/lib/comment-auto-watch.js); everything they add is behind this.
   const autoWatch = isAutoWatchAccount(ownerUser);
+  // Managed accounts (users.billing_managed): AI-written DMs, the open-thread
+  // rules, and a handoff instead of silence when the AI is unreachable.
+  const managed = isBillingManaged(ownerUser);
   const autoWatchToken = autoWatch ? decryptOrNull(ownerUser.meta_page_access_token) : null;
   const autoWatchAccount = { igAccountId: igbaId, username: ownerUser.instagram_username || null };
 
@@ -193,7 +198,7 @@ async function processCommentEvent(entry, change) {
     caption: postRow.caption || "",
   });
 
-  const { classification, raw, latencyMs } = await classifyComment({
+  const classifyArgs = {
     commentText,
     postCaption: postRow.caption || "",
     // The bundle's offer snapshot. This was hard-wired to null, so the
@@ -201,7 +206,35 @@ async function processCommentEvent(entry, change) {
     // STRONG") classified LOW_SIGNAL and price questions UNCERTAIN.
     // scripts/replay-comment-classifier.mjs: 11/14 → 14/14 with the offer.
     creatorOffer: offerSnapshot,
-  });
+  };
+  // Coach accounts: a classifier failure throws as before (logged by
+  // handleCommentEvent). Managed accounts: the comment is saved as class
+  // 'error', shown in Comment Activity and handed to the clinic.
+  let classified;
+  if (managed) {
+    const startedAt = Date.now();
+    try {
+      classified = await classifyComment(classifyArgs);
+    } catch (err) {
+      await recordAiUnavailableComment(admin, {
+        ownerUser,
+        creatorId,
+        postId: postRow.id,
+        bundleId: bundle.id,
+        commentId,
+        fromId,
+        fromUsername,
+        commentText,
+        latencyMs: Date.now() - startedAt,
+        stage: "comment_classification",
+        error: err,
+      });
+      return;
+    }
+  } else {
+    classified = await classifyComment(classifyArgs);
+  }
+  const { classification, raw, latencyMs } = classified;
 
   // Honors the COMMENT_CLASSIFIER_ENABLED env kill switch.
   if (classification?.skipped) {
@@ -283,7 +316,6 @@ async function processCommentEvent(entry, change) {
 
   // Managed accounts: the DM is written by the AI (below), and a
   // treatment the comment names wins over the post's tag.
-  const managed = isBillingManaged(ownerUser);
   const commentTreatmentKey = managed
     ? matchTreatment(normalizeTreatmentCategories(ownerUser.treatment_categories), commentText)
     : null;
@@ -354,6 +386,24 @@ async function processCommentEvent(entry, change) {
         instagramUsername: fromUsername,
         treatmentKey: leadTreatmentKey,
       });
+      // A treatment this comment names is the lead's latest interest, even
+      // over one already recorded: update it and emit lead_updated (the
+      // trigger only covers null -> value).
+      if (commentTreatmentKey) {
+        const { changed } = await setTreatmentInterest(admin, {
+          userId: creatorId,
+          conversationId: thread.conversation.id,
+          treatmentKey: commentTreatmentKey,
+          treatmentCategories: ownerUser.treatment_categories,
+        });
+        if (changed) {
+          await emitTreatmentUpdated(admin, {
+            userId: creatorId,
+            conversationId: thread.conversation.id,
+            treatmentKey: commentTreatmentKey,
+          });
+        }
+      }
     } else if (thread) {
       quietThread = thread.conversation;
     }
@@ -368,8 +418,9 @@ async function processCommentEvent(entry, change) {
     decided_action: decision.action,
     rendered_dm: decision.rendered,
     dispatched: false,
-    // Which open-thread state skipped it ("open_thread:paused" or
-    // "open_thread:active"); comment_to_dm_log has no reason column.
+    // Which open-thread state skipped it ("open_thread:paused",
+    // "open_thread:active" or "open_thread:awaiting_reply");
+    // comment_to_dm_log has no reason column.
     ...(decision.action === "dm_skipped_open_thread" ? { dispatch_error: decision.reason } : {}),
   };
 
@@ -469,6 +520,25 @@ async function processCommentEvent(entry, change) {
     });
     if (gen.kind === "reply" || gen.kind === "handoff") replyText = gen.text;
     if (gen.kind === "handoff") knowledgeHandoff = gen.category;
+    // The AI is unreachable: no template, no DM. The clinic gets it.
+    if (gen.kind === "failed" && gen.reason === "ai_unavailable") {
+      await logDecision(
+        admin,
+        {
+          ...logFields,
+          decided_action: "ai_unavailable",
+          rendered_dm: null,
+          dispatched: false,
+          dispatch_error: `${AI_UNAVAILABLE_NOTE} (${describeAiError(gen.error)})`.slice(0, 500),
+          dispatch_retryable: false,
+        },
+        { commentId }
+      );
+      console.warn("[comment-event] ai unavailable at comment reply: handed off", { commentId, error: describeAiError(gen.error) });
+      await handOffCommentAiUnavailable(admin, { userId: creatorId, classificationId: persisted.id, fromId, fromUsername });
+      await alertAiUnavailable(admin, { user: ownerUser, stage: "comment_reply", error: gen.error });
+      return;
+    }
     console.log("[comment-event] ai comment reply", {
       commentId,
       thread: quietThread ? "quiet" : "none",
@@ -661,6 +731,58 @@ async function findOrCreatePost(admin, creatorId, mediaId) {
     return null;
   }
   return inserted;
+}
+
+// A managed account's comment the classifier couldn't reach the AI for: saved
+// as class 'error' (so it shows in Comment Activity), logged as
+// 'ai_unavailable', handed to the clinic (handoff_requested), and the
+// operator alerted (at most once an hour). Nothing is sent to the lead.
+async function recordAiUnavailableComment(admin, { ownerUser, creatorId, postId, bundleId, commentId, fromId, fromUsername, commentText, latencyMs, stage, error }) {
+  const detail = describeAiError(error);
+  console.warn("[comment-event] ai unavailable at classification: handed off", { commentId, error: detail });
+  const { data: row, error: insertErr } = await admin
+    .from("comment_classifications")
+    .insert({
+      creator_id: creatorId,
+      post_id: postId,
+      bundle_id: bundleId,
+      ig_comment_id: commentId,
+      ig_commenter_username: fromUsername,
+      comment_text: commentText,
+      class: "error",
+      confidence: 0,
+      language: null,
+      reasoning: `${AI_UNAVAILABLE_NOTE}: ${detail}`.slice(0, 500),
+      signals: ["ai_unavailable"],
+      model: CLASSIFIER_MODEL,
+      classifier_version: CLASSIFIER_VERSION,
+      input_tokens: 0,
+      output_tokens: 0,
+      cache_read_tokens: 0,
+      cache_creation_tokens: 0,
+      latency_ms: latencyMs,
+    })
+    .select()
+    .single();
+  if (insertErr) {
+    console.error("[comment-event] error classification insert failed:", { commentId, error: insertErr.message });
+  } else {
+    await logDecision(
+      admin,
+      {
+        comment_classification_id: row.id,
+        creator_id: creatorId,
+        decided_action: "ai_unavailable",
+        rendered_dm: null,
+        dispatched: false,
+        dispatch_error: `${AI_UNAVAILABLE_NOTE} (${detail})`.slice(0, 500),
+        dispatch_retryable: false,
+      },
+      { commentId }
+    );
+    await handOffCommentAiUnavailable(admin, { userId: creatorId, classificationId: row.id, fromId, fromUsername });
+  }
+  await alertAiUnavailable(admin, { user: ownerUser, stage, error });
 }
 
 function decryptOrNull(enc) {

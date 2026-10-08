@@ -208,13 +208,30 @@ function compose(event, p) {
       };
     }
 
+    // The AI can't be reached for a managed account (src/lib/ai-unavailable.js):
+    // comments and DMs are being handed to the clinic unanswered. At most
+    // once per hour per account.
+    case "ai_unavailable":
+      return {
+        subject: `[clinchd] ⚠️ AI unavailable: ${p.businessName || p.email || "unknown account"}`,
+        body: [
+          `account: ${p.businessName || "unknown"} (${p.email || "no email"})`,
+          `user id: ${p.userId || "unknown"}`,
+          `failed at: ${p.stage || "unknown"}`,
+          `error: ${p.error || "unknown"}`,
+          "",
+          "Nothing is being sent to leads. Each comment or DM is handed off to the clinic (Needs attention).",
+          "Check the Anthropic account (credits, status) and the logs.",
+        ].join("\n"),
+      };
+
     default:
       return null;
   }
 }
 
 /**
- * @param {"signup"|"instagram_connected"|"subscription_started"|"cancellation_requested"|"subscription_canceled"|"account_deleted"|"checkout_unlinked"|"duplicate_subscription_canceled"} event
+ * @param {"signup"|"instagram_connected"|"subscription_started"|"cancellation_requested"|"subscription_canceled"|"account_deleted"|"checkout_unlinked"|"duplicate_subscription_canceled"|"ai_unavailable"} event
  * @param {object} payload - event-specific fields, see compose()
  * @returns {Promise<boolean>} true when the founder EMAIL was accepted by
  *   Resend. Still never throws; the boolean lets a caller with a retryable

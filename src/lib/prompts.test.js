@@ -254,6 +254,8 @@ describe("business persona: amounts, prices and deal terms only as written", () 
     expect(p).toContain("DEAL TERMS ONLY AS WRITTEN");
     expect(p).toMatch(/caption of the post they commented on/);
     expect(p).toMatch(/Never add an end date, a duration/);
+    expect(p).toMatch(/Never add urgency \("sooner rather than later"/);
+    expect(p).toMatch(/never apply a discount to a price yourself/);
   });
   it("coach prompts don't get these rules (unchanged)", () => {
     for (const rule of ["NEVER ESTIMATE AMOUNTS OR DOSAGE", "PRICES ONLY AS WRITTEN", "DEAL TERMS ONLY AS WRITTEN"]) {
