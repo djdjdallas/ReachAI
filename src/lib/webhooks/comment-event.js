@@ -12,6 +12,7 @@ import { persistCommentDmConversation } from "@/lib/comment-dm-conversation";
 import { disclosureLine, prepareFirstMessage, releaseFirstMessage } from "@/lib/persona-disclosure";
 import { isPersonaAccount } from "@/lib/persona";
 import { applyClinicCommentRules, handOffClinicComment, prepareClinicComment } from "@/lib/verticals/clinic/comment";
+import { isUndefinedColumn } from "@/lib/db-errors";
 
 // Phase 2 of the comment-to-DM pipeline. Receives a single change object
 // from a Meta Instagram webhook payload (entry.changes[i] where
@@ -112,18 +113,13 @@ async function processCommentEvent(entry, change) {
   // classification row. posts.ig_media_id is UNIQUE so it doubles as the
   // dedup key here.
   const adOriginalPost =
-    originalMediaId && originalMediaId !== mediaId ? await findPost(admin, originalMediaId) : null;
+    originalMediaId && originalMediaId !== mediaId ? await findPost(admin, originalMediaId, creatorId) : null;
   const postRow = adOriginalPost || (await findOrCreatePost(admin, creatorId, mediaId));
   if (!postRow) return;
 
   // 6. Read the per-post monitoring toggle. Saves Anthropic spend when a
   // coach has turned the post off OR hasn't opted-in yet.
-  const { data: monitoringRow } = await admin
-    .from("post_monitoring_settings")
-    .select("enabled, actions_per_class, last_public_reply_text, treatment_key")
-    .eq("creator_id", creatorId)
-    .eq("post_id", postRow.id)
-    .maybeSingle();
+  const monitoringRow = await readMonitoringRow(admin, creatorId, postRow.id);
 
   if (!monitoringRow) {
     console.log("[comment-event] no monitoring row — skipping", { commentId, postId: postRow.id });
@@ -505,12 +501,35 @@ async function findOrCreatePost(admin, creatorId, mediaId) {
   return inserted;
 }
 
-async function findPost(admin, mediaId) {
-  const { data } = await admin
-    .from("posts")
-    .select("id, caption, ig_media_id")
-    .eq("ig_media_id", mediaId)
-    .maybeSingle();
+// The post's monitoring row, or null. treatment_key comes from migration
+// 20261011120000: if the code is live before that migration runs, the
+// select fails with 42703, and a failed read here would skip every
+// account's comments as "no monitoring row". Retry without it (no tag).
+async function readMonitoringRow(admin, creatorId, postId) {
+  const read = (cols) =>
+    admin
+      .from("post_monitoring_settings")
+      .select(cols)
+      .eq("creator_id", creatorId)
+      .eq("post_id", postId)
+      .maybeSingle();
+  const base = "enabled, actions_per_class, last_public_reply_text";
+  const { data, error } = await read(`${base}, treatment_key`);
+  if (!isUndefinedColumn(error)) return data || null;
+  console.warn("[comment-event] treatment_key column missing (migration 20261011120000 not run); reading without it");
+  const retry = await read(base);
+  return retry.data ? { ...retry.data, treatment_key: null } : null;
+}
+
+// The posts row for a media id. With creatorId, only that creator's row:
+// an ad's original_media_id must name one of the account's own posts, so
+// another creator's row falls through to the ad's own media.
+// findOrCreatePost looks up unscoped, as before (ig_media_id is UNIQUE, so
+// a scoped miss there would fail the insert).
+async function findPost(admin, mediaId, creatorId = null) {
+  let q = admin.from("posts").select("id, caption, ig_media_id").eq("ig_media_id", mediaId);
+  if (creatorId) q = q.eq("creator_id", creatorId);
+  const { data } = await q.maybeSingle();
   return data || null;
 }
 

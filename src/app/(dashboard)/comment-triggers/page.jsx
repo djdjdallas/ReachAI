@@ -6,6 +6,7 @@ import { canUseCommentToDM } from "@/lib/comment-to-dm-gate";
 import { decryptToken } from "@/lib/token-utils";
 import PostPicker from "./PostPicker";
 import { templatesByClassFrom } from "./templates";
+import { loadMonitoringByMediaId } from "./monitoring";
 import { ACCESS_COLUMNS } from "@/lib/billing/status";
 import { isPersonaAccount } from "@/lib/persona";
 import { treatmentOptions } from "@/lib/verticals/clinic/treatment";
@@ -112,32 +113,7 @@ export default async function CommentTriggersPage() {
   // Pull existing monitoring rows so we can render toggle state. Join via
   // posts table to map ig_media_id → enabled/actions_per_class.
   const admin = getSupabaseAdmin();
-  const { data: postRows } = await admin
-    .from("posts")
-    .select(
-      `
-      id,
-      ig_media_id,
-      post_monitoring_settings ( enabled, actions_per_class, treatment_key )
-    `
-    )
-    .eq("creator_id", user.id)
-    .not("ig_media_id", "is", null);
-
-  const monitoringByMediaId = {};
-  for (const row of postRows || []) {
-    if (!row?.ig_media_id) continue;
-    const ms = Array.isArray(row.post_monitoring_settings)
-      ? row.post_monitoring_settings[0]
-      : row.post_monitoring_settings;
-    if (ms) {
-      monitoringByMediaId[row.ig_media_id] = {
-        enabled: ms.enabled !== false,
-        actions_per_class: ms.actions_per_class || null,
-        treatment_key: ms.treatment_key || null,
-      };
-    }
-  }
+  const monitoringByMediaId = await loadMonitoringByMediaId(admin, user.id);
 
   // Surface "no template written" warnings inline next to each per-intent
   // dropdown. Without this, picking "Send DM" for a class without a template

@@ -59,9 +59,10 @@ const newId = () => `00000000-0000-4000-8000-${String(++seq).padStart(12, "0")}`
 
 /**
  * @param {Record<string, object[]>} tables
- * @param {{unique?: Record<string, string>, rpc?: Record<string, Function>, failOn?: Record<string, object>}} [opts]
+ * @param {{unique?: Record<string, string>, rpc?: Record<string, Function>, failOn?: Record<string, object|Function>}} [opts]
  *   unique: table → conflict column for insert/upsert
- *   failOn: table → error returned by every statement on that table
+ *   failOn: table → error returned by every statement on that table, or a
+ *     function (statement) → error|null to fail only some statements
  */
 export function fakeDb(tables, opts = {}) {
   const calls = [];
@@ -142,7 +143,8 @@ export function fakeDb(tables, opts = {}) {
 
       function run() {
         calls.push({ table, op: st.op, data: st.data, filters: st.filters });
-        if (opts.failOn?.[table]) return { data: null, error: opts.failOn[table] };
+        const fail = typeof opts.failOn?.[table] === "function" ? opts.failOn[table](st) : opts.failOn?.[table];
+        if (fail) return { data: null, error: fail };
         const uniq = st.onConflict || opts.unique?.[table];
         if (st.op === "select") {
           let hit = rows.filter((r) => matches(r, st.filters));

@@ -47,7 +47,7 @@ function setup(userOverrides = {}, extra = {}) {
           ...userOverrides,
         },
       ],
-      posts: [{ id: "p1", caption: "Botox special", ig_media_id: "media-1", permalink: "https://instagram.com/p/abc" }],
+      posts: [{ id: "p1", creator_id: "u1", caption: "Botox special", ig_media_id: "media-1", permalink: "https://instagram.com/p/abc" }, ...(extra.posts || [])],
       post_monitoring_settings: [{ creator_id: "u1", post_id: "p1", enabled: true, actions_per_class: {}, ...extra.monitoring }],
       comment_classifications: [],
       dm_templates: extra.templates || [],
@@ -59,7 +59,7 @@ function setup(userOverrides = {}, extra = {}) {
       outbound_webhook_events: [],
       lead_profiles: [],
     },
-    { unique: { conversations: "instagram_sender_id", lead_profiles: "conversation_id" } }
+    { unique: { conversations: "instagram_sender_id", lead_profiles: "conversation_id" }, failOn: extra.failOn }
   );
   db.rpc = async () => ({ data: true, error: null });
 }
@@ -382,11 +382,64 @@ describe("comment-to-DM: ad comments", () => {
     expect(db.tables.posts.map((p) => p.ig_media_id)).toEqual(["media-1"]);
   });
 
+  it("an original_media_id that is another creator's post falls through to the ad's own media", async () => {
+    setup({ business_name: null }, {
+      templates: tpl,
+      posts: [{ id: "p-foreign", creator_id: "someone-else", caption: "theirs", ig_media_id: "media-foreign" }],
+    });
+    await handleCommentEvent(...adComment("media-foreign"));
+    // Not classified against the foreign post; the ad's media got its own
+    // row (unwatched, so skipped).
+    expect(sendPrivateReplyToComment).not.toHaveBeenCalled();
+    expect(db.tables.comment_classifications).toHaveLength(0);
+    expect(db.tables.posts.find((p) => p.ig_media_id === "ad-media-9")).toMatchObject({ creator_id: "u1" });
+  });
+
   it("an ad whose original post Clinchd doesn't know falls back to the ad's media (not watched: skipped)", async () => {
     setup({ business_name: null }, { templates: tpl });
     await handleCommentEvent(...adComment("media-unknown"));
     expect(sendPrivateReplyToComment).not.toHaveBeenCalled();
     expect(db.tables.comment_classifications).toHaveLength(0);
     expect(db.tables.posts.map((p) => p.ig_media_id)).toEqual(["media-1", "ad-media-9"]);
+  });
+});
+
+describe("comment-to-DM: deploy before migration 20261011120000", () => {
+  beforeEach(() => decideAction.mockImplementation(actual.decideAction));
+
+  // PostgREST's answer to a select naming a column the table doesn't have.
+  const noTreatmentColumn = {
+    post_monitoring_settings: (st) =>
+      st.op === "select" && /treatment_key/.test(st.cols || "")
+        ? { code: "42703", message: "column post_monitoring_settings.treatment_key does not exist" }
+        : null,
+  };
+
+  it("a coach comment still DMs when treatment_key doesn't exist yet", async () => {
+    setup({ business_name: null, calendly_url: "https://calendly.com/x" }, {
+      templates: [{ creator_id: "u1", intent_class: "HIGH_INTENT", template: "Book: {{BOOKING_LINK}}" }],
+      failOn: noTreatmentColumn,
+    });
+    await handleCommentEvent(...comment());
+    expect(sendPrivateReplyToComment.mock.calls[0][2]).toBe("Book: https://calendly.com/x");
+  });
+
+  it("a clinic comment still DMs, rendered as untagged", async () => {
+    setup({ treatment_categories: TREATMENTS }, {
+      templates: [{ creator_id: "u1", intent_class: "HIGH_INTENT", template: "Thanks for asking about {{TREATMENT|our services}}!" }],
+      monitoring: { treatment_key: "lip_filler" },
+      failOn: noTreatmentColumn,
+    });
+    await handleCommentEvent(...comment());
+    expect(sendPrivateReplyToComment.mock.calls[0][2]).toBe(`${LINE} Thanks for asking about our services!`);
+  });
+
+  it("any other read error still skips (unchanged)", async () => {
+    setup({ business_name: null }, {
+      templates: [{ creator_id: "u1", intent_class: "HIGH_INTENT", template: "Book" }],
+      failOn: { post_monitoring_settings: { code: "57014", message: "statement timeout" } },
+    });
+    await handleCommentEvent(...comment());
+    expect(sendPrivateReplyToComment).not.toHaveBeenCalled();
   });
 });
