@@ -1,6 +1,6 @@
 // In-memory stand-in for the supabase-js query builder with select, insert,
 // upsert, update and delete, for tests of the outbound webhook helpers.
-// Filters: eq, neq, is, in, lt, ilike (with % wildcards), not(col,'is',null).
+// Filters: eq, neq, is, in, lt, gte, ilike (with % wildcards), not(col,'is',null).
 // Modifiers: order (ignored unless asked), limit, single, maybeSingle.
 // Each statement applies in one synchronous step, like a single SQL
 // statement. Not a database: no constraints except an optional unique key
@@ -33,6 +33,8 @@ function matches(row, filters) {
         return v !== null;
       case "in":
         return val.includes(v);
+      case "gte":
+        return v !== null && v >= val;
       case "lt":
         return v !== null && v < val;
       case "ilike":
@@ -111,6 +113,7 @@ export function fakeDb(tables, opts = {}) {
         is: (c, v) => (st.filters.push(["is", c, v]), builder),
         in: (c, v) => (st.filters.push(["in", c, v]), builder),
         lt: (c, v) => (st.filters.push(["lt", c, v]), builder),
+        gte: (c, v) => (st.filters.push(["gte", c, v]), builder),
         ilike: (c, v) => (st.filters.push(["ilike", c, v]), builder),
         not: (c, op, v) => {
           if (op !== "is" || v !== null) throw new Error("fake-db: only not(col, 'is', null)");

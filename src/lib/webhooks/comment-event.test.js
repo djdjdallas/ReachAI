@@ -594,3 +594,75 @@ describe("comment-to-DM: managed-account auto-watch", () => {
     });
   });
 });
+
+describe("comment-to-DM: open-thread skip (managed accounts)", () => {
+  beforeEach(() => decideAction.mockImplementation(actual.decideAction));
+
+  const tpl = [{ creator_id: "u1", intent_class: "HIGH_INTENT", template: "Hey! Book: {{BOOKING_LINK}}" }];
+  const MANAGED = { business_name: null, billing_managed: true, calendly_url: "https://calendly.com/x" };
+  const ago = (days) => new Date(Date.now() - days * 86_400_000).toISOString();
+  const thread = (fields = {}) => ({ id: "conv-1", user_id: "u1", instagram_sender_id: LEAD, origin: "inbound", ai_paused: false, disclosed_at: "2026-10-01T00:00:00.000Z", ...fields });
+  const msg = (created_at, id = "m-1") => ({ id, conversation_id: "conv-1", role: "user", source: "lead", content: "hi", created_at });
+
+  it("a paused thread: no DM, logged dm_skipped_open_thread", async () => {
+    setup(MANAGED, { templates: tpl, conversations: [thread({ ai_paused: true })] });
+    await handleCommentEvent(...comment());
+    expect(sendPrivateReplyToComment).not.toHaveBeenCalled();
+    expect(db.tables.comment_to_dm_log.at(-1)).toMatchObject({ decided_action: "dm_skipped_open_thread", dispatched: false, rendered_dm: null });
+    expect(db.tables.messages).toHaveLength(0);
+  });
+
+  it("a thread with a message in the last 7 days: no DM", async () => {
+    setup(MANAGED, { templates: tpl, conversations: [thread()], messages: [msg(ago(30), "m-old"), msg(ago(6), "m-recent")] });
+    await handleCommentEvent(...comment());
+    expect(sendPrivateReplyToComment).not.toHaveBeenCalled();
+    expect(db.tables.comment_to_dm_log.at(-1)).toMatchObject({ decided_action: "dm_skipped_open_thread" });
+    expect(db.tables.messages).toHaveLength(2);
+  });
+
+  it("an old thread (last message over 7 days ago): the DM sends into it", async () => {
+    setup(MANAGED, { templates: tpl, conversations: [thread()], messages: [msg(ago(8))] });
+    await handleCommentEvent(...comment());
+    expect(sendPrivateReplyToComment.mock.calls[0][2]).toBe("Hey! Book: https://calendly.com/x");
+    expect(db.tables.comment_to_dm_log.at(-1)).toMatchObject({ decided_action: "dm", dispatched: true });
+    expect(db.tables.messages.filter((m) => m.conversation_id === "conv-1")).toHaveLength(2);
+  });
+
+  it("no thread at all: the DM sends", async () => {
+    setup(MANAGED, { templates: tpl });
+    await handleCommentEvent(...comment());
+    expect(sendPrivateReplyToComment).toHaveBeenCalledTimes(1);
+  });
+
+  it("a complaint on an open thread still hands off, about that thread", async () => {
+    setup({ billing_managed: true }, { templates: tpl, webhooks: [WEBHOOK], conversations: [thread()], messages: [msg(ago(1))] });
+    classifyAs("HIGH_INTENT", 0.95);
+    await handleCommentEvent(...comment("c-1", "my lips are still lumpy, how do I fix this?"));
+    expect(sendPrivateReplyToComment).not.toHaveBeenCalled();
+    expect(db.tables.comment_to_dm_log.at(-1)).toMatchObject({ decided_action: "queue_review" });
+    expect(db.tables.outbound_webhook_events).toEqual([
+      expect.objectContaining({ event_type: "handoff_requested", conversation_id: "conv-1", data: { reason: "other" } }),
+    ]);
+  });
+
+  it("a skipped DM still seeds the thread's treatment from the post tag (lead_updated)", async () => {
+    setup({ billing_managed: true, treatment_categories: TREATMENTS }, {
+      templates: tpl,
+      webhooks: [WEBHOOK],
+      monitoring: { treatment_key: "lip_filler" },
+      conversations: [thread({ ai_paused: true })],
+    });
+    await handleCommentEvent(...comment("c-1", "how much?"));
+    expect(sendPrivateReplyToComment).not.toHaveBeenCalled();
+    expect(db.tables.lead_profiles).toEqual([
+      expect.objectContaining({ conversation_id: "conv-1", treatment_interest: "lip_filler", instagram_username: "jane" }),
+    ]);
+  });
+
+  it("coach accounts unchanged: a recent thread still gets the DM", async () => {
+    setup({ ...MANAGED, billing_managed: false }, { templates: tpl, conversations: [thread()], messages: [msg(ago(1))] });
+    await handleCommentEvent(...comment());
+    expect(sendPrivateReplyToComment).toHaveBeenCalledTimes(1);
+    expect(db.tables.comment_to_dm_log.at(-1)).toMatchObject({ decided_action: "dm", dispatched: true });
+  });
+});

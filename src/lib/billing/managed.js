@@ -49,3 +49,13 @@ export function billingPageView({ access, hasStripeCustomer }) {
     accessUnavailable: !access,
   };
 }
+
+/**
+ * Whether the account is managed (users.billing_managed): billed outside
+ * Clinchd. Server-only column (protect_server_user_columns). Gates the
+ * managed-account comment features (auto-watch, open-thread skip).
+ * @param {{billing_managed?: boolean}|null} user - users row
+ */
+export function isBillingManaged(user) {
+  return user?.billing_managed === true;
+}
