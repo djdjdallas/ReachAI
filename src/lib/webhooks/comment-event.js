@@ -14,6 +14,9 @@ import { isPersonaAccount } from "@/lib/persona";
 import { applyClinicCommentRules, handOffClinicComment, prepareClinicComment } from "@/lib/verticals/clinic/comment";
 import { isUndefinedColumn } from "@/lib/db-errors";
 import { autoWatchPost, ingestOwnedPost, isAdComment, isAutoWatchAccount } from "@/lib/comment-auto-watch";
+import { isBillingManaged } from "@/lib/billing/managed";
+import { findOpenThread } from "@/lib/comment-open-thread";
+import { captureLeadFacts } from "@/lib/outbound-webhooks/lead-capture";
 
 // Phase 2 of the comment-to-DM pipeline. Receives a single change object
 // from a Meta Instagram webhook payload (entry.changes[i] where
@@ -290,6 +293,24 @@ async function processCommentEvent(entry, change) {
   let clinicHandoff = null;
   if (clinic) {
     ({ decision, handoff: clinicHandoff } = applyClinicCommentRules({ classification, commentText, decision }));
+  }
+
+  // Managed accounts: no comment template into a thread that is paused or
+  // active in the last 7 days (src/lib/comment-open-thread.js). The lead
+  // facts the DM would have recorded still are, so the post's treatment
+  // tag reaches the lead (lead_updated). Complaints were routed above.
+  if (decision.action === "dm" && isBillingManaged(ownerUser)) {
+    const open = await findOpenThread(admin, { userId: creatorId, igsid: fromId });
+    if (open) {
+      decision = { action: "dm_skipped_open_thread", rendered: null, reason: `open_thread:${open.reason}` };
+      await captureLeadFacts(admin, {
+        userId: creatorId,
+        conversationId: open.conversationId,
+        text: commentText,
+        instagramUsername: fromUsername,
+        treatmentKey: clinic?.treatmentKey || null,
+      });
+    }
   }
 
   // 11. Decide branches:

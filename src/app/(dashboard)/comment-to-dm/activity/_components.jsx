@@ -128,6 +128,20 @@ export function Outcome({ log }) {
     );
   }
 
+  if (log.decided_action === "dm_skipped_open_thread") {
+    return (
+      <div className="flex items-start gap-2">
+        <Pill tone="gray" icon={MinusCircle}>
+          DM skipped
+        </Pill>
+        <p className="text-xs text-stone-500 mt-1">
+          They&apos;re already in a conversation with you (active this week, or
+          handed to you), so no comment DM was added to it.
+        </p>
+      </div>
+    );
+  }
+
   if (log.decided_action === "queue_review") {
     return (
       <div className="flex items-start gap-2">

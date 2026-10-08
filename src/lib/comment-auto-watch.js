@@ -14,10 +14,11 @@
 // auto-watched: the picker can't show it.
 
 import { getOwnMedia } from "@/lib/instagram";
+import { isBillingManaged } from "@/lib/billing/managed";
 
-/** Whether the account gets auto-watch. */
+/** Whether the account gets auto-watch: managed accounts. */
 export function isAutoWatchAccount(user) {
-  return user?.billing_managed === true;
+  return isBillingManaged(user);
 }
 
 /**

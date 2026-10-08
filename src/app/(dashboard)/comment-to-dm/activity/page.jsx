@@ -86,7 +86,7 @@ async function getPostsWithActivity(supabase, userId) {
       agg.dispatched += 1;
     } else if (log.decided_action === "dm" && log.dispatched === false) {
       agg.failed += 1;
-    } else if (log.decided_action === "skip") {
+    } else if (log.decided_action === "skip" || log.decided_action === "dm_skipped_open_thread") {
       agg.skipped += 1;
     } else if (log.decided_action === "queue_review") {
       agg.pending += 1;
