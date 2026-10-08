@@ -4,7 +4,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 // 24h window must be refused up front (409 with the agreed copy), with no
 // DM quota, no model call, no saved row and no send.
 
-const state = { lastLeadAt: null };
+const state = { lastLeadAt: null, userLinks: {} };
 const ops = [];
 
 function admin() {
@@ -31,6 +31,7 @@ function admin() {
                       instagram_business_account_id: "igba",
                       meta_page_access_token: "enc",
                       script_config: { greeting: "Hi" },
+                      ...state.userLinks,
                     },
                     error: null,
                   });
@@ -70,7 +71,8 @@ vi.mock("@/lib/supabase/server", () => ({
 }));
 vi.mock("@/lib/supabase/admin", () => ({ getSupabaseAdmin: () => admin() }));
 vi.mock("@/lib/anthropic", () => ({ generateReply }));
-vi.mock("@/lib/prompts", () => ({ buildSystemPrompt: () => "prompt" }));
+const buildSystemPrompt = vi.fn(() => "prompt");
+vi.mock("@/lib/prompts", () => ({ buildSystemPrompt }));
 vi.mock("@/lib/active-offer", () => ({ getActiveOffer: async () => null, ownerFromUser: () => ({}) }));
 const lintReply = vi.fn((t) => ({ text: t, handoff: null }));
 vi.mock("@/lib/reply-lint", () => ({ lintReply }));
@@ -87,6 +89,9 @@ const req = (body) =>
 
 beforeEach(() => {
   ops.length = 0;
+  state.userLinks = {};
+  buildSystemPrompt.mockClear();
+  lintReply.mockClear();
   generateReply.mockClear();
   sendInstagramMessage.mockClear();
 });
@@ -143,5 +148,19 @@ describe("POST /api/ai/reply knowledge handoff", () => {
     expect(generateReply).toHaveBeenCalledTimes(1);
     expect(sendInstagramMessage).not.toHaveBeenCalled();
     expect(ops.some((o) => o.table === "messages" && o.op === "insert")).toBe(false);
+  });
+});
+
+describe("POST /api/ai/reply booking link", () => {
+  it.each([
+    ["booking_url first", { booking_url: "https://book.sole.example/now", calendly_url: "https://calendly.com/sole/consult" }, "https://book.sole.example/now"],
+    ["Calendly as the fallback", { booking_url: null, calendly_url: "https://calendly.com/sole/consult" }, "https://calendly.com/sole/consult"],
+  ])("an AI reply uses %s", async (_label, links, expected) => {
+    state.lastLeadAt = new Date(Date.now() - 3_600_000).toISOString();
+    state.userLinks = links;
+    const res = await POST(req({ conversationId: "conv-1", message: "how do I book?", manual: false }));
+    expect(res.status).toBe(200);
+    expect(buildSystemPrompt.mock.calls[0][1]).toBe(expected);
+    expect(lintReply.mock.calls[0][1]).toEqual({ bookingLink: expected });
   });
 });

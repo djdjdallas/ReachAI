@@ -5,7 +5,11 @@ import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import { canUseCommentToDM } from "@/lib/comment-to-dm-gate";
 import { decryptToken } from "@/lib/token-utils";
 import PostPicker from "./PostPicker";
+import { templatesByClassFrom } from "./templates";
+import { loadMonitoringByMediaId } from "./monitoring";
 import { ACCESS_COLUMNS } from "@/lib/billing/status";
+import { isPersonaAccount } from "@/lib/persona";
+import { treatmentOptions } from "@/lib/verticals/clinic/treatment";
 
 export const metadata = {
   title: "Comment to DM · Clinchd",
@@ -39,7 +43,7 @@ export default async function CommentTriggersPage() {
 
   const { data: profile } = await supabase
     .from("users")
-    .select(`email, instagram_business_account_id, meta_page_access_token, ${ACCESS_COLUMNS}`)
+    .select(`email, instagram_business_account_id, meta_page_access_token, business_name, treatment_categories, ${ACCESS_COLUMNS}`)
     .eq("id", user.id)
     .maybeSingle();
 
@@ -109,46 +113,20 @@ export default async function CommentTriggersPage() {
   // Pull existing monitoring rows so we can render toggle state. Join via
   // posts table to map ig_media_id → enabled/actions_per_class.
   const admin = getSupabaseAdmin();
-  const { data: postRows } = await admin
-    .from("posts")
-    .select(
-      `
-      id,
-      ig_media_id,
-      post_monitoring_settings ( enabled, actions_per_class )
-    `
-    )
-    .eq("creator_id", user.id)
-    .not("ig_media_id", "is", null);
-
-  const monitoringByMediaId = {};
-  for (const row of postRows || []) {
-    if (!row?.ig_media_id) continue;
-    const ms = Array.isArray(row.post_monitoring_settings)
-      ? row.post_monitoring_settings[0]
-      : row.post_monitoring_settings;
-    if (ms) {
-      monitoringByMediaId[row.ig_media_id] = {
-        enabled: ms.enabled !== false,
-        actions_per_class: ms.actions_per_class || null,
-      };
-    }
-  }
+  const monitoringByMediaId = await loadMonitoringByMediaId(admin, user.id);
 
   // Surface "no template written" warnings inline next to each per-intent
   // dropdown. Without this, picking "Send DM" for a class without a template
   // silently downgrades to queue_review at runtime via decideAction().
   const { data: templates } = await admin
     .from("dm_templates")
-    .select("intent_class, body")
+    .select("intent_class, template")
     .eq("creator_id", user.id);
 
-  const templatesByClass = {};
-  for (const t of templates || []) {
-    if (!t?.intent_class) continue;
-    templatesByClass[t.intent_class] =
-      typeof t.body === "string" && t.body.trim().length > 0;
-  }
+  const templatesByClass = templatesByClassFrom(templates);
+
+  // Clinic accounts can tag a post with one of their treatments.
+  const treatments = isPersonaAccount(profile) ? treatmentOptions(profile) : [];
 
   return (
     <PostPicker
@@ -156,6 +134,7 @@ export default async function CommentTriggersPage() {
       monitoringByMediaId={monitoringByMediaId}
       mediaError={mediaError}
       templatesByClass={templatesByClass}
+      treatments={treatments}
     />
   );
 }

@@ -208,6 +208,11 @@ competitor name from visible body copy and re-anchored to the human-setter cost.
     - Calendly name matching normalizes the invitee's name but not the stored `sender_name`, so extra whitespace there means no match: a safe miss (booking-only lead).
     - The linter's time-range rule rewrites "4pm — 5pm is booked" as "4pm to 5pm is booked".
   - **Not yet seen:** a delivery to the real Mara Rue receiver (not built yet). The runbook's `test` step is the first check.
+- **Comment-to-DM clinic follow-ups (2026-10-08, PR #57).** Fixed in #57: ad comments now match the watched post on `media.original_media_id`; AI replies use `booking_url` before `calendly_url`; the picker's "No template written" check reads `template`. Still open:
+  - **Daily digest of comment handoffs.** #57 sends no per-comment email: clinic comment handoffs go only to `handoff_requested` (the clinic's Needs attention in Mara Rue). Coach accounts and clinics without a webhook get nothing beyond the activity page. Build a once-a-day email listing the day's handed-off comments (complaints first), skipped on days with none.
+  - **Auto-watch new posts.** Today every post needs a manual toggle. Option: a per-account flag (managed accounts only) that treats a post with no monitoring row as watched with default actions, instead of skipping it. Same no-row branch in `comment-event.js`; no cron or media polling needed.
+  - **Multi-comment / open-thread dedup.** One commenter on several posts gets a private reply per comment: each reply is a separate Meta send, and every opener is appended to the same thread (keyed on the IGSID). A lead mid-conversation who comments gets a template dropped into the live thread. Option: skip the DM (log `dm_skipped_open_thread`) when the commenter's thread had a message in the last N days, or already got a comment opener.
+  - **Dynamic ads:** Meta omits the ad id for them; if `original_media_id` is missing too, their comments still skip as "no monitoring row". Check on the first clinic ad.
 
 ---
 

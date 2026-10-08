@@ -1,3 +1,4 @@
+import { bookingLinkFor } from "@/lib/booking-url";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import { classifyComment, CLASSIFIER_MODEL, CLASSIFIER_VERSION } from "@/lib/classifier";
 import { buildContextBundle } from "@/lib/contextBundle";
@@ -9,6 +10,9 @@ import { ACCESS_COLUMNS } from "@/lib/billing/status";
 import { maybePostPublicReply } from "@/lib/comment-public-reply";
 import { persistCommentDmConversation } from "@/lib/comment-dm-conversation";
 import { disclosureLine, prepareFirstMessage, releaseFirstMessage } from "@/lib/persona-disclosure";
+import { isPersonaAccount } from "@/lib/persona";
+import { applyClinicCommentRules, handOffClinicComment, prepareClinicComment } from "@/lib/verticals/clinic/comment";
+import { isUndefinedColumn } from "@/lib/db-errors";
 
 // Phase 2 of the comment-to-DM pipeline. Receives a single change object
 // from a Meta Instagram webhook payload (entry.changes[i] where
@@ -43,6 +47,11 @@ async function processCommentEvent(entry, change) {
   //              parent_id?, created_time? } }
   const commentId = value.id || null;
   const mediaId = value.media?.id || value.media_id || null;
+  // Ads and boosted posts: media.id is the ad's media, and
+  // original_media_id is the organic post the ad runs (absent for dynamic
+  // ads). Watched posts are organic (the picker lists /me/media), so the
+  // comment belongs to that post when Clinchd knows it.
+  const originalMediaId = value.media?.original_media_id || null;
   const fromUsername = value.from?.username || null;
   // The commenter's Instagram-scoped id. This is the SAME id the inbound
   // messaging webhook sees as event.sender.id, so it's the key we persist on
@@ -74,7 +83,7 @@ async function processCommentEvent(entry, change) {
   const { data: ownerUser, error: ownerErr } = await admin
     .from("users")
     .select(
-      `id, email, meta_page_access_token, instagram_business_account_id, comment_public_reply_enabled, business_name, assistant_name, ${ACCESS_COLUMNS}`
+      `id, email, meta_page_access_token, instagram_business_account_id, comment_public_reply_enabled, business_name, assistant_name, treatment_categories, ${ACCESS_COLUMNS}`
     )
     .eq("instagram_business_account_id", igbaId)
     .maybeSingle();
@@ -103,17 +112,14 @@ async function processCommentEvent(entry, change) {
   // its post_id to look up monitoring settings and to FK the
   // classification row. posts.ig_media_id is UNIQUE so it doubles as the
   // dedup key here.
-  const postRow = await findOrCreatePost(admin, creatorId, mediaId);
+  const adOriginalPost =
+    originalMediaId && originalMediaId !== mediaId ? await findPost(admin, originalMediaId, creatorId) : null;
+  const postRow = adOriginalPost || (await findOrCreatePost(admin, creatorId, mediaId));
   if (!postRow) return;
 
   // 6. Read the per-post monitoring toggle. Saves Anthropic spend when a
   // coach has turned the post off OR hasn't opted-in yet.
-  const { data: monitoringRow } = await admin
-    .from("post_monitoring_settings")
-    .select("enabled, actions_per_class, last_public_reply_text")
-    .eq("creator_id", creatorId)
-    .eq("post_id", postRow.id)
-    .maybeSingle();
+  const monitoringRow = await readMonitoringRow(admin, creatorId, postRow.id);
 
   if (!monitoringRow) {
     console.log("[comment-event] no monitoring row — skipping", { commentId, postId: postRow.id });
@@ -215,7 +221,7 @@ async function processCommentEvent(entry, change) {
       .eq("creator_id", creatorId),
     admin
       .from("users")
-      .select("calendly_url")
+      .select("booking_url, calendly_url")
       .eq("id", creatorId)
       .maybeSingle(),
     admin
@@ -235,12 +241,26 @@ async function processCommentEvent(entry, change) {
     }
   }
 
-  const decision = decideAction(classification, monitoringRow, templates, {
+  // Clinic accounts (business_name set) apply their own rules around the
+  // shared decision: src/lib/verticals/clinic/comment.js. Coach accounts
+  // never enter that module.
+  const clinic = isPersonaAccount(ownerUser)
+    ? prepareClinicComment({ ownerUser, monitoringRow, templates })
+    : null;
+
+  let decision = decideAction(classification, monitoringRow, clinic ? clinic.templates : templates, {
     postCaption: postRow.caption || "",
     commenterName: fromUsername,
     offerName: offerRow?.offer_name || null,
-    bookingLink: userRow?.calendly_url || null,
+    // Same link the booking_link_sent detection looks for: the account's
+    // booking_url, else its Calendly link.
+    bookingLink: bookingLinkFor(userRow) || null,
   });
+
+  let clinicHandoff = null;
+  if (clinic) {
+    ({ decision, handoff: clinicHandoff } = applyClinicCommentRules({ classification, commentText, decision }));
+  }
 
   // 11. Decide branches:
   //   - Non-DM action: log decision, exit (no Graph API call).
@@ -261,7 +281,16 @@ async function processCommentEvent(entry, change) {
       class: classification.class,
       decided_action: decision.action,
       reason: decision.reason,
+      ...(clinicHandoff ? { clinicHandoff } : {}),
     });
+    if (clinicHandoff) {
+      await handOffClinicComment(admin, {
+        userId: creatorId,
+        classificationId: persisted.id,
+        fromId,
+        fromUsername,
+      });
+    }
     return;
   }
 
@@ -407,6 +436,7 @@ async function processCommentEvent(entry, change) {
       disclosedNow: Boolean(disclosureLine(ownerUser)) && dmText.includes(disclosureLine(ownerUser)),
       providerMessageId: result.messageId || null,
       commentText,
+      treatmentKey: clinic?.treatmentKey || null,
     });
 
     // Optional public reply under the trigger comment ("sent! check your
@@ -449,12 +479,7 @@ async function processCommentEvent(entry, change) {
 // is UNIQUE so a parallel webhook for a different comment on the same post
 // will hit the existing row.
 async function findOrCreatePost(admin, creatorId, mediaId) {
-  const { data: existing } = await admin
-    .from("posts")
-    .select("id, caption, ig_media_id")
-    .eq("ig_media_id", mediaId)
-    .maybeSingle();
-
+  const existing = await findPost(admin, mediaId);
   if (existing) return existing;
 
   const { data: inserted, error } = await admin
@@ -474,6 +499,38 @@ async function findOrCreatePost(admin, creatorId, mediaId) {
     return null;
   }
   return inserted;
+}
+
+// The post's monitoring row, or null. treatment_key comes from migration
+// 20261011120000: if the code is live before that migration runs, the
+// select fails with 42703, and a failed read here would skip every
+// account's comments as "no monitoring row". Retry without it (no tag).
+async function readMonitoringRow(admin, creatorId, postId) {
+  const read = (cols) =>
+    admin
+      .from("post_monitoring_settings")
+      .select(cols)
+      .eq("creator_id", creatorId)
+      .eq("post_id", postId)
+      .maybeSingle();
+  const base = "enabled, actions_per_class, last_public_reply_text";
+  const { data, error } = await read(`${base}, treatment_key`);
+  if (!isUndefinedColumn(error)) return data || null;
+  console.warn("[comment-event] treatment_key column missing (migration 20261011120000 not run); reading without it");
+  const retry = await read(base);
+  return retry.data ? { ...retry.data, treatment_key: null } : null;
+}
+
+// The posts row for a media id. With creatorId, only that creator's row:
+// an ad's original_media_id must name one of the account's own posts, so
+// another creator's row falls through to the ad's own media.
+// findOrCreatePost looks up unscoped, as before (ig_media_id is UNIQUE, so
+// a scoped miss there would fail the insert).
+async function findPost(admin, mediaId, creatorId = null) {
+  let q = admin.from("posts").select("id, caption, ig_media_id").eq("ig_media_id", mediaId);
+  if (creatorId) q = q.eq("creator_id", creatorId);
+  const { data } = await q.maybeSingle();
+  return data || null;
 }
 
 // Meta sends comment timestamps in either of two shapes depending on the

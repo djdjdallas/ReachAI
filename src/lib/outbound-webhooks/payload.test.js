@@ -88,6 +88,42 @@ describe("buildEnvelope", () => {
     expect(odd.data).toEqual({ reason: "other" });
   });
 
+  it("a comment handoff with no DM thread is a comment-only lead", () => {
+    const cid = "3F2A1B0C-9D8E-4F7A-8B6C-5D4E3F2A1B0C";
+    const e = buildEnvelope({
+      event: ev("handoff_requested", { conversation_id: null, data: { reason: "other", comment_lead: { id: cid, instagram_username: "jane.doe" } } }),
+      user,
+      conversation: null,
+      profile: null,
+      booking: null,
+    });
+    expect(e.lead).toEqual({ id: `cmt_${cid.toLowerCase()}`, instagram_username: "jane.doe", source: "instagram_comment" });
+    expect(e.conversation).toBeNull();
+    // Only the reason leaves; the comment lead stays internal.
+    expect(e.data).toEqual({ reason: "other" });
+  });
+
+  it("a comment lead with a bad id or username is not trusted", () => {
+    const bad = buildEnvelope({
+      event: ev("handoff_requested", { conversation_id: null, data: { reason: "other", comment_lead: { id: "not-a-uuid" } } }),
+      user, conversation: null, profile: null, booking: null,
+    });
+    expect(bad.lead).toBeNull();
+    const badName = buildEnvelope({
+      event: ev("handoff_requested", { conversation_id: null, data: { reason: "other", comment_lead: { id: "3f2a1b0c-9d8e-4f7a-8b6c-5d4e3f2a1b0c", instagram_username: "<script>" } } }),
+      user, conversation: null, profile: null, booking: null,
+    });
+    expect(badName.lead).toEqual({ id: "cmt_3f2a1b0c-9d8e-4f7a-8b6c-5d4e3f2a1b0c", source: "instagram_comment" });
+  });
+
+  it("a comment_lead on another event type is ignored", () => {
+    const e = buildEnvelope({
+      event: ev("lead_updated", { conversation_id: null, data: { comment_lead: { id: "3f2a1b0c-9d8e-4f7a-8b6c-5d4e3f2a1b0c" } } }),
+      user, conversation: null, profile: null, booking: null,
+    });
+    expect(e.lead).toBeNull();
+  });
+
   it("consultation_booked matched by name: scheduled_for only, no invitee name or email", () => {
     const booking = { id: "b1", start_time: "2026-10-08T17:00:00Z", invitee_name: "Jane Q Doe", invitee_email: "other@example.com", conversation_id: "c1" };
     const e = buildEnvelope({ event: ev("consultation_booked", { booking_id: "b1" }), user, conversation, profile: { instagram_username: "jane.doe" }, booking });

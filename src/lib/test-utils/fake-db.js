@@ -4,7 +4,8 @@
 // Modifiers: order (ignored unless asked), limit, single, maybeSingle.
 // Each statement applies in one synchronous step, like a single SQL
 // statement. Not a database: no constraints except an optional unique key
-// per table for upsert/insert conflicts.
+// per table for upsert/insert conflicts (onConflict may list several
+// columns; ignoreDuplicates is honored).
 
 function likeToRegex(pattern) {
   let re = "";
@@ -58,9 +59,10 @@ const newId = () => `00000000-0000-4000-8000-${String(++seq).padStart(12, "0")}`
 
 /**
  * @param {Record<string, object[]>} tables
- * @param {{unique?: Record<string, string>, rpc?: Record<string, Function>, failOn?: Record<string, object>}} [opts]
+ * @param {{unique?: Record<string, string>, rpc?: Record<string, Function>, failOn?: Record<string, object|Function>}} [opts]
  *   unique: table → conflict column for insert/upsert
- *   failOn: table → error returned by every statement on that table
+ *   failOn: table → error returned by every statement on that table, or a
+ *     function (statement) → error|null to fail only some statements
  */
 export function fakeDb(tables, opts = {}) {
   const calls = [];
@@ -92,6 +94,7 @@ export function fakeDb(tables, opts = {}) {
           st.op = "upsert";
           st.data = data;
           st.onConflict = o.onConflict || null;
+          st.ignoreDuplicates = o.ignoreDuplicates === true;
           return builder;
         },
         update(data) {
@@ -140,7 +143,8 @@ export function fakeDb(tables, opts = {}) {
 
       function run() {
         calls.push({ table, op: st.op, data: st.data, filters: st.filters });
-        if (opts.failOn?.[table]) return { data: null, error: opts.failOn[table] };
+        const fail = typeof opts.failOn?.[table] === "function" ? opts.failOn[table](st) : opts.failOn?.[table];
+        if (fail) return { data: null, error: fail };
         const uniq = st.onConflict || opts.unique?.[table];
         if (st.op === "select") {
           let hit = rows.filter((r) => matches(r, st.filters));
@@ -151,9 +155,11 @@ export function fakeDb(tables, opts = {}) {
           const list = Array.isArray(st.data) ? st.data : [st.data];
           const written = [];
           for (const d of list) {
-            const existing = uniq ? rows.find((r) => r[uniq] === d[uniq]) : null;
+            const keyCols = uniq ? uniq.split(",").map((c) => c.trim()) : [];
+            const existing = uniq ? rows.find((r) => keyCols.every((c) => r[c] === d[c])) : null;
             if (existing) {
               if (st.op === "insert") return { data: null, error: { code: "23505", message: "duplicate key" } };
+              if (st.ignoreDuplicates) continue;
               Object.assign(existing, d);
               written.push(existing);
             } else {

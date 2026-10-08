@@ -15,6 +15,9 @@ const EMAIL_RE = /[A-Z0-9._%+-]+@[A-Z0-9-]+(?:\.[A-Z0-9-]+)*\.[A-Z]{2,24}/gi;
 const PHONE_CANDIDATE_RE = /(?<![\w@])\+?\d[\d\s().-]{6,20}\d(?![\w@])/g;
 const USERNAME_RE = /^[A-Za-z0-9._]{1,30}$/;
 const CATEGORY_KEY_RE = /^[a-z0-9][a-z0-9_-]{0,39}$/;
+// A label goes into DMs ({{TREATMENT}}), so letters, digits, spaces and a
+// little punctuation only.
+const CATEGORY_LABEL_RE = /^[\p{L}\p{N}][\p{L}\p{N} '&.+-]{0,39}$/u;
 
 /**
  * The one email in the text, lowercased; null when there is none or more
@@ -65,10 +68,11 @@ export function extractPhone(text) {
 
 /**
  * The account's treatment list, validated. Stored on users as
- *   [{"key": "botox", "match": ["botox", "tox", "dysport"]}, ...]
- * Invalid entries are dropped.
+ *   [{"key": "botox", "match": ["botox", "tox", "dysport"], "label": "Botox"}, ...]
+ * label is optional (the human name for {{TREATMENT}} in comment DMs); an
+ * invalid one is dropped. Invalid entries are dropped.
  *
- * @returns {Array<{key: string, match: string[]}>}
+ * @returns {Array<{key: string, match: string[], label?: string}>}
  */
 export function normalizeTreatmentCategories(value) {
   if (!Array.isArray(value)) return [];
@@ -81,9 +85,36 @@ export function normalizeTreatmentCategories(value) {
       .map((t) => t.trim().toLowerCase())
       .filter((t) => t.length >= 2 && t.length <= 40)
       .slice(0, 30);
-    out.push({ key, match: terms.length ? terms : [key.replace(/[_-]+/g, " ")] });
+    const label = typeof entry.label === "string" ? entry.label.normalize("NFC").replace(/\s+/g, " ").trim() : "";
+    out.push({
+      key,
+      match: terms.length ? terms : [key.replace(/[_-]+/g, " ")],
+      ...(CATEGORY_LABEL_RE.test(label) ? { label } : {}),
+    });
   }
   return out;
+}
+
+/**
+ * The validated category for a key, or null when the key isn't in the
+ * account's list.
+ *
+ * @returns {{key: string, match: string[], label?: string}|null}
+ */
+export function findTreatment(categories, key) {
+  if (typeof key !== "string" || !key) return null;
+  return normalizeTreatmentCategories(categories).find((c) => c.key === key) || null;
+}
+
+/**
+ * The human name for a category: its label, else the key with separators
+ * as spaces ("lip_filler" → "lip filler"). Null when the key isn't in the
+ * list.
+ */
+export function treatmentLabel(categories, key) {
+  const c = findTreatment(categories, key);
+  if (!c) return null;
+  return c.label || c.key.replace(/[_-]+/g, " ");
 }
 
 const escapeRe = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -138,12 +169,15 @@ export async function hasEnabledOutboundWebhook(admin, userId) {
  * should reach the clinic). Username and treatment: first value wins.
  *
  * @param {object} admin - service-role client
- * @param {{userId: string, conversationId: string, text?: string, instagramUsername?: string, treatmentCategories?: any}} args
+ * @param {{userId: string, conversationId: string, text?: string, instagramUsername?: string, treatmentCategories?: any, treatmentKey?: string|null}} args
  *   treatmentCategories: users.treatment_categories when the caller has the
  *   row; loaded here when undefined.
+ *   treatmentKey: a known treatment for this lead (the tag on the post they
+ *   commented on). Used before matching the text; ignored unless it is in
+ *   the account's list.
  * @returns {Promise<{written: boolean}>}
  */
-export async function captureLeadFacts(admin, { userId, conversationId, text, instagramUsername, treatmentCategories }) {
+export async function captureLeadFacts(admin, { userId, conversationId, text, instagramUsername, treatmentCategories, treatmentKey = null }) {
   try {
     if (!userId || !conversationId) return { written: false };
     if (!(await hasEnabledOutboundWebhook(admin, userId))) return { written: false };
@@ -172,7 +206,7 @@ export async function captureLeadFacts(admin, { userId, conversationId, text, in
     const phone = extractPhone(text);
     if (phone && phone !== existing?.phone) patch.phone = phone;
     if (!existing?.treatment_interest) {
-      const key = matchTreatment(normalizeTreatmentCategories(categories), text);
+      const key = findTreatment(categories, treatmentKey)?.key || matchTreatment(normalizeTreatmentCategories(categories), text);
       if (key) patch.treatment_interest = key;
     }
     if (!Object.keys(patch).length) return { written: false };

@@ -4,9 +4,15 @@ import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import { canUseCommentToDM } from "@/lib/comment-to-dm-gate";
 import { ACTIONS, DEFAULT_ACTIONS_PER_CLASS } from "@/lib/comment-trigger-rules";
 import { ACCESS_COLUMNS } from "@/lib/billing/status";
+import { isPersonaAccount } from "@/lib/persona";
+import { postTreatment } from "@/lib/verticals/clinic/treatment";
 
 // POST /api/settings/post-monitoring
-// Body: { ig_media_id, enabled, actions_per_class? }
+// Body: { ig_media_id, enabled, actions_per_class?, treatment_key? }
+//
+// treatment_key (clinic accounts only, src/lib/verticals/clinic): one of the account's
+// treatment_categories keys, or null to clear. Left unchanged when the
+// field is absent.
 //
 // Upserts a row in post_monitoring_settings keyed on (creator_id, post_id).
 // The `posts` row is upserted from ig_media_id+caption+permalink so the
@@ -42,7 +48,7 @@ export async function POST(request) {
 
     const { data: profile } = await supabase
       .from("users")
-      .select(`email, ${ACCESS_COLUMNS}`)
+      .select(`email, business_name, treatment_categories, ${ACCESS_COLUMNS}`)
       .eq("id", user.id)
       .maybeSingle();
 
@@ -62,6 +68,20 @@ export async function POST(request) {
       );
     }
     const enabled = body.enabled !== false;
+    const hasTreatment = Object.prototype.hasOwnProperty.call(body, "treatment_key");
+    let treatmentKey = null;
+    if (hasTreatment && body.treatment_key !== null && body.treatment_key !== "") {
+      const match = isPersonaAccount(profile)
+        ? postTreatment(profile, body.treatment_key)
+        : null;
+      if (!match) {
+        return NextResponse.json(
+          { error: "Unknown treatment for this account" },
+          { status: 400 }
+        );
+      }
+      treatmentKey = match.key;
+    }
     const actionsPerClass = sanitizeActionsPerClass(body.actions_per_class);
     const caption =
       typeof body.caption === "string" ? body.caption.slice(0, 4000) : null;
@@ -130,6 +150,7 @@ export async function POST(request) {
         .update({
           enabled,
           actions_per_class: actionsPerClass,
+          ...(hasTreatment ? { treatment_key: treatmentKey } : {}),
           updated_at: new Date().toISOString(),
         })
         .eq("id", existingMonitor.id)
@@ -148,6 +169,7 @@ export async function POST(request) {
           post_id: postId,
           enabled,
           actions_per_class: actionsPerClass,
+          ...(hasTreatment ? { treatment_key: treatmentKey } : {}),
         });
       if (insertErr) {
         return NextResponse.json(
@@ -162,6 +184,7 @@ export async function POST(request) {
       post_id: postId,
       enabled,
       actions_per_class: actionsPerClass,
+      ...(hasTreatment ? { treatment_key: treatmentKey } : {}),
     });
   } catch (err) {
     console.error("[post-monitoring] error:", err);

@@ -1,3 +1,4 @@
+import { bookingLinkFor } from "@/lib/booking-url";
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
@@ -66,14 +67,14 @@ export async function GET() {
     const [entries, offer, profile] = await Promise.all([
       loadEntries(admin, user.id),
       getActiveOffer(admin, user.id),
-      admin.from("users").select("calendly_url").eq("id", user.id).maybeSingle(),
+      admin.from("users").select("calendly_url, booking_url").eq("id", user.id).maybeSingle(),
     ]);
     return NextResponse.json({
       entries,
       totalChars: totalChars(entries),
       cap: KNOWLEDGE_TOTAL_CAP,
       offer,
-      bookingLink: profile?.data?.calendly_url || "",
+      bookingLink: bookingLinkFor(profile?.data),
     });
   } catch (err) {
     console.error("[knowledge] GET failed:", err?.message);

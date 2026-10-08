@@ -92,8 +92,9 @@ function summarizeOverrides(actionsPerClass) {
   return `Currently sending DMs on ${head}, and ${tail}.`;
 }
 
-function PostCard({ item, initial, templatesByClass, onChange }) {
+function PostCard({ item, initial, templatesByClass, treatments, onChange }) {
   const [enabled, setEnabled] = useState(initial?.enabled === true);
+  const [treatmentKey, setTreatmentKey] = useState(initial?.treatment_key || "");
   const [actionsPerClass, setActionsPerClass] = useState(
     initial?.actions_per_class || null
   );
@@ -106,7 +107,8 @@ function PostCard({ item, initial, templatesByClass, onChange }) {
     return actionsPerClass?.[cls] || DEFAULT_ACTIONS_PER_CLASS[cls] || "none";
   }
 
-  async function persist(nextEnabled, nextActions) {
+  // extra: fields sent only when they change (treatment_key).
+  async function persist(nextEnabled, nextActions, extra = {}) {
     setSaving(true);
     setError(null);
     try {
@@ -120,6 +122,7 @@ function PostCard({ item, initial, templatesByClass, onChange }) {
           caption: item.caption || null,
           permalink: item.permalink || null,
           media_type: item.media_type || null,
+          ...extra,
         }),
       });
       const data = await res.json().catch(() => ({}));
@@ -127,7 +130,11 @@ function PostCard({ item, initial, templatesByClass, onChange }) {
         setError(data.error || `Save failed (${res.status})`);
         return false;
       }
-      onChange?.({ enabled: nextEnabled, actions_per_class: nextActions });
+      onChange?.({
+        enabled: nextEnabled,
+        actions_per_class: nextActions,
+        treatment_key: "treatment_key" in extra ? extra.treatment_key : treatmentKey || null,
+      });
       return true;
     } catch (err) {
       setError(err?.message || "Network error");
@@ -150,6 +157,13 @@ function PostCard({ item, initial, templatesByClass, onChange }) {
     setActionsPerClass(next);
     const ok = await persist(enabled, next);
     if (!ok) setActionsPerClass(prev);
+  }
+
+  async function changeTreatment(next) {
+    const prev = treatmentKey;
+    setTreatmentKey(next);
+    const ok = await persist(enabled, actionsPerClass, { treatment_key: next || null });
+    if (!ok) setTreatmentKey(prev);
   }
 
   async function resetOverrides() {
@@ -222,6 +236,25 @@ function PostCard({ item, initial, templatesByClass, onChange }) {
               </span>
             </button>
           </div>
+
+          {enabled && treatments?.length > 0 && (
+            <label className="mt-3 flex items-center gap-2 text-xs text-stone-600">
+              <span className="font-semibold">Treatment</span>
+              <select
+                value={treatmentKey}
+                onChange={(e) => changeTreatment(e.target.value)}
+                disabled={saving}
+                className="rounded-full border border-stone-300 px-3 py-1 text-xs bg-white"
+              >
+                <option value="">None</option>
+                {treatments.map((t) => (
+                  <option key={t.key} value={t.key}>
+                    {t.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
 
           {enabled && (
             <div className="mt-3">
@@ -363,6 +396,7 @@ export default function PostPicker({
   monitoringByMediaId,
   mediaError,
   templatesByClass,
+  treatments = [],
 }) {
   const [overrides, setOverrides] = useState({});
 
@@ -442,6 +476,7 @@ export default function PostPicker({
               item={item}
               initial={initial}
               templatesByClass={templatesByClass}
+              treatments={treatments}
               onChange={(next) => handleChange(item.id, next)}
             />
           );
