@@ -62,3 +62,42 @@ describe("prepareClinicComment", () => {
     }
   });
 });
+
+describe("applyClinicCommentRules: intent signal", () => {
+  const ownerUser = { treatment_categories: [{ key: "botox", match: ["botox"] }] };
+  const high = { action: "dm", rendered: "Hey!", reason: "template_rendered:HIGH_INTENT" };
+  const decideHighIntent = () => high;
+  const runSig = (cls, text, decision = queued(cls)) =>
+    applyClinicCommentRules({ classification: { class: cls }, commentText: text, decision, ownerUser, decideHighIntent });
+
+  it("UNCERTAIN, LOW_SIGNAL, low-confidence HIGH_INTENT and praise with a signal take the HIGH_INTENT decision", () => {
+    for (const cls of ["UNCERTAIN", "LOW_SIGNAL", "HIGH_INTENT", "ENGAGED_NOT_BUYING"]) {
+      expect(runSig(cls, "love my botox, how much for more?")).toEqual({
+        decision: { ...high, reason: "clinic_intent_signal:template_rendered:HIGH_INTENT" },
+        handoff: null,
+      });
+    }
+  });
+  it("spam and personal messages are never upgraded", () => {
+    for (const cls of ["SPAM", "NOT_A_LEAD"]) {
+      const ignore = { action: "ignore", rendered: null, reason: `routed_by_class:${cls}` };
+      expect(runSig(cls, "botox how much", ignore).decision).toBe(ignore);
+    }
+  });
+  it("a complaint wins over a signal", () => {
+    expect(runSig("UNCERTAIN", "I want a refund for my botox").handoff).toBe("complaint");
+  });
+  it("the HIGH_INTENT decision queues (no template): handed off as an inquiry", () => {
+    const r = applyClinicCommentRules({
+      classification: { class: "UNCERTAIN" },
+      commentText: "how much",
+      decision: queued("UNCERTAIN"),
+      ownerUser,
+      decideHighIntent: () => ({ action: "queue_review", rendered: null, reason: "no_template_for_class" }),
+    });
+    expect(r).toEqual({ decision: { action: "queue_review", rendered: null, reason: "clinic_intent_signal:no_template_for_class" }, handoff: "inquiry" });
+  });
+  it("an existing DM decision is left alone", () => {
+    expect(runSig("HIGH_INTENT", "how much", dm).decision).toBe(dm);
+  });
+});

@@ -13,7 +13,7 @@ import { disclosureLine, prepareFirstMessage, releaseFirstMessage } from "@/lib/
 import { isPersonaAccount } from "@/lib/persona";
 import { applyClinicCommentRules, handOffClinicComment, prepareClinicComment } from "@/lib/verticals/clinic/comment";
 import { isUndefinedColumn } from "@/lib/db-errors";
-import { autoWatchPost, ingestOwnedPost, isAdComment, isAutoWatchAccount } from "@/lib/comment-auto-watch";
+import { autoWatchPost, fillMissingCaption, ingestOwnedPost, isAdComment, isAutoWatchAccount } from "@/lib/comment-auto-watch";
 import { isBillingManaged } from "@/lib/billing/managed";
 import { findOpenThread } from "@/lib/comment-open-thread";
 import { captureLeadFacts } from "@/lib/outbound-webhooks/lead-capture";
@@ -87,7 +87,7 @@ async function processCommentEvent(entry, change) {
   const { data: ownerUser, error: ownerErr } = await admin
     .from("users")
     .select(
-      `id, email, meta_page_access_token, instagram_business_account_id, comment_public_reply_enabled, business_name, assistant_name, treatment_categories, ${ACCESS_COLUMNS}`
+      `id, email, meta_page_access_token, instagram_business_account_id, comment_public_reply_enabled, business_name, assistant_name, treatment_categories, instagram_username, ${ACCESS_COLUMNS}`
     )
     .eq("instagram_business_account_id", igbaId)
     .maybeSingle();
@@ -120,6 +120,7 @@ async function processCommentEvent(entry, change) {
   // (src/lib/comment-auto-watch.js); everything they add is behind this.
   const autoWatch = isAutoWatchAccount(ownerUser);
   const autoWatchToken = autoWatch ? decryptOrNull(ownerUser.meta_page_access_token) : null;
+  const autoWatchAccount = { igAccountId: igbaId, username: ownerUser.instagram_username || null };
 
   let adOriginalPost =
     originalMediaId && originalMediaId !== mediaId ? await findPost(admin, originalMediaId, creatorId) : null;
@@ -129,7 +130,7 @@ async function processCommentEvent(entry, change) {
     adOriginalPost = await ingestOwnedPost(admin, {
       creatorId,
       mediaId: originalMediaId,
-      igAccountId: igbaId,
+      account: autoWatchAccount,
       token: autoWatchToken,
     });
   }
@@ -149,9 +150,13 @@ async function processCommentEvent(entry, change) {
     postRow.creator_id === creatorId &&
     (!isAdComment(value.media) || postRow === adOriginalPost)
   ) {
-    postRow = await autoWatchPost(admin, { creatorId, postRow, igAccountId: igbaId, token: autoWatchToken });
+    postRow = await autoWatchPost(admin, { creatorId, postRow, account: autoWatchAccount, token: autoWatchToken });
     monitoringRow = await readMonitoringRow(admin, creatorId, postRow.id);
-    console.log("[comment-event] auto-watched post", { commentId, postId: postRow.id, watching: Boolean(monitoringRow) });
+    console.log("[comment-event] auto-watched post", { commentId, postId: postRow.id, watching: Boolean(monitoringRow), hasCaption: Boolean(postRow.caption) });
+  } else if (autoWatch && monitoringRow && !postRow.caption && postRow.creator_id === creatorId) {
+    // A watched post still without a caption (first seen through a comment
+    // while the caption read was failing): fill it now.
+    postRow = await fillMissingCaption(admin, { postRow, account: autoWatchAccount, token: autoWatchToken });
   }
 
   if (!monitoringRow) {
@@ -281,18 +286,29 @@ async function processCommentEvent(entry, change) {
     ? prepareClinicComment({ ownerUser, monitoringRow, templates })
     : null;
 
-  let decision = decideAction(classification, monitoringRow, clinic ? clinic.templates : templates, {
+  const renderContext = {
     postCaption: postRow.caption || "",
     commenterName: fromUsername,
     offerName: offerRow?.offer_name || null,
     // Same link the booking_link_sent detection looks for: the account's
     // booking_url, else its Calendly link.
     bookingLink: bookingLinkFor(userRow) || null,
-  });
+  };
+  let decision = decideAction(classification, monitoringRow, clinic ? clinic.templates : templates, renderContext);
 
   let clinicHandoff = null;
   if (clinic) {
-    ({ decision, handoff: clinicHandoff } = applyClinicCommentRules({ classification, commentText, decision }));
+    ({ decision, handoff: clinicHandoff } = applyClinicCommentRules({
+      classification,
+      commentText,
+      decision,
+      ownerUser,
+      treatmentKey: clinic.treatmentKey,
+      // The same decision for this comment as HIGH_INTENT (template, post
+      // overrides), for comments with a clinic intent signal.
+      decideHighIntent: () =>
+        decideAction({ ...classification, class: "HIGH_INTENT", confidence: 1 }, monitoringRow, clinic.templates, renderContext),
+    }));
   }
 
   // Managed accounts: no comment template into a thread that is paused or
