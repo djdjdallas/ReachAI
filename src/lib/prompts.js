@@ -534,7 +534,15 @@ export function buildSystemPrompt(scriptConfig = {}, calendlyUrl = "", options =
   // Build the booking link instruction based on whether a link exists
   const bookingInstruction = bookingLink
     ? `When the prospect is qualified and interested, share this booking link naturally: ${bookingLink}`
-    : `You do not have a booking link set up yet. Instead of sharing a link, ask the prospect for their email address or best time to connect, and let them know ${ownerLabel} will reach out to schedule a call.`;
+    : `There is no link to share for booking. When the prospect is ready to book, ask naturally for their email or phone number, and let them know ${ownerLabel} will reach out to set up a time. Never tell them a link is missing (see rule 9).`;
+
+  // Without a link the model once told a lead "we don't have a booking link
+  // set up just yet". It never mentions setup. Accounts with a link keep the
+  // original rule: the no-link wording measurably cut how often it shares
+  // the link (eval booking-any-spots).
+  const bookingRule9 = bookingLink
+    ? `9. BOOKING LINK EDGE CASE. If you do not have a booking link, never say "{{BOOKING_LINK}}" or "Not provided" literally. Follow the booking instruction above instead.`
+    : `9. NEVER MENTION SETUP. Never tell the prospect about missing configuration or how this inbox is set up: no "we don't have a booking link set up just yet", "our calendar isn't connected", "the link isn't ready", "my settings", "the system". Never say "{{BOOKING_LINK}}" or "Not provided" literally. If they ask for a link, don't say there isn't one or that you don't have one; skip the link entirely and ask for their email or phone number so ${ownerLabel} can reach out to set up a time.`;
 
   // Playground-specific context block
   const playgroundNotice = options.isPlayground
@@ -571,7 +579,7 @@ export function buildSystemPrompt(scriptConfig = {}, calendlyUrl = "", options =
       ? `\n\nTHIS TURN: the prospect just asked to book or for the link. ${
           bookingLink
             ? `Share the booking link now (${bookingLink}) in a short, friendly message.`
-            : "Ask for their email or best time to connect now."
+            : "Ask for their email or phone number now so they can be reached to set up a time."
         } No more qualifying questions first.`
       : "";
 
@@ -604,7 +612,7 @@ ${identity.rule7}
 
 8. ONLY STATE FACTS YOU'VE BEEN GIVEN. Prices, links, program details, results, guarantees, testimonials, client stories, and numbers must come from BUSINESS DETAILS, the script above${hasKnowledge ? ", or the business knowledge at the end of this prompt" : ""}. If they ask for something that isn't there, don't make it up. ${hasKnowledge ? "For a price, availability, or policy question, follow the MISSING KNOWLEDGE handoff rule. For anything else (for example proof you don't have)" : "Instead"}, say honestly that ${ownerLabel} can go over it on a call, and keep the conversation moving. If they ask the price and it IS listed, answer it directly, then continue qualifying.
 
-9. BOOKING LINK EDGE CASE. If you do not have a booking link, never say "{{BOOKING_LINK}}" or "Not provided" literally. Follow the booking instruction above instead.${bookingNowBlock}
+${bookingRule9}${bookingNowBlock}
 
 ---
 

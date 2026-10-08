@@ -66,6 +66,21 @@ describe("buildEnvelope", () => {
     expect(e.data).toEqual({});
   });
 
+  it("lead_updated is the normal envelope with the current lead fields and empty data", () => {
+    const e = buildEnvelope({ event: ev("lead_updated", { data: { note: "x" } }), user, conversation, profile, booking: null });
+    expect(e.type).toBe("lead_updated");
+    expect(e.lead).toEqual({
+      id: "c1",
+      instagram_username: "jane.doe",
+      email: "jane@example.com",
+      phone: "+15125550123",
+      treatment_interest: "botox",
+      source: "instagram_comment",
+    });
+    expect(e.conversation).toEqual({ id: "c1", trigger: null, trigger_type: "comment" });
+    expect(e.data).toEqual({});
+  });
+
   it("handoff_requested carries only the reason", () => {
     const e = buildEnvelope({ event: ev("handoff_requested", { data: { reason: "medical_question", note: "pregnant" } }), user, conversation, profile, booking: null });
     expect(e.data).toEqual({ reason: "medical_question" });

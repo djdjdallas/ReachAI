@@ -3,7 +3,8 @@
 
 export const CONTRACT_VERSION = "1";
 
-// Lifecycle events, in funnel order. 'test' is sent only by the admin script.
+// Lifecycle events, in funnel order, then lead_updated (a lead field
+// changed; no stage meaning). 'test' is sent only by the admin script.
 export const LIFECYCLE_EVENT_TYPES = Object.freeze([
   "new_inquiry",
   "dm_started",
@@ -12,6 +13,7 @@ export const LIFECYCLE_EVENT_TYPES = Object.freeze([
   "consultation_booked",
   "follow_up_sent",
   "handoff_requested",
+  "lead_updated",
 ]);
 export const EVENT_TYPES = Object.freeze([...LIFECYCLE_EVENT_TYPES, "test"]);
 

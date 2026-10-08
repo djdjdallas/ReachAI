@@ -112,6 +112,16 @@ const PERSONA = {
   owner: { name: "Solé Aesthetics", igHandle: "soleaesthetics", businessName: "Solé Aesthetics", assistantName: "Katlynne" },
   bookingLink: "https://sole.example/book",
 };
+// The same accounts with no booking link: the prompt must never surface
+// that ("we don't have a booking link set up just yet", seen live); the
+// reply asks for an email or phone instead.
+const PERSONA_NO_LINK = { ...PERSONA, bookingLink: "" };
+const COACH_NO_LINK = { scriptConfig, activeOffer, owner, bookingLink: "" };
+const MENTIONS_SETUP =
+  /booking link|configur|\bsystem\b|settings|integrat|(not|n'?t) (yet )?connected|set ?up (yet|just yet)|(not|n'?t) (been )?set ?up|\bjust yet\b|(don'?t|do not|doesn'?t|does not) have (a |the |any )?(\w+ )?(link|calendar|booking|scheduling)|link (isn'?t|is not|ready)/i;
+const ASKS_CONTACT = /\b(e-?mail|phone|number)\b/i;
+const noSetupTalk = (r) => !MENTIONS_SETUP.test(r) && ASKS_CONTACT.test(r);
+
 // A yes/no about whether a slot is free ("we do!", "yes we have spots",
 // "we're fully booked"). "We're open Saturdays 9-6" (hours) is allowed.
 const CLAIMS_AVAILABILITY =
@@ -323,6 +333,36 @@ const CASES = [
     expect: "reply",
     check: (r) => !/^\s*(hey|hi|hello)\b/i.test(r) && !/first time|had it (done )?before/i.test(r),
     checkDesc: "no mid-thread greeting, does not re-ask the opener's question",
+  },
+  {
+    id: "no-link-persona-book-consult",
+    group: "no booking link",
+    cfg: PERSONA_NO_LINK,
+    kb: PERSONA_NO_LINK.kb,
+    msg: "how do i book a botox consult?",
+    expect: "reply",
+    check: noSetupTalk,
+    checkDesc: "asks for email or phone, never mentions a missing link or setup",
+  },
+  {
+    id: "no-link-persona-send-link",
+    group: "no booking link",
+    cfg: PERSONA_NO_LINK,
+    kb: PERSONA_NO_LINK.kb,
+    msg: "can you send me the booking link?",
+    expect: "reply",
+    check: noSetupTalk,
+    checkDesc: "asks for email or phone, never mentions a missing link or setup",
+  },
+  {
+    id: "no-link-coach-call",
+    group: "no booking link",
+    cfg: COACH_NO_LINK,
+    kb: BASE_KB,
+    msg: "this sounds great, how do we set up a call?",
+    expect: "reply",
+    check: noSetupTalk,
+    checkDesc: "asks for email or phone, never mentions a missing link or setup",
   },
   {
     id: "missing-weekend-appointments",

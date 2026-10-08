@@ -19,6 +19,7 @@ MIGRATIONS=(
   20261007140000_ci_grant_reader.sql
   20261008120000_knowledge_entries.sql
   20261009120000_outbound_webhooks.sql
+  20261010120000_outbound_lead_updated.sql
 )
 psql_() { psql -X -v ON_ERROR_STOP=1 -q "$@"; }
 
@@ -232,6 +233,27 @@ srv "update public.lead_profiles set phone='+15125550123' where conversation_id=
 expect "a phone emits once more" "2" "$(ev contact_captured)"
 expect "bad phone rejected by the table" "lead_profiles_phone_check" "$(as_role service_role "update public.lead_profiles set phone='555-0123' where conversation_id='$C1'")"
 expect "free-text treatment rejected by the table" "lead_profiles_treatment_interest_check" "$(as_role service_role "update public.lead_profiles set treatment_interest='I want botox for my migraines' where conversation_id='$C1'")"
+
+# lead_updated: treatment_interest null -> value
+expect "lead_updated when treatment is filled in" "lead_updated:$C1:treatment:botox" "$(q "select dedupe_key from public.outbound_webhook_events where event_type='lead_updated' and conversation_id='$C1'")"
+srv "update public.lead_profiles set treatment_interest='filler' where conversation_id='$C1'" >/dev/null
+expect "changing an existing treatment emits nothing" "1" "$(ev lead_updated)"
+srv "update public.lead_profiles set treatment_interest=null where conversation_id='$C1'" >/dev/null
+srv "update public.lead_profiles set treatment_interest='filler' where conversation_id='$C1'" >/dev/null
+expect "null -> value again emits for the new key" "2" "$(ev lead_updated)"
+srv "update public.lead_profiles set treatment_interest=null where conversation_id='$C1'" >/dev/null
+srv "update public.lead_profiles set treatment_interest='filler' where conversation_id='$C1'" >/dev/null
+expect "the same key never emits twice" "2" "$(ev lead_updated)"
+srv "insert into public.lead_profiles(conversation_id,user_id,treatment_interest) values ('$C2','$U1','botox')" >/dev/null
+expect "lead_updated on an insert with a treatment" "1" "$(ev lead_updated "conversation_id='$C2'")"
+expect "a treatment-only profile emits no contact_captured" "0" "$(ev contact_captured "conversation_id='$C2'")"
+q "update public.outbound_webhooks set event_types='{new_inquiry,contact_captured}' where user_id='$U1'" >/dev/null
+srv "insert into public.lead_profiles(conversation_id,user_id,treatment_interest) values ('dddddddd-0000-0000-0000-000000000003','$U1','botox')" >/dev/null
+expect "not emitted when the webhook isn't subscribed" "0" "$(ev lead_updated "conversation_id='dddddddd-0000-0000-0000-000000000003'")"
+q "update public.outbound_webhooks set event_types=default where user_id='$U1'" >/dev/null
+q "delete from public.lead_profiles where conversation_id='dddddddd-0000-0000-0000-000000000003'" >/dev/null
+expect "default event_types include lead_updated" "t" "$(q "select 'lead_updated' = any(event_types) from public.outbound_webhooks where user_id='$U1'")"
+expect "lead_updated is a valid outbox type" "INSERT 0 1" "$(as_role service_role "insert into public.outbound_webhook_events(user_id,event_type,dedupe_key) values ('$U1','lead_updated','x')")"
 
 # Comment opener that Meta's echo saved first (staff message, native_send
 # thread), relabeled by the comment-to-DM path.
