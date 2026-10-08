@@ -1,32 +1,42 @@
 import { describe, it, expect } from "vitest";
-import { findOpenThread, OPEN_THREAD_WINDOW_MS } from "./comment-open-thread";
+import { findLeadThread, ACTIVE_LEAD_WINDOW_MS } from "./comment-open-thread";
 import { fakeDb } from "@/lib/test-utils/fake-db";
 
 const NOW = Date.parse("2026-10-08T12:00:00.000Z");
 const at = (msAgo) => new Date(NOW - msAgo).toISOString();
+const lead = (msAgo, conversation_id = "c1") => ({ id: `m${msAgo}`, conversation_id, role: "user", source: "lead", created_at: at(msAgo) });
 const setup = (conv, messages = []) =>
-  fakeDb({ conversations: conv ? [{ id: "c1", user_id: "u1", instagram_sender_id: "lead", ai_paused: false, ...conv }] : [], messages });
-const check = (db, igsid = "lead") => findOpenThread(db, { userId: "u1", igsid, now: NOW });
+  fakeDb({ conversations: conv ? [{ id: "c1", user_id: "u1", instagram_sender_id: "lead", ai_paused: false, status: "interested", ...conv }] : [], messages });
+const check = (db, igsid = "lead") => findLeadThread(db, { userId: "u1", igsid, now: NOW });
+const state = async (db) => (await check(db))?.state;
 
-describe("findOpenThread", () => {
-  it("paused wins, even with no messages", async () => {
-    expect(await check(setup({ ai_paused: true }))).toEqual({ conversationId: "c1", reason: "paused" });
+describe("findLeadThread", () => {
+  it("paused: ai_paused, or taken over (status manual)", async () => {
+    expect(await state(setup({ ai_paused: true }, [lead(60_000)]))).toBe("paused");
+    expect(await state(setup({ status: "manual" }))).toBe("paused");
   });
-  it("a message from either side within 7 days", async () => {
-    const db = setup({}, [{ id: "m1", conversation_id: "c1", role: "assistant", created_at: at(OPEN_THREAD_WINDOW_MS - 60_000) }]);
-    expect(await check(db)).toEqual({ conversationId: "c1", reason: "recent" });
+  it("active: the lead sent a message within 6 hours (boundary included)", async () => {
+    expect(await state(setup({}, [lead(60 * 60_000)]))).toBe("active");
+    expect(await state(setup({}, [lead(ACTIVE_LEAD_WINDOW_MS)]))).toBe("active");
   });
-  it("exactly 7 days ago still counts; older does not", async () => {
-    expect(await check(setup({}, [{ id: "m1", conversation_id: "c1", created_at: at(OPEN_THREAD_WINDOW_MS) }]))).toEqual({ conversationId: "c1", reason: "recent" });
-    expect(await check(setup({}, [{ id: "m1", conversation_id: "c1", created_at: at(OPEN_THREAD_WINDOW_MS + 1000) }]))).toBeNull();
+  it("quiet: the lead's last message is older than 6 hours", async () => {
+    expect(await state(setup({}, [lead(ACTIVE_LEAD_WINDOW_MS + 1000)]))).toBe("quiet");
+    expect(await state(setup({}, [lead(2 * 86_400_000)]))).toBe("quiet");
   });
-  it("another conversation's recent message doesn't count", async () => {
-    expect(await check(setup({}, [{ id: "m1", conversation_id: "c-other", created_at: at(1000) }]))).toBeNull();
+  it("our own recent messages, the owner's, or another thread's don't make it active", async () => {
+    const db = setup({}, [
+      { id: "a", conversation_id: "c1", role: "assistant", source: "agent", created_at: at(1000) },
+      { id: "b", conversation_id: "c1", role: "assistant", source: "manual", created_at: at(1000) },
+      lead(1000, "c-other"),
+    ]);
+    expect(await state(db)).toBe("quiet");
   });
-  it("no thread, no igsid, or a read error: not open", async () => {
+  it("returns the conversation", async () => {
+    expect((await check(setup({}))).conversation).toMatchObject({ id: "c1", ai_paused: false });
+  });
+  it("no thread, no igsid, or a read error: null", async () => {
     expect(await check(setup(null))).toBeNull();
-    expect(await check(setup({ ai_paused: true }), null)).toBeNull();
-    const broken = fakeDb({ conversations: [] }, { failOn: { conversations: { code: "57014" } } });
-    expect(await check(broken)).toBeNull();
+    expect(await check(setup({}), null)).toBeNull();
+    expect(await check(fakeDb({ conversations: [] }, { failOn: { conversations: { code: "57014" } } }))).toBeNull();
   });
 });
