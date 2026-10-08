@@ -232,3 +232,36 @@ describe("buildSystemPrompt: business inbox thread rules", () => {
     expect(c).toContain('"do you have weekend appointments?"');
   });
 });
+
+describe("business persona: amounts, prices and deal terms only as written", () => {
+  const persona = { name: "Solé Aesthetics", businessName: "Solé Aesthetics", assistantName: "Katlynne" };
+  const p = buildSystemPrompt({ offer: "Botox and fillers" }, "https://sole.example/book", { owner: persona });
+  const coach = buildSystemPrompt(sc, "https://cal.com/x", { owner: { name: "Dom" } });
+
+  it("never estimates dosage or amounts, even from the knowledge; points to the consultation", () => {
+    expect(p).toContain("NEVER ESTIMATE AMOUNTS OR DOSAGE");
+    expect(p).toMatch(/units, syringes, vials, sessions, or treatments/);
+    expect(p).toMatch(/even if the business knowledge lists typical amounts/);
+    expect(p).toMatch(/decided at their consultation/);
+  });
+  it("prices only as written: no estimates, ranges or calculated numbers; 'pricing at consultation' is an answer", () => {
+    expect(p).toContain("PRICES ONLY AS WRITTEN");
+    expect(p).toMatch(/calculate a new number from it \(a total, a discounted price, a saving\)/);
+    expect(p).toMatch(/pricing is given at the consultation, that is the answer/);
+    expect(p).toMatch(/never call anything free or complimentary \(a consultation, a call, a touch-up\) unless that is written/);
+  });
+  it("deal terms only from the knowledge or the post's caption; never an invented end date or duration", () => {
+    expect(p).toContain("DEAL TERMS ONLY AS WRITTEN");
+    expect(p).toMatch(/caption of the post they commented on/);
+    expect(p).toMatch(/Never add an end date, a duration/);
+  });
+  it("coach prompts don't get these rules (unchanged)", () => {
+    for (const rule of ["NEVER ESTIMATE AMOUNTS OR DOSAGE", "PRICES ONLY AS WRITTEN", "DEAL TERMS ONLY AS WRITTEN"]) {
+      expect(coach).not.toContain(rule);
+    }
+  });
+  it("adds no em dashes", () => {
+    const block = p.slice(p.indexOf("NEVER ESTIMATE AMOUNTS"), p.indexOf("DEAL TERMS ONLY AS WRITTEN") + 600);
+    expect(block).not.toMatch(/[—–]/);
+  });
+});
