@@ -227,3 +227,48 @@ export async function captureLeadFacts(admin, { userId, conversationId, text, in
     return { written: false };
   }
 }
+
+/**
+ * Set the lead's treatment_interest to a key the latest comment named, even
+ * when one is already recorded (a newer interest wins). Accounts with an
+ * enabled webhook only, like every lead fact. The caller emits lead_updated
+ * when this reports a change (the trigger only covers null -> value).
+ * Never throws.
+ *
+ * @param {object} admin
+ * @param {{userId: string, conversationId: string, treatmentKey: string, treatmentCategories?: any}} args
+ * @returns {Promise<{changed: boolean}>}
+ */
+export async function setTreatmentInterest(admin, { userId, conversationId, treatmentKey, treatmentCategories }) {
+  try {
+    if (!userId || !conversationId || !treatmentKey) return { changed: false };
+    if (!(await hasEnabledOutboundWebhook(admin, userId))) return { changed: false };
+    let categories = treatmentCategories;
+    if (categories === undefined) {
+      const { data: u } = await admin.from("users").select("treatment_categories").eq("id", userId).maybeSingle();
+      categories = u?.treatment_categories;
+    }
+    const key = findTreatment(categories, treatmentKey)?.key;
+    if (!key) return { changed: false };
+    const { data: existing, error: readErr } = await admin
+      .from("lead_profiles")
+      .select("treatment_interest")
+      .eq("conversation_id", conversationId)
+      .maybeSingle();
+    if (readErr || existing?.treatment_interest === key) return { changed: false };
+    const { error } = await admin
+      .from("lead_profiles")
+      .upsert(
+        { conversation_id: conversationId, user_id: userId, treatment_interest: key, updated_at: new Date().toISOString() },
+        { onConflict: "conversation_id" }
+      );
+    if (error) {
+      console.warn("[lead-capture] treatment update failed:", error.code);
+      return { changed: false };
+    }
+    return { changed: true };
+  } catch (err) {
+    console.warn("[lead-capture] treatment update threw:", err?.message);
+    return { changed: false };
+  }
+}

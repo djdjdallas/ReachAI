@@ -61,8 +61,10 @@ const newId = () => `00000000-0000-4000-8000-${String(++seq).padStart(12, "0")}`
 
 /**
  * @param {Record<string, object[]>} tables
- * @param {{unique?: Record<string, string>, rpc?: Record<string, Function>, failOn?: Record<string, object|Function>}} [opts]
+ * @param {{unique?: Record<string, string>, rpc?: Record<string, Function>, failOn?: Record<string, object|Function>, defaults?: Record<string, Function>}} [opts]
  *   unique: table → conflict column for insert/upsert
+ *   defaults: table → () => fields an insert gets when it doesn't set them
+ *     (column defaults, e.g. messages.created_at)
  *   failOn: table → error returned by every statement on that table, or a
  *     function (statement) → error|null to fail only some statements
  */
@@ -166,7 +168,7 @@ export function fakeDb(tables, opts = {}) {
               Object.assign(existing, d);
               written.push(existing);
             } else {
-              const row = { id: newId(), ...d };
+              const row = { id: newId(), ...(opts.defaults?.[table]?.() || {}), ...d };
               rows.push(row);
               written.push(row);
             }

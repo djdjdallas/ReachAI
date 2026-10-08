@@ -1,3 +1,5 @@
+import { alertAiUnavailable, handOffDmAiUnavailable } from "@/lib/ai-unavailable";
+import { isBillingManaged } from "@/lib/billing/managed";
 import { bookingLinkFor } from "@/lib/booking-url";
 import { NextResponse, after } from "next/server";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
@@ -1944,6 +1946,14 @@ async function processIncomingMessage({
         event: "ai_reply_failed",
         properties: { conversation_id: conversation.id, error: err.message },
       });
+      // Managed accounts: the AI is unreachable, so nothing goes to the lead
+      // and the thread goes to the clinic (handoff_requested, once per thread
+      // per hour), with an operator alert (once per hour per account).
+      // Coach accounts: unchanged.
+      if (isBillingManaged(user)) {
+        await handOffDmAiUnavailable(supabase, { userId: user.id, conversationId: conversation.id });
+        await alertAiUnavailable(supabase, { user, stage: "dm_reply", error: err });
+      }
       return;
     }
 

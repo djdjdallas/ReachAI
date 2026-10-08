@@ -93,3 +93,33 @@ describe("accountAgeHours", () => {
     expect(accountAgeHours(null)).toBeNull();
   });
 });
+
+describe("ai_unavailable alert", () => {
+  beforeEach(() => {
+    sendEmail.mockClear();
+    sendSms.mockClear();
+  });
+
+  it("names the account, where it failed and the error; email only", async () => {
+    const ok = await sendBusinessEventAlert("ai_unavailable", {
+      email: "clinic@example.com",
+      businessName: "Solé Aesthetics",
+      userId: "e1f2fb2c-1487-49fa-bb30-9bb8706f0281",
+      stage: "comment_classification",
+      error: "400 Your credit balance is too low to access the Anthropic API.",
+    });
+    expect(ok).toBe(true);
+    const { subject, html } = sendEmail.mock.calls[0][0];
+    expect(subject).toBe("[clinchd] ⚠️ AI unavailable: Solé Aesthetics");
+    for (const line of [
+      "account: Solé Aesthetics (clinic@example.com)",
+      "user id: e1f2fb2c-1487-49fa-bb30-9bb8706f0281",
+      "failed at: comment_classification",
+      "error: 400 Your credit balance is too low to access the Anthropic API.",
+      "Nothing is being sent to leads.",
+    ]) {
+      expect(html).toContain(line);
+    }
+    expect(sendSms).not.toHaveBeenCalled();
+  });
+});

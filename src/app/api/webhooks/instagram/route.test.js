@@ -56,6 +56,11 @@ vi.mock("@/lib/tokens/reconnect", () => ({
 }));
 vi.mock("@/lib/notifications", () => notifications);
 vi.mock("@/lib/alerts/handoff-email", () => handoff);
+const aiUnavailable = {
+  handOffDmAiUnavailable: vi.fn(async () => ({ emitted: true })),
+  alertAiUnavailable: vi.fn(async () => ({ alerted: true })),
+};
+vi.mock("@/lib/ai-unavailable", () => aiUnavailable);
 vi.mock("@/lib/posthog-server", () => ({
   getPostHogClient: () => posthog,
 }));
@@ -636,7 +641,16 @@ function makeDb() {
       return { data: q.single ? self.state.user : [self.state.user].filter(Boolean), error: null };
     }
     if (table === "conversations" && op === "select") {
-      const conv = self.state.conversation;
+      // The (user_id, instagram_sender_id) lookup is honored when the seeded
+      // thread has those columns, so a test can tell "attached to the
+      // existing thread" from "made a new one".
+      let conv = self.state.conversation;
+      if (conv) {
+        const keyMiss = q.filters.some(
+          ([op, col, val]) => op === "eq" && ["user_id", "instagram_sender_id"].includes(col) && conv[col] !== undefined && conv[col] !== val
+        );
+        if (keyMiss) conv = null;
+      }
       return { data: q.single ? conv : [conv].filter(Boolean), error: null };
     }
     if (table === "conversations" && op === "insert") {
@@ -845,5 +859,70 @@ describe("first-message AI disclosure (persona accounts)", () => {
 
     expect(sentText()).toBe("Hey! Coaching is $550.");
     expect(db.state.conversation.disclosed_at ?? null).toBeNull();
+  });
+});
+
+describe("a DM reply to a comment-to-DM thread (private reply)", () => {
+  // The comment path keys the thread on the commenter's id from the comment
+  // webhook (value.from.id); Meta sends their DM reply with the same id as
+  // event.sender.id (confirmed live, PR #3). The reply must land on that
+  // thread as an inbound lead message: the open-thread check
+  // (src/lib/comment-open-thread.js) reads exactly those rows.
+  const commentThread = () => ({
+    id: "conv-comment",
+    user_id: "user-1",
+    instagram_sender_id: LEAD,
+    instagram_thread_id: LEAD,
+    origin: "clinchd_sent",
+    status: "new",
+    ai_paused: false,
+    disclosed_at: "2026-10-08T15:46:49.000Z",
+  });
+
+  it("is stored on the same conversation, as role user / source lead, with its send time", async () => {
+    db.state.user = user();
+    db.state.conversation = commentThread();
+    const sentAt = Date.now() - 60_000;
+    await POST(inbound("yes how much?", "mid-reply", sentAt));
+    expect(db.inserted("conversations")).toHaveLength(0);
+    expect(db.inserted("messages")[0]).toMatchObject({
+      conversation_id: "conv-comment",
+      role: "user",
+      source: "lead",
+      provider_message_id: "mid-reply",
+      created_at: new Date(sentAt).toISOString(),
+    });
+  });
+
+  it("control: a DM from someone else gets its own new conversation", async () => {
+    db.state.user = user();
+    db.state.conversation = { ...commentThread(), instagram_sender_id: "someone-else" };
+    await POST(inbound("hi", "mid-other"));
+    expect(db.inserted("conversations")).toEqual([expect.objectContaining({ instagram_sender_id: LEAD, origin: "inbound" })]);
+  });
+});
+
+describe("AI unavailable on a DM reply", () => {
+  const creditErr = () => Object.assign(new Error("Your credit balance is too low to access the Anthropic API."), { status: 400 });
+
+  it("managed accounts: nothing is sent, the thread is handed off, the operator alerted", async () => {
+    db.state.user = user({ billing_managed: true });
+    ai.generateReply.mockRejectedValueOnce(creditErr());
+    await POST(inbound());
+    expect(ig.sendInstagramMessage).not.toHaveBeenCalled();
+    expect(db.inserted("messages").filter((m) => m.role === "assistant")).toHaveLength(0);
+    expect(aiUnavailable.handOffDmAiUnavailable).toHaveBeenCalledWith(expect.anything(), { userId: "user-1", conversationId: "conv-new" });
+    expect(aiUnavailable.alertAiUnavailable).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ stage: "dm_reply", user: expect.objectContaining({ id: "user-1" }) }));
+    expect(db.conversationSkipReasons()).toContain("generation_failed");
+  });
+
+  it("coach accounts unchanged: nothing sent, no handoff, no alert", async () => {
+    db.state.user = user();
+    ai.generateReply.mockRejectedValueOnce(creditErr());
+    await POST(inbound());
+    expect(ig.sendInstagramMessage).not.toHaveBeenCalled();
+    expect(aiUnavailable.handOffDmAiUnavailable).not.toHaveBeenCalled();
+    expect(aiUnavailable.alertAiUnavailable).not.toHaveBeenCalled();
+    expect(db.conversationSkipReasons()).toContain("generation_failed");
   });
 });

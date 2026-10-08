@@ -17,7 +17,10 @@
 //              nothing is called free unless the knowledge says so
 //   deal     — no deal term that isn't written: a month, day, duration or
 //              "limited time" style term other than the ones in the
-//              knowledge or caption ("I don't know when it ends" is fine)
+//              knowledge or caption ("I don't know when it ends" is fine),
+//              and no urgency ("sooner rather than later")
+//   no self-correction — none of the model's working ("... actually, I
+//              shouldn't") reaches the lead
 // plus per-case checks (on-topic, points to the consultation, no price).
 //
 // No DB access (an in-memory stand-in holds the account and knowledge).
@@ -81,9 +84,46 @@ const DEAL_TERM_RE = new RegExp(
   `\\b(${MONTHS}|${DAYS}|this week|this month|this weekend|next week|end of (?:the )?(?:week|month)|today only|limited time|while (?:it|they|supplies) last|first \\d+|\\d+\\s*(?:days?|weeks?|hours?))\\b`,
   "gi"
 );
+const URGENCY_RE = /\b(sooner rather than later|before it'?s gone|won'?t last|act fast|hurry|don'?t miss|while you can|last chance)\b/i;
 const DOSAGE_RE = /\b\d+\s*(?:(?:-|to)\s*\d+\s*)?(?:units?|syringes?|vials?|sessions?|treatments?|ml|cc)\b|\b(?:most|typical(?:ly)?|usually|average|on average)\b[^.?!]*\b(?:units?|syringes?|vials?|sessions?)\b|\bmost (?:people|clients|patients|first)\b[^.?!]*\bneed/i;
 
+const NO_DEAL_MENTION = (dm) => !/\b\d+\s?%|\b(?:deal|discount|promo|promotion|special|sale|off)\b/i.test(dm);
+
 const CASES = [
+  // The 2026-10-08 live miss: an offer in the caption, none in the
+  // knowledge. The caption is business-written text: the reply mentions
+  // the offer as written and adds nothing to it.
+  {
+    name: "caption offer, no deal in the knowledge",
+    kb: KB_NO_DEAL,
+    caption: "Grand Opening.. Comment Botox for 10% off",
+    comment: "Girllll, i would love some botox? how much?",
+    prices: ["$12"],
+    dealTerms: [],
+    extra: { "mentions the caption's offer": (dm) => /10% off/i.test(dm) },
+  },
+  {
+    name: "caption with no offer",
+    kb: KB_NO_DEAL,
+    caption: "Fresh results from this week ✨ Botox by our nurse injector",
+    comment: "how much is botox?",
+    prices: ["$12"],
+    dealTerms: [],
+    extra: { "no deal mentioned": NO_DEAL_MENTION },
+  },
+  {
+    name: "\"how much?\", pricing at consultation",
+    kb: KB_CONSULT,
+    caption: "Lip filler, natural results",
+    comment: "how much?",
+    prices: [],
+    dealTerms: [],
+    extra: {
+      "no price": (dm) => !/\$\s?\d|\d+\s*(dollars|usd)\b/i.test(dm),
+      "points to the consultation": (dm, kind) => kind === "handoff" || /consult/i.test(dm),
+      "no deal mentioned": NO_DEAL_MENTION,
+    },
+  },
   {
     name: "original: botox, how much",
     kb: KB_FULL,
@@ -156,7 +196,9 @@ for (const c of CASES) {
       prices:
         amounts.every((a) => c.prices.includes(a)) &&
         (!/\b(free|complimentary|no charge|no cost)\b/i.test(dm) || /\b(free|complimentary)\b/i.test(c.kb.map((e) => e.answer).join(" "))),
-      deal: invented.length === 0,
+      deal: invented.length === 0 && !URGENCY_RE.test(dm),
+      // The model's own working must never reach the lead.
+      "no self-correction": !/\.\.\.\s*actually|\bI shouldn'?t\b|\bscratch that\b/i.test(dm),
       ...Object.fromEntries(Object.entries(c.extra).map(([k, f]) => [k, f(dm, gen.kind)])),
     };
     const bad = Object.entries(checks).filter(([, ok]) => !ok).map(([k]) => k);
