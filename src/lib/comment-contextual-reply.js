@@ -1,9 +1,11 @@
-// A contextual comment reply for a lead who already has a quiet thread
-// (managed accounts; src/lib/comment-open-thread.js). Instead of the
-// generic template, the normal AI reply path writes the reply: the same
+// The AI-written comment reply for managed accounts: a lead with no
+// thread yet (the first DM), or one whose thread went quiet
+// (src/lib/comment-open-thread.js). Instead of the generic template, the
+// normal AI reply path writes the reply: the same
 // system prompt (script, voice, persona and identity rules, active offer,
 // business knowledge, booking link, never claiming availability), the
-// thread's history, and the comment as the lead's newest turn:
+// thread's history (none for a first DM), and the comment as the lead's
+// newest turn:
 //   They commented on your post (caption: "..."): "<comment>"
 // The output goes through lintReply like every reply path. A handoff
 // marker (a medical question, or a price/availability/policy question the
@@ -37,7 +39,8 @@ export function commentTurn(caption, commentText) {
 
 /**
  * @param {object} admin - service-role client
- * @param {{userId: string, conversation: object, caption: string|null, commentText: string}} args
+ * @param {{userId: string, conversation: object|null, caption: string|null, commentText: string}} args
+ *   conversation: the lead's thread, or null for a first DM (no history).
  * @returns {Promise<
  *   {kind: "reply", text: string} |
  *   {kind: "handoff", category: string, text: string} |
@@ -58,14 +61,18 @@ export async function generateCommentReply(admin, { userId, conversation, captio
     // Same bar as the webhook: no script, no AI reply.
     if (!sc.greeting && !sc.offer) return { kind: "failed", reason: "no_script" };
 
-    const { data: rows, error: histErr } = await admin
-      .from("messages")
-      .select("role, content, source, created_at")
-      .eq("conversation_id", conversation.id)
-      .order("created_at", { ascending: false })
-      .limit(HISTORY_LIMIT);
-    if (histErr) return { kind: "failed", reason: "history_read_failed" };
-    const history = [...(rows || [])]
+    let rows = [];
+    if (conversation?.id) {
+      const { data, error: histErr } = await admin
+        .from("messages")
+        .select("role, content, source, created_at")
+        .eq("conversation_id", conversation.id)
+        .order("created_at", { ascending: false })
+        .limit(HISTORY_LIMIT);
+      if (histErr) return { kind: "failed", reason: "history_read_failed" };
+      rows = data || [];
+    }
+    const history = [...rows]
       .sort((a, b) => String(a.created_at).localeCompare(String(b.created_at)))
       .map((m) => ({ role: m.role, content: m.content || "", source: m.source }));
 
@@ -73,7 +80,7 @@ export async function generateCommentReply(admin, { userId, conversation, captio
     const bookingLink = bookingLinkFor(user);
     const systemPrompt = buildSystemPrompt(sc, bookingLink, {
       voiceProfile: user.voice_profile,
-      conversation,
+      conversation: conversation || null,
       activeOffer,
       knowledge,
       owner: ownerFromUser(user),

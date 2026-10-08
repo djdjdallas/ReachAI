@@ -38,11 +38,13 @@ const NO_INTENT_OVERRIDE = new Set(["SPAM", "NOT_A_LEAD"]);
  * Before the decision: the post's treatment, and the templates with
  * {{TREATMENT}} rendered.
  *
- * @param {{ownerUser: object, monitoringRow: object, templates: Record<string, string>}} args
+ * @param {{ownerUser: object, monitoringRow: object, templates: Record<string, string>, treatmentKey?: string|null}} args
+ *   treatmentKey: a treatment that wins over the post's tag (managed
+ *   accounts: one the comment names). Ignored unless in the account's list.
  * @returns {{treatmentKey: string|null, templates: Record<string, string>}}
  */
-export function prepareClinicComment({ ownerUser, monitoringRow, templates }) {
-  const treatment = postTreatment(ownerUser, monitoringRow?.treatment_key);
+export function prepareClinicComment({ ownerUser, monitoringRow, templates, treatmentKey = null }) {
+  const treatment = postTreatment(ownerUser, treatmentKey) || postTreatment(ownerUser, monitoringRow?.treatment_key);
   const rendered = {};
   for (const [cls, template] of Object.entries(templates || {})) {
     rendered[cls] = renderTreatmentTokens(template, treatment?.label || null);
