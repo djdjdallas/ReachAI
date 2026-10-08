@@ -31,7 +31,22 @@ describe("buildSystemPrompt: current behavior (keep)", () => {
   });
 
   it("falls back to collecting contact details without a link", () => {
-    expect(buildSystemPrompt(sc, "")).toMatch(/ask the prospect for their email/i);
+    const p = buildSystemPrompt(sc, "");
+    expect(p).toMatch(/ask naturally for their email or phone number/i);
+    // The old instruction ("You do not have a booking link set up yet") was
+    // parroted to a lead as "we don't have a booking link set up just yet".
+    expect(p).not.toMatch(/you do not have a booking link/i);
+    expect(p).toContain("NEVER MENTION SETUP");
+  });
+
+  it("accounts with a link keep the original rule 9", () => {
+    const p = buildSystemPrompt(sc, LINK);
+    expect(p).toContain("9. BOOKING LINK EDGE CASE.");
+    expect(p).not.toContain("NEVER MENTION SETUP");
+  });
+
+  it("a booking turn without a link asks for email or phone", () => {
+    expect(buildSystemPrompt(sc, "", { intentHint: "booking_cta" })).toMatch(/ask for their email or phone number now/i);
   });
 
   it("adds the native-send framing only for native_send threads", () => {

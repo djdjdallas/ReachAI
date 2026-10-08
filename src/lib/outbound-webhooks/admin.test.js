@@ -13,7 +13,8 @@ const ROW = "123e4567-e89b-42d3-a456-426614174000";
 
 describe("admin", () => {
   it("parseEventTypes defaults to every lifecycle event and rejects unknown types", () => {
-    expect(parseEventTypes(undefined)).toHaveLength(7);
+    expect(parseEventTypes(undefined)).toHaveLength(8);
+    expect(parseEventTypes(undefined)).toContain("lead_updated");
     expect(parseEventTypes("dm_started, handoff_requested")).toEqual(["dm_started", "handoff_requested"]);
     expect(() => parseEventTypes("dm_started,lead_deleted")).toThrow(/lead_deleted/);
   });

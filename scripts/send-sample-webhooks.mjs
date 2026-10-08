@@ -68,6 +68,7 @@ const specs = {
   consultation_booked: { profile, booking, data: { demo: true } },
   follow_up_sent: { profile },
   handoff_requested: { profile, data: { reason: "medical_question" } },
+  lead_updated: { profile: { instagram_username: profile.instagram_username, treatment_interest: "botox" } },
   test: {},
 };
 

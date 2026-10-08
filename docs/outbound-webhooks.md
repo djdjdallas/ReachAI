@@ -61,6 +61,7 @@ through a comment and `dm` for one who messaged first.
 | `consultation_booked` | A real Calendly booking was recorded (or a demo booking on a demo account). | once per booking |
 | `follow_up_sent` | A follow-up nudge was delivered. | once per nudge |
 | `handoff_requested` | The lead was handed to a person and the assistant paused. | once per pause |
+| `lead_updated` | A lead field was filled in without a lifecycle step: today, the lead's `treatment_interest` was first recognized. No stage meaning; update the lead and nothing else. | once per lead per treatment key |
 | `test` | Sent by a Clinchd admin to check the connection. | on demand |
 
 ### `new_inquiry`
@@ -347,6 +348,38 @@ reserved: nothing produces it in version 1.
 }
 ```
 
+### `lead_updated`
+
+The lead's details changed, with no step in the funnel. Fires when
+`treatment_interest` goes from unknown to a category key, for example when a
+lead who already exists says "I'm interested in botox". Update the stored
+lead from `lead`; don't move it to a new stage. `data` is `{}`.
+
+```json
+{
+  "id": "evt_7c6f9a8d-0e1b-4c23-d4e5-f6a7b8c9d0e1",
+  "type": "lead_updated",
+  "version": "1",
+  "occurred_at": "2026-10-06T15:03:40.000Z",
+  "workspace": {
+    "id": "5e1f0c3a-2b7d-4c1e-9a55-0d6f3b8e2a11",
+    "name": "Solé Aesthetics"
+  },
+  "lead": {
+    "id": "8c2d4e6f-1a3b-4c5d-8e9f-0a1b2c3d4e5f",
+    "instagram_username": "jane.doe.glow",
+    "treatment_interest": "botox",
+    "source": "instagram_dm"
+  },
+  "conversation": {
+    "id": "8c2d4e6f-1a3b-4c5d-8e9f-0a1b2c3d4e5f",
+    "trigger": null,
+    "trigger_type": "dm"
+  },
+  "data": {}
+}
+```
+
 ### `test`
 
 ```json
@@ -486,6 +519,13 @@ status, destination host, timestamps) is kept.
 - A lead's email or phone is taken only when a message (or the comment that
   started the thread) contains exactly one of them. A correction produces a
   new `contact_captured` with the new value (up to 6 per lead).
+- `treatment_interest` is set once per lead (the first recognized
+  category) and `lead_updated` fires for it. A lead who later mentions a
+  different treatment keeps the first key. If the same step that captured the
+  treatment also captured an email or phone, `contact_captured` and
+  `lead_updated` both arrive, carrying the same lead fields.
+- Webhooks created before `lead_updated` existed don't receive it until an
+  admin adds it to their event list.
 - No `consultation_canceled` / `rescheduled` events. A reschedule in
   Calendly creates a new booking, so it arrives as a new
   `consultation_booked`.

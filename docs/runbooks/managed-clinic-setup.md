@@ -211,6 +211,21 @@ Same steps as A, with these differences:
 | Re-send one event (same id, same body) | `... replay --event evt_<uuid> --apply` |
 | End a managed contract | `cadmin scripts/managed-account.mjs --user <email> --managed false --apply` then `outbound-webhooks.mjs disable` |
 
+- **Changing events replaces the whole list.** `events` sets exactly the
+  types you pass, so list every type the account should keep.
+- **Adding `lead_updated` to an existing webhook** (webhooks created before
+  migration `20261010120000_outbound_lead_updated.sql` don't have it; new
+  ones get it by default). Run only after that migration is applied, or the
+  database rejects the type. For the Solé demo account:
+
+  ```bash
+  cadmin scripts/outbound-webhooks.mjs events --user e1f2fb2c-1487-49fa-bb30-9bb8706f0281 \
+    --events new_inquiry,dm_started,contact_captured,booking_link_sent,consultation_booked,follow_up_sent,handoff_requested,lead_updated
+  # read the dry run, then add --apply; confirm with show
+  ```
+
+  Check `show` first: if the account was set up with a narrower list, keep
+  that list and append `lead_updated`.
 - **Emit failures:** if a database trigger couldn't write the outbox, the
   DM still goes through and the failure is recorded. The cron logs
   `[outbound-webhooks] emit failure` with the account and SQL error code,
