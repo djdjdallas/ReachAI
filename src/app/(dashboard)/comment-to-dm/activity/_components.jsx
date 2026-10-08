@@ -135,8 +135,8 @@ export function Outcome({ log }) {
           DM skipped
         </Pill>
         <p className="text-xs text-stone-500 mt-1">
-          They&apos;re already in a conversation with you (active this week, or
-          handed to you), so no comment DM was added to it.
+          They&apos;re already in a conversation with you (messaging in the last
+          6 hours, or handed to you), so no comment DM was added to it.
         </p>
       </div>
     );

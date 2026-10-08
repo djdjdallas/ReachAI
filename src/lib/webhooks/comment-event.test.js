@@ -9,6 +9,7 @@ const sendPrivateReplyToComment = vi.fn(async () => ({ success: true, messageId:
 const decideAction = vi.fn(() => ({ action: "dm", rendered: "Hey! Thanks for commenting. First time trying Botox?" }));
 const classifyComment = vi.fn(async () => ({ classification: { class: "HIGH_INTENT", confidence: 0.95, signals: [] }, raw: {}, latencyMs: 1 }));
 const sendEmail = vi.fn(async () => {});
+const generateCommentReply = vi.fn(async () => ({ kind: "reply", text: "Contextual reply." }));
 const getOwnMedia = vi.fn(async () => ({ caption: "Botox special, comment BOTOX", permalink: "https://instagram.com/p/new", media_type: "IMAGE" }));
 
 vi.mock("@/lib/supabase/admin", () => ({ getSupabaseAdmin: () => db }));
@@ -24,6 +25,7 @@ vi.mock("@/lib/token-utils", () => ({ decryptToken: () => "page-token" }));
 vi.mock("@/lib/comment-to-dm-gate", () => ({ canUseCommentToDM: () => true }));
 vi.mock("@/lib/comment-public-reply", () => ({ maybePostPublicReply: vi.fn(async () => {}) }));
 vi.mock("@/lib/notifications", () => ({ sendEmail }));
+vi.mock("@/lib/comment-contextual-reply", () => ({ generateCommentReply }));
 
 const { handleCommentEvent } = await import("./comment-event");
 
@@ -42,7 +44,9 @@ function setup(userOverrides = {}, extra = {}) {
           meta_page_access_token: "enc",
           comment_public_reply_enabled: false,
           plan: "unlimited",
-          billing_managed: true,
+          // Managed-account features (auto-watch, open-thread rules) are
+          // opt-in per test.
+          billing_managed: false,
           business_name: "Solé Aesthetics",
           assistant_name: "Katlynne",
           ...userOverrides,
@@ -59,6 +63,7 @@ function setup(userOverrides = {}, extra = {}) {
       outbound_webhooks: extra.webhooks || [],
       outbound_webhook_events: [],
       lead_profiles: [],
+      dm_drip_queue: extra.drips || [],
     },
     { unique: { conversations: "instagram_sender_id", lead_profiles: "conversation_id", posts: "ig_media_id" }, failOn: extra.failOn }
   );
@@ -595,58 +600,133 @@ describe("comment-to-DM: managed-account auto-watch", () => {
   });
 });
 
-describe("comment-to-DM: open-thread skip (managed accounts)", () => {
+describe("comment-to-DM: lead with an existing thread (managed accounts)", () => {
   beforeEach(() => decideAction.mockImplementation(actual.decideAction));
 
+  const CAPTION = "Botox special";
   const tpl = [{ creator_id: "u1", intent_class: "HIGH_INTENT", template: "Hey! Book: {{BOOKING_LINK}}" }];
-  const MANAGED = { business_name: null, billing_managed: true, calendly_url: "https://calendly.com/x" };
-  const ago = (days) => new Date(Date.now() - days * 86_400_000).toISOString();
-  const thread = (fields = {}) => ({ id: "conv-1", user_id: "u1", instagram_sender_id: LEAD, origin: "inbound", ai_paused: false, disclosed_at: "2026-10-01T00:00:00.000Z", ...fields });
-  const msg = (created_at, id = "m-1") => ({ id, conversation_id: "conv-1", role: "user", source: "lead", content: "hi", created_at });
+  const MANAGED = { billing_managed: true, calendly_url: "https://calendly.com/x" };
+  const ago = (hours) => new Date(Date.now() - hours * 3_600_000).toISOString();
+  const thread = (fields = {}) => ({ id: "conv-1", user_id: "u1", instagram_sender_id: LEAD, origin: "inbound", status: "interested", ai_paused: false, disclosed_at: "2026-10-01T00:00:00.000Z", ...fields });
+  const leadMsg = (created_at, id = "m-lead") => ({ id, conversation_id: "conv-1", role: "user", source: "lead", content: "hi", created_at });
+  const aiMsg = (created_at, id = "m-ai") => ({ id, conversation_id: "conv-1", role: "assistant", source: "agent", content: "what are you looking for?", created_at });
+  const sent = () => sendPrivateReplyToComment.mock.calls.map((c) => c[2]);
 
-  it("a paused thread: no DM, logged dm_skipped_open_thread", async () => {
-    setup(MANAGED, { templates: tpl, conversations: [thread({ ai_paused: true })] });
-    await handleCommentEvent(...comment());
-    expect(sendPrivateReplyToComment).not.toHaveBeenCalled();
-    expect(db.tables.comment_to_dm_log.at(-1)).toMatchObject({ decided_action: "dm_skipped_open_thread", dispatched: false, rendered_dm: null });
-    expect(db.tables.messages).toHaveLength(0);
-  });
-
-  it("a thread with a message in the last 7 days: no DM", async () => {
-    setup(MANAGED, { templates: tpl, conversations: [thread()], messages: [msg(ago(30), "m-old"), msg(ago(6), "m-recent")] });
-    await handleCommentEvent(...comment());
-    expect(sendPrivateReplyToComment).not.toHaveBeenCalled();
-    expect(db.tables.comment_to_dm_log.at(-1)).toMatchObject({ decided_action: "dm_skipped_open_thread" });
-    expect(db.tables.messages).toHaveLength(2);
-  });
-
-  it("an old thread (last message over 7 days ago): the DM sends into it", async () => {
-    setup(MANAGED, { templates: tpl, conversations: [thread()], messages: [msg(ago(8))] });
-    await handleCommentEvent(...comment());
-    expect(sendPrivateReplyToComment.mock.calls[0][2]).toBe("Hey! Book: https://calendly.com/x");
+  it("a quiet lead (last message 2 days ago) gets a contextual AI reply to the comment, not the template", async () => {
+    setup(MANAGED, { templates: tpl, conversations: [thread()], messages: [leadMsg(ago(48))] });
+    generateCommentReply.mockResolvedValueOnce({ kind: "reply", text: "Good timing! The Botox special is still on, want the link to grab a spot?" });
+    await handleCommentEvent(...comment("c-1", "is this still going?"));
+    expect(generateCommentReply).toHaveBeenCalledWith(db, {
+      userId: "u1",
+      conversation: expect.objectContaining({ id: "conv-1" }),
+      caption: CAPTION,
+      commentText: "is this still going?",
+    });
+    // Already disclosed: no AI intro.
+    expect(sent()).toEqual(["Good timing! The Botox special is still on, want the link to grab a spot?"]);
+    expect(db.tables.messages.filter((m) => m.conversation_id === "conv-1").at(-1)).toMatchObject({
+      role: "assistant",
+      source: "agent",
+      content: "Good timing! The Botox special is still on, want the link to grab a spot?",
+    });
     expect(db.tables.comment_to_dm_log.at(-1)).toMatchObject({ decided_action: "dm", dispatched: true });
-    expect(db.tables.messages.filter((m) => m.conversation_id === "conv-1")).toHaveLength(2);
   });
 
-  it("no thread at all: the DM sends", async () => {
-    setup(MANAGED, { templates: tpl });
+  it("a quiet thread never disclosed yet: the reply carries the AI intro", async () => {
+    setup(MANAGED, { templates: tpl, conversations: [thread({ disclosed_at: null })], messages: [leadMsg(ago(48))] });
+    generateCommentReply.mockResolvedValueOnce({ kind: "reply", text: "Hey! Good timing, the special is still on." });
     await handleCommentEvent(...comment());
-    expect(sendPrivateReplyToComment).toHaveBeenCalledTimes(1);
+    expect(sent()).toEqual([`${LINE} Good timing, the special is still on.`]);
   });
 
-  it("a complaint on an open thread still hands off, about that thread", async () => {
-    setup({ billing_managed: true }, { templates: tpl, webhooks: [WEBHOOK], conversations: [thread()], messages: [msg(ago(1))] });
+  it("lead active 1 hour ago: skipped, logged with the reason", async () => {
+    setup(MANAGED, { templates: tpl, conversations: [thread()], messages: [leadMsg(ago(1))] });
+    await handleCommentEvent(...comment());
+    expect(sendPrivateReplyToComment).not.toHaveBeenCalled();
+    expect(generateCommentReply).not.toHaveBeenCalled();
+    expect(db.tables.comment_to_dm_log.at(-1)).toMatchObject({ decided_action: "dm_skipped_open_thread", dispatch_error: "open_thread:active", dispatched: false });
+  });
+
+  it("only the lead's own messages count: an AI message 1 hour ago with the lead last seen 7 hours ago is quiet", async () => {
+    setup(MANAGED, { templates: tpl, conversations: [thread()], messages: [leadMsg(ago(7)), aiMsg(ago(1))] });
+    await handleCommentEvent(...comment());
+    expect(sent()).toEqual(["Contextual reply."]);
+  });
+
+  it.each([
+    ["paused (ai_paused)", { ai_paused: true }],
+    ["taken over (status manual)", { status: "manual" }],
+  ])("a %s thread: skipped, logged open_thread:paused", async (_l, fields) => {
+    setup(MANAGED, { templates: tpl, conversations: [thread(fields)], messages: [leadMsg(ago(72))] });
+    await handleCommentEvent(...comment());
+    expect(sendPrivateReplyToComment).not.toHaveBeenCalled();
+    expect(db.tables.comment_to_dm_log.at(-1)).toMatchObject({ decided_action: "dm_skipped_open_thread", dispatch_error: "open_thread:paused" });
+  });
+
+  it.each([
+    ["paused", { ai_paused: true }, []],
+    ["active", {}, [leadMsg(ago(1))]],
+    ["quiet", {}, [leadMsg(ago(48))]],
+  ])("a complaint on a %s thread hands off, about that thread", async (_l, fields, messages) => {
+    setup({ ...MANAGED, business_name: "Solé Aesthetics" }, { templates: tpl, webhooks: [WEBHOOK], conversations: [thread(fields)], messages });
     classifyAs("HIGH_INTENT", 0.95);
     await handleCommentEvent(...comment("c-1", "my lips are still lumpy, how do I fix this?"));
     expect(sendPrivateReplyToComment).not.toHaveBeenCalled();
+    expect(generateCommentReply).not.toHaveBeenCalled();
     expect(db.tables.comment_to_dm_log.at(-1)).toMatchObject({ decided_action: "queue_review" });
     expect(db.tables.outbound_webhook_events).toEqual([
       expect.objectContaining({ event_type: "handoff_requested", conversation_id: "conv-1", data: { reason: "other" } }),
     ]);
   });
 
+  it("a scheduled drip on the thread is cancelled when the reply goes out (one message, not two)", async () => {
+    setup(MANAGED, {
+      templates: tpl,
+      conversations: [thread()],
+      messages: [leadMsg(ago(48))],
+      drips: [
+        { id: "d-1", conversation_id: "conv-1", status: "scheduled" },
+        { id: "d-2", conversation_id: "conv-other", status: "scheduled" },
+      ],
+    });
+    await handleCommentEvent(...comment());
+    expect(db.tables.dm_drip_queue).toEqual([
+      expect.objectContaining({ id: "d-1", status: "canceled", skip_reason: "comment_reply_sent" }),
+      expect.objectContaining({ id: "d-2", status: "scheduled" }),
+    ]);
+  });
+
+  it("a failed send leaves the drip scheduled", async () => {
+    setup(MANAGED, { templates: tpl, conversations: [thread()], messages: [leadMsg(ago(48))], drips: [{ id: "d-1", conversation_id: "conv-1", status: "scheduled" }] });
+    sendPrivateReplyToComment.mockResolvedValueOnce({ success: false, error: "meta_error", retryable: true });
+    await handleCommentEvent(...comment());
+    expect(db.tables.dm_drip_queue[0].status).toBe("scheduled");
+  });
+
+  it("a medical question: the holding text goes out and the thread pauses with the category (handoff_requested)", async () => {
+    setup(MANAGED, { templates: tpl, conversations: [thread()], messages: [leadMsg(ago(48))] });
+    generateCommentReply.mockResolvedValueOnce({ kind: "handoff", category: "medical_question", text: "Good question, someone from the team will get back to you." });
+    await handleCommentEvent(...comment("c-1", "can I get botox while pregnant?"));
+    expect(sent()).toEqual(["Good question, someone from the team will get back to you."]);
+    expect(db.tables.conversations[0]).toMatchObject({ ai_paused: true, ai_pause_reason: "medical_question" });
+  });
+
+  it("generation fails: the template goes out so the comment is still answered", async () => {
+    setup(MANAGED, { templates: tpl, conversations: [thread()], messages: [leadMsg(ago(48))] });
+    generateCommentReply.mockResolvedValueOnce({ kind: "failed", reason: "generation_failed" });
+    await handleCommentEvent(...comment());
+    expect(sent()).toEqual(["Hey! Book: https://calendly.com/x"]);
+  });
+
+  it("no thread at all: the template opener, unchanged", async () => {
+    setup(MANAGED, { templates: tpl });
+    await handleCommentEvent(...comment());
+    expect(generateCommentReply).not.toHaveBeenCalled();
+    expect(sent()[0]).toBe(`${LINE} Book: https://calendly.com/x`);
+  });
+
   it("a skipped DM still seeds the thread's treatment from the post tag (lead_updated)", async () => {
-    setup({ billing_managed: true, treatment_categories: TREATMENTS }, {
+    setup({ ...MANAGED, treatment_categories: TREATMENTS }, {
       templates: tpl,
       webhooks: [WEBHOOK],
       monitoring: { treatment_key: "lip_filler" },
@@ -659,11 +739,11 @@ describe("comment-to-DM: open-thread skip (managed accounts)", () => {
     ]);
   });
 
-  it("coach accounts unchanged: a recent thread still gets the DM", async () => {
-    setup({ ...MANAGED, billing_managed: false }, { templates: tpl, conversations: [thread()], messages: [msg(ago(1))] });
+  it("coach accounts unchanged: an active thread still gets the template, no AI generation", async () => {
+    setup({ ...MANAGED, billing_managed: false, business_name: null }, { templates: tpl, conversations: [thread()], messages: [leadMsg(ago(1))] });
     await handleCommentEvent(...comment());
-    expect(sendPrivateReplyToComment).toHaveBeenCalledTimes(1);
-    expect(db.tables.comment_to_dm_log.at(-1)).toMatchObject({ decided_action: "dm", dispatched: true });
+    expect(generateCommentReply).not.toHaveBeenCalled();
+    expect(sent()).toEqual(["Hey! Book: https://calendly.com/x"]);
   });
 });
 

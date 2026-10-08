@@ -15,7 +15,9 @@ import { applyClinicCommentRules, handOffClinicComment, prepareClinicComment } f
 import { isUndefinedColumn } from "@/lib/db-errors";
 import { autoWatchPost, fillMissingCaption, ingestOwnedPost, isAdComment, isAutoWatchAccount } from "@/lib/comment-auto-watch";
 import { isBillingManaged } from "@/lib/billing/managed";
-import { findOpenThread } from "@/lib/comment-open-thread";
+import { findLeadThread } from "@/lib/comment-open-thread";
+import { generateCommentReply } from "@/lib/comment-contextual-reply";
+import { cancelDripForConversation } from "@/lib/drip/queue";
 import { captureLeadFacts } from "@/lib/outbound-webhooks/lead-capture";
 
 // Phase 2 of the comment-to-DM pipeline. Receives a single change object
@@ -311,21 +313,26 @@ async function processCommentEvent(entry, change) {
     }));
   }
 
-  // Managed accounts: no comment template into a thread that is paused or
-  // active in the last 7 days (src/lib/comment-open-thread.js). The lead
-  // facts the DM would have recorded still are, so the post's treatment
-  // tag reaches the lead (lead_updated). Complaints were routed above.
+  // Managed accounts, a commenter who already has a thread
+  // (src/lib/comment-open-thread.js): paused or chatting in the last 6
+  // hours, skip the DM; a quiet thread gets a contextual AI reply instead
+  // of the template (below). The lead facts are recorded either way, so
+  // the post's treatment tag reaches the lead (lead_updated). Complaints
+  // were routed above. No thread: the template opener, unchanged.
+  let quietThread = null;
   if (decision.action === "dm" && isBillingManaged(ownerUser)) {
-    const open = await findOpenThread(admin, { userId: creatorId, igsid: fromId });
-    if (open) {
-      decision = { action: "dm_skipped_open_thread", rendered: null, reason: `open_thread:${open.reason}` };
+    const thread = await findLeadThread(admin, { userId: creatorId, igsid: fromId });
+    if (thread && thread.state !== "quiet") {
+      decision = { action: "dm_skipped_open_thread", rendered: null, reason: `open_thread:${thread.state}` };
       await captureLeadFacts(admin, {
         userId: creatorId,
-        conversationId: open.conversationId,
+        conversationId: thread.conversation.id,
         text: commentText,
         instagramUsername: fromUsername,
         treatmentKey: clinic?.treatmentKey || null,
       });
+    } else if (thread) {
+      quietThread = thread.conversation;
     }
   }
 
@@ -338,6 +345,9 @@ async function processCommentEvent(entry, change) {
     decided_action: decision.action,
     rendered_dm: decision.rendered,
     dispatched: false,
+    // Which open-thread state skipped it ("open_thread:paused" or
+    // "open_thread:active"); comment_to_dm_log has no reason column.
+    ...(decision.action === "dm_skipped_open_thread" ? { dispatch_error: decision.reason } : {}),
   };
 
   if (decision.action !== "dm") {
@@ -441,7 +451,31 @@ async function processCommentEvent(entry, change) {
   // (released below if the send fails). With no thread yet nothing has been
   // sent to this lead, and persistCommentDmConversation creates the thread
   // with disclosed_at set.
-  let dmText = decision.rendered;
+  // A quiet existing thread (managed accounts): a contextual AI reply to
+  // the comment instead of the template. A handoff marker sends the
+  // holding text and pauses the thread after the send. If generation
+  // fails, the template goes out so the comment still gets an answer.
+  let replyText = decision.rendered;
+  let knowledgeHandoff = null;
+  if (quietThread) {
+    const gen = await generateCommentReply(admin, {
+      userId: creatorId,
+      conversation: quietThread,
+      caption: postRow.caption || null,
+      commentText,
+    });
+    if (gen.kind === "reply" || gen.kind === "handoff") replyText = gen.text;
+    if (gen.kind === "handoff") knowledgeHandoff = gen.category;
+    console.log("[comment-event] quiet thread reply", {
+      commentId,
+      conversationId: quietThread.id,
+      kind: gen.kind,
+      ...(gen.kind === "handoff" ? { category: gen.category } : {}),
+      ...(gen.kind === "failed" ? { reason: gen.reason, fallback: "template" } : {}),
+    });
+  }
+
+  let dmText = replyText;
   let disclosureClaim = null;
   if (disclosureLine(ownerUser)) {
     const { data: existingConv } = fromId
@@ -452,7 +486,7 @@ async function processCommentEvent(entry, change) {
           .eq("instagram_sender_id", fromId)
           .maybeSingle()
       : { data: null };
-    const prepared = await prepareFirstMessage(admin, ownerUser, decision.rendered, {
+    const prepared = await prepareFirstMessage(admin, ownerUser, replyText, {
       conversationId: existingConv?.id || null,
     });
     dmText = prepared.text;
@@ -505,6 +539,24 @@ async function processCommentEvent(entry, change) {
       commentText,
       treatmentKey: clinic?.treatmentKey || null,
     });
+
+    if (quietThread) {
+      // One message, not two: a follow-up nudge scheduled on the thread
+      // would land right after this reply.
+      await cancelDripForConversation(quietThread.id, "comment_reply_sent");
+      if (knowledgeHandoff) {
+        // Same as the DM path's knowledge handoff: the thread pauses with
+        // the category, which emits handoff_requested (medical_question /
+        // missing_knowledge). No email (comment handoffs go to Needs
+        // attention only).
+        const { error: pauseErr } = await admin
+          .from("conversations")
+          .update({ ai_paused: true, ai_pause_reason: knowledgeHandoff })
+          .eq("id", quietThread.id)
+          .eq("ai_paused", false);
+        if (pauseErr) console.error("[comment-event] knowledge handoff pause failed:", { commentId, code: pauseErr.code });
+      }
+    }
 
     // Optional public reply under the trigger comment ("sent! check your
     // dms 🙌"). Runs ONLY after a successful DM dispatch, is opt-in via
