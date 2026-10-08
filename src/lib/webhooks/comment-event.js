@@ -1,3 +1,4 @@
+import { bookingLinkFor } from "@/lib/booking-url";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import { classifyComment, CLASSIFIER_MODEL, CLASSIFIER_VERSION } from "@/lib/classifier";
 import { buildContextBundle } from "@/lib/contextBundle";
@@ -10,10 +11,7 @@ import { maybePostPublicReply } from "@/lib/comment-public-reply";
 import { persistCommentDmConversation } from "@/lib/comment-dm-conversation";
 import { disclosureLine, prepareFirstMessage, releaseFirstMessage } from "@/lib/persona-disclosure";
 import { isPersonaAccount } from "@/lib/persona";
-import { findTreatment, treatmentLabel } from "@/lib/outbound-webhooks/lead-capture";
-import { emitCommentHandoff } from "@/lib/outbound-webhooks/emit";
-import { looksLikeComplaint } from "@/lib/comment-complaint";
-import { sendCommentAttentionEmail } from "@/lib/alerts/handoff-email";
+import { applyClinicCommentRules, handOffClinicComment, prepareClinicComment } from "@/lib/verticals/clinic/comment";
 
 // Phase 2 of the comment-to-DM pipeline. Receives a single change object
 // from a Meta Instagram webhook payload (entry.changes[i] where
@@ -48,6 +46,11 @@ async function processCommentEvent(entry, change) {
   //              parent_id?, created_time? } }
   const commentId = value.id || null;
   const mediaId = value.media?.id || value.media_id || null;
+  // Ads and boosted posts: media.id is the ad's media, and
+  // original_media_id is the organic post the ad runs (absent for dynamic
+  // ads). Watched posts are organic (the picker lists /me/media), so the
+  // comment belongs to that post when Clinchd knows it.
+  const originalMediaId = value.media?.original_media_id || null;
   const fromUsername = value.from?.username || null;
   // The commenter's Instagram-scoped id. This is the SAME id the inbound
   // messaging webhook sees as event.sender.id, so it's the key we persist on
@@ -108,7 +111,9 @@ async function processCommentEvent(entry, change) {
   // its post_id to look up monitoring settings and to FK the
   // classification row. posts.ig_media_id is UNIQUE so it doubles as the
   // dedup key here.
-  const postRow = await findOrCreatePost(admin, creatorId, mediaId);
+  const adOriginalPost =
+    originalMediaId && originalMediaId !== mediaId ? await findPost(admin, originalMediaId) : null;
+  const postRow = adOriginalPost || (await findOrCreatePost(admin, creatorId, mediaId));
   if (!postRow) return;
 
   // 6. Read the per-post monitoring toggle. Saves Anthropic spend when a
@@ -240,36 +245,25 @@ async function processCommentEvent(entry, change) {
     }
   }
 
-  // Persona (clinic) accounts can tag a watched post with one of their
-  // treatments: {{TREATMENT}} renders its label and the lead's profile is
-  // seeded with it. A tag no longer in the account's list is ignored.
-  const persona = isPersonaAccount(ownerUser);
-  const postTreatmentKey = persona
-    ? findTreatment(ownerUser.treatment_categories, monitoringRow.treatment_key)?.key || null
+  // Clinic accounts (business_name set) apply their own rules around the
+  // shared decision: src/lib/verticals/clinic/comment.js. Coach accounts
+  // never enter that module.
+  const clinic = isPersonaAccount(ownerUser)
+    ? prepareClinicComment({ ownerUser, monitoringRow, templates })
     : null;
 
-  let decision = decideAction(classification, monitoringRow, templates, {
+  let decision = decideAction(classification, monitoringRow, clinic ? clinic.templates : templates, {
     postCaption: postRow.caption || "",
     commenterName: fromUsername,
     offerName: offerRow?.offer_name || null,
     // Same link the booking_link_sent detection looks for: the account's
     // booking_url, else its Calendly link.
-    bookingLink: userRow?.booking_url || userRow?.calendly_url || null,
-    treatment: postTreatmentKey ? treatmentLabel(ownerUser.treatment_categories, postTreatmentKey) : null,
+    bookingLink: bookingLinkFor(userRow) || null,
   });
 
-  // Persona accounts: a complaint (bad outcome, side effect, refund) never
-  // gets a sales DM, whatever the post's per-class actions say, and it and
-  // every comment queued for review go to a person instead of dropping
-  // silently. Logged as queue_review so the activity views show it.
-  let attention = null;
-  if (persona) {
-    if (classification.class === "CRITICAL_NEGATIVE" || looksLikeComplaint(commentText)) {
-      attention = "complaint";
-      decision = { action: "queue_review", rendered: null, reason: "persona_complaint" };
-    } else if (decision.action === "queue_review") {
-      attention = "needs_review";
-    }
+  let clinicHandoff = null;
+  if (clinic) {
+    ({ decision, handoff: clinicHandoff } = applyClinicCommentRules({ classification, commentText, decision }));
   }
 
   // 11. Decide branches:
@@ -291,17 +285,14 @@ async function processCommentEvent(entry, change) {
       class: classification.class,
       decided_action: decision.action,
       reason: decision.reason,
-      attention,
+      ...(clinicHandoff ? { clinicHandoff } : {}),
     });
-    if (attention) {
-      await handOffComment(admin, {
-        ownerUser,
-        reason: attention,
+    if (clinicHandoff) {
+      await handOffClinicComment(admin, {
+        userId: creatorId,
         classificationId: persisted.id,
         fromId,
         fromUsername,
-        commentText,
-        postRow,
       });
     }
     return;
@@ -449,7 +440,7 @@ async function processCommentEvent(entry, change) {
       disclosedNow: Boolean(disclosureLine(ownerUser)) && dmText.includes(disclosureLine(ownerUser)),
       providerMessageId: result.messageId || null,
       commentText,
-      treatmentKey: postTreatmentKey,
+      treatmentKey: clinic?.treatmentKey || null,
     });
 
     // Optional public reply under the trigger comment ("sent! check your
@@ -487,52 +478,12 @@ async function processCommentEvent(entry, change) {
   });
 }
 
-// A comment on a persona account that needs a person: handoff_requested
-// (reason "other") for the clinic's Needs attention, and an email to the
-// owner. About the commenter's DM thread when they have one; otherwise
-// about the comment itself. Never throws.
-async function handOffComment(admin, { ownerUser, reason, classificationId, fromId, fromUsername, commentText, postRow }) {
-  try {
-    const { data: conv } = fromId
-      ? await admin
-          .from("conversations")
-          .select("id")
-          .eq("user_id", ownerUser.id)
-          .eq("instagram_sender_id", fromId)
-          .maybeSingle()
-      : { data: null };
-    await emitCommentHandoff(admin, {
-      userId: ownerUser.id,
-      classificationId,
-      conversationId: conv?.id || null,
-      instagramUsername: fromUsername,
-      reason: "other",
-    });
-    await sendCommentAttentionEmail({
-      user: ownerUser,
-      reason,
-      commenterUsername: fromUsername,
-      commentText,
-      postPermalink: postRow.permalink || null,
-      postId: postRow.id,
-      conversationId: conv?.id || null,
-    });
-  } catch (err) {
-    console.error("[comment-event] handoff failed:", { classificationId, error: err?.message });
-  }
-}
-
 // Posts come in from comments before any other ingest path knows about
 // them. Upsert so we don't lose the FK target on cold accounts. ig_media_id
 // is UNIQUE so a parallel webhook for a different comment on the same post
 // will hit the existing row.
 async function findOrCreatePost(admin, creatorId, mediaId) {
-  const { data: existing } = await admin
-    .from("posts")
-    .select("id, caption, ig_media_id, permalink")
-    .eq("ig_media_id", mediaId)
-    .maybeSingle();
-
+  const existing = await findPost(admin, mediaId);
   if (existing) return existing;
 
   const { data: inserted, error } = await admin
@@ -544,7 +495,7 @@ async function findOrCreatePost(admin, creatorId, mediaId) {
       caption: null,
       posted_at: new Date().toISOString(),
     })
-    .select("id, caption, ig_media_id, permalink")
+    .select("id, caption, ig_media_id")
     .single();
 
   if (error) {
@@ -552,6 +503,15 @@ async function findOrCreatePost(admin, creatorId, mediaId) {
     return null;
   }
   return inserted;
+}
+
+async function findPost(admin, mediaId) {
+  const { data } = await admin
+    .from("posts")
+    .select("id, caption, ig_media_id")
+    .eq("ig_media_id", mediaId)
+    .maybeSingle();
+  return data || null;
 }
 
 // Meta sends comment timestamps in either of two shapes depending on the

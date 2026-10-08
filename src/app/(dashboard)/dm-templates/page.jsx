@@ -1,3 +1,4 @@
+import { bookingLinkFor } from "@/lib/booking-url";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
@@ -6,7 +7,7 @@ import { canUseCommentToDM } from "@/lib/comment-to-dm-gate";
 import TemplateEditor from "./TemplateEditor";
 import PublicReplySection from "./PublicReplySection";
 import { isPersonaAccount } from "@/lib/persona";
-import { normalizeTreatmentCategories, treatmentLabel } from "@/lib/outbound-webhooks/lead-capture";
+import { treatmentOptions } from "@/lib/verticals/clinic/treatment";
 import { ACCESS_COLUMNS } from "@/lib/billing/status";
 
 export const metadata = {
@@ -109,15 +110,10 @@ export default async function DmTemplatesPage() {
     postCaptionIsSample: !latestPostCaption,
     offerName: offerRes.data?.offer_name || null,
     // Same link comment DMs send: booking_url, else the Calendly link.
-    bookingLink: profile?.booking_url || profile?.calendly_url || null,
-    // Persona accounts with treatments get {{TREATMENT}}, previewed with
+    bookingLink: bookingLinkFor(profile) || null,
+    // Clinic accounts with treatments get {{TREATMENT}}, previewed with
     // their first treatment.
-    treatmentSample: isPersonaAccount(profile)
-      ? (() => {
-          const first = normalizeTreatmentCategories(profile?.treatment_categories)[0];
-          return first ? treatmentLabel([first], first.key) : null;
-        })()
-      : null,
+    treatmentSample: isPersonaAccount(profile) ? treatmentOptions(profile)[0]?.label || null : null,
   };
 
   return (

@@ -5,9 +5,10 @@ import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import { canUseCommentToDM } from "@/lib/comment-to-dm-gate";
 import { decryptToken } from "@/lib/token-utils";
 import PostPicker from "./PostPicker";
+import { templatesByClassFrom } from "./templates";
 import { ACCESS_COLUMNS } from "@/lib/billing/status";
 import { isPersonaAccount } from "@/lib/persona";
-import { normalizeTreatmentCategories, treatmentLabel } from "@/lib/outbound-webhooks/lead-capture";
+import { treatmentOptions } from "@/lib/verticals/clinic/treatment";
 
 export const metadata = {
   title: "Comment to DM · Clinchd",
@@ -143,23 +144,13 @@ export default async function CommentTriggersPage() {
   // silently downgrades to queue_review at runtime via decideAction().
   const { data: templates } = await admin
     .from("dm_templates")
-    .select("intent_class, body")
+    .select("intent_class, template")
     .eq("creator_id", user.id);
 
-  const templatesByClass = {};
-  for (const t of templates || []) {
-    if (!t?.intent_class) continue;
-    templatesByClass[t.intent_class] =
-      typeof t.body === "string" && t.body.trim().length > 0;
-  }
+  const templatesByClass = templatesByClassFrom(templates);
 
-  // Persona (clinic) accounts can tag a post with one of their treatments.
-  const treatments = isPersonaAccount(profile)
-    ? normalizeTreatmentCategories(profile.treatment_categories).map((c) => ({
-        key: c.key,
-        label: treatmentLabel([c], c.key),
-      }))
-    : [];
+  // Clinic accounts can tag a post with one of their treatments.
+  const treatments = isPersonaAccount(profile) ? treatmentOptions(profile) : [];
 
   return (
     <PostPicker

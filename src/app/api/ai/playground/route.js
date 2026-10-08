@@ -1,3 +1,4 @@
+import { bookingLinkFor } from "@/lib/booking-url";
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
@@ -62,7 +63,7 @@ export async function POST(request) {
 
     const { data: userProfile, error: profileError } = await getSupabaseAdmin()
       .from("users")
-      .select("id, script_config, calendly_url, voice_profile, full_name, instagram_username, business_name, assistant_name, holding_text")
+      .select("id, script_config, calendly_url, booking_url, voice_profile, full_name, instagram_username, business_name, assistant_name, holding_text")
       .eq("id", user.id)
       .single();
 
@@ -74,7 +75,7 @@ export async function POST(request) {
     }
 
     const scriptConfig = userProfile.script_config || {};
-    const calendlyUrl = userProfile.calendly_url || "";
+    const calendlyUrl = bookingLinkFor(userProfile);
 
     if (!scriptConfig.greeting && !scriptConfig.offer) {
       return NextResponse.json(

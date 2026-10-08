@@ -317,7 +317,7 @@ reserved: nothing produces it in version 1.
 | Medical or health question | `medical_question` |
 | A price, availability or policy question the clinic's knowledge doesn't answer | `missing_knowledge` |
 | Complex objection, stuck conversation, hostile or refund request, crisis signal | `other` |
-| A comment on a watched post that got no DM and needs a person: a complaint (bad outcome, side effect, refund), or a comment the assistant wasn't confident enough to DM. Nothing is paused. | `other` |
+| A comment on a watched post that got no DM and needs a person: a complaint (bad outcome, side effect, refund), or a possible inquiry the assistant couldn't DM (not confident enough, or no template). Praise and fan comments never hand off. Nothing is paused. | `other` |
 | Staff replied by hand, or a silent safety pause | no event |
 
 ```json

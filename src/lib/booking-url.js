@@ -1,4 +1,5 @@
-// Leaf module, no imports. Normalizes the booking link (users.calendly_url)
+// Leaf module, no imports. bookingLinkFor picks the link an account sends;
+// normalizeBookingUrl normalizes the booking link (users.calendly_url)
 // before a browser save, to match the users_calendly_url_check constraint
 // (migration 20261005150000): null, or https:// and at most 500 characters.
 //
@@ -24,4 +25,18 @@ export function normalizeBookingUrl(raw) {
     return { ok: false, error: "Booking link can't contain spaces." };
   }
   return { ok: true, value };
+}
+
+/**
+ * The booking link an account sends leads: users.booking_url (set by
+ * scripts/managed-account.mjs), else the Calendly link. The same order
+ * booking_link_sent detection uses (outbound_link_core in migration
+ * 20261009120000). Every reply path, the comment DM and the reply linter
+ * read it from here.
+ *
+ * @param {{booking_url?: string|null, calendly_url?: string|null}|null} user
+ * @returns {string} the link, or "" when the account has none
+ */
+export function bookingLinkFor(user) {
+  return user?.booking_url || user?.calendly_url || "";
 }

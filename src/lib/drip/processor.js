@@ -1,3 +1,4 @@
+import { bookingLinkFor } from "@/lib/booking-url";
 import { hasActiveAccess } from "@/lib/billing/access";
 import { ACCESS_COLUMNS } from "@/lib/billing/status";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
@@ -51,7 +52,7 @@ export async function processDrip(dripRow) {
   const { data: user } = await admin
     .from("users")
     .select(
-      `id, email, drip_enabled, ai_mode, script_config, voice_profile, calendly_url, meta_page_access_token, instagram_business_account_id, full_name, instagram_username, business_name, assistant_name, ${ACCESS_COLUMNS}`
+      `id, email, drip_enabled, ai_mode, script_config, voice_profile, calendly_url, booking_url, meta_page_access_token, instagram_business_account_id, full_name, instagram_username, business_name, assistant_name, ${ACCESS_COLUMNS}`
     )
     .eq("id", dripRow.user_id)
     .single();
@@ -176,7 +177,7 @@ export async function processDrip(dripRow) {
     try {
       const { activeOffer, knowledge } = await loadReplyGrounding(admin, user.id);
       const systemPrompt =
-        buildSystemPrompt(user.script_config || {}, user.calendly_url, {
+        buildSystemPrompt(user.script_config || {}, bookingLinkFor(user), {
           voiceProfile: user.voice_profile,
           conversation: conv,
           activeOffer,
@@ -201,7 +202,7 @@ export async function processDrip(dripRow) {
       // Same pre-send filter as the live reply paths. Only generated nudges
       // are filtered; a coach-authored template is sent as written.
       const lint = lintReply(await generateReply(systemPrompt, history), {
-        bookingLink: user.calendly_url || "",
+        bookingLink: bookingLinkFor(user),
       });
       // A handoff marker means the last open question needs the owner (the
       // live reply path already handed it off, or should have). A nudge

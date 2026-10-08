@@ -1,3 +1,4 @@
+import { bookingLinkFor } from "@/lib/booking-url";
 import { NextResponse, after } from "next/server";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import { generateReply, classifyIncomingMessage } from "@/lib/anthropic";
@@ -1739,7 +1740,7 @@ async function processIncomingMessage({
     : await loadReplyGrounding(supabase, user.id);
 
   // Build prompt and generate reply
-  const systemPrompt = buildSystemPrompt(sc, user.calendly_url, {
+  const systemPrompt = buildSystemPrompt(sc, bookingLinkFor(user), {
     voiceProfile: user.voice_profile,
     conversation,
     activeOffer,
@@ -1949,7 +1950,7 @@ async function processIncomingMessage({
     // Pre-send filter: rewrites mechanical AI tells (dashes, semicolons,
     // markdown, filler openers) and blocks leftover {{placeholders}}. See
     // src/lib/reply-lint.js.
-    lint = lintReply(aiReply, { bookingLink: user.calendly_url || "" });
+    lint = lintReply(aiReply, { bookingLink: bookingLinkFor(user) });
     if (lint.handoff) {
       // Fail-safe: any marker, well-formed or not, alone or mixed into text,
       // is a handoff. Never a silent drop, never the model's text.
@@ -2133,7 +2134,8 @@ async function processIncomingMessage({
   let newStatus = conversation.status;
 
   // Detect from AI reply
-  const hasCalendlyLink = user.calendly_url && aiReply.includes(user.calendly_url);
+  const bookingLink = bookingLinkFor(user);
+  const hasCalendlyLink = bookingLink && aiReply.includes(bookingLink);
   const hasBookKeyword =
     /\b(book a call|schedule a call|book a slot|grab a spot|set up a time|appointment)\b/i.test(aiReply);
   const hasBookedFromAi =

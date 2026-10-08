@@ -212,19 +212,19 @@ describe("comment-to-DM: per-post treatment", () => {
     expect(db.tables.lead_profiles[0]?.treatment_interest ?? null).toBeNull();
   });
 
-  it("coach accounts ignore a tag", async () => {
+  it("coach accounts never enter the clinic module: the template renders as on main", async () => {
     setup({ business_name: null, treatment_categories: TREATMENTS }, { templates: tpl, monitoring: { treatment_key: "lip_filler" } });
     await handleCommentEvent(...comment());
-    expect(sendPrivateReplyToComment.mock.calls[0][2]).toBe("Thanks for asking about our services!");
+    expect(sendPrivateReplyToComment.mock.calls[0][2]).toBe("Thanks for asking about {{TREATMENT|our services}}!");
   });
 });
 
-describe("comment-to-DM: persona comments that need a person", () => {
+describe("comment-to-DM: clinic comments that need a person", () => {
   beforeEach(() => decideAction.mockImplementation(actual.decideAction));
 
   const tpl = [{ creator_id: "u1", intent_class: "HIGH_INTENT", template: "Hey! Grab a spot: {{BOOKING_LINK}}" }];
 
-  it("a low-confidence comment: no DM, handoff_requested (other) as a comment-only lead, owner emailed", async () => {
+  it("a low-confidence inquiry: no DM, handoff_requested (other) as a comment-only lead, no email", async () => {
     setup({}, { templates: tpl, webhooks: [WEBHOOK] });
     classifyAs("HIGH_INTENT", 0.6);
     await handleCommentEvent(...comment("c-1", "hmm maybe"));
@@ -238,20 +238,22 @@ describe("comment-to-DM: persona comments that need a person", () => {
       }),
     ]);
     expect(db.tables.comment_to_dm_log.at(-1)).toMatchObject({ decided_action: "queue_review", dispatched: false });
-    expect(sendEmail).toHaveBeenCalledTimes(1);
-    const mail = sendEmail.mock.calls[0][0];
-    expect(mail.to).toBe("clinic@example.com");
-    expect(mail.subject).toBe("A comment needs you: @jane");
-    expect(mail.html).toContain("hmm maybe");
-    expect(mail.html).toContain("https://instagram.com/p/abc");
+    expect(sendEmail).not.toHaveBeenCalled();
   });
 
-  it("an UNCERTAIN comment (queue_review by class) is handed off too", async () => {
+  it("an UNCERTAIN comment is handed off", async () => {
     setup({}, { templates: tpl, webhooks: [WEBHOOK] });
     classifyAs("UNCERTAIN", 0.5);
     await handleCommentEvent(...comment("c-1", "what lane?"));
     expect(db.tables.outbound_webhook_events).toHaveLength(1);
-    expect(sendEmail).toHaveBeenCalledTimes(1);
+  });
+
+  it("a confident inquiry with no template is handed off rather than dropped", async () => {
+    setup({}, { webhooks: [WEBHOOK] });
+    classifyAs("HIGH_INTENT", 0.95);
+    await handleCommentEvent(...comment("c-1", "how much?"));
+    expect(sendPrivateReplyToComment).not.toHaveBeenCalled();
+    expect(db.tables.outbound_webhook_events).toHaveLength(1);
   });
 
   it("a commenter with an open DM thread: the event is about that thread", async () => {
@@ -263,15 +265,6 @@ describe("comment-to-DM: persona comments that need a person", () => {
     classifyAs("UNCERTAIN", 0.5);
     await handleCommentEvent(...comment("c-1", "what lane?"));
     expect(db.tables.outbound_webhook_events[0]).toMatchObject({ conversation_id: "conv-1", data: { reason: "other" } });
-    expect(sendEmail.mock.calls[0][0].html).toContain("/conversations?thread=conv-1");
-  });
-
-  it("no webhook: still emails the owner", async () => {
-    setup({}, { templates: tpl });
-    classifyAs("UNCERTAIN", 0.5);
-    await handleCommentEvent(...comment("c-1", "what lane?"));
-    expect(db.tables.outbound_webhook_events).toHaveLength(0);
-    expect(sendEmail).toHaveBeenCalledTimes(1);
   });
 
   it("a Meta re-delivery hands off once", async () => {
@@ -280,7 +273,26 @@ describe("comment-to-DM: persona comments that need a person", () => {
     await handleCommentEvent(...comment("c-1", "what lane?"));
     await handleCommentEvent(...comment("c-1", "what lane?"));
     expect(db.tables.outbound_webhook_events).toHaveLength(1);
-    expect(sendEmail).toHaveBeenCalledTimes(1);
+  });
+
+  it("praise is ignored: no DM, no handoff, even when the post is set to DM it", async () => {
+    setup({}, {
+      templates: [...tpl, { creator_id: "u1", intent_class: "ENGAGED_NOT_BUYING", template: "Thank you!! Book: {{BOOKING_LINK}}" }],
+      webhooks: [WEBHOOK],
+      monitoring: { actions_per_class: { ENGAGED_NOT_BUYING: "dm" } },
+    });
+    classifyAs("ENGAGED_NOT_BUYING", 0.95);
+    await handleCommentEvent(...comment("c-1", "so pretty 😍🔥"));
+    expect(sendPrivateReplyToComment).not.toHaveBeenCalled();
+    expect(db.tables.outbound_webhook_events).toHaveLength(0);
+    expect(db.tables.comment_to_dm_log.at(-1)).toMatchObject({ decided_action: "ignore" });
+  });
+
+  it("praise on the default (queue_review) is ignored too", async () => {
+    setup({}, { templates: tpl, webhooks: [WEBHOOK] });
+    classifyAs("ENGAGED_NOT_BUYING", 0.95);
+    await handleCommentEvent(...comment("c-1", "obsessed with this"));
+    expect(db.tables.outbound_webhook_events).toHaveLength(0);
   });
 
   it("ignored classes stay silent", async () => {
@@ -288,7 +300,6 @@ describe("comment-to-DM: persona comments that need a person", () => {
     classifyAs("SPAM", 0.99);
     await handleCommentEvent(...comment("c-1", "follow 4 follow"));
     expect(db.tables.outbound_webhook_events).toHaveLength(0);
-    expect(sendEmail).not.toHaveBeenCalled();
   });
 
   it("coach accounts keep the old silent queue", async () => {
@@ -296,11 +307,10 @@ describe("comment-to-DM: persona comments that need a person", () => {
     classifyAs("UNCERTAIN", 0.5);
     await handleCommentEvent(...comment("c-1", "what lane?"));
     expect(db.tables.outbound_webhook_events).toHaveLength(0);
-    expect(sendEmail).not.toHaveBeenCalled();
   });
 });
 
-describe("comment-to-DM: persona complaints", () => {
+describe("comment-to-DM: clinic complaints", () => {
   beforeEach(() => decideAction.mockImplementation(actual.decideAction));
 
   const tpl = [
@@ -314,7 +324,7 @@ describe("comment-to-DM: persona complaints", () => {
     await handleCommentEvent(...comment("c-1", "my lips are still lumpy, how do I fix this?"));
     expect(sendPrivateReplyToComment).not.toHaveBeenCalled();
     expect(db.tables.outbound_webhook_events[0]).toMatchObject({ event_type: "handoff_requested", data: { reason: "other" } });
-    expect(sendEmail.mock.calls[0][0].html).toContain("complaint");
+    expect(sendEmail).not.toHaveBeenCalled();
   });
 
   it("CRITICAL_NEGATIVE set to DM on the post still gets no DM", async () => {
@@ -323,7 +333,6 @@ describe("comment-to-DM: persona complaints", () => {
     await handleCommentEvent(...comment("c-1", "this place is a scam"));
     expect(sendPrivateReplyToComment).not.toHaveBeenCalled();
     expect(db.tables.outbound_webhook_events).toHaveLength(1);
-    expect(sendEmail).toHaveBeenCalledTimes(1);
   });
 
   it("CRITICAL_NEGATIVE on the default (ignore) is handed off rather than dropped", async () => {
@@ -339,5 +348,45 @@ describe("comment-to-DM: persona complaints", () => {
     classifyAs("CRITICAL_NEGATIVE", 0.97);
     await handleCommentEvent(...comment("c-1", "this place is a scam"));
     expect(sendPrivateReplyToComment).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("comment-to-DM: ad comments", () => {
+  beforeEach(() => decideAction.mockImplementation(actual.decideAction));
+
+  const tpl = [{ creator_id: "u1", intent_class: "HIGH_INTENT", template: "Hey {{COMMENTER_NAME}}! Book: {{BOOKING_LINK}}" }];
+  // The shape Meta sends for a comment on an ad or boosted post: media.id
+  // is the ad's media; original_media_id is the organic post.
+  const adComment = (originalMediaId = "media-1") => [
+    { id: IGBA },
+    {
+      field: "comments",
+      value: {
+        id: "c-ad-1",
+        text: "how much??",
+        from: { id: LEAD, username: "jane" },
+        media: { id: "ad-media-9", ad_id: "120200000000001", ad_title: "Botox October", original_media_id: originalMediaId, media_product_type: "AD" },
+        created_time: new Date().toISOString(),
+      },
+    },
+  ];
+
+  it("a comment on an ad for a watched post is handled as that post's comment", async () => {
+    setup({ business_name: null, calendly_url: "https://calendly.com/x" }, { templates: tpl });
+    await handleCommentEvent(...adComment());
+    expect(sendPrivateReplyToComment).toHaveBeenCalledTimes(1);
+    expect(sendPrivateReplyToComment.mock.calls[0][1]).toBe("c-ad-1");
+    expect(sendPrivateReplyToComment.mock.calls[0][2]).toBe("Hey jane! Book: https://calendly.com/x");
+    expect(db.tables.comment_classifications[0]).toMatchObject({ post_id: "p1", ig_comment_id: "c-ad-1" });
+    // No stray posts row for the ad's own media.
+    expect(db.tables.posts.map((p) => p.ig_media_id)).toEqual(["media-1"]);
+  });
+
+  it("an ad whose original post Clinchd doesn't know falls back to the ad's media (not watched: skipped)", async () => {
+    setup({ business_name: null }, { templates: tpl });
+    await handleCommentEvent(...adComment("media-unknown"));
+    expect(sendPrivateReplyToComment).not.toHaveBeenCalled();
+    expect(db.tables.comment_classifications).toHaveLength(0);
+    expect(db.tables.posts.map((p) => p.ig_media_id)).toEqual(["media-1", "ad-media-9"]);
   });
 });

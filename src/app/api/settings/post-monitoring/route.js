@@ -5,12 +5,12 @@ import { canUseCommentToDM } from "@/lib/comment-to-dm-gate";
 import { ACTIONS, DEFAULT_ACTIONS_PER_CLASS } from "@/lib/comment-trigger-rules";
 import { ACCESS_COLUMNS } from "@/lib/billing/status";
 import { isPersonaAccount } from "@/lib/persona";
-import { findTreatment } from "@/lib/outbound-webhooks/lead-capture";
+import { postTreatment } from "@/lib/verticals/clinic/treatment";
 
 // POST /api/settings/post-monitoring
 // Body: { ig_media_id, enabled, actions_per_class?, treatment_key? }
 //
-// treatment_key (persona accounts only): one of the account's
+// treatment_key (clinic accounts only, src/lib/verticals/clinic): one of the account's
 // treatment_categories keys, or null to clear. Left unchanged when the
 // field is absent.
 //
@@ -72,7 +72,7 @@ export async function POST(request) {
     let treatmentKey = null;
     if (hasTreatment && body.treatment_key !== null && body.treatment_key !== "") {
       const match = isPersonaAccount(profile)
-        ? findTreatment(profile.treatment_categories, body.treatment_key)
+        ? postTreatment(profile, body.treatment_key)
         : null;
       if (!match) {
         return NextResponse.json(

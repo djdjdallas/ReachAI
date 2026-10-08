@@ -1,4 +1,4 @@
-// Complaint check for comments on persona (clinic) accounts. Leaf module,
+// Complaint check for comments on clinic (persona) accounts. Leaf module,
 // no imports.
 //
 // A comment about a bad outcome, a side effect or a refund must never get a

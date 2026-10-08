@@ -1,3 +1,4 @@
+import { bookingLinkFor } from "@/lib/booking-url";
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
@@ -196,7 +197,7 @@ export async function POST(request) {
       );
       const systemPrompt = buildSystemPrompt(
         userProfile.script_config,
-        userProfile.calendly_url,
+        bookingLinkFor(userProfile),
         {
           voiceProfile: userProfile.voice_profile,
           conversation,
@@ -214,7 +215,7 @@ export async function POST(request) {
 
       // Same pre-send filter as the webhook (src/lib/reply-lint.js).
       const lint = lintReply(await generateReply(systemPrompt, allMessages), {
-        bookingLink: userProfile.calendly_url || "",
+        bookingLink: bookingLinkFor(userProfile),
       });
       // Knowledge handoff (medical, or a price/availability/policy question
       // the knowledge doesn't cover). The coach is the one asking here, so

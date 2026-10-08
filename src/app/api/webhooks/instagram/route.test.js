@@ -253,6 +253,20 @@ describe("inbound DM for a serving account (unchanged)", () => {
   });
 });
 
+describe("booking link in AI replies", () => {
+  it.each([
+    ["booking_url when the account has one", { booking_url: "https://book.sole.example/now", calendly_url: "https://calendly.com/sole/consult" }, "https://book.sole.example/now"],
+    ["the Calendly link otherwise", { booking_url: null, calendly_url: "https://calendly.com/sole/consult" }, "https://calendly.com/sole/consult"],
+    ["empty when the account has neither", { booking_url: null, calendly_url: null }, ""],
+  ])("prompt and linter get %s", async (_label, links, expected) => {
+    db.state.user = user(links);
+    const { buildSystemPrompt } = await import("@/lib/prompts");
+    await POST(inbound());
+    expect(buildSystemPrompt.mock.calls[0][1] || "").toBe(expected);
+    expect(lint.lintReply.mock.calls[0][1]).toEqual({ bookingLink: expected });
+  });
+});
+
 describe("send-time checks (audit L6, LM1)", () => {
   it("L6: access that ends during the reply delay stops the send", async () => {
     db.state.user = user();

@@ -11,6 +11,7 @@ import {
   Copy,
 } from "lucide-react";
 import { renderTemplate } from "@/lib/comment-trigger-rules";
+import { renderTreatmentTokens } from "@/lib/verticals/clinic/treatment";
 
 const CORAL = "#ff7e67";
 
@@ -28,8 +29,9 @@ const KNOWN_TOKENS = new Set([
   "POST_CAPTION_SNIPPET",
   "OFFER_NAME",
   "BOOKING_LINK",
-  "TREATMENT",
 ]);
+// Clinic accounts with treatments also have {{TREATMENT}}.
+const CLINIC_TOKENS = new Set([...KNOWN_TOKENS, "TREATMENT"]);
 
 // One row per intent class, in display order. Class names must match
 // src/lib/classifier.js's CLASS_ENUM so dm_templates row lookups in
@@ -264,7 +266,12 @@ function PlaceholderRow({ row }) {
 function TemplatePreview({ body, context }) {
   const trimmed = (body || "").trim();
   if (!trimmed) return null;
-  const rendered = renderTemplate(trimmed, context);
+  // Clinic accounts: {{TREATMENT}} renders first, as in the comment
+  // pipeline (src/lib/verticals/clinic/comment.js).
+  const rendered = renderTemplate(
+    context.treatment ? renderTreatmentTokens(trimmed, context.treatment) : trimmed,
+    context
+  );
   return (
     <div className="rounded-2xl border border-stone-100 bg-stone-50 px-3.5 py-2.5">
       <p className="text-[10px] font-bold text-stone-400 uppercase tracking-wide mb-1">
@@ -295,14 +302,15 @@ function TemplateCard({ meta, initialBody, onSave, renderCtx }) {
   // [dominickjerell] case) get a soft warning pointing at the available
   // tokens. Compare case-insensitively so [offer_name] and [OFFER_NAME]
   // both count as known.
+  const knownTokens = renderCtx?.treatment ? CLINIC_TOKENS : KNOWN_TOKENS;
   const bracketMatches = body.match(BRACKET_TOKEN_RE) || [];
   const knownBracketTokens = bracketMatches.filter((m) =>
-    KNOWN_TOKENS.has(m.slice(1, -1).toUpperCase())
+    knownTokens.has(m.slice(1, -1).toUpperCase())
   );
   const unknownBracketTokens = Array.from(
     new Set(
       bracketMatches.filter(
-        (m) => !KNOWN_TOKENS.has(m.slice(1, -1).toUpperCase())
+        (m) => !knownTokens.has(m.slice(1, -1).toUpperCase())
       )
     )
   );
@@ -315,7 +323,7 @@ function TemplateCard({ meta, initialBody, onSave, renderCtx }) {
     // uppercase because the renderer's match is case-sensitive.
     setBody((prev) =>
       prev.replace(BRACKET_TOKEN_RE, (match, name) =>
-        KNOWN_TOKENS.has(name.toUpperCase()) ? `{{${name.toUpperCase()}}}` : match
+        knownTokens.has(name.toUpperCase()) ? `{{${name.toUpperCase()}}}` : match
       )
     );
   }

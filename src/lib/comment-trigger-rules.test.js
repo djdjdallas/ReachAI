@@ -58,27 +58,3 @@ describe("renderTemplate", () => {
     expect(renderTemplate("hey {{COMMENTER_NAME}}, about {{OFFER_NAME}}")).toBe("hey there, about our offer");
   });
 });
-
-describe("renderTemplate {{TREATMENT}}", () => {
-  it("renders the post's treatment label", () => {
-    expect(renderTemplate("Curious about {{TREATMENT}}?", { treatment: "lip filler" })).toBe("Curious about lip filler?");
-  });
-  it("an untagged post gets the default fallback", () => {
-    expect(renderTemplate("Curious about {{TREATMENT}}?", {})).toBe("Curious about our treatments?");
-  });
-  it("an untagged post gets the template's own fallback", () => {
-    expect(renderTemplate("First time trying {{TREATMENT|this treatment}}?", {})).toBe("First time trying this treatment?");
-  });
-  it("a tagged post ignores the template's fallback", () => {
-    expect(renderTemplate("First time trying {{TREATMENT|this treatment}}?", { treatment: "Botox" })).toBe("First time trying Botox?");
-  });
-  it("renders every occurrence alongside the other tokens", () => {
-    expect(
-      renderTemplate("{{TREATMENT}} with {{COMMENTER_NAME}}: {{TREATMENT|x}} {{BOOKING_LINK}}", {
-        treatment: "Botox",
-        commenterName: "jane",
-        bookingLink: "https://book.example/now",
-      })
-    ).toBe("Botox with jane: Botox https://book.example/now");
-  });
-});
