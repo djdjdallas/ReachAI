@@ -6,6 +6,8 @@ import { canUseCommentToDM } from "@/lib/comment-to-dm-gate";
 import { decryptToken } from "@/lib/token-utils";
 import PostPicker from "./PostPicker";
 import { ACCESS_COLUMNS } from "@/lib/billing/status";
+import { isPersonaAccount } from "@/lib/persona";
+import { normalizeTreatmentCategories, treatmentLabel } from "@/lib/outbound-webhooks/lead-capture";
 
 export const metadata = {
   title: "Comment to DM · Clinchd",
@@ -39,7 +41,7 @@ export default async function CommentTriggersPage() {
 
   const { data: profile } = await supabase
     .from("users")
-    .select(`email, instagram_business_account_id, meta_page_access_token, ${ACCESS_COLUMNS}`)
+    .select(`email, instagram_business_account_id, meta_page_access_token, business_name, treatment_categories, ${ACCESS_COLUMNS}`)
     .eq("id", user.id)
     .maybeSingle();
 
@@ -115,7 +117,7 @@ export default async function CommentTriggersPage() {
       `
       id,
       ig_media_id,
-      post_monitoring_settings ( enabled, actions_per_class )
+      post_monitoring_settings ( enabled, actions_per_class, treatment_key )
     `
     )
     .eq("creator_id", user.id)
@@ -131,6 +133,7 @@ export default async function CommentTriggersPage() {
       monitoringByMediaId[row.ig_media_id] = {
         enabled: ms.enabled !== false,
         actions_per_class: ms.actions_per_class || null,
+        treatment_key: ms.treatment_key || null,
       };
     }
   }
@@ -150,12 +153,21 @@ export default async function CommentTriggersPage() {
       typeof t.body === "string" && t.body.trim().length > 0;
   }
 
+  // Persona (clinic) accounts can tag a post with one of their treatments.
+  const treatments = isPersonaAccount(profile)
+    ? normalizeTreatmentCategories(profile.treatment_categories).map((c) => ({
+        key: c.key,
+        label: treatmentLabel([c], c.key),
+      }))
+    : [];
+
   return (
     <PostPicker
       mediaItems={mediaItems}
       monitoringByMediaId={monitoringByMediaId}
       mediaError={mediaError}
       templatesByClass={templatesByClass}
+      treatments={treatments}
     />
   );
 }

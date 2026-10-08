@@ -7,10 +7,12 @@ import { fakeDb } from "@/lib/test-utils/fake-db";
 let db;
 const sendPrivateReplyToComment = vi.fn(async () => ({ success: true, messageId: "mid-opener" }));
 const decideAction = vi.fn(() => ({ action: "dm", rendered: "Hey! Thanks for commenting. First time trying Botox?" }));
+const classifyComment = vi.fn(async () => ({ classification: { class: "HIGH_INTENT", confidence: 0.95, signals: [] }, raw: {}, latencyMs: 1 }));
+const sendEmail = vi.fn(async () => {});
 
 vi.mock("@/lib/supabase/admin", () => ({ getSupabaseAdmin: () => db }));
 vi.mock("@/lib/classifier", () => ({
-  classifyComment: vi.fn(async () => ({ classification: { class: "HIGH_INTENT", confidence: 0.95, signals: [] }, raw: {}, latencyMs: 1 })),
+  classifyComment,
   CLASSIFIER_MODEL: "test",
   CLASSIFIER_VERSION: "test",
 }));
@@ -20,6 +22,7 @@ vi.mock("@/lib/instagram", () => ({ sendPrivateReplyToComment }));
 vi.mock("@/lib/token-utils", () => ({ decryptToken: () => "page-token" }));
 vi.mock("@/lib/comment-to-dm-gate", () => ({ canUseCommentToDM: () => true }));
 vi.mock("@/lib/comment-public-reply", () => ({ maybePostPublicReply: vi.fn(async () => {}) }));
+vi.mock("@/lib/notifications", () => ({ sendEmail }));
 
 const { handleCommentEvent } = await import("./comment-event");
 
@@ -44,24 +47,26 @@ function setup(userOverrides = {}, extra = {}) {
           ...userOverrides,
         },
       ],
-      posts: [{ id: "p1", caption: "Botox special", ig_media_id: "media-1" }],
-      post_monitoring_settings: [{ creator_id: "u1", post_id: "p1", enabled: true, actions_per_class: {} }],
+      posts: [{ id: "p1", caption: "Botox special", ig_media_id: "media-1", permalink: "https://instagram.com/p/abc" }],
+      post_monitoring_settings: [{ creator_id: "u1", post_id: "p1", enabled: true, actions_per_class: {}, ...extra.monitoring }],
       comment_classifications: [],
-      dm_templates: [],
+      dm_templates: extra.templates || [],
       creator_offers: [],
       comment_to_dm_log: [],
       conversations: extra.conversations || [],
       messages: extra.messages || [],
-      outbound_webhooks: [],
+      outbound_webhooks: extra.webhooks || [],
+      outbound_webhook_events: [],
+      lead_profiles: [],
     },
-    { unique: { conversations: "instagram_sender_id" } }
+    { unique: { conversations: "instagram_sender_id", lead_profiles: "conversation_id" } }
   );
   db.rpc = async () => ({ data: true, error: null });
 }
 
-const comment = (id = "c-1") => [
+const comment = (id = "c-1", text = "BOTOX") => [
   { id: IGBA },
-  { field: "comments", value: { id, text: "BOTOX", media: { id: "media-1" }, from: { id: LEAD, username: "jane" }, created_time: new Date().toISOString() } },
+  { field: "comments", value: { id, text, media: { id: "media-1" }, from: { id: LEAD, username: "jane" }, created_time: new Date().toISOString() } },
 ];
 
 beforeEach(() => vi.clearAllMocks());
@@ -144,5 +149,195 @@ describe("comment-to-DM opener: first-message AI disclosure", () => {
     await handleCommentEvent(...comment());
     expect(db.tables.conversations[0].origin).toBe("native_send");
     expect(db.tables.messages.find((m) => m.id === "m-echo").source).toBe("agent");
+  });
+});
+
+// The real decision layer, for the tests below that exercise rendering and
+// routing end to end.
+const actual = await vi.importActual("@/lib/comment-trigger-rules");
+const WEBHOOK = { id: "w1", user_id: "u1", enabled: true, event_types: ["handoff_requested", "lead_updated"] };
+const TREATMENTS = [
+  { key: "botox", match: ["botox"], label: "Botox" },
+  { key: "lip_filler", match: ["lips", "lip filler"], label: "lip filler" },
+];
+const classifyAs = (cls, confidence = 0.95) =>
+  classifyComment.mockResolvedValueOnce({ classification: { class: cls, confidence, signals: [] }, raw: {}, latencyMs: 1 });
+
+describe("comment-to-DM: booking link", () => {
+  beforeEach(() => decideAction.mockImplementation(actual.decideAction));
+
+  const tpl = [{ creator_id: "u1", intent_class: "HIGH_INTENT", template: "Book here: {{BOOKING_LINK}}" }];
+
+  it("renders booking_url when the account has one", async () => {
+    setup({ business_name: null, booking_url: "https://book.sole.example/now", calendly_url: "https://calendly.com/sole/consult" }, { templates: tpl });
+    await handleCommentEvent(...comment());
+    expect(sendPrivateReplyToComment.mock.calls[0][2]).toBe("Book here: https://book.sole.example/now");
+  });
+
+  it("falls back to the Calendly link", async () => {
+    setup({ business_name: null, booking_url: null, calendly_url: "https://calendly.com/sole/consult" }, { templates: tpl });
+    await handleCommentEvent(...comment());
+    expect(sendPrivateReplyToComment.mock.calls[0][2]).toBe("Book here: https://calendly.com/sole/consult");
+  });
+});
+
+describe("comment-to-DM: per-post treatment", () => {
+  beforeEach(() => decideAction.mockImplementation(actual.decideAction));
+
+  const tpl = [{ creator_id: "u1", intent_class: "HIGH_INTENT", template: "Thanks for asking about {{TREATMENT|our services}}!" }];
+
+  it("a tagged post renders the treatment label and seeds the lead's treatment", async () => {
+    setup({ treatment_categories: TREATMENTS }, { templates: tpl, monitoring: { treatment_key: "lip_filler" }, webhooks: [WEBHOOK] });
+    await handleCommentEvent(...comment("c-1", "how much??"));
+    expect(sendPrivateReplyToComment.mock.calls[0][2]).toBe(`${LINE} Thanks for asking about lip filler!`);
+    expect(db.tables.lead_profiles[0]).toMatchObject({ conversation_id: db.tables.conversations[0].id, treatment_interest: "lip_filler" });
+  });
+
+  it("the post's tag wins over a treatment named in the comment", async () => {
+    setup({ treatment_categories: TREATMENTS }, { templates: tpl, monitoring: { treatment_key: "lip_filler" }, webhooks: [WEBHOOK] });
+    await handleCommentEvent(...comment("c-1", "is botox included?"));
+    expect(db.tables.lead_profiles[0].treatment_interest).toBe("lip_filler");
+  });
+
+  it("an untagged post renders the template's fallback", async () => {
+    setup({ treatment_categories: TREATMENTS }, { templates: tpl });
+    await handleCommentEvent(...comment());
+    expect(sendPrivateReplyToComment.mock.calls[0][2]).toBe(`${LINE} Thanks for asking about our services!`);
+  });
+
+  it("a tag the account no longer has is ignored", async () => {
+    setup({ treatment_categories: TREATMENTS }, { templates: tpl, monitoring: { treatment_key: "laser" }, webhooks: [WEBHOOK] });
+    await handleCommentEvent(...comment("c-1", "how much??"));
+    expect(sendPrivateReplyToComment.mock.calls[0][2]).toBe(`${LINE} Thanks for asking about our services!`);
+    expect(db.tables.lead_profiles[0]?.treatment_interest ?? null).toBeNull();
+  });
+
+  it("coach accounts ignore a tag", async () => {
+    setup({ business_name: null, treatment_categories: TREATMENTS }, { templates: tpl, monitoring: { treatment_key: "lip_filler" } });
+    await handleCommentEvent(...comment());
+    expect(sendPrivateReplyToComment.mock.calls[0][2]).toBe("Thanks for asking about our services!");
+  });
+});
+
+describe("comment-to-DM: persona comments that need a person", () => {
+  beforeEach(() => decideAction.mockImplementation(actual.decideAction));
+
+  const tpl = [{ creator_id: "u1", intent_class: "HIGH_INTENT", template: "Hey! Grab a spot: {{BOOKING_LINK}}" }];
+
+  it("a low-confidence comment: no DM, handoff_requested (other) as a comment-only lead, owner emailed", async () => {
+    setup({}, { templates: tpl, webhooks: [WEBHOOK] });
+    classifyAs("HIGH_INTENT", 0.6);
+    await handleCommentEvent(...comment("c-1", "hmm maybe"));
+    expect(sendPrivateReplyToComment).not.toHaveBeenCalled();
+    const classificationId = db.tables.comment_classifications[0].id;
+    expect(db.tables.outbound_webhook_events).toEqual([
+      expect.objectContaining({
+        event_type: "handoff_requested",
+        conversation_id: null,
+        data: { reason: "other", comment_lead: { id: classificationId, instagram_username: "jane" } },
+      }),
+    ]);
+    expect(db.tables.comment_to_dm_log.at(-1)).toMatchObject({ decided_action: "queue_review", dispatched: false });
+    expect(sendEmail).toHaveBeenCalledTimes(1);
+    const mail = sendEmail.mock.calls[0][0];
+    expect(mail.to).toBe("clinic@example.com");
+    expect(mail.subject).toBe("A comment needs you: @jane");
+    expect(mail.html).toContain("hmm maybe");
+    expect(mail.html).toContain("https://instagram.com/p/abc");
+  });
+
+  it("an UNCERTAIN comment (queue_review by class) is handed off too", async () => {
+    setup({}, { templates: tpl, webhooks: [WEBHOOK] });
+    classifyAs("UNCERTAIN", 0.5);
+    await handleCommentEvent(...comment("c-1", "what lane?"));
+    expect(db.tables.outbound_webhook_events).toHaveLength(1);
+    expect(sendEmail).toHaveBeenCalledTimes(1);
+  });
+
+  it("a commenter with an open DM thread: the event is about that thread", async () => {
+    setup({}, {
+      templates: tpl,
+      webhooks: [WEBHOOK],
+      conversations: [{ id: "conv-1", user_id: "u1", instagram_sender_id: LEAD, origin: "inbound" }],
+    });
+    classifyAs("UNCERTAIN", 0.5);
+    await handleCommentEvent(...comment("c-1", "what lane?"));
+    expect(db.tables.outbound_webhook_events[0]).toMatchObject({ conversation_id: "conv-1", data: { reason: "other" } });
+    expect(sendEmail.mock.calls[0][0].html).toContain("/conversations?thread=conv-1");
+  });
+
+  it("no webhook: still emails the owner", async () => {
+    setup({}, { templates: tpl });
+    classifyAs("UNCERTAIN", 0.5);
+    await handleCommentEvent(...comment("c-1", "what lane?"));
+    expect(db.tables.outbound_webhook_events).toHaveLength(0);
+    expect(sendEmail).toHaveBeenCalledTimes(1);
+  });
+
+  it("a Meta re-delivery hands off once", async () => {
+    setup({}, { templates: tpl, webhooks: [WEBHOOK] });
+    classifyAs("UNCERTAIN", 0.5);
+    await handleCommentEvent(...comment("c-1", "what lane?"));
+    await handleCommentEvent(...comment("c-1", "what lane?"));
+    expect(db.tables.outbound_webhook_events).toHaveLength(1);
+    expect(sendEmail).toHaveBeenCalledTimes(1);
+  });
+
+  it("ignored classes stay silent", async () => {
+    setup({}, { templates: tpl, webhooks: [WEBHOOK] });
+    classifyAs("SPAM", 0.99);
+    await handleCommentEvent(...comment("c-1", "follow 4 follow"));
+    expect(db.tables.outbound_webhook_events).toHaveLength(0);
+    expect(sendEmail).not.toHaveBeenCalled();
+  });
+
+  it("coach accounts keep the old silent queue", async () => {
+    setup({ business_name: null }, { templates: tpl, webhooks: [WEBHOOK] });
+    classifyAs("UNCERTAIN", 0.5);
+    await handleCommentEvent(...comment("c-1", "what lane?"));
+    expect(db.tables.outbound_webhook_events).toHaveLength(0);
+    expect(sendEmail).not.toHaveBeenCalled();
+  });
+});
+
+describe("comment-to-DM: persona complaints", () => {
+  beforeEach(() => decideAction.mockImplementation(actual.decideAction));
+
+  const tpl = [
+    { creator_id: "u1", intent_class: "HIGH_INTENT", template: "Hey! Grab a spot: {{BOOKING_LINK}}" },
+    { creator_id: "u1", intent_class: "CRITICAL_NEGATIVE", template: "So sorry! Book a fix: {{BOOKING_LINK}}" },
+  ];
+
+  it("a complaint the classifier called HIGH_INTENT gets no sales DM; it is handed off", async () => {
+    setup({}, { templates: tpl, webhooks: [WEBHOOK] });
+    classifyAs("HIGH_INTENT", 0.95);
+    await handleCommentEvent(...comment("c-1", "my lips are still lumpy, how do I fix this?"));
+    expect(sendPrivateReplyToComment).not.toHaveBeenCalled();
+    expect(db.tables.outbound_webhook_events[0]).toMatchObject({ event_type: "handoff_requested", data: { reason: "other" } });
+    expect(sendEmail.mock.calls[0][0].html).toContain("complaint");
+  });
+
+  it("CRITICAL_NEGATIVE set to DM on the post still gets no DM", async () => {
+    setup({}, { templates: tpl, webhooks: [WEBHOOK], monitoring: { actions_per_class: { CRITICAL_NEGATIVE: "dm" } } });
+    classifyAs("CRITICAL_NEGATIVE", 0.97);
+    await handleCommentEvent(...comment("c-1", "this place is a scam"));
+    expect(sendPrivateReplyToComment).not.toHaveBeenCalled();
+    expect(db.tables.outbound_webhook_events).toHaveLength(1);
+    expect(sendEmail).toHaveBeenCalledTimes(1);
+  });
+
+  it("CRITICAL_NEGATIVE on the default (ignore) is handed off rather than dropped", async () => {
+    setup({}, { templates: tpl, webhooks: [WEBHOOK] });
+    classifyAs("CRITICAL_NEGATIVE", 0.97);
+    await handleCommentEvent(...comment("c-1", "I want a refund"));
+    expect(db.tables.outbound_webhook_events).toHaveLength(1);
+    expect(db.tables.comment_to_dm_log.at(-1)).toMatchObject({ decided_action: "queue_review" });
+  });
+
+  it("coach accounts: a CRITICAL_NEGATIVE set to DM still follows the post's setting", async () => {
+    setup({ business_name: null }, { templates: tpl, monitoring: { actions_per_class: { CRITICAL_NEGATIVE: "dm" } } });
+    classifyAs("CRITICAL_NEGATIVE", 0.97);
+    await handleCommentEvent(...comment("c-1", "this place is a scam"));
+    expect(sendPrivateReplyToComment).toHaveBeenCalledTimes(1);
   });
 });

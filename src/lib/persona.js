@@ -64,3 +64,11 @@ export function personaFromUser(user) {
     businessName: cleanBusinessName(user?.business_name),
   };
 }
+
+/**
+ * A persona account (a clinic with a named AI assistant): business_name is
+ * set and valid. Coach accounts are not.
+ */
+export function isPersonaAccount(user) {
+  return Boolean(cleanBusinessName(user?.business_name));
+}

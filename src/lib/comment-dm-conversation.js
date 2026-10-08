@@ -36,6 +36,9 @@ export async function persistCommentDmConversation({
   commentText,
   // The DM that just went out carried the first-message AI disclosure.
   disclosedNow = false,
+  // The treatment tagged on the post (persona accounts): seeds the lead's
+  // treatment_interest ahead of matching the comment text.
+  treatmentKey = null,
 }) {
   try {
     // Without the recipient IGSID there is no key the inbound reply can match
@@ -72,14 +75,15 @@ export async function persistCommentDmConversation({
         .is("disclosed_at", null);
     }
 
-    // Outbound webhooks: the commenter's username and a treatment category
-    // matched in the comment (accounts with an enabled webhook only). Never
-    // throws.
+    // Outbound webhooks: the commenter's username and a treatment category,
+    // the post's tag or else one matched in the comment (accounts with an
+    // enabled webhook only). Never throws.
     await captureLeadFacts(admin, {
       userId,
       conversationId: conversation.id,
       text: commentText,
       instagramUsername: senderName,
+      treatmentKey,
     });
 
     // Exactly one assistant message, idempotent on provider_message_id so a

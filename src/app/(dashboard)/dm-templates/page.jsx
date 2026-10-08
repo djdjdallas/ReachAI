@@ -5,6 +5,8 @@ import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import { canUseCommentToDM } from "@/lib/comment-to-dm-gate";
 import TemplateEditor from "./TemplateEditor";
 import PublicReplySection from "./PublicReplySection";
+import { isPersonaAccount } from "@/lib/persona";
+import { normalizeTreatmentCategories, treatmentLabel } from "@/lib/outbound-webhooks/lead-capture";
 import { ACCESS_COLUMNS } from "@/lib/billing/status";
 
 export const metadata = {
@@ -24,7 +26,7 @@ export default async function DmTemplatesPage() {
 
   const { data: profile } = await supabase
     .from("users")
-    .select(`email, calendly_url, comment_public_reply_enabled, ${ACCESS_COLUMNS}`)
+    .select(`email, calendly_url, booking_url, business_name, treatment_categories, comment_public_reply_enabled, ${ACCESS_COLUMNS}`)
     .eq("id", user.id)
     .maybeSingle();
 
@@ -106,7 +108,16 @@ export default async function DmTemplatesPage() {
     commenterIsSample: !latestCommentRes.data?.ig_commenter_username,
     postCaptionIsSample: !latestPostCaption,
     offerName: offerRes.data?.offer_name || null,
-    bookingLink: profile?.calendly_url || null,
+    // Same link comment DMs send: booking_url, else the Calendly link.
+    bookingLink: profile?.booking_url || profile?.calendly_url || null,
+    // Persona accounts with treatments get {{TREATMENT}}, previewed with
+    // their first treatment.
+    treatmentSample: isPersonaAccount(profile)
+      ? (() => {
+          const first = normalizeTreatmentCategories(profile?.treatment_categories)[0];
+          return first ? treatmentLabel([first], first.key) : null;
+        })()
+      : null,
   };
 
   return (

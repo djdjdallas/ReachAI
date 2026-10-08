@@ -4,7 +4,8 @@
 // Modifiers: order (ignored unless asked), limit, single, maybeSingle.
 // Each statement applies in one synchronous step, like a single SQL
 // statement. Not a database: no constraints except an optional unique key
-// per table for upsert/insert conflicts.
+// per table for upsert/insert conflicts (onConflict may list several
+// columns; ignoreDuplicates is honored).
 
 function likeToRegex(pattern) {
   let re = "";
@@ -92,6 +93,7 @@ export function fakeDb(tables, opts = {}) {
           st.op = "upsert";
           st.data = data;
           st.onConflict = o.onConflict || null;
+          st.ignoreDuplicates = o.ignoreDuplicates === true;
           return builder;
         },
         update(data) {
@@ -151,9 +153,11 @@ export function fakeDb(tables, opts = {}) {
           const list = Array.isArray(st.data) ? st.data : [st.data];
           const written = [];
           for (const d of list) {
-            const existing = uniq ? rows.find((r) => r[uniq] === d[uniq]) : null;
+            const keyCols = uniq ? uniq.split(",").map((c) => c.trim()) : [];
+            const existing = uniq ? rows.find((r) => keyCols.every((c) => r[c] === d[c])) : null;
             if (existing) {
               if (st.op === "insert") return { data: null, error: { code: "23505", message: "duplicate key" } };
+              if (st.ignoreDuplicates) continue;
               Object.assign(existing, d);
               written.push(existing);
             } else {

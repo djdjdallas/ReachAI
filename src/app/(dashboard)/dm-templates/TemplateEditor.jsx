@@ -28,6 +28,7 @@ const KNOWN_TOKENS = new Set([
   "POST_CAPTION_SNIPPET",
   "OFFER_NAME",
   "BOOKING_LINK",
+  "TREATMENT",
 ]);
 
 // One row per intent class, in display order. Class names must match
@@ -124,11 +125,23 @@ function buildPlaceholderRows(values) {
     {
       token: "{{BOOKING_LINK}}",
       resolved: values.bookingLink,
-      sourceLabel: values.bookingLink ? "your Calendly link" : null,
+      sourceLabel: values.bookingLink ? "your booking link" : null,
       missing: !values.bookingLink,
       configHref: "/settings",
       configLabel: "Connect Calendly",
     },
+    // Clinic accounts with treatments: the treatment tagged on the post.
+    ...(values.treatmentSample
+      ? [
+          {
+            token: "{{TREATMENT}}",
+            resolved: values.treatmentSample,
+            sourceLabel:
+              "sample: the treatment tagged on the post. Untagged posts get \"our treatments\", or your own fallback with {{TREATMENT|this treatment}}",
+            missing: false,
+          },
+        ]
+      : []),
   ];
 }
 
@@ -138,6 +151,7 @@ function renderContext(values) {
     postCaption: values.postCaption,
     offerName: values.offerName || "",
     bookingLink: values.bookingLink || "",
+    treatment: values.treatmentSample || "",
   };
 }
 

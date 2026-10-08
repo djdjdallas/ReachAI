@@ -23,14 +23,14 @@ Every event has the same shape:
 | `occurred_at` | ISO 8601 | When the step happened in Clinchd (not when it was sent). |
 | `workspace` | object | `{ "id": <Clinchd account id>, "name": <business name> }`. One workspace = one clinic location. |
 | `lead` | object \| null | `null` only for `test`. See below. |
-| `conversation` | object \| null | `{ "id", "trigger": null, "trigger_type": "comment" \| "dm" }`. `null` for `test` and for booking-only leads. |
+| `conversation` | object \| null | `{ "id", "trigger": null, "trigger_type": "comment" \| "dm" }`. `null` for `test`, booking-only leads and comment-only leads. |
 | `data` | object | Per type; `{}` unless listed below. |
 
 ### `lead`
 
 | Field | Notes |
 |---|---|
-| `id` | Stable lead id. The Clinchd conversation id (one lead = one Instagram thread per account), so it equals `conversation.id`. A Calendly booking that matched no conversation uses `bkg_<booking id>`. |
+| `id` | Stable lead id. The Clinchd conversation id (one lead = one Instagram thread per account), so it equals `conversation.id`. A Calendly booking that matched no conversation uses `bkg_<booking id>`. A comment handed to a person before any DM thread existed (`handoff_requested` only) uses `cmt_<comment id>`; if that person later gets a DM thread, it is a new lead id. |
 | `instagram_username` | When known. |
 | `first_name`, `last_name` | Only from a Calendly booking (the invitee's name), and only when the booking matched the lead by email or is a booking-only lead. Never guessed from Instagram display names. |
 | `email` | Validated format, lowercased. |
@@ -60,7 +60,7 @@ through a comment and `dm` for one who messaged first.
 | `booking_link_sent` | A delivered message contained the account's booking link. | once per lead |
 | `consultation_booked` | A real Calendly booking was recorded (or a demo booking on a demo account). | once per booking |
 | `follow_up_sent` | A follow-up nudge was delivered. | once per nudge |
-| `handoff_requested` | The lead was handed to a person and the assistant paused. | once per pause |
+| `handoff_requested` | The lead was handed to a person and the assistant paused, or a comment on a watched post needs a person and got no DM. | once per pause, or once per comment |
 | `lead_updated` | A lead field was filled in without a lifecycle step: today, the lead's `treatment_interest` was first recognized. No stage meaning; update the lead and nothing else. | once per lead per treatment key |
 | `test` | Sent by a Clinchd admin to check the connection. | on demand |
 
@@ -317,6 +317,7 @@ reserved: nothing produces it in version 1.
 | Medical or health question | `medical_question` |
 | A price, availability or policy question the clinic's knowledge doesn't answer | `missing_knowledge` |
 | Complex objection, stuck conversation, hostile or refund request, crisis signal | `other` |
+| A comment on a watched post that got no DM and needs a person: a complaint (bad outcome, side effect, refund), or a comment the assistant wasn't confident enough to DM. Nothing is paused. | `other` |
 | Staff replied by hand, or a silent safety pause | no event |
 
 ```json
@@ -345,6 +346,22 @@ reserved: nothing produces it in version 1.
   "data": {
     "reason": "medical_question"
   }
+}
+```
+
+A comment from someone with no DM thread yet arrives as a **comment-only
+lead**: `lead.id` is `cmt_<comment id>`, the only other lead fields are
+`instagram_username` and `source`, and `conversation` is `null`.
+
+```json
+{
+  "lead": {
+    "id": "cmt_3f2a1b0c-9d8e-4f7a-8b6c-5d4e3f2a1b0c",
+    "instagram_username": "jane.doe.glow",
+    "source": "instagram_comment"
+  },
+  "conversation": null,
+  "data": { "reason": "other" }
 }
 ```
 

@@ -15,6 +15,7 @@ import { CONTRACT_VERSION, HANDOFF_REASONS, publicEventId } from "./events";
 import { extractEmail, normalizePhone, validUsername } from "./lead-capture";
 
 const CATEGORY_KEY_RE = /^[a-z0-9][a-z0-9_-]{0,39}$/;
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const NAME_PART_RE = /^[\p{L}\p{M}][\p{L}\p{M}' .-]{0,59}$/u;
 
 function cleanName(part) {
@@ -84,11 +85,17 @@ export function buildEnvelope({ event, user, conversation, profile, booking }) {
   const conversationId = event.conversation_id || null;
   // A Calendly booking that matched no conversation is a booking-only lead.
   const bookingOnly = type === "consultation_booked" && !conversationId && booking?.id;
-  const leadId = conversationId || (bookingOnly ? `bkg_${booking.id}` : null);
+  // A comment handed to a person before any DM thread existed is a
+  // comment-only lead (src/lib/outbound-webhooks/emit.js).
+  const commentLead =
+    type === "handoff_requested" && !conversationId && UUID_RE.test(String(event.data?.comment_lead?.id || ""))
+      ? event.data.comment_lead
+      : null;
+  const leadId = conversationId || (bookingOnly ? `bkg_${booking.id}` : commentLead ? `cmt_${commentLead.id.toLowerCase()}` : null);
 
   if (leadId) {
     const lead = { id: leadId };
-    const username = validUsername(profile?.instagram_username);
+    const username = validUsername(profile?.instagram_username) || validUsername(commentLead?.instagram_username);
     if (username) lead.instagram_username = username;
 
     // The invitee's name and email are attached only when the booking is
@@ -111,6 +118,7 @@ export function buildEnvelope({ event, user, conversation, profile, booking }) {
     const treatment = typeof profile?.treatment_interest === "string" ? profile.treatment_interest : null;
     if (treatment && CATEGORY_KEY_RE.test(treatment)) lead.treatment_interest = treatment;
     if (conversation?.origin) lead.source = leadSourceFor(conversation.origin);
+    else if (commentLead) lead.source = "instagram_comment";
     envelope.lead = lead;
   }
 

@@ -16,7 +16,8 @@
 //                                  validated like an AI reply (no em dashes etc.)
 //   --booking-url https://...      booking link for booking_link_sent ("" clears;
 //                                  falls back to calendly_url)
-//   --treatments '<json>'          [{"key":"botox","match":["botox","tox"]}, ...] ("" clears)
+//   --treatments '<json>'          [{"key":"botox","match":["botox","tox"],"label":"Botox"}, ...] ("" clears;
+//                                  label optional: the name {{TREATMENT}} renders in comment DMs)
 //   --demo true|false              webhook_demo: allows --demo-booking
 //   --demo-booking [conversation_id]   record a demo booking (emits
 //                                  consultation_booked with data.demo = true)
@@ -101,7 +102,10 @@ function buildPatch() {
       }
       const clean = normalizeTreatmentCategories(parsed);
       if (!clean.length || clean.length !== (Array.isArray(parsed) ? parsed.length : -1)) {
-        throw new Error('--treatments: an array of {"key": "botox", "match": ["botox", "tox"]}; keys are a-z 0-9 _ -, max 40 chars');
+        throw new Error('--treatments: an array of {"key": "botox", "match": ["botox", "tox"], "label": "Botox"}; keys are a-z 0-9 _ -, max 40 chars; label optional');
+      }
+      if (parsed.some((e, i) => e?.label != null && clean[i].label === undefined)) {
+        throw new Error("--treatments: a label is letters, digits, spaces and ' & . + - only, up to 40 chars");
       }
       patch.treatment_categories = clean;
     }

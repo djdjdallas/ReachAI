@@ -9,6 +9,11 @@ import { ACCESS_COLUMNS } from "@/lib/billing/status";
 import { maybePostPublicReply } from "@/lib/comment-public-reply";
 import { persistCommentDmConversation } from "@/lib/comment-dm-conversation";
 import { disclosureLine, prepareFirstMessage, releaseFirstMessage } from "@/lib/persona-disclosure";
+import { isPersonaAccount } from "@/lib/persona";
+import { findTreatment, treatmentLabel } from "@/lib/outbound-webhooks/lead-capture";
+import { emitCommentHandoff } from "@/lib/outbound-webhooks/emit";
+import { looksLikeComplaint } from "@/lib/comment-complaint";
+import { sendCommentAttentionEmail } from "@/lib/alerts/handoff-email";
 
 // Phase 2 of the comment-to-DM pipeline. Receives a single change object
 // from a Meta Instagram webhook payload (entry.changes[i] where
@@ -74,7 +79,7 @@ async function processCommentEvent(entry, change) {
   const { data: ownerUser, error: ownerErr } = await admin
     .from("users")
     .select(
-      `id, email, meta_page_access_token, instagram_business_account_id, comment_public_reply_enabled, business_name, assistant_name, ${ACCESS_COLUMNS}`
+      `id, email, meta_page_access_token, instagram_business_account_id, comment_public_reply_enabled, business_name, assistant_name, treatment_categories, ${ACCESS_COLUMNS}`
     )
     .eq("instagram_business_account_id", igbaId)
     .maybeSingle();
@@ -110,7 +115,7 @@ async function processCommentEvent(entry, change) {
   // coach has turned the post off OR hasn't opted-in yet.
   const { data: monitoringRow } = await admin
     .from("post_monitoring_settings")
-    .select("enabled, actions_per_class, last_public_reply_text")
+    .select("enabled, actions_per_class, last_public_reply_text, treatment_key")
     .eq("creator_id", creatorId)
     .eq("post_id", postRow.id)
     .maybeSingle();
@@ -215,7 +220,7 @@ async function processCommentEvent(entry, change) {
       .eq("creator_id", creatorId),
     admin
       .from("users")
-      .select("calendly_url")
+      .select("booking_url, calendly_url")
       .eq("id", creatorId)
       .maybeSingle(),
     admin
@@ -235,12 +240,37 @@ async function processCommentEvent(entry, change) {
     }
   }
 
-  const decision = decideAction(classification, monitoringRow, templates, {
+  // Persona (clinic) accounts can tag a watched post with one of their
+  // treatments: {{TREATMENT}} renders its label and the lead's profile is
+  // seeded with it. A tag no longer in the account's list is ignored.
+  const persona = isPersonaAccount(ownerUser);
+  const postTreatmentKey = persona
+    ? findTreatment(ownerUser.treatment_categories, monitoringRow.treatment_key)?.key || null
+    : null;
+
+  let decision = decideAction(classification, monitoringRow, templates, {
     postCaption: postRow.caption || "",
     commenterName: fromUsername,
     offerName: offerRow?.offer_name || null,
-    bookingLink: userRow?.calendly_url || null,
+    // Same link the booking_link_sent detection looks for: the account's
+    // booking_url, else its Calendly link.
+    bookingLink: userRow?.booking_url || userRow?.calendly_url || null,
+    treatment: postTreatmentKey ? treatmentLabel(ownerUser.treatment_categories, postTreatmentKey) : null,
   });
+
+  // Persona accounts: a complaint (bad outcome, side effect, refund) never
+  // gets a sales DM, whatever the post's per-class actions say, and it and
+  // every comment queued for review go to a person instead of dropping
+  // silently. Logged as queue_review so the activity views show it.
+  let attention = null;
+  if (persona) {
+    if (classification.class === "CRITICAL_NEGATIVE" || looksLikeComplaint(commentText)) {
+      attention = "complaint";
+      decision = { action: "queue_review", rendered: null, reason: "persona_complaint" };
+    } else if (decision.action === "queue_review") {
+      attention = "needs_review";
+    }
+  }
 
   // 11. Decide branches:
   //   - Non-DM action: log decision, exit (no Graph API call).
@@ -261,7 +291,19 @@ async function processCommentEvent(entry, change) {
       class: classification.class,
       decided_action: decision.action,
       reason: decision.reason,
+      attention,
     });
+    if (attention) {
+      await handOffComment(admin, {
+        ownerUser,
+        reason: attention,
+        classificationId: persisted.id,
+        fromId,
+        fromUsername,
+        commentText,
+        postRow,
+      });
+    }
     return;
   }
 
@@ -407,6 +449,7 @@ async function processCommentEvent(entry, change) {
       disclosedNow: Boolean(disclosureLine(ownerUser)) && dmText.includes(disclosureLine(ownerUser)),
       providerMessageId: result.messageId || null,
       commentText,
+      treatmentKey: postTreatmentKey,
     });
 
     // Optional public reply under the trigger comment ("sent! check your
@@ -444,6 +487,41 @@ async function processCommentEvent(entry, change) {
   });
 }
 
+// A comment on a persona account that needs a person: handoff_requested
+// (reason "other") for the clinic's Needs attention, and an email to the
+// owner. About the commenter's DM thread when they have one; otherwise
+// about the comment itself. Never throws.
+async function handOffComment(admin, { ownerUser, reason, classificationId, fromId, fromUsername, commentText, postRow }) {
+  try {
+    const { data: conv } = fromId
+      ? await admin
+          .from("conversations")
+          .select("id")
+          .eq("user_id", ownerUser.id)
+          .eq("instagram_sender_id", fromId)
+          .maybeSingle()
+      : { data: null };
+    await emitCommentHandoff(admin, {
+      userId: ownerUser.id,
+      classificationId,
+      conversationId: conv?.id || null,
+      instagramUsername: fromUsername,
+      reason: "other",
+    });
+    await sendCommentAttentionEmail({
+      user: ownerUser,
+      reason,
+      commenterUsername: fromUsername,
+      commentText,
+      postPermalink: postRow.permalink || null,
+      postId: postRow.id,
+      conversationId: conv?.id || null,
+    });
+  } catch (err) {
+    console.error("[comment-event] handoff failed:", { classificationId, error: err?.message });
+  }
+}
+
 // Posts come in from comments before any other ingest path knows about
 // them. Upsert so we don't lose the FK target on cold accounts. ig_media_id
 // is UNIQUE so a parallel webhook for a different comment on the same post
@@ -451,7 +529,7 @@ async function processCommentEvent(entry, change) {
 async function findOrCreatePost(admin, creatorId, mediaId) {
   const { data: existing } = await admin
     .from("posts")
-    .select("id, caption, ig_media_id")
+    .select("id, caption, ig_media_id, permalink")
     .eq("ig_media_id", mediaId)
     .maybeSingle();
 
@@ -466,7 +544,7 @@ async function findOrCreatePost(admin, creatorId, mediaId) {
       caption: null,
       posted_at: new Date().toISOString(),
     })
-    .select("id, caption, ig_media_id")
+    .select("id, caption, ig_media_id, permalink")
     .single();
 
   if (error) {

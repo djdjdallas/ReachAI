@@ -6,6 +6,8 @@ import {
   normalizeTreatmentCategories,
   matchTreatment,
   captureLeadFacts,
+  findTreatment,
+  treatmentLabel,
 } from "./lead-capture";
 import { fakeDb } from "@/lib/test-utils/fake-db";
 
@@ -146,5 +148,59 @@ describe("captureLeadFacts", () => {
   it("never throws", async () => {
     const db = { from: () => { throw new Error("boom"); } };
     await expect(captureLeadFacts(db, { userId: "u1", conversationId: "c1", text: "x" })).resolves.toEqual({ written: false });
+  });
+});
+
+describe("treatment labels", () => {
+  const cats = [
+    { key: "lip_filler", match: ["lip filler"], label: "lip filler" },
+    { key: "botox", match: ["botox"] },
+    { key: "laser", match: ["laser"], label: "<b>laser</b>" },
+  ];
+  it("keeps a valid label and drops an invalid one", () => {
+    const out = normalizeTreatmentCategories(cats);
+    expect(out[0].label).toBe("lip filler");
+    expect(out[1]).not.toHaveProperty("label");
+    expect(out[2]).not.toHaveProperty("label");
+  });
+  it("treatmentLabel: the label, else the key with spaces, else null", () => {
+    expect(treatmentLabel(cats, "lip_filler")).toBe("lip filler");
+    expect(treatmentLabel([{ key: "chemical-peel", match: [] }], "chemical-peel")).toBe("chemical peel");
+    expect(treatmentLabel(cats, "botox")).toBe("botox");
+    expect(treatmentLabel(cats, "nope")).toBeNull();
+    expect(treatmentLabel(cats, null)).toBeNull();
+  });
+  it("findTreatment only returns keys in the list", () => {
+    expect(findTreatment(cats, "botox")?.key).toBe("botox");
+    expect(findTreatment(cats, "BOTOX")).toBeNull();
+    expect(findTreatment(null, "botox")).toBeNull();
+  });
+});
+
+describe("captureLeadFacts with a post treatment", () => {
+  const setup = (profiles = []) =>
+    fakeDb(
+      {
+        users: [{ id: "u1", treatment_categories: [{ key: "botox", match: ["botox"] }, { key: "lip_filler", match: ["lips"] }] }],
+        outbound_webhooks: [{ id: "w1", user_id: "u1", enabled: true }],
+        lead_profiles: profiles,
+      },
+      { unique: { lead_profiles: "conversation_id" } }
+    );
+
+  it("seeds treatment_interest from the post's tag before matching the text", async () => {
+    const db = setup();
+    await captureLeadFacts(db, { userId: "u1", conversationId: "c1", text: "how much for botox", treatmentKey: "lip_filler" });
+    expect(db.tables.lead_profiles[0].treatment_interest).toBe("lip_filler");
+  });
+  it("a tag not in the account's list falls back to the text", async () => {
+    const db = setup();
+    await captureLeadFacts(db, { userId: "u1", conversationId: "c1", text: "how much for botox", treatmentKey: "laser" });
+    expect(db.tables.lead_profiles[0].treatment_interest).toBe("botox");
+  });
+  it("never overwrites a treatment already known", async () => {
+    const db = setup([{ conversation_id: "c1", user_id: "u1", treatment_interest: "botox" }]);
+    await captureLeadFacts(db, { userId: "u1", conversationId: "c1", text: "hi", treatmentKey: "lip_filler" });
+    expect(db.tables.lead_profiles[0].treatment_interest).toBe("botox");
   });
 });

@@ -5,7 +5,8 @@
 //
 // No I/O. All Supabase reads happen in the calling route, which passes the
 // resolved monitoring row, the templates map, and any context strings the
-// renderer needs (post caption, commenter name, offer name, booking link).
+// renderer needs (post caption, commenter name, offer name, booking link,
+// treatment label).
 
 export const ACTIONS = Object.freeze({
   DM: "dm",
@@ -43,15 +44,26 @@ function snippet(text, max = 50) {
   return `${trimmed.slice(0, max - 1).trimEnd()}…`;
 }
 
+// {{TREATMENT}} is the treatment tagged on the post (persona accounts), as
+// its human label ("lip filler"). An untagged post renders the template's
+// own fallback, {{TREATMENT|this treatment}}, else DEFAULT_TREATMENT_FALLBACK.
+export const DEFAULT_TREATMENT_FALLBACK = "our treatments";
+const TREATMENT_TOKEN_RE = /\{\{TREATMENT(?:\|([^{}|]{0,60}))?\}\}/g;
+
 export function renderTemplate(template, context = {}) {
   if (typeof template !== "string" || !template) return "";
+  const treatment = typeof context.treatment === "string" ? context.treatment.trim() : "";
+  const withTreatment = template.replace(
+    TREATMENT_TOKEN_RE,
+    (_, fallback) => treatment || (fallback?.trim() || DEFAULT_TREATMENT_FALLBACK)
+  );
   const replacements = {
     "{{POST_CAPTION_SNIPPET}}": snippet(context.postCaption || "", 50),
     "{{COMMENTER_NAME}}": context.commenterName || "there",
     "{{OFFER_NAME}}": context.offerName || "our offer",
     "{{BOOKING_LINK}}": context.bookingLink || "",
   };
-  let out = template;
+  let out = withTreatment;
   for (const [token, value] of Object.entries(replacements)) {
     out = out.split(token).join(value);
   }
@@ -85,7 +97,7 @@ function resolveAction(intentClass, monitoringSettings) {
  * @param {object} classification          - Output of classifyComment().classification
  * @param {object|null} monitoringSettings - post_monitoring_settings row for the post (or null)
  * @param {object|null} templates          - { [intent_class]: template_string }
- * @param {object} [context]               - { postCaption, commenterName, offerName, bookingLink }
+ * @param {object} [context]               - { postCaption, commenterName, offerName, bookingLink, treatment }
  * @returns {{ action: string, rendered: string|null, reason: string }}
  */
 export function decideAction(

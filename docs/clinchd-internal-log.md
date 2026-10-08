@@ -208,6 +208,13 @@ competitor name from visible body copy and re-anchored to the human-setter cost.
     - Calendly name matching normalizes the invitee's name but not the stored `sender_name`, so extra whitespace there means no match: a safe miss (booking-only lead).
     - The linter's time-range rule rewrites "4pm — 5pm is booked" as "4pm to 5pm is booked".
   - **Not yet seen:** a delivery to the real Mara Rue receiver (not built yet). The runbook's `test` step is the first check.
+- **Comment-to-DM clinic follow-ups (2026-10-08, from the comment-DM gaps PR).** Not built; decide before more clinic accounts:
+  - **Ad comments are dropped.** Meta delivers ad and boosted-post comments on the `comments` field with `ad_id`, `ad_title` and `original_media_id` on `value.media`; `media.id` is the ad's media, not the organic post. The pipeline keys monitoring on `media.id`, and the picker only lists `/me/media` (organic, 25 most recent), so ad comments hit "no monitoring row" and skip, unlogged (only `findOrCreatePost` leaves a `WEBHOOK_INGEST` posts row behind). Fix: look up monitoring by `media.original_media_id` when present. Dynamic ads carry no ad id. Meta warns ad comments can arrive twice; the `ig_comment_id` dedup covers that. Private replies work on ad comments.
+  - **Auto-watch new posts.** Today every post needs a manual toggle. Option: a per-account flag (managed accounts only) that treats a post with no monitoring row as watched with default actions, instead of skipping it. Same no-row branch in `comment-event.js`; no cron or media polling needed.
+  - **Multi-comment / open-thread dedup.** One commenter on several posts gets a private reply per comment: each reply is a separate Meta send, and every opener is appended to the same thread (keyed on the IGSID). A lead mid-conversation who comments gets a template dropped into the live thread. Option: skip the DM (log `dm_skipped_open_thread`) when the commenter's thread had a message in the last N days, or already got a comment opener.
+  - **Needs-attention email volume.** Every persona `queue_review` comment now emails the owner, including the default for ENGAGED_NOT_BUYING (praise). A busy post could mean dozens of emails. Watch the first clinic week; options are a digest, or setting ENGAGED_NOT_BUYING to ignore on clinic posts.
+  - **AI reply path still uses only `calendly_url`** for the booking link (`prompts.js`, `lintReply` in the Instagram webhook, `/api/ai/reply`), while `booking_link_sent` also matches `booking_url`. A clinic with only `booking_url` gets no link in AI replies.
+  - **Comment picker template warning is always on.** `comment-triggers/page.jsx` reads `dm_templates.body`, but the column is `template`, so "No template written" shows for every DM class.
 
 ---
 
