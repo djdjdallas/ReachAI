@@ -7,6 +7,7 @@ import { decryptToken } from "@/lib/token-utils";
 import PostPicker from "./PostPicker";
 import { templatesByClassFrom } from "./templates";
 import { loadMonitoringByMediaId } from "./monitoring";
+import { isAutoWatchAccount } from "@/lib/comment-auto-watch";
 import { ACCESS_COLUMNS } from "@/lib/billing/status";
 import { isPersonaAccount } from "@/lib/persona";
 import { treatmentOptions } from "@/lib/verticals/clinic/treatment";
@@ -135,6 +136,7 @@ export default async function CommentTriggersPage() {
       mediaError={mediaError}
       templatesByClass={templatesByClass}
       treatments={treatments}
+      autoWatch={isAutoWatchAccount(profile)}
     />
   );
 }

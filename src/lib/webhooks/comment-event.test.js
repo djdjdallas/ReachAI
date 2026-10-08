@@ -9,6 +9,7 @@ const sendPrivateReplyToComment = vi.fn(async () => ({ success: true, messageId:
 const decideAction = vi.fn(() => ({ action: "dm", rendered: "Hey! Thanks for commenting. First time trying Botox?" }));
 const classifyComment = vi.fn(async () => ({ classification: { class: "HIGH_INTENT", confidence: 0.95, signals: [] }, raw: {}, latencyMs: 1 }));
 const sendEmail = vi.fn(async () => {});
+const getOwnMedia = vi.fn(async () => ({ caption: "Botox special, comment BOTOX", permalink: "https://instagram.com/p/new", media_type: "IMAGE" }));
 
 vi.mock("@/lib/supabase/admin", () => ({ getSupabaseAdmin: () => db }));
 vi.mock("@/lib/classifier", () => ({
@@ -18,7 +19,7 @@ vi.mock("@/lib/classifier", () => ({
 }));
 vi.mock("@/lib/contextBundle", () => ({ buildContextBundle: vi.fn(async () => ({ bundle: { id: "b1" }, offerSnapshot: null })) }));
 vi.mock("@/lib/comment-trigger-rules", () => ({ decideAction }));
-vi.mock("@/lib/instagram", () => ({ sendPrivateReplyToComment }));
+vi.mock("@/lib/instagram", () => ({ sendPrivateReplyToComment, getOwnMedia }));
 vi.mock("@/lib/token-utils", () => ({ decryptToken: () => "page-token" }));
 vi.mock("@/lib/comment-to-dm-gate", () => ({ canUseCommentToDM: () => true }));
 vi.mock("@/lib/comment-public-reply", () => ({ maybePostPublicReply: vi.fn(async () => {}) }));
@@ -48,7 +49,7 @@ function setup(userOverrides = {}, extra = {}) {
         },
       ],
       posts: [{ id: "p1", creator_id: "u1", caption: "Botox special", ig_media_id: "media-1", permalink: "https://instagram.com/p/abc" }, ...(extra.posts || [])],
-      post_monitoring_settings: [{ creator_id: "u1", post_id: "p1", enabled: true, actions_per_class: {}, ...extra.monitoring }],
+      post_monitoring_settings: extra.monitoringRows || [{ creator_id: "u1", post_id: "p1", enabled: true, actions_per_class: {}, ...extra.monitoring }],
       comment_classifications: [],
       dm_templates: extra.templates || [],
       creator_offers: [],
@@ -59,7 +60,7 @@ function setup(userOverrides = {}, extra = {}) {
       outbound_webhook_events: [],
       lead_profiles: [],
     },
-    { unique: { conversations: "instagram_sender_id", lead_profiles: "conversation_id" }, failOn: extra.failOn }
+    { unique: { conversations: "instagram_sender_id", lead_profiles: "conversation_id", posts: "ig_media_id" }, failOn: extra.failOn }
   );
   db.rpc = async () => ({ data: true, error: null });
 }
@@ -383,7 +384,7 @@ describe("comment-to-DM: ad comments", () => {
   });
 
   it("an original_media_id that is another creator's post falls through to the ad's own media", async () => {
-    setup({ business_name: null }, {
+    setup({ business_name: null, billing_managed: false }, {
       templates: tpl,
       posts: [{ id: "p-foreign", creator_id: "someone-else", caption: "theirs", ig_media_id: "media-foreign" }],
     });
@@ -396,7 +397,7 @@ describe("comment-to-DM: ad comments", () => {
   });
 
   it("an ad whose original post Clinchd doesn't know falls back to the ad's media (not watched: skipped)", async () => {
-    setup({ business_name: null }, { templates: tpl });
+    setup({ business_name: null, billing_managed: false }, { templates: tpl });
     await handleCommentEvent(...adComment("media-unknown"));
     expect(sendPrivateReplyToComment).not.toHaveBeenCalled();
     expect(db.tables.comment_classifications).toHaveLength(0);
@@ -441,5 +442,155 @@ describe("comment-to-DM: deploy before migration 20261011120000", () => {
     });
     await handleCommentEvent(...comment());
     expect(sendPrivateReplyToComment).not.toHaveBeenCalled();
+  });
+});
+
+describe("comment-to-DM: managed-account auto-watch", () => {
+  beforeEach(() => decideAction.mockImplementation(actual.decideAction));
+
+  const tpl = [{ creator_id: "u1", intent_class: "HIGH_INTENT", template: "Hey! Book: {{BOOKING_LINK}}" }];
+  const COACH = { business_name: null, billing_managed: false, calendly_url: "https://calendly.com/x" };
+  const MANAGED = { ...COACH, billing_managed: true };
+  // A post Clinchd first sees through this comment.
+  const onNewPost = (id = "c-1", text = "how much?") => {
+    const [entry, change] = comment(id, text);
+    return [entry, { ...change, value: { ...change.value, media: { id: "media-new" } } }];
+  };
+  const adComment = (media) => [
+    { id: IGBA },
+    { field: "comments", value: { id: "c-ad", text: "how much??", from: { id: LEAD, username: "jane" }, media, created_time: new Date().toISOString() } },
+  ];
+  const monitoring = () => db.tables.post_monitoring_settings;
+
+  it("a comment on an unwatched post is handled with the defaults, and the post is watched from now on", async () => {
+    setup(MANAGED, { templates: tpl, monitoringRows: [] });
+    await handleCommentEvent(...onNewPost());
+    expect(sendPrivateReplyToComment.mock.calls[0][2]).toBe("Hey! Book: https://calendly.com/x");
+    const post = db.tables.posts.find((p) => p.ig_media_id === "media-new");
+    expect(monitoring()).toEqual([expect.objectContaining({ creator_id: "u1", post_id: post.id, enabled: true, actions_per_class: null })]);
+    // The caption came from Meta and grounded the classifier.
+    expect(getOwnMedia).toHaveBeenCalledWith("media-new", "page-token", IGBA);
+    expect(post).toMatchObject({ caption: "Botox special, comment BOTOX", permalink: "https://instagram.com/p/new" });
+    expect(classifyComment.mock.calls[0][0].postCaption).toBe("Botox special, comment BOTOX");
+  });
+
+  it("the second comment uses the row the first one created", async () => {
+    setup(MANAGED, { templates: tpl, monitoringRows: [] });
+    await handleCommentEvent(...onNewPost("c-1"));
+    await handleCommentEvent(...onNewPost("c-2"));
+    expect(monitoring()).toHaveLength(1);
+    expect(sendPrivateReplyToComment).toHaveBeenCalledTimes(2);
+    expect(getOwnMedia).toHaveBeenCalledTimes(1);
+  });
+
+  it("default actions per class: a praise comment is queued, not DM'd", async () => {
+    setup(MANAGED, { templates: [...tpl, { creator_id: "u1", intent_class: "ENGAGED_NOT_BUYING", template: "thx" }], monitoringRows: [] });
+    classifyAs("ENGAGED_NOT_BUYING", 0.95);
+    await handleCommentEvent(...onNewPost("c-1", "love this"));
+    expect(sendPrivateReplyToComment).not.toHaveBeenCalled();
+    expect(db.tables.comment_to_dm_log.at(-1)).toMatchObject({ decided_action: "queue_review" });
+  });
+
+  it("a post the account turned off stays off", async () => {
+    setup(MANAGED, { templates: tpl, monitoringRows: [{ creator_id: "u1", post_id: "p1", enabled: false, actions_per_class: null }] });
+    await handleCommentEvent(...comment());
+    expect(sendPrivateReplyToComment).not.toHaveBeenCalled();
+    expect(monitoring()).toEqual([expect.objectContaining({ post_id: "p1", enabled: false })]);
+    expect(getOwnMedia).not.toHaveBeenCalled();
+  });
+
+  it("Meta can't read the post: still watched, without a caption", async () => {
+    setup(MANAGED, { templates: tpl, monitoringRows: [] });
+    getOwnMedia.mockResolvedValueOnce(null);
+    await handleCommentEvent(...onNewPost());
+    expect(sendPrivateReplyToComment).toHaveBeenCalledTimes(1);
+    expect(monitoring()).toHaveLength(1);
+  });
+
+  it("a post row that belongs to another creator is never auto-watched", async () => {
+    setup(MANAGED, {
+      templates: tpl,
+      monitoringRows: [],
+      posts: [{ id: "p-foreign", creator_id: "someone-else", caption: "theirs", ig_media_id: "media-foreign" }],
+    });
+    const [entry, change] = comment();
+    await handleCommentEvent(entry, { ...change, value: { ...change.value, media: { id: "media-foreign" } } });
+    expect(sendPrivateReplyToComment).not.toHaveBeenCalled();
+    expect(monitoring()).toHaveLength(0);
+  });
+
+  it("coach accounts unchanged: no row, no DM, nothing created, no Meta read", async () => {
+    setup(COACH, { templates: tpl, monitoringRows: [] });
+    await handleCommentEvent(...onNewPost());
+    expect(sendPrivateReplyToComment).not.toHaveBeenCalled();
+    expect(monitoring()).toHaveLength(0);
+    expect(getOwnMedia).not.toHaveBeenCalled();
+    expect(db.tables.comment_classifications).toHaveLength(0);
+  });
+
+  it("clinic: an auto-watched post is untagged, so {{TREATMENT|fallback}} renders the fallback", async () => {
+    setup({ billing_managed: true, treatment_categories: TREATMENTS }, {
+      templates: [{ creator_id: "u1", intent_class: "HIGH_INTENT", template: "Thanks for asking about {{TREATMENT|our services}}!" }],
+      monitoringRows: [],
+    });
+    await handleCommentEvent(...onNewPost());
+    expect(sendPrivateReplyToComment.mock.calls[0][2]).toBe(`${LINE} Thanks for asking about our services!`);
+    expect(monitoring()[0].treatment_key ?? null).toBeNull();
+  });
+
+  describe("ad comments", () => {
+    it("an ad for an unwatched post the account owns: the organic post is auto-watched", async () => {
+      setup(MANAGED, { templates: tpl, monitoringRows: [] });
+      await handleCommentEvent(...adComment({ id: "ad-media-9", ad_id: "1202", original_media_id: "media-1" }));
+      expect(sendPrivateReplyToComment).toHaveBeenCalledTimes(1);
+      expect(monitoring()).toEqual([expect.objectContaining({ post_id: "p1", enabled: true })]);
+      expect(db.tables.posts.map((p) => p.ig_media_id)).toEqual(["media-1"]);
+    });
+
+    it("an ad for a post Clinchd hasn't seen: ingested once Meta confirms it is the account's own, then watched", async () => {
+      setup(MANAGED, { templates: tpl, monitoringRows: [] });
+      await handleCommentEvent(...adComment({ id: "ad-media-9", ad_id: "1202", original_media_id: "media-organic" }));
+      expect(getOwnMedia).toHaveBeenCalledWith("media-organic", "page-token", IGBA);
+      const post = db.tables.posts.find((p) => p.ig_media_id === "media-organic");
+      expect(post).toMatchObject({ creator_id: "u1", caption: "Botox special, comment BOTOX" });
+      expect(monitoring()).toEqual([expect.objectContaining({ post_id: post.id, enabled: true })]);
+      expect(sendPrivateReplyToComment).toHaveBeenCalledTimes(1);
+      // No row for the ad's own media.
+      expect(db.tables.posts.some((p) => p.ig_media_id === "ad-media-9")).toBe(false);
+    });
+
+    it("an ad whose original Meta won't confirm as the account's: not auto-watched", async () => {
+      setup(MANAGED, { templates: tpl, monitoringRows: [] });
+      getOwnMedia.mockResolvedValueOnce(null);
+      await handleCommentEvent(...adComment({ id: "ad-media-9", ad_id: "1202", original_media_id: "media-elsewhere" }));
+      expect(sendPrivateReplyToComment).not.toHaveBeenCalled();
+      expect(monitoring()).toHaveLength(0);
+    });
+
+    it("an ad whose original is another creator's post: not auto-watched", async () => {
+      setup(MANAGED, {
+        templates: tpl,
+        monitoringRows: [],
+        posts: [{ id: "p-foreign", creator_id: "someone-else", caption: "theirs", ig_media_id: "media-foreign" }],
+      });
+      await handleCommentEvent(...adComment({ id: "ad-media-9", ad_id: "1202", original_media_id: "media-foreign" }));
+      expect(sendPrivateReplyToComment).not.toHaveBeenCalled();
+      expect(monitoring()).toHaveLength(0);
+    });
+
+    it("a dynamic ad (no original_media_id): the ad's own media is never auto-watched", async () => {
+      setup(MANAGED, { templates: tpl, monitoringRows: [] });
+      await handleCommentEvent(...adComment({ id: "ad-media-9", ad_id: "1202" }));
+      expect(sendPrivateReplyToComment).not.toHaveBeenCalled();
+      expect(monitoring()).toHaveLength(0);
+    });
+
+    it("coach accounts: an ad for an unwatched post is skipped as before", async () => {
+      setup(COACH, { templates: tpl, monitoringRows: [] });
+      await handleCommentEvent(...adComment({ id: "ad-media-9", ad_id: "1202", original_media_id: "media-organic" }));
+      expect(sendPrivateReplyToComment).not.toHaveBeenCalled();
+      expect(getOwnMedia).not.toHaveBeenCalled();
+      expect(db.tables.posts.some((p) => p.ig_media_id === "media-organic")).toBe(false);
+    });
   });
 });

@@ -461,6 +461,44 @@ export async function postPublicCommentReply(commentId, text, pageAccessToken) {
   return { success: true, replyId: data?.id || null };
 }
 
+/**
+ * One of the account's own media objects: caption, permalink and type, for
+ * a post first seen through a comment (managed-account auto-watch,
+ * src/lib/comment-auto-watch.js).
+ *
+ * Instagram API with Instagram Login tokens only read the account's own
+ * media. When Meta returns owner.id it must be the account; otherwise the
+ * read itself is the ownership check.
+ *
+ * Best-effort: any failure returns null.
+ *
+ * @param {string} mediaId
+ * @param {string} accessToken - decrypted account token
+ * @param {string} igAccountId - the account's Instagram user id
+ * @returns {Promise<{caption: string|null, permalink: string|null, media_type: string|null}|null>}
+ */
+export async function getOwnMedia(mediaId, accessToken, igAccountId) {
+  let data;
+  try {
+    const url = `https://graph.instagram.com/${GRAPH_API_VERSION}/${encodeURIComponent(mediaId)}?fields=id,caption,permalink,media_type,owner`;
+    const res = await fetch(url, { headers: { Authorization: `Bearer ${accessToken}` } });
+    data = await res.json().catch(() => ({}));
+  } catch (err) {
+    console.error("getOwnMedia error:", err?.message);
+    return null;
+  }
+  if (!data || data.error || !data.id) {
+    if (data?.error) console.warn("getOwnMedia failed:", { code: data.error.code, message: data.error.message });
+    return null;
+  }
+  if (data.owner?.id && igAccountId && String(data.owner.id) !== String(igAccountId)) return null;
+  return {
+    caption: typeof data.caption === "string" ? data.caption.slice(0, 4000) : null,
+    permalink: typeof data.permalink === "string" ? data.permalink.slice(0, 1000) : null,
+    media_type: typeof data.media_type === "string" ? data.media_type.slice(0, 32) : null,
+  };
+}
+
 // ── Webhook Verification ────────────────────────────────────────────────
 
 /**

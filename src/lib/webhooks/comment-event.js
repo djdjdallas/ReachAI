@@ -13,6 +13,7 @@ import { disclosureLine, prepareFirstMessage, releaseFirstMessage } from "@/lib/
 import { isPersonaAccount } from "@/lib/persona";
 import { applyClinicCommentRules, handOffClinicComment, prepareClinicComment } from "@/lib/verticals/clinic/comment";
 import { isUndefinedColumn } from "@/lib/db-errors";
+import { autoWatchPost, ingestOwnedPost, isAdComment, isAutoWatchAccount } from "@/lib/comment-auto-watch";
 
 // Phase 2 of the comment-to-DM pipeline. Receives a single change object
 // from a Meta Instagram webhook payload (entry.changes[i] where
@@ -112,14 +113,43 @@ async function processCommentEvent(entry, change) {
   // its post_id to look up monitoring settings and to FK the
   // classification row. posts.ig_media_id is UNIQUE so it doubles as the
   // dedup key here.
-  const adOriginalPost =
+  // Managed accounts auto-watch posts with no monitoring row
+  // (src/lib/comment-auto-watch.js); everything they add is behind this.
+  const autoWatch = isAutoWatchAccount(ownerUser);
+  const autoWatchToken = autoWatch ? decryptOrNull(ownerUser.meta_page_access_token) : null;
+
+  let adOriginalPost =
     originalMediaId && originalMediaId !== mediaId ? await findPost(admin, originalMediaId, creatorId) : null;
-  const postRow = adOriginalPost || (await findOrCreatePost(admin, creatorId, mediaId));
+  // An ad for a post Clinchd hasn't seen: managed accounts ingest it when
+  // Meta confirms it is the account's own.
+  if (!adOriginalPost && autoWatch && originalMediaId && originalMediaId !== mediaId) {
+    adOriginalPost = await ingestOwnedPost(admin, {
+      creatorId,
+      mediaId: originalMediaId,
+      igAccountId: igbaId,
+      token: autoWatchToken,
+    });
+  }
+  let postRow = adOriginalPost || (await findOrCreatePost(admin, creatorId, mediaId));
   if (!postRow) return;
 
   // 6. Read the per-post monitoring toggle. Saves Anthropic spend when a
   // coach has turned the post off OR hasn't opted-in yet.
-  const monitoringRow = await readMonitoringRow(admin, creatorId, postRow.id);
+  let monitoringRow = await readMonitoringRow(admin, creatorId, postRow.id);
+
+  // Auto-watch: a managed account's own post with no row is watched with
+  // the defaults; the row is created now so it shows in the picker. An ad
+  // comment counts only when it resolved to the ad's organic post.
+  if (
+    !monitoringRow &&
+    autoWatch &&
+    postRow.creator_id === creatorId &&
+    (!isAdComment(value.media) || postRow === adOriginalPost)
+  ) {
+    postRow = await autoWatchPost(admin, { creatorId, postRow, igAccountId: igbaId, token: autoWatchToken });
+    monitoringRow = await readMonitoringRow(admin, creatorId, postRow.id);
+    console.log("[comment-event] auto-watched post", { commentId, postId: postRow.id, watching: Boolean(monitoringRow) });
+  }
 
   if (!monitoringRow) {
     console.log("[comment-event] no monitoring row — skipping", { commentId, postId: postRow.id });
@@ -491,7 +521,7 @@ async function findOrCreatePost(admin, creatorId, mediaId) {
       caption: null,
       posted_at: new Date().toISOString(),
     })
-    .select("id, caption, ig_media_id")
+    .select("id, caption, ig_media_id, creator_id")
     .single();
 
   if (error) {
@@ -499,6 +529,14 @@ async function findOrCreatePost(admin, creatorId, mediaId) {
     return null;
   }
   return inserted;
+}
+
+function decryptOrNull(enc) {
+  try {
+    return enc ? decryptToken(enc) : null;
+  } catch {
+    return null;
+  }
 }
 
 // The post's monitoring row, or null. treatment_key comes from migration
@@ -527,7 +565,7 @@ async function readMonitoringRow(admin, creatorId, postId) {
 // findOrCreatePost looks up unscoped, as before (ig_media_id is UNIQUE, so
 // a scoped miss there would fail the insert).
 async function findPost(admin, mediaId, creatorId = null) {
-  let q = admin.from("posts").select("id, caption, ig_media_id").eq("ig_media_id", mediaId);
+  let q = admin.from("posts").select("id, caption, ig_media_id, creator_id").eq("ig_media_id", mediaId);
   if (creatorId) q = q.eq("creator_id", creatorId);
   const { data } = await q.maybeSingle();
   return data || null;

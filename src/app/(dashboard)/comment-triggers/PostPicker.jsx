@@ -18,6 +18,7 @@ const AMBER = "#f59e0b";
 // fallback shown in the UI matches what decideAction() actually uses when
 // a coach hasn't overridden a class.
 import { DEFAULT_ACTIONS_PER_CLASS } from "@/lib/comment-trigger-rules";
+import { postStateFor } from "./post-state";
 
 const CLASS_DESCRIPTIONS = {
   HIGH_INTENT: "Clear buy signal — price questions, link requests, 'sign me up'.",
@@ -397,6 +398,10 @@ export default function PostPicker({
   mediaError,
   templatesByClass,
   treatments = [],
+  // Managed accounts: a post with no monitoring row is watched with the
+  // defaults from its first comment (src/lib/comment-auto-watch.js), so it
+  // shows as on. Turning it off saves a row with enabled = false.
+  autoWatch = false,
 }) {
   const [overrides, setOverrides] = useState({});
 
@@ -411,10 +416,10 @@ export default function PostPicker({
   // callout dismisses as soon as the first toggle flips on.
   const monitoredCount = useMemo(() => {
     return items.reduce((acc, item) => {
-      const state = overrides[item.id] ?? monitoringByMediaId[item.id] ?? null;
+      const state = postStateFor(item.id, { overrides, monitoringByMediaId, autoWatch });
       return state?.enabled === true ? acc + 1 : acc;
     }, 0);
-  }, [items, overrides, monitoringByMediaId]);
+  }, [items, overrides, monitoringByMediaId, autoWatch]);
 
   return (
     <div className="max-w-4xl mx-auto p-3 md:p-5 space-y-6">
@@ -432,6 +437,12 @@ export default function PostPicker({
           </Link>
           .
         </p>
+        {autoWatch && (
+          <p className="mt-2 text-sm text-stone-600">
+            New posts are watched automatically from their first comment, with
+            the default actions. Turn a post off to stop.
+          </p>
+        )}
       </div>
 
       {mediaError && (
@@ -469,7 +480,7 @@ export default function PostPicker({
 
       <div className="space-y-4">
         {items.map((item) => {
-          const initial = overrides[item.id] ?? monitoringByMediaId[item.id] ?? null;
+          const initial = postStateFor(item.id, { overrides, monitoringByMediaId, autoWatch });
           return (
             <PostCard
               key={item.id}
