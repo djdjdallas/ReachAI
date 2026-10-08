@@ -9,8 +9,14 @@
 //   - A complaint (CRITICAL_NEGATIVE, or a bad outcome, side effect or
 //     refund: complaint.js) never gets a DM, whatever the post's per-class
 //     actions say. It is handed to a person.
-//   - Praise and fan comments (ENGAGED_NOT_BUYING) are ignored: no DM, no
-//     handoff.
+//   - A comment with an intent signal (intent.js: it names one of the
+//     account's treatments or the post's tagged one, or says an interest
+//     phrase like "how much" or "love to") gets the HIGH_INTENT decision,
+//     whatever the classifier called it, unless it is a complaint, spam or
+//     personal. The classifier often calls these UNCERTAIN on clinic posts
+//     ("I would love to check you guys out... Botox").
+//   - Praise and fan comments (ENGAGED_NOT_BUYING) without a signal are
+//     ignored: no DM, no handoff.
 //   - A comment queued for review that might be a real inquiry
 //     (HIGH_INTENT below the DM confidence bar or with no usable template,
 //     or UNCERTAIN) is handed to a person.
@@ -19,10 +25,14 @@
 
 import { emitCommentHandoff } from "@/lib/outbound-webhooks/emit";
 import { looksLikeComplaint } from "./complaint";
+import { hasClinicIntentSignal } from "./intent";
 import { postTreatment, renderTreatmentTokens } from "./treatment";
 
 // Classes whose queued comments might be a real inquiry.
 const INQUIRY_CLASSES = new Set(["HIGH_INTENT", "UNCERTAIN"]);
+// Classes an intent signal never overrides: spam that names a treatment,
+// or a personal message, is still not a lead.
+const NO_INTENT_OVERRIDE = new Set(["SPAM", "NOT_A_LEAD"]);
 
 /**
  * Before the decision: the post's treatment, and the templates with
@@ -44,13 +54,32 @@ export function prepareClinicComment({ ownerUser, monitoringRow, templates }) {
  * After the decision: the clinic rules above. Complaints and handed-off
  * comments are logged as queue_review, so the activity views show them.
  *
- * @param {{classification: object, commentText: string, decision: {action: string, rendered: string|null, reason: string}}} args
+ * @param {object} args
+ * @param {object} args.classification
+ * @param {string} args.commentText
+ * @param {{action: string, rendered: string|null, reason: string}} args.decision - the shared decision
+ * @param {object} [args.ownerUser] - users row (treatment_categories), for the intent signal
+ * @param {string|null} [args.treatmentKey] - the post's treatment tag
+ * @param {() => object} [args.decideHighIntent] - the shared decision for this comment as HIGH_INTENT
  * @returns {{decision: object, handoff: "complaint"|"inquiry"|null}}
  */
-export function applyClinicCommentRules({ classification, commentText, decision }) {
+export function applyClinicCommentRules({ classification, commentText, decision, ownerUser = null, treatmentKey = null, decideHighIntent = null }) {
   const cls = classification?.class;
   if (cls === "CRITICAL_NEGATIVE" || looksLikeComplaint(commentText)) {
     return { decision: { action: "queue_review", rendered: null, reason: "clinic_complaint" }, handoff: "complaint" };
+  }
+  if (
+    decideHighIntent &&
+    decision.action !== "dm" &&
+    !NO_INTENT_OVERRIDE.has(cls) &&
+    hasClinicIntentSignal({ ownerUser, treatmentKey, commentText })
+  ) {
+    const high = decideHighIntent();
+    return {
+      decision: { ...high, reason: `clinic_intent_signal:${high.reason}` },
+      // No HIGH_INTENT template (or the post queues HIGH_INTENT): a person.
+      handoff: high.action === "queue_review" ? "inquiry" : null,
+    };
   }
   if (cls === "ENGAGED_NOT_BUYING") {
     return { decision: { action: "ignore", rendered: null, reason: "clinic_praise_ignored" }, handoff: null };

@@ -36,12 +36,12 @@ export function isAdComment(media) {
  * the row, or null (not owned, unreadable, or the insert failed).
  *
  * @param {object} admin - service-role client
- * @param {{creatorId: string, mediaId: string, igAccountId: string, token: string|null}} args
+ * @param {{creatorId: string, mediaId: string, account: {igAccountId: string, username?: string|null}, token: string|null}} args
  */
-export async function ingestOwnedPost(admin, { creatorId, mediaId, igAccountId, token }) {
+export async function ingestOwnedPost(admin, { creatorId, mediaId, account, token }) {
   try {
-    if (!token || !mediaId) return null;
-    const media = await getOwnMedia(mediaId, token, igAccountId);
+    if (!mediaId) return null;
+    const media = await getOwnMedia(mediaId, token, account);
     if (!media) return null;
     const { data, error } = await admin
       .from("posts")
@@ -67,29 +67,45 @@ export async function ingestOwnedPost(admin, { creatorId, mediaId, igAccountId, 
 }
 
 /**
- * Start watching a post: fill its caption from Meta when Clinchd has none
- * (the classifier grounds on it), then create the monitoring row with the
- * defaults (enabled, no per-class overrides, no treatment tag). Returns the
- * post with any caption filled in. Never throws; a concurrent comment
- * creating the row first is fine (the caller re-reads it).
+ * Fill a post's missing caption (and permalink, type) from Meta: the
+ * classifier and {{POST_CAPTION_SNIPPET}} ground on it. Returns the post
+ * with what was filled; unchanged when it already has a caption or Meta
+ * can't be read (getOwnMedia logs why). Never throws.
  *
  * @param {object} admin - service-role client
- * @param {{creatorId: string, postRow: object, igAccountId: string, token: string|null}} args
+ * @param {{postRow: object, account: {igAccountId: string, username?: string|null}, token: string|null}} args
  * @returns {Promise<object>} postRow
  */
-export async function autoWatchPost(admin, { creatorId, postRow, igAccountId, token }) {
-  let post = postRow;
+export async function fillMissingCaption(admin, { postRow, account, token }) {
+  if (postRow?.caption) return postRow;
   try {
-    if (!post.caption && token) {
-      const media = await getOwnMedia(post.ig_media_id, token, igAccountId);
-      if (media) {
-        const patch = Object.fromEntries(Object.entries(media).filter(([, v]) => v != null));
-        if (Object.keys(patch).length) {
-          await admin.from("posts").update({ ...patch, updated_at: new Date().toISOString() }).eq("id", post.id);
-          post = { ...post, ...patch };
-        }
-      }
-    }
+    const media = await getOwnMedia(postRow.ig_media_id, token, account);
+    if (!media) return postRow;
+    const patch = Object.fromEntries(Object.entries(media).filter(([, v]) => v != null));
+    if (!Object.keys(patch).length) return postRow;
+    const { error } = await admin.from("posts").update({ ...patch, updated_at: new Date().toISOString() }).eq("id", postRow.id);
+    if (error) console.warn("[auto-watch] caption save failed:", { postId: postRow.id, code: error.code });
+    return { ...postRow, ...patch };
+  } catch (err) {
+    console.warn("[auto-watch] caption fill threw:", { postId: postRow?.id, error: err?.message });
+    return postRow;
+  }
+}
+
+/**
+ * Start watching a post: fill its caption when Clinchd has none, then
+ * create the monitoring row with the defaults (enabled, no per-class
+ * overrides, no treatment tag). Returns the post with any caption filled
+ * in. Never throws; a concurrent comment creating the row first is fine
+ * (the caller re-reads it).
+ *
+ * @param {object} admin - service-role client
+ * @param {{creatorId: string, postRow: object, account: {igAccountId: string, username?: string|null}, token: string|null}} args
+ * @returns {Promise<object>} postRow
+ */
+export async function autoWatchPost(admin, { creatorId, postRow, account, token }) {
+  const post = await fillMissingCaption(admin, { postRow, account, token });
+  try {
     const { error } = await admin
       .from("post_monitoring_settings")
       .upsert(

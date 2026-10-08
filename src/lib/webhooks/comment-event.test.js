@@ -469,7 +469,7 @@ describe("comment-to-DM: managed-account auto-watch", () => {
     const post = db.tables.posts.find((p) => p.ig_media_id === "media-new");
     expect(monitoring()).toEqual([expect.objectContaining({ creator_id: "u1", post_id: post.id, enabled: true, actions_per_class: null })]);
     // The caption came from Meta and grounded the classifier.
-    expect(getOwnMedia).toHaveBeenCalledWith("media-new", "page-token", IGBA);
+    expect(getOwnMedia).toHaveBeenCalledWith("media-new", "page-token", { igAccountId: IGBA, username: null });
     expect(post).toMatchObject({ caption: "Botox special, comment BOTOX", permalink: "https://instagram.com/p/new" });
     expect(classifyComment.mock.calls[0][0].postCaption).toBe("Botox special, comment BOTOX");
   });
@@ -550,7 +550,7 @@ describe("comment-to-DM: managed-account auto-watch", () => {
     it("an ad for a post Clinchd hasn't seen: ingested once Meta confirms it is the account's own, then watched", async () => {
       setup(MANAGED, { templates: tpl, monitoringRows: [] });
       await handleCommentEvent(...adComment({ id: "ad-media-9", ad_id: "1202", original_media_id: "media-organic" }));
-      expect(getOwnMedia).toHaveBeenCalledWith("media-organic", "page-token", IGBA);
+      expect(getOwnMedia).toHaveBeenCalledWith("media-organic", "page-token", { igAccountId: IGBA, username: null });
       const post = db.tables.posts.find((p) => p.ig_media_id === "media-organic");
       expect(post).toMatchObject({ creator_id: "u1", caption: "Botox special, comment BOTOX" });
       expect(monitoring()).toEqual([expect.objectContaining({ post_id: post.id, enabled: true })]);
@@ -664,5 +664,130 @@ describe("comment-to-DM: open-thread skip (managed accounts)", () => {
     await handleCommentEvent(...comment());
     expect(sendPrivateReplyToComment).toHaveBeenCalledTimes(1);
     expect(db.tables.comment_to_dm_log.at(-1)).toMatchObject({ decided_action: "dm", dispatched: true });
+  });
+});
+
+describe("comment-to-DM: live case 2026-10-08 (comment 18118746053059317)", () => {
+  beforeEach(() => decideAction.mockImplementation(actual.decideAction));
+
+  const CAPTION = "Grand Opening.. Comment Botox for 10% off";
+  const COMMENT = "I would love to check you guys out... Botox";
+  const tpl = [{ creator_id: "u1", intent_class: "HIGH_INTENT", template: "Hey! Here's the 10% off: {{BOOKING_LINK}}" }];
+  // A managed clinic account, as the live account was.
+  const CLINIC = { billing_managed: true, instagram_username: "soleaesthetics", calendly_url: "https://calendly.com/sole/consult" };
+  const newPostComment = () => {
+    const [entry, change] = comment("18118746053059317", COMMENT);
+    return [entry, { ...change, value: { ...change.value, media: { id: "media-grand-opening" } } }];
+  };
+
+  it("first comment on the auto-watched post: caption fetched, classified UNCERTAIN 0.55, still DMs the high-intent template", async () => {
+    setup(CLINIC, { templates: tpl, monitoringRows: [] });
+    getOwnMedia.mockResolvedValueOnce({ caption: CAPTION, permalink: "https://www.instagram.com/p/DPq1AbCdEfG/", media_type: "IMAGE" });
+    classifyAs("UNCERTAIN", 0.55);
+    await handleCommentEvent(...newPostComment());
+    expect(getOwnMedia).toHaveBeenCalledWith("media-grand-opening", "page-token", { igAccountId: IGBA, username: "soleaesthetics" });
+    expect(classifyComment.mock.calls[0][0].postCaption).toBe(CAPTION);
+    expect(sendPrivateReplyToComment).toHaveBeenCalledTimes(1);
+    expect(sendPrivateReplyToComment.mock.calls[0][2]).toBe(`${LINE} Here's the 10% off: https://calendly.com/sole/consult`);
+    expect(db.tables.comment_to_dm_log.at(-1)).toMatchObject({ decided_action: "dm", dispatched: true });
+    expect(db.tables.comment_classifications[0]).toMatchObject({ class: "UNCERTAIN", confidence: 0.55 });
+  });
+
+  it("the live post as it is now (watched, still no caption): the caption is filled and the comment DMs", async () => {
+    setup(CLINIC, {
+      templates: tpl,
+      posts: [{ id: "p-go", creator_id: "u1", ig_media_id: "media-grand-opening", caption: null, media_type: "WEBHOOK_INGEST" }],
+      monitoringRows: [{ creator_id: "u1", post_id: "p-go", enabled: true, actions_per_class: null }],
+    });
+    getOwnMedia.mockResolvedValueOnce({ caption: CAPTION, permalink: null, media_type: "IMAGE" });
+    classifyAs("UNCERTAIN", 0.55);
+    await handleCommentEvent(...newPostComment());
+    expect(db.tables.posts.find((p) => p.id === "p-go")).toMatchObject({ caption: CAPTION, media_type: "IMAGE" });
+    expect(sendPrivateReplyToComment).toHaveBeenCalledTimes(1);
+  });
+
+  it("even if Meta still can't be read, the intent signal DMs", async () => {
+    setup(CLINIC, { templates: tpl, monitoringRows: [] });
+    getOwnMedia.mockResolvedValueOnce(null);
+    classifyAs("UNCERTAIN", 0.55);
+    await handleCommentEvent(...newPostComment());
+    expect(sendPrivateReplyToComment).toHaveBeenCalledTimes(1);
+  });
+
+  it("coach accounts unchanged: the same comment UNCERTAIN is queued, no DM", async () => {
+    setup({ ...CLINIC, business_name: null, billing_managed: false }, { templates: tpl, monitoringRows: [{ creator_id: "u1", post_id: "p1", enabled: true, actions_per_class: null }] });
+    classifyAs("UNCERTAIN", 0.55);
+    await handleCommentEvent(...comment("c-1", COMMENT));
+    expect(sendPrivateReplyToComment).not.toHaveBeenCalled();
+    expect(db.tables.comment_to_dm_log.at(-1)).toMatchObject({ decided_action: "queue_review" });
+  });
+});
+
+describe("comment-to-DM: clinic intent signal", () => {
+  beforeEach(() => decideAction.mockImplementation(actual.decideAction));
+
+  const tpl = [{ creator_id: "u1", intent_class: "HIGH_INTENT", template: "Hey! Book: {{BOOKING_LINK}}" }];
+  const CLINIC = { billing_managed: false, calendly_url: "https://calendly.com/x", treatment_categories: TREATMENTS };
+
+  it.each([
+    ["names a treatment's match term", "lips 👀"],
+    ["names a treatment's label", "lip filler??"],
+    ["an interest phrase", "how much"],
+  ])("UNCERTAIN that %s DMs", async (_l, text) => {
+    setup(CLINIC, { templates: tpl, webhooks: [WEBHOOK] });
+    classifyAs("UNCERTAIN", 0.5);
+    await handleCommentEvent(...comment("c-1", text));
+    expect(sendPrivateReplyToComment).toHaveBeenCalledTimes(1);
+    expect(db.tables.outbound_webhook_events).toHaveLength(0);
+  });
+
+  it("the post's tagged treatment, named in the comment, DMs", async () => {
+    setup({ ...CLINIC, treatment_categories: [{ key: "hydrafacial", match: ["hydra"], label: "HydraFacial" }] }, {
+      templates: tpl,
+      monitoring: { treatment_key: "hydrafacial" },
+    });
+    classifyAs("LOW_SIGNAL", 0.9);
+    await handleCommentEvent(...comment("c-1", "hydrafacial 🙌"));
+    expect(sendPrivateReplyToComment).toHaveBeenCalledTimes(1);
+  });
+
+  it("UNCERTAIN without a signal still hands off", async () => {
+    setup(CLINIC, { templates: tpl, webhooks: [WEBHOOK] });
+    classifyAs("UNCERTAIN", 0.5);
+    await handleCommentEvent(...comment("c-1", "what lane?"));
+    expect(sendPrivateReplyToComment).not.toHaveBeenCalled();
+    expect(db.tables.outbound_webhook_events).toHaveLength(1);
+  });
+
+  it("a complaint with a signal still hands off", async () => {
+    setup(CLINIC, { templates: tpl, webhooks: [WEBHOOK] });
+    classifyAs("UNCERTAIN", 0.5);
+    await handleCommentEvent(...comment("c-1", "I want my money back for the botox"));
+    expect(sendPrivateReplyToComment).not.toHaveBeenCalled();
+    expect(db.tables.outbound_webhook_events).toHaveLength(1);
+  });
+
+  it("spam that names a treatment is still ignored", async () => {
+    setup(CLINIC, { templates: tpl, webhooks: [WEBHOOK] });
+    classifyAs("SPAM", 0.99);
+    await handleCommentEvent(...comment("c-1", "cheap botox at my page, follow me"));
+    expect(sendPrivateReplyToComment).not.toHaveBeenCalled();
+    expect(db.tables.outbound_webhook_events).toHaveLength(0);
+  });
+
+  it("no HIGH_INTENT template: a signal comment hands off instead", async () => {
+    setup(CLINIC, { templates: [], webhooks: [WEBHOOK] });
+    classifyAs("UNCERTAIN", 0.5);
+    await handleCommentEvent(...comment("c-1", "how much"));
+    expect(sendPrivateReplyToComment).not.toHaveBeenCalled();
+    expect(db.tables.outbound_webhook_events).toHaveLength(1);
+  });
+
+  it("a post that sets HIGH_INTENT to ignore is respected", async () => {
+    setup(CLINIC, { templates: tpl, webhooks: [WEBHOOK], monitoring: { actions_per_class: { HIGH_INTENT: "ignore" } } });
+    classifyAs("UNCERTAIN", 0.5);
+    await handleCommentEvent(...comment("c-1", "how much"));
+    expect(sendPrivateReplyToComment).not.toHaveBeenCalled();
+    expect(db.tables.outbound_webhook_events).toHaveLength(0);
   });
 });

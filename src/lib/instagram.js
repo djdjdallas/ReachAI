@@ -466,32 +466,72 @@ export async function postPublicCommentReply(commentId, text, pageAccessToken) {
  * a post first seen through a comment (managed-account auto-watch,
  * src/lib/comment-auto-watch.js).
  *
- * Instagram API with Instagram Login tokens only read the account's own
- * media. When Meta returns owner.id it must be the account; otherwise the
- * read itself is the ownership check.
+ * GET graph.instagram.com/{media-id} with the account's Instagram User
+ * access token (Business Login for Instagram, instagram_business_basic).
  *
- * Best-effort: any failure returns null.
+ * Ownership, per Meta's IG Media reference: `owner` is "only returned if
+ * the app user making the query also created the media; otherwise,
+ * `username` field is returned instead". So owner present = the account's
+ * own. owner.id is NOT compared with the webhook id: on Instagram Login it
+ * is the app-scoped user id (/me `id`, 269...), while the webhook and
+ * users.instagram_business_account_id carry the professional account id
+ * (/me `user_id`, 17841...); see src/app/api/auth/instagram/callback. That
+ * comparison never matched, so every read returned null, silently.
+ * Without owner, a username equal to the account's handle also counts.
+ *
+ * Best-effort: any failure returns null and logs why (HTTP status, Meta's
+ * error code, or the ids and usernames on an ownership miss). The token
+ * is never logged.
  *
  * @param {string} mediaId
  * @param {string} accessToken - decrypted account token
- * @param {string} igAccountId - the account's Instagram user id
+ * @param {{igAccountId?: string, username?: string|null}} [account] - for the logs and the username fallback
  * @returns {Promise<{caption: string|null, permalink: string|null, media_type: string|null}|null>}
  */
-export async function getOwnMedia(mediaId, accessToken, igAccountId) {
+export async function getOwnMedia(mediaId, accessToken, account = {}) {
+  const ctx = { mediaId, igAccountId: account.igAccountId || null };
+  if (!accessToken) {
+    console.warn("[getOwnMedia] no access token", ctx);
+    return null;
+  }
+  let res;
   let data;
   try {
-    const url = `https://graph.instagram.com/${GRAPH_API_VERSION}/${encodeURIComponent(mediaId)}?fields=id,caption,permalink,media_type,owner`;
-    const res = await fetch(url, { headers: { Authorization: `Bearer ${accessToken}` } });
-    data = await res.json().catch(() => ({}));
+    const url = `https://graph.instagram.com/${GRAPH_API_VERSION}/${encodeURIComponent(mediaId)}?fields=id,caption,permalink,media_type,owner,username`;
+    res = await fetch(url, { headers: { Authorization: `Bearer ${accessToken}` } });
+    data = await res.json().catch(() => null);
   } catch (err) {
-    console.error("getOwnMedia error:", err?.message);
+    console.warn("[getOwnMedia] network error", { ...ctx, error: err?.message });
     return null;
   }
-  if (!data || data.error || !data.id) {
-    if (data?.error) console.warn("getOwnMedia failed:", { code: data.error.code, message: data.error.message });
+  if (data?.error) {
+    console.warn("[getOwnMedia] Meta error", {
+      ...ctx,
+      status: res?.status,
+      code: data.error.code ?? null,
+      subcode: data.error.error_subcode ?? null,
+      type: data.error.type ?? null,
+      message: data.error.message ?? null,
+    });
     return null;
   }
-  if (data.owner?.id && igAccountId && String(data.owner.id) !== String(igAccountId)) return null;
+  if (!res?.ok || !data?.id) {
+    console.warn("[getOwnMedia] unexpected response", { ...ctx, status: res?.status ?? null, hasBody: Boolean(data) });
+    return null;
+  }
+  const accountUsername = typeof account.username === "string" ? account.username.replace(/^@/, "").toLowerCase() : null;
+  const owned =
+    Boolean(data.owner?.id) ||
+    (Boolean(accountUsername) && typeof data.username === "string" && data.username.toLowerCase() === accountUsername);
+  if (!owned) {
+    console.warn("[getOwnMedia] not the account's media", {
+      ...ctx,
+      ownerId: data.owner?.id ?? null,
+      mediaUsername: data.username ?? null,
+      accountUsername,
+    });
+    return null;
+  }
   return {
     caption: typeof data.caption === "string" ? data.caption.slice(0, 4000) : null,
     permalink: typeof data.permalink === "string" ? data.permalink.slice(0, 1000) : null,
