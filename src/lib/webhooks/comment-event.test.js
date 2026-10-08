@@ -469,6 +469,9 @@ describe("comment-to-DM: managed-account auto-watch", () => {
 
   it("a comment on an unwatched post is handled with the defaults, and the post is watched from now on", async () => {
     setup(MANAGED, { templates: tpl, monitoringRows: [] });
+    // Managed accounts get an AI-written DM; this test is about the
+    // template, so generation fails and the template is the fallback.
+    generateCommentReply.mockResolvedValueOnce({ kind: "failed", reason: "test" });
     await handleCommentEvent(...onNewPost());
     expect(sendPrivateReplyToComment.mock.calls[0][2]).toBe("Hey! Book: https://calendly.com/x");
     const post = db.tables.posts.find((p) => p.ig_media_id === "media-new");
@@ -538,6 +541,9 @@ describe("comment-to-DM: managed-account auto-watch", () => {
       templates: [{ creator_id: "u1", intent_class: "HIGH_INTENT", template: "Thanks for asking about {{TREATMENT|our services}}!" }],
       monitoringRows: [],
     });
+    // Managed accounts get an AI-written DM; this test is about the
+    // template, so generation fails and the template is the fallback.
+    generateCommentReply.mockResolvedValueOnce({ kind: "failed", reason: "test" });
     await handleCommentEvent(...onNewPost());
     expect(sendPrivateReplyToComment.mock.calls[0][2]).toBe(`${LINE} Thanks for asking about our services!`);
     expect(monitoring()[0].treatment_key ?? null).toBeNull();
@@ -718,11 +724,11 @@ describe("comment-to-DM: lead with an existing thread (managed accounts)", () =>
     expect(sent()).toEqual(["Hey! Book: https://calendly.com/x"]);
   });
 
-  it("no thread at all: the template opener, unchanged", async () => {
+  it("no thread at all: the AI writes the first DM, with the intro", async () => {
     setup(MANAGED, { templates: tpl });
     await handleCommentEvent(...comment());
-    expect(generateCommentReply).not.toHaveBeenCalled();
-    expect(sent()[0]).toBe(`${LINE} Book: https://calendly.com/x`);
+    expect(generateCommentReply).toHaveBeenCalledWith(db, expect.objectContaining({ conversation: null }));
+    expect(sent()).toEqual([`${LINE} Contextual reply.`]);
   });
 
   it("a skipped DM still seeds the thread's treatment from the post tag (lead_updated)", async () => {
@@ -760,7 +766,7 @@ describe("comment-to-DM: live case 2026-10-08 (comment 18118746053059317)", () =
     return [entry, { ...change, value: { ...change.value, media: { id: "media-grand-opening" } } }];
   };
 
-  it("first comment on the auto-watched post: caption fetched, classified UNCERTAIN 0.55, still DMs the high-intent template", async () => {
+  it("first comment on the auto-watched post: caption fetched, classified UNCERTAIN 0.55, still DMs (AI-written)", async () => {
     setup(CLINIC, { templates: tpl, monitoringRows: [] });
     getOwnMedia.mockResolvedValueOnce({ caption: CAPTION, permalink: "https://www.instagram.com/p/DPq1AbCdEfG/", media_type: "IMAGE" });
     classifyAs("UNCERTAIN", 0.55);
@@ -768,7 +774,8 @@ describe("comment-to-DM: live case 2026-10-08 (comment 18118746053059317)", () =
     expect(getOwnMedia).toHaveBeenCalledWith("media-grand-opening", "page-token", { igAccountId: IGBA, username: "soleaesthetics" });
     expect(classifyComment.mock.calls[0][0].postCaption).toBe(CAPTION);
     expect(sendPrivateReplyToComment).toHaveBeenCalledTimes(1);
-    expect(sendPrivateReplyToComment.mock.calls[0][2]).toBe(`${LINE} Here's the 10% off: https://calendly.com/sole/consult`);
+    expect(generateCommentReply).toHaveBeenCalledWith(db, { userId: "u1", conversation: null, caption: CAPTION, commentText: COMMENT });
+    expect(sendPrivateReplyToComment.mock.calls[0][2]).toBe(`${LINE} Contextual reply.`);
     expect(db.tables.comment_to_dm_log.at(-1)).toMatchObject({ decided_action: "dm", dispatched: true });
     expect(db.tables.comment_classifications[0]).toMatchObject({ class: "UNCERTAIN", confidence: 0.55 });
   });
@@ -869,5 +876,87 @@ describe("comment-to-DM: clinic intent signal", () => {
     await handleCommentEvent(...comment("c-1", "how much"));
     expect(sendPrivateReplyToComment).not.toHaveBeenCalled();
     expect(db.tables.outbound_webhook_events).toHaveLength(0);
+  });
+});
+
+describe("comment-to-DM: AI-written first DM (managed accounts)", () => {
+  beforeEach(() => decideAction.mockImplementation(actual.decideAction));
+
+  const tpl = [{ creator_id: "u1", intent_class: "HIGH_INTENT", template: "Thanks for asking about {{TREATMENT|our services}}! {{BOOKING_LINK}}" }];
+  const CLINIC = { billing_managed: true, calendly_url: "https://calendly.com/x", treatment_categories: TREATMENTS };
+  const sent = () => sendPrivateReplyToComment.mock.calls.map((c) => c[2]);
+
+  it("a treatment the comment names beats the post's tag: seeded on the lead and in the fallback template", async () => {
+    setup(CLINIC, { templates: tpl, webhooks: [WEBHOOK], monitoring: { treatment_key: "lip_filler" } });
+    generateCommentReply.mockResolvedValueOnce({ kind: "failed", reason: "generation_failed" });
+    await handleCommentEvent(...comment("c-1", "how much is botox?"));
+    expect(sent()).toEqual([`${LINE} Thanks for asking about Botox! https://calendly.com/x`]);
+    expect(db.tables.lead_profiles[0]).toMatchObject({ treatment_interest: "botox" });
+  });
+
+  it("a comment naming no treatment: the post's tag is used", async () => {
+    setup(CLINIC, { templates: tpl, webhooks: [WEBHOOK], monitoring: { treatment_key: "lip_filler" } });
+    await handleCommentEvent(...comment("c-1", "how much??"));
+    expect(db.tables.lead_profiles[0]).toMatchObject({ treatment_interest: "lip_filler" });
+  });
+
+  it("non-managed clinic accounts keep the post's tag first (unchanged)", async () => {
+    setup({ ...CLINIC, billing_managed: false }, { templates: tpl, webhooks: [WEBHOOK], monitoring: { treatment_key: "lip_filler" } });
+    await handleCommentEvent(...comment("c-1", "how much is botox?"));
+    expect(sent()).toEqual([`${LINE} Thanks for asking about lip filler! https://calendly.com/x`]);
+    expect(db.tables.lead_profiles[0]).toMatchObject({ treatment_interest: "lip_filler" });
+    expect(generateCommentReply).not.toHaveBeenCalled();
+  });
+
+  it("generation fails: the high-intent template goes out instead", async () => {
+    setup(CLINIC, { templates: tpl });
+    generateCommentReply.mockResolvedValueOnce({ kind: "failed", reason: "lint_blocked" });
+    await handleCommentEvent(...comment("c-1", "how much??"));
+    expect(sent()).toEqual([`${LINE} Thanks for asking about our services! https://calendly.com/x`]);
+    expect(db.tables.comment_to_dm_log.at(-1)).toMatchObject({ decided_action: "dm", dispatched: true });
+  });
+
+  it("no template: the AI-written DM still goes out", async () => {
+    setup(CLINIC, { templates: [], webhooks: [WEBHOOK] });
+    generateCommentReply.mockResolvedValueOnce({ kind: "reply", text: "Botox is $12 a unit right now, want the link to book?" });
+    await handleCommentEvent(...comment("c-1", "how much is botox?"));
+    expect(sent()).toEqual([`${LINE} Botox is $12 a unit right now, want the link to book?`]);
+    expect(db.tables.outbound_webhook_events).toHaveLength(0);
+    expect(db.tables.comment_to_dm_log.at(-1)).toMatchObject({ decided_action: "dm", dispatched: true });
+  });
+
+  it("no template and generation fails: handed off as before, and no outbound slot spent", async () => {
+    setup(CLINIC, { templates: [], webhooks: [WEBHOOK] });
+    const rpc = vi.fn(async () => ({ data: true, error: null }));
+    db.rpc = rpc;
+    generateCommentReply.mockResolvedValueOnce({ kind: "failed", reason: "generation_failed" });
+    await handleCommentEvent(...comment("c-1", "how much is botox?"));
+    expect(sendPrivateReplyToComment).not.toHaveBeenCalled();
+    expect(rpc).not.toHaveBeenCalled();
+    expect(db.tables.comment_to_dm_log.at(-1)).toMatchObject({ decided_action: "queue_review", dispatched: false });
+    expect(db.tables.outbound_webhook_events).toEqual([expect.objectContaining({ event_type: "handoff_requested", data: expect.objectContaining({ reason: "other" }) })]);
+  });
+
+  it("a medical question on a first DM: holding text with the intro, the new thread paused with the category", async () => {
+    setup(CLINIC, { templates: tpl });
+    generateCommentReply.mockResolvedValueOnce({ kind: "handoff", category: "medical_question", text: "Good question, someone from the team will get back to you shortly." });
+    await handleCommentEvent(...comment("c-1", "can I get botox while breastfeeding?"));
+    expect(sent()).toEqual([`${LINE} Good question, someone from the team will get back to you shortly.`]);
+    expect(db.tables.conversations[0]).toMatchObject({ instagram_sender_id: LEAD, ai_paused: true, ai_pause_reason: "medical_question" });
+  });
+
+  it("a complaint still hands off; the AI is never asked", async () => {
+    setup(CLINIC, { templates: tpl, webhooks: [WEBHOOK] });
+    await handleCommentEvent(...comment("c-1", "my botox went wrong and I want a refund"));
+    expect(generateCommentReply).not.toHaveBeenCalled();
+    expect(sendPrivateReplyToComment).not.toHaveBeenCalled();
+    expect(db.tables.outbound_webhook_events).toHaveLength(1);
+  });
+
+  it("coach accounts unchanged: no template still queues, no AI", async () => {
+    setup({ business_name: null, billing_managed: false }, { templates: [] });
+    await handleCommentEvent(...comment("c-1", "how much?"));
+    expect(generateCommentReply).not.toHaveBeenCalled();
+    expect(db.tables.comment_to_dm_log.at(-1)).toMatchObject({ decided_action: "queue_review" });
   });
 });
