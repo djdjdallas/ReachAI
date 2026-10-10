@@ -566,6 +566,10 @@ export function verifyWebhookSignature(rawBody, signatureHeader) {
 
 // ── Profile Helpers ─────────────────────────────────────────────────────
 
+function logProfileSkipped(igsid, reason) {
+  console.warn(JSON.stringify({ event: "ig_profile_fetch_skipped", igsid, reason }));
+}
+
 /**
  * Fetches a participant's profile (name, profile pic) for display in the dashboard.
  */
@@ -581,14 +585,17 @@ export async function getParticipantProfile(userId, accessToken) {
     const res = await fetch(url);
     data = await res.json();
   } catch (err) {
-    console.error("getParticipantProfile error:", err.message);
+    logProfileSkipped(userId, err?.message);
     return null;
   }
   if (data.error) {
-    console.error("Failed to fetch participant profile:", data.error.message);
     if (isMetaTokenDead(data.error)) {
+      console.error("Failed to fetch participant profile:", data.error.message);
       throw metaApiError("Failed to fetch participant profile", data.error);
     }
+    // Expected for people who never messaged the account (e.g. the recipient
+    // of an outbound-first thread): Meta answers "User consent is required".
+    logProfileSkipped(userId, data.error.message);
     return null;
   }
   return data;

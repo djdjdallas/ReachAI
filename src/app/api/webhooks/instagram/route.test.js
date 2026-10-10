@@ -258,6 +258,31 @@ describe("inbound DM for a serving account (unchanged)", () => {
   });
 });
 
+describe("profile lookup is optional enrichment", () => {
+  it("a lead with no profile access (Meta: consent required) is still saved and answered, 200", async () => {
+    db.state.user = user();
+    // getParticipantProfile returns null for every non-190 Graph error.
+    ig.getParticipantProfile.mockResolvedValueOnce(null);
+
+    const res = await POST(inbound());
+
+    expect(res.status).toBe(200);
+    expect(db.inserted("messages")[0]).toMatchObject({ role: "user", source: "lead" });
+    expect(ai.generateReply).toHaveBeenCalled();
+    expect(ig.sendInstagramMessage).toHaveBeenCalled();
+  });
+
+  it("a non-token throw from the lookup does not drop the event either", async () => {
+    db.state.user = user();
+    ig.getParticipantProfile.mockRejectedValueOnce(new Error("User consent is required to access user profile"));
+
+    const res = await POST(inbound());
+
+    expect(res.status).toBe(200);
+    expect(db.inserted("messages")[0]).toMatchObject({ role: "user", source: "lead" });
+  });
+});
+
 describe("booking link in AI replies", () => {
   it.each([
     ["booking_url when the account has one", { booking_url: "https://book.sole.example/now", calendly_url: "https://calendly.com/sole/consult" }, "https://book.sole.example/now"],
