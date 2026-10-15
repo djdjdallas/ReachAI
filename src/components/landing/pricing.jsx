@@ -61,7 +61,7 @@ export default function Pricing() {
           <h2 className="text-4xl md:text-6xl font-black mb-6 tracking-tight text-stone-900">
             A $3,000 setter, or $97/mo.
           </h2>
-          <p className="text-stone-500 text-xl font-medium">
+          <p className="text-stone-600 text-xl font-medium">
             The price is on this page because you shouldn&apos;t have to book a call to learn it.
           </p>
         </div>
@@ -77,9 +77,9 @@ export default function Pricing() {
                 <span className="text-6xl font-black tracking-tight text-stone-900">
                   {basePlan.price}
                 </span>
-                <span className="text-stone-400 font-bold text-lg">/mo</span>
+                <span className="text-stone-500 font-bold text-lg">/mo</span>
               </div>
-              <p className="mt-6 text-stone-500 font-medium">
+              <p className="mt-6 text-stone-600 font-medium">
                 {basePlan.description}
               </p>
             </div>
@@ -89,7 +89,7 @@ export default function Pricing() {
                   key={f}
                   className="flex items-center gap-3 font-bold text-stone-600"
                 >
-                  <Check className="w-5 h-5 text-[#ff7e67]" />
+                  <Check className="w-5 h-5 shrink-0 text-[#ff7e67]" />
                   {f}
                 </li>
               ))}
@@ -100,10 +100,10 @@ export default function Pricing() {
                 onClick={() => posthog.capture("pricing_cta_clicked", { plan: "base", price: "$97" })}
                 className="w-full block py-4 rounded-full border-2 border-stone-200 font-black hover:border-stone-900 transition-colors text-stone-900 mb-3"
               >
-                Start 7-Day Trial
+                Start Free Trial
               </Link>
-              <p className="text-[11px] text-stone-400 font-bold uppercase tracking-wider">
-                Includes 7-day free trial for new accounts
+              <p className="text-[13px] text-stone-600 font-semibold">
+                7 days free · Card required · Cancel anytime
               </p>
             </div>
           </div>
@@ -128,7 +128,7 @@ export default function Pricing() {
             <ul className="space-y-4 mb-10 flex-1 font-bold">
               {unlimitedPlan.features.map((f) => (
                 <li key={f} className="flex items-center gap-3">
-                  <CheckCircle className="w-5 h-5 text-white" />
+                  <CheckCircle className="w-5 h-5 shrink-0 text-white" />
                   {f}
                 </li>
               ))}
@@ -139,10 +139,10 @@ export default function Pricing() {
                 onClick={() => posthog.capture("pricing_cta_clicked", { plan: "unlimited", price: "$197" })}
                 className="w-full block py-5 rounded-full bg-white text-[#ff7e67] font-black hover:scale-105 active:scale-95 transition-all shadow-xl mb-3"
               >
-                Get Unlimited Access
+                Start Free Trial
               </Link>
-              <p className="text-[11px] text-white/70 font-bold uppercase tracking-wider">
-                Includes 7-day free trial for new accounts
+              <p className="text-[13px] text-white/85 font-semibold">
+                7 days free · Card required · Cancel anytime
               </p>
             </div>
           </div>
@@ -167,21 +167,21 @@ export default function Pricing() {
 
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <div className="bg-white/5 rounded-2xl p-5 border border-white/10">
-                  <div className="text-[10px] font-bold uppercase tracking-widest text-white/50 mb-2">
+                  <div className="text-[11px] font-bold uppercase tracking-widest text-white/75 mb-2">
                     A human setter
                   </div>
                   <div className="text-2xl font-black mb-1">$2k to $4k/mo</div>
                   <div className="text-xs text-white/60">+ sleeps, ramps, has off days</div>
                 </div>
                 <div className="bg-white/5 rounded-2xl p-5 border border-white/10">
-                  <div className="text-[10px] font-bold uppercase tracking-widest text-white/50 mb-2">
+                  <div className="text-[11px] font-bold uppercase tracking-widest text-white/75 mb-2">
                     Done-for-you build teams
                   </div>
                   <div className="text-2xl font-black mb-1">Price on a call</div>
                   <div className="text-xs text-white/60">+ application and a 72 hour build</div>
                 </div>
                 <div className="bg-[#ff7e67] rounded-2xl p-5 border border-[#ff7e67]">
-                  <div className="text-[10px] font-bold uppercase tracking-widest text-white/80 mb-2">
+                  <div className="text-[11px] font-bold uppercase tracking-widest text-white/80 mb-2">
                     Clinchd Unlimited
                   </div>
                   <div className="text-2xl font-black mb-1">$197/mo. Flat.</div>
@@ -193,7 +193,7 @@ export default function Pricing() {
         </div>
 
         <div className="mt-16 flex flex-col items-center gap-4 reveal-up">
-          <p className="text-stone-400 font-medium text-sm">
+          <p className="text-stone-500 font-medium text-sm">
             No commitment. Cancel anytime with one click.
           </p>
         </div>

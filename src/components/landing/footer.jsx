@@ -13,7 +13,7 @@ export default function Footer() {
                 Clinchd
               </span>
             </div>
-            <p className="text-stone-400 text-lg font-medium max-w-xs leading-relaxed">
+            <p className="text-stone-500 text-lg font-medium max-w-xs leading-relaxed">
               The AI setter for coaches who sell high-ticket offers on Instagram.
             </p>
           </div>
@@ -21,7 +21,7 @@ export default function Footer() {
             <h5 className="font-black mb-8 uppercase tracking-widest text-[11px] text-stone-900">
               Product
             </h5>
-            <ul className="space-y-5 text-[15px] font-bold text-stone-400">
+            <ul className="space-y-5 text-[15px] font-bold text-stone-500">
               <li>
                 <a href="/#features" className="hover:text-[#ff7e67] transition-colors">Features</a>
               </li>
@@ -37,7 +37,7 @@ export default function Footer() {
             <h5 className="font-black mb-8 uppercase tracking-widest text-[11px] text-stone-900">
               Compare
             </h5>
-            <ul className="space-y-5 text-[15px] font-bold text-stone-400">
+            <ul className="space-y-5 text-[15px] font-bold text-stone-500">
               <li>
                 <Link href="/compare/vs-manychat" className="hover:text-[#ff7e67] transition-colors">vs ManyChat</Link>
               </li>
@@ -56,7 +56,7 @@ export default function Footer() {
             <h5 className="font-black mb-8 uppercase tracking-widest text-[11px] text-stone-900">
               Resources
             </h5>
-            <ul className="space-y-5 text-[15px] font-bold text-stone-400">
+            <ul className="space-y-5 text-[15px] font-bold text-stone-500">
               <li>
                 <Link href="/blog" className="hover:text-[#ff7e67] transition-colors">Blog</Link>
               </li>

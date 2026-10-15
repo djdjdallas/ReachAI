@@ -34,13 +34,13 @@ export default function HowItWorks() {
     <section id="how-it-works" className="py-32 md:py-48 bg-[#fafaf9]">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="max-w-3xl mb-24 reveal-up">
-          <div className="inline-flex items-center px-4 py-1 rounded-full bg-stone-100 text-stone-500 text-[11px] font-bold uppercase tracking-widest mb-6">
+          <div className="inline-flex items-center px-4 py-1 rounded-full bg-stone-100 text-stone-600 text-[11px] font-bold uppercase tracking-widest mb-6">
             How It Works
           </div>
           <h2 className="text-4xl md:text-6xl font-black mb-8 leading-tight text-stone-900">
             From DM to discovery call in under 10 minutes.
           </h2>
-          <p className="text-stone-500 text-xl font-medium">
+          <p className="text-stone-600 text-xl font-medium">
             A 3-step workflow that replaces your setter and saves you 20+ hours a
             week.
           </p>
@@ -65,7 +65,7 @@ export default function HowItWorks() {
                   <h3 className="text-2xl md:text-3xl font-black text-stone-900 mb-4">
                     {step.title}
                   </h3>
-                  <p className="text-stone-500 text-base md:text-lg leading-relaxed font-medium">
+                  <p className="text-stone-600 text-base md:text-lg leading-relaxed font-medium">
                     {step.description}
                   </p>
                 </div>

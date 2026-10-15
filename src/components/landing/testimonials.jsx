@@ -11,7 +11,7 @@ const builtForCards = [
     icon: Users,
     title: "Coaching-specific qualification",
     body:
-      "Every objection script, qualifying question, and tone preset was designed around the patterns we saw across 200+ coach DM scripts. Built for $500 to $25K offers, not a generic chat builder.",
+      "Every objection script, qualifying question, and tone preset was designed around how coaches actually qualify and book in DMs. Built for $500 to $25K offers, not a generic chat builder.",
   },
   {
     icon: Sparkles,
@@ -37,10 +37,10 @@ export default function Testimonials() {
             <h2 className="text-4xl font-black mb-8 leading-tight text-stone-900">
               Built for coaches selling $1K+ offers on Instagram.
             </h2>
-            <p className="text-stone-500 text-lg font-medium mb-6">
-              Clinchd was designed around the qualification patterns, objection handling, and timing decisions we saw across hundreds of real coach DM conversations.
+            <p className="text-stone-600 text-lg font-medium mb-6">
+              Clinchd was designed around the qualification patterns, objection handling, and timing decisions that decide whether a DM turns into a booked call.
             </p>
-            <p className="text-stone-500 font-medium">
+            <p className="text-stone-600 font-medium">
               Be among the first to see public results.
             </p>
           </div>
@@ -59,7 +59,7 @@ export default function Testimonials() {
                   <h3 className="font-extrabold text-stone-900 mb-3 leading-tight">
                     {card.title}
                   </h3>
-                  <p className="text-stone-500 text-sm leading-relaxed">
+                  <p className="text-stone-600 text-[15px] leading-relaxed">
                     {card.body}
                   </p>
                 </div>

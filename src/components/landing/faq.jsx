@@ -71,7 +71,7 @@ export default function Faq() {
           <h2 className="text-4xl font-black mb-4 text-stone-900">
             Common Questions
           </h2>
-          <p className="text-stone-500 font-medium">
+          <p className="text-stone-600 font-medium">
             Everything you need to know about your AI setter.
           </p>
         </div>
@@ -93,7 +93,7 @@ export default function Faq() {
                   className={`w-5 h-5 text-[#ff7e67] faq-icon flex-shrink-0 ml-4`}
                 />
               </div>
-              <div className="faq-answer text-stone-500 font-medium text-sm leading-relaxed">
+              <div className="faq-answer text-stone-600 font-medium text-[15px] leading-relaxed">
                 {faq.answer}
               </div>
             </div>

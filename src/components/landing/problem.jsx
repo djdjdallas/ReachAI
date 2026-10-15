@@ -30,9 +30,9 @@ export default function Problem() {
           <h2 className="text-4xl md:text-5xl font-black tracking-tight text-stone-900 mb-6">
             Stop losing warm leads in your DMs
           </h2>
-          <p className="text-stone-500 text-lg font-medium">
-            Most coaches lose 30-50% of their warm leads because they can&apos;t
-            respond fast enough. Sound familiar?
+          <p className="text-stone-600 text-lg font-medium">
+            A lead who waits hours for a reply usually moves on. If you
+            can&apos;t answer fast enough, warm leads go cold. Sound familiar?
           </p>
         </div>
 
@@ -50,7 +50,7 @@ export default function Problem() {
                 <h3 className="text-xl font-extrabold text-stone-900 mb-3">
                   {point.title}
                 </h3>
-                <p className="text-sm text-stone-500 leading-relaxed font-medium">
+                <p className="text-[15px] text-stone-600 leading-relaxed font-medium">
                   {point.description}
                 </p>
               </div>

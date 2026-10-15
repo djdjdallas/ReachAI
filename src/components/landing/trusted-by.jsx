@@ -4,8 +4,8 @@ export default function TrustedBy() {
   return (
     <section className="py-20 bg-white border-y border-stone-100 reveal-up">
       <div className="max-w-7xl mx-auto px-4">
-        <p className="text-center text-[12px] font-extrabold text-stone-400 uppercase tracking-[0.2em] mb-12">
-          Trusted by 100+ Coaches &amp; Course Creators
+        <p className="text-center text-[12px] font-extrabold text-stone-500 uppercase tracking-[0.2em] mb-12">
+          Built on the official platforms you already use
         </p>
         <div className="flex flex-wrap justify-center gap-16 md:gap-32 opacity-30 grayscale">
           <div className="flex items-center gap-2">

@@ -88,7 +88,7 @@ export default function Features() {
           <h2 className="text-4xl md:text-5xl font-black mb-6 tracking-tight text-stone-900">
             Your AI Setter That Never Misses a Lead
           </h2>
-          <p className="text-stone-500 text-lg font-medium">
+          <p className="text-stone-600 text-lg font-medium">
             Everything a $5K/mo setter does, at a fraction of the cost.
           </p>
         </div>
@@ -121,7 +121,7 @@ export default function Features() {
                 <h4 className="font-extrabold text-xl mb-4 text-stone-900">
                   {feature.title}
                 </h4>
-                <p className="text-sm text-stone-500 leading-relaxed font-medium">
+                <p className="text-[15px] text-stone-600 leading-relaxed font-medium">
                   {feature.description}
                 </p>
               </div>
@@ -134,7 +134,7 @@ export default function Features() {
           <div className="aspect-[5/4] w-full max-w-3xl mx-auto">
             <AgentStats />
           </div>
-          <p className="text-center text-sm text-stone-400 font-medium mt-4">
+          <p className="text-center text-sm text-stone-500 font-medium mt-4">
             Track every conversation, qualification, and booking from one dashboard.
           </p>
         </div>
