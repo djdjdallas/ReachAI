@@ -45,7 +45,7 @@ export default function WhoItsFor() {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-4xl mx-auto reveal-up">
           {/* Not you */}
           <div className="bg-white rounded-[2rem] border border-stone-100 p-8 md:p-10 soft-shadow">
-            <div className="text-[11px] font-bold uppercase tracking-widest text-stone-400 mb-6">
+            <div className="text-[11px] font-bold uppercase tracking-widest text-stone-500 mb-6">
               The enterprise gate
             </div>
             <ul className="space-y-4">
@@ -54,7 +54,7 @@ export default function WhoItsFor() {
                   <span className="mt-0.5 flex-shrink-0 w-6 h-6 rounded-full bg-stone-100 flex items-center justify-center">
                     <X className="w-3.5 h-3.5 text-stone-400" />
                   </span>
-                  <span className="text-stone-500 font-medium leading-snug">
+                  <span className="text-stone-600 font-medium leading-snug">
                     {item}
                   </span>
                 </li>

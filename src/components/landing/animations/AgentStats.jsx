@@ -200,7 +200,7 @@ export default function AgentStats() {
         <div className="flex items-center justify-between mb-7">
           <div>
             <div className="text-[11px] font-bold uppercase tracking-[0.12em] text-stone-500 mb-1">
-              Last 30 days · Live
+              Example data
             </div>
             <h3
               className="text-stone-900 m-0"
@@ -214,13 +214,13 @@ export default function AgentStats() {
               Your AI Agent Performance
             </h3>
           </div>
-          {/* Live indicator */}
+          {/* Sample indicator */}
           <div className="flex items-center gap-2">
             <span
               className="text-[11px] font-bold uppercase tracking-[0.12em]"
               style={{ color: "#ff7e67" }}
             >
-              Live
+              Sample
             </span>
             <span
               className="relative block w-2 h-2 rounded-full"

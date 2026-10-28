@@ -18,14 +18,14 @@ export default function FinalCta() {
               href="/signup"
               className="inline-flex items-center gap-3 bg-stone-900 text-white px-12 py-6 rounded-full text-xl font-black hover:bg-[#ff7e67] hover:scale-105 active:scale-95 transition-all shadow-2xl"
             >
-              Get Started for Free
+              Start Free Trial
               <Rocket className="w-5 h-5" />
             </Link>
             <div className="flex flex-col gap-2">
-              <p className="text-stone-500 font-bold uppercase tracking-widest text-xs">
-                7-day trial &middot; Setup in 5 minutes
+              <p className="text-stone-600 font-bold uppercase tracking-widest text-xs">
+                7 days free &middot; Card required &middot; Setup in 5 minutes
               </p>
-              <p className="text-stone-400 font-medium text-xs italic">
+              <p className="text-stone-500 font-medium text-xs italic">
                 Your AI setter starts qualifying leads today.
               </p>
             </div>

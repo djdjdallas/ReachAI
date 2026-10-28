@@ -6,7 +6,7 @@ export default function Integrations() {
           <h2 className="text-3xl md:text-4xl font-black tracking-tight text-stone-900 mb-4">
             Works With Your Existing Tools
           </h2>
-          <p className="text-stone-500 text-lg font-medium">
+          <p className="text-stone-600 text-lg font-medium">
             Clinchd connects to Calendly, Cal.com, and the tools you already use.
             No migration, no headaches.
           </p>

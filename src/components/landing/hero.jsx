@@ -125,7 +125,7 @@ export default function Hero() {
                 href="/signup"
                 className="inline-flex items-center gap-2 px-7 py-4 bg-[#ff7e67] text-white rounded-full text-[15px] font-bold tracking-tight shadow-[0_4px_14px_rgba(255,126,103,0.35)] hover:shadow-[0_6px_20px_rgba(255,126,103,0.45)] hover:-translate-y-px transition-all"
               >
-                Start for $97/month
+                Start Free Trial
                 <ArrowRight className="w-4 h-4" />
               </Link>
 
@@ -138,8 +138,8 @@ export default function Hero() {
             </div>
 
             {/* Trust microcopy */}
-            <p className="text-[13px] font-medium text-stone-500 tracking-tight mb-7">
-              No application · No sales call · Live in minutes
+            <p className="text-[13px] font-medium text-stone-600 tracking-tight mb-7">
+              7 days free · Card required · Cancel anytime · No sales call
             </p>
 
             {/* Social proof strip */}
@@ -147,32 +147,12 @@ export default function Hero() {
               ref={trustRef}
               className="flex items-center gap-3 pt-5 border-t border-stone-100 max-w-md"
             >
-              {/* Avatar stack — replace initials with real user photos when available */}
-              <div className="flex">
-                {[
-                  { bg: "#fcefe8", letter: "S" },
-                  { bg: "#ffe0d4", letter: "M" },
-                  { bg: "#ffd4c2", letter: "J" },
-                  { bg: "#ffcab6", letter: "E" },
-                ].map((avatar, i) => (
-                  <div
-                    key={i}
-                    className="w-7 h-7 rounded-full border-2 border-white flex items-center justify-center text-[10px] font-bold text-[#ff7e67]"
-                    style={{
-                      background: avatar.bg,
-                      marginLeft: i === 0 ? 0 : "-8px",
-                    }}
-                  >
-                    {avatar.letter}
-                  </div>
-                ))}
-              </div>
               <div className="flex-1 min-w-0">
                 <div className="text-[12px] font-semibold text-stone-900 leading-snug">
-                  Used by coaches and course creators
+                  Built on the official Meta Graph API
                 </div>
-                <div className="text-[11px] font-medium text-stone-400 mt-px">
-                  ★★★★★ from early users
+                <div className="text-[12px] font-medium text-stone-600 mt-px">
+                  You can take over any conversation in one click
                 </div>
               </div>
             </div>

@@ -132,7 +132,7 @@ export default function Navbar() {
         <div className="md:hidden bg-white border-t border-stone-100 px-4 py-6 space-y-1">
           <a href="/#how-it-works" onClick={() => setMobileOpen(false)} className="block px-4 py-3 text-sm font-semibold text-stone-700 hover:text-[#ff7e67] hover:bg-[#fff5f2] rounded-xl transition-colors">How it Works</a>
           <a href="/#pricing" onClick={() => setMobileOpen(false)} className="block px-4 py-3 text-sm font-semibold text-stone-700 hover:text-[#ff7e67] hover:bg-[#fff5f2] rounded-xl transition-colors">Pricing</a>
-          <div className="px-4 py-2 text-xs font-bold uppercase tracking-widest text-stone-400">Compare</div>
+          <div className="px-4 py-2 text-xs font-bold uppercase tracking-widest text-stone-500">Compare</div>
           {compareLinks.map((link) => (
             <Link
               key={link.href}
@@ -143,7 +143,7 @@ export default function Navbar() {
               {link.label}
             </Link>
           ))}
-          <div className="px-4 py-2 text-xs font-bold uppercase tracking-widest text-stone-400">For Coaches</div>
+          <div className="px-4 py-2 text-xs font-bold uppercase tracking-widest text-stone-500">For Coaches</div>
           {nicheLinks.map((link) => (
             <Link
               key={link.href}

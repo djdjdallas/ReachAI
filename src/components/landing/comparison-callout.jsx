@@ -18,7 +18,7 @@ export default function ComparisonCallout() {
           <h2 className="text-4xl md:text-5xl font-black tracking-tight text-stone-900 mb-6">
             The math on a human setter
           </h2>
-          <p className="text-stone-500 text-lg font-medium max-w-2xl mx-auto">
+          <p className="text-stone-600 text-lg font-medium max-w-2xl mx-auto">
             You keep the relationship, the account, and the control. Clinchd just
             makes sure nobody waits.
           </p>
@@ -26,8 +26,8 @@ export default function ComparisonCallout() {
 
         <div className="bg-white rounded-[2rem] border border-stone-100 overflow-hidden soft-shadow reveal-up">
           <div className="grid grid-cols-3 text-center border-b border-stone-100">
-            <div className="py-5 px-4 text-sm font-bold text-stone-400 uppercase tracking-wider" />
-            <div className="py-5 px-4 text-sm font-bold text-stone-400 uppercase tracking-wider border-x border-stone-100">
+            <div className="py-5 px-4 text-sm font-bold text-stone-500 uppercase tracking-wider" />
+            <div className="py-5 px-4 text-sm font-bold text-stone-500 uppercase tracking-wider border-x border-stone-100">
               Human setter
             </div>
             <div className="py-5 px-4 text-sm font-bold text-[#ff7e67] uppercase tracking-wider bg-[#fff5f2]">
@@ -45,7 +45,7 @@ export default function ComparisonCallout() {
               <div className="py-4 px-4 text-sm font-bold text-stone-900 text-left pl-6">
                 {row.feature}
               </div>
-              <div className="py-4 px-4 text-sm text-stone-400 border-x border-stone-50">
+              <div className="py-4 px-4 text-sm text-stone-500 border-x border-stone-50">
                 {row.setter}
               </div>
               <div className="py-4 px-4 text-sm font-semibold text-stone-900 bg-[#fff5f2]/30">
@@ -56,7 +56,7 @@ export default function ComparisonCallout() {
         </div>
 
         <div className="mt-10 max-w-3xl mx-auto reveal-up">
-          <p className="text-center text-stone-500 font-medium leading-relaxed">
+          <p className="text-center text-stone-600 font-medium leading-relaxed">
             Clinchd handles qualifying and booking. You still close the call.
             That&apos;s the part only you can do.
           </p>
