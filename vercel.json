@@ -9,6 +9,10 @@
       "schedule": "0 14 * * *"
     },
     {
+      "path": "/api/cron/missed-leads",
+      "schedule": "0 16 * * *"
+    },
+    {
       "path": "/api/cron/drip-process",
       "schedule": "*/15 * * * *"
     },
