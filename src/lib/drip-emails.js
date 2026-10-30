@@ -110,7 +110,7 @@ export const DRIP_SEQUENCE = [
   {
     step: 1,
     delayDays: 0,
-    subject: "Welcome to Clinchd \u2014 let\u2019s get your AI live in 30 minutes",
+    subject: "Welcome to Clinchd. Let\u2019s get your AI live in 30 minutes",
     html: layout({
       badge: "Welcome to Clinchd",
       content: `
@@ -124,20 +124,20 @@ export const DRIP_SEQUENCE = [
   ])}
   ${button("Set Up My Account", "{{app_url}}/onboarding")}
   ${divider()}
-  ${p("<span style=\"font-size:14px;color:#a8a29e;\">Need help? Just reply to this email \u2014 we read every one.</span>")}
+  ${p("<span style=\"font-size:14px;color:#a8a29e;\">Need help? Just reply to this email. We read every one.</span>")}
 `,
     }),
   },
   {
     step: 2,
     delayDays: 1,
-    subject: "Your AI DM setter is waiting \u2014 here\u2019s how to train it",
+    subject: "Your AI DM setter is waiting. Here\u2019s how to train it",
     html: layout({
       badge: "Step 2 \u00B7 Script Builder",
       content: `
   ${h1("Time to make your AI sound like you")}
-  ${p("The script builder is where the magic happens. Tell the AI about your offer, your ideal client, and the questions that matter \u2014 it\u2019ll handle the rest.")}
-  ${tipBox("<strong>\uD83D\uDCA1 Pro tip:</strong> Use your voice profile so the AI matches your natural tone. Prospects can\u2019t tell it\u2019s not you.")}
+  ${p("The script builder is where the magic happens. Tell the AI about your offer, your ideal client, and the questions that matter. It\u2019ll handle the rest.")}
+  ${tipBox("<strong>\uD83D\uDCA1 Pro tip:</strong> Use your voice profile so the AI matches your natural tone.")}
   ${button("Build My Script", "{{app_url}}/script-builder")}
   ${divider()}
   ${p("<span style=\"font-size:14px;color:#a8a29e;\">Most users finish their script in under 10 minutes.</span>")}
@@ -147,12 +147,12 @@ export const DRIP_SEQUENCE = [
   {
     step: 3,
     delayDays: 3,
-    subject: "The coaches booking 9 calls/day are doing this one thing",
+    subject: "Let qualified leads book themselves",
     html: layout({
       badge: "Step 3 \u00B7 Calendly",
       content: `
-  ${h1("They connected Calendly \u2014 and leads started booking themselves")}
-  ${p("When Clinchd qualifies a lead, it shares your Calendly link at exactly the right moment. No back-and-forth, no missed follow-ups \u2014 the lead books while they\u2019re still excited.")}
+  ${h1("Connect Calendly and leads can book themselves")}
+  ${p("When Clinchd qualifies a lead, it shares your Calendly link at exactly the right moment. No back-and-forth, no missed follow-ups. The lead books while they\u2019re still excited.")}
   ${p("<strong style=\"color:#1c1917;\">Here\u2019s how the flow works:</strong>")}
   ${checklist([
     { title: "A prospect DMs you on Instagram" },
@@ -167,7 +167,7 @@ export const DRIP_SEQUENCE = [
   {
     step: 4,
     delayDays: 7,
-    subject: "Quick check-in \u2014 is your AI getting results?",
+    subject: "Quick check-in: is your AI getting results?",
     html: layout({
       badge: "Your first week",
       content: `
@@ -175,11 +175,11 @@ export const DRIP_SEQUENCE = [
   ${p("You\u2019ve been on Clinchd for a week now. Pop into your dashboard to see how many leads your AI has qualified and how many calls have been booked.")}
   ${p("<strong style=\"color:#1c1917;\">Quick FAQ:</strong>")}
   ${tipBox("<strong>AI sounds off?</strong> Tweak your script or update your voice profile.")}
-  ${tipBox("<strong>Want to pause?</strong> Switch to Handoff mode in Settings \u2014 messages still get logged.")}
+  ${tipBox("<strong>Want to pause?</strong> Switch to Handoff mode in Settings. Messages still get logged.")}
   ${tipBox("<strong>Need more conversations?</strong> Upgrade to Unlimited for uncapped qualified conversations.")}
   ${button("View My Dashboard", "{{app_url}}/dashboard")}
   ${divider()}
-  ${p("<span style=\"font-size:14px;color:#a8a29e;\">Questions? Reply any time \u2014 we\u2019re here to help you close.</span>")}
+  ${p("<span style=\"font-size:14px;color:#a8a29e;\">Questions? Reply any time. We\u2019re here to help you close.</span>")}
 `,
     }),
   },
