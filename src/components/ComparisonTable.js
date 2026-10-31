@@ -10,7 +10,7 @@ export default function ComparisonTable({ rows, competitorName }) {
             <th className="text-left py-4 px-6 text-sm font-bold uppercase tracking-wider text-stone-400 border-b border-stone-100">
               {competitorName}
             </th>
-            <th className="text-left py-4 px-6 text-sm font-bold uppercase tracking-wider text-[#ff7e67] border-b border-[#ff7e67]/20 bg-[#fff5f2] rounded-t-xl">
+            <th className="text-left py-4 px-6 text-sm font-bold uppercase tracking-wider text-[#fc6e56] border-b border-[#fc6e56]/20 bg-[#fff5f2] rounded-t-xl">
               Clinchd
             </th>
           </tr>
@@ -27,7 +27,7 @@ export default function ComparisonTable({ rows, competitorName }) {
               <td className="py-4 px-6 text-sm text-stone-500 border-b border-stone-50">
                 {row.competitor}
               </td>
-              <td className="py-4 px-6 text-sm font-semibold text-stone-900 border-b border-[#ff7e67]/10 bg-[#fff5f2]/50">
+              <td className="py-4 px-6 text-sm font-semibold text-stone-900 border-b border-[#fc6e56]/10 bg-[#fff5f2]/50">
                 {row.clinchd}
               </td>
             </tr>

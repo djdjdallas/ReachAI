@@ -265,7 +265,7 @@ export default function ConnectSetup() {
               <div className="cs-connected absolute right-0 top-0 inline-flex items-center gap-1.5">
                 <div
                   className="w-[18px] h-[18px] rounded-full flex items-center justify-center flex-shrink-0"
-                  style={{ background: "#ff7e67" }}
+                  style={{ background: "#fc6e56" }}
                 >
                   <svg
                     width="10"
@@ -282,7 +282,7 @@ export default function ConnectSetup() {
                 </div>
                 <span
                   className="text-[12px] font-bold"
-                  style={{ color: "#ff7e67" }}
+                  style={{ color: "#fc6e56" }}
                 >
                   Connected
                 </span>
@@ -350,18 +350,18 @@ export default function ConnectSetup() {
             style={{
               padding: "0.625rem 1.25rem",
               background: "#fff5f2",
-              border: "1px solid rgba(255, 126, 103, 0.3)",
+              border: "1px solid rgba(252, 110, 86, 0.3)",
             }}
           >
             <span
               className="relative block w-2 h-2 rounded-full"
-              style={{ background: "#ff7e67" }}
+              style={{ background: "#fc6e56" }}
             >
               <span
                 className="cs-ready-pulse absolute rounded-full"
                 style={{
                   inset: "-3px",
-                  background: "#ff7e67",
+                  background: "#fc6e56",
                   opacity: 0.4,
                 }}
               />
@@ -371,7 +371,7 @@ export default function ConnectSetup() {
               style={{
                 fontFamily: "'Cabinet Grotesk', system-ui, sans-serif",
                 letterSpacing: "0.1em",
-                color: "#ff7e67",
+                color: "#fc6e56",
               }}
             >
               Ready to go
@@ -397,7 +397,7 @@ function InstagramAvatar() {
         height: "40px",
         background:
           "linear-gradient(135deg, #fcefe8 0%, #ffe0d4 50%, #ffd4c2 100%)",
-        border: "1px solid rgba(255, 126, 103, 0.15)",
+        border: "1px solid rgba(252, 110, 86, 0.15)",
       }}
     >
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
@@ -407,7 +407,7 @@ function InstagramAvatar() {
           width="18"
           height="18"
           rx="5"
-          stroke="#ff7e67"
+          stroke="#fc6e56"
           strokeWidth="2"
           opacity="0.6"
         />
@@ -415,7 +415,7 @@ function InstagramAvatar() {
           cx="12"
           cy="12"
           r="4"
-          stroke="#ff7e67"
+          stroke="#fc6e56"
           strokeWidth="2"
           opacity="0.6"
         />
@@ -442,7 +442,7 @@ function TextareaContent({ fullText, charsRevealed, isFocused }) {
       style={{
         background: "#ffffff",
         border: isFocused
-          ? "1px solid rgba(255, 126, 103, 0.35)"
+          ? "1px solid rgba(252, 110, 86, 0.35)"
           : "1px solid #e7e5e4",
         borderRadius: "0.75rem",
         padding: "0.75rem 0.875rem",
@@ -453,7 +453,7 @@ function TextareaContent({ fullText, charsRevealed, isFocused }) {
         color: "#1c1917",
         transition: "border 0.3s ease-out, box-shadow 0.3s ease-out",
         boxShadow: isFocused
-          ? "0 0 0 3px rgba(255, 126, 103, 0.08)"
+          ? "0 0 0 3px rgba(252, 110, 86, 0.08)"
           : "none",
       }}
     >

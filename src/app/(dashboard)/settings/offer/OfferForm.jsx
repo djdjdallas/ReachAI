@@ -21,7 +21,7 @@ import {
   Tag,
 } from "lucide-react";
 
-const CORAL = "#ff7e67";
+const CORAL = "#fc6e56";
 
 function listToText(arr) {
   if (!Array.isArray(arr)) return "";

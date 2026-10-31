@@ -109,7 +109,7 @@ export default function BlogIndex() {
                 onClick={() => setActiveCategory(cat)}
                 className={`px-4 py-2 rounded-full text-sm font-bold transition-all ${
                   activeCategory === cat
-                    ? "bg-[#ff7e67] text-white shadow-md shadow-[#ff7e67]/20"
+                    ? "bg-[#fc6e56] text-white shadow-md shadow-[#fc6e56]/20"
                     : "bg-stone-100 text-stone-500 hover:bg-stone-200"
                 }`}
               >
@@ -124,12 +124,12 @@ export default function BlogIndex() {
       {activeCategory === "All" && (
         <section className="pb-8 bg-white">
           <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="bg-[#fff5f2] rounded-[2rem] border border-[#ff7e67]/10 p-8 md:p-12">
-              <span className="inline-flex items-center rounded-full bg-[#ff7e67] px-3 py-1 text-xs font-bold text-white mb-4">
+            <div className="bg-[#fff5f2] rounded-[2rem] border border-[#fc6e56]/10 p-8 md:p-12">
+              <span className="inline-flex items-center rounded-full bg-[#fc6e56] px-3 py-1 text-xs font-bold text-white mb-4">
                 Featured
               </span>
               <h2 className="text-2xl md:text-3xl font-black text-stone-900 mb-3">
-                <a href={`/blog/${featured.slug}`} className="hover:text-[#ff7e67] transition-colors">
+                <a href={`/blog/${featured.slug}`} className="hover:text-[#fc6e56] transition-colors">
                   {featured.title}
                 </a>
               </h2>

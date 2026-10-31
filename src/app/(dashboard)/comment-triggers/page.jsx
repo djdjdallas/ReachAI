@@ -17,7 +17,7 @@ export const metadata = {
   robots: { index: false, follow: false },
 };
 
-const CORAL = "#ff7e67";
+const CORAL = "#fc6e56";
 const IG_GRAPH_BASE = "https://graph.instagram.com/v21.0";
 
 async function fetchRecentMedia(accessToken) {

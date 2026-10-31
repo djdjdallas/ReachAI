@@ -90,7 +90,7 @@ function formatDuration(start, end) {
 }
 
 const SOURCE_COLORS = {
-  calendly: { bg: "bg-[#fff5f2]", border: "border-[#ff7e67]/20", dot: "bg-[#ff7e67]", text: "text-[#ff7e67]" },
+  calendly: { bg: "bg-[#fff5f2]", border: "border-[#fc6e56]/20", dot: "bg-[#fc6e56]", text: "text-[#fc6e56]" },
   google_calendar: { bg: "bg-blue-50", border: "border-blue-200", dot: "bg-blue-500", text: "text-blue-600" },
   manual: { bg: "bg-stone-50", border: "border-stone-200", dot: "bg-stone-400", text: "text-stone-600" },
 };
@@ -261,13 +261,13 @@ export default function CalendarPage() {
           <div className="flex items-center bg-white p-1 rounded-2xl border border-stone-200 soft-shadow">
             <button
               onClick={() => setViewMode("month")}
-              className={`px-6 py-2 rounded-xl text-sm font-bold ${viewMode === "month" ? "bg-[#fff5f2] text-[#ff7e67]" : "text-stone-500 hover:text-stone-900"} transition-colors`}
+              className={`px-6 py-2 rounded-xl text-sm font-bold ${viewMode === "month" ? "bg-[#fff5f2] text-[#fc6e56]" : "text-stone-500 hover:text-stone-900"} transition-colors`}
             >
               Month
             </button>
             <button
               onClick={() => setViewMode("week")}
-              className={`px-6 py-2 rounded-xl text-sm font-bold ${viewMode === "week" ? "bg-[#fff5f2] text-[#ff7e67]" : "text-stone-500 hover:text-stone-900"} transition-colors`}
+              className={`px-6 py-2 rounded-xl text-sm font-bold ${viewMode === "week" ? "bg-[#fff5f2] text-[#fc6e56]" : "text-stone-500 hover:text-stone-900"} transition-colors`}
             >
               Week
             </button>
@@ -306,7 +306,7 @@ export default function CalendarPage() {
                       key={idx}
                       className={`min-h-[100px] p-3 ${!day.currentMonth ? "bg-stone-50/50 text-stone-300" : "text-stone-900"} ${isToday ? "bg-[#fff5f2]/30" : ""}`}
                     >
-                      <span className={`text-sm font-bold ${isToday ? "flex items-center justify-center w-7 h-7 bg-[#ff7e67] text-white rounded-full" : ""}`}>
+                      <span className={`text-sm font-bold ${isToday ? "flex items-center justify-center w-7 h-7 bg-[#fc6e56] text-white rounded-full" : ""}`}>
                         {day.day}
                       </span>
                       {dayEvents.length > 0 && (
@@ -352,7 +352,7 @@ export default function CalendarPage() {
                       key={idx}
                       className={`min-h-[300px] p-3 ${!day.currentMonth ? "bg-stone-50/50 text-stone-300" : "text-stone-900"} ${isToday ? "bg-[#fff5f2]/30" : ""}`}
                     >
-                      <span className={`text-sm font-bold ${isToday ? "flex items-center justify-center w-7 h-7 bg-[#ff7e67] text-white rounded-full" : ""}`}>
+                      <span className={`text-sm font-bold ${isToday ? "flex items-center justify-center w-7 h-7 bg-[#fc6e56] text-white rounded-full" : ""}`}>
                         {day.day}
                       </span>
                       {dayEvents.length > 0 && (
@@ -396,7 +396,7 @@ export default function CalendarPage() {
                 {/* Calendly status */}
                 <div className="flex items-center gap-4 bg-stone-50 p-4 rounded-2xl border border-stone-100">
                   <div className="w-10 h-10 bg-white rounded-xl shadow-sm border border-stone-100 flex items-center justify-center">
-                    <span className="text-[#ff7e67] text-lg font-bold">C</span>
+                    <span className="text-[#fc6e56] text-lg font-bold">C</span>
                   </div>
                   <div className="flex-1">
                     <p className="text-sm font-bold">Calendly</p>
@@ -450,7 +450,7 @@ export default function CalendarPage() {
               <h3 className="text-lg font-extrabold mb-6">Upcoming</h3>
               <div className="space-y-4">
                 {upcomingEvents.slice(0, 4).map((evt) => (
-                  <div key={evt.id} className="p-4 rounded-2xl border border-stone-100 bg-[#fff5f2] relative group cursor-pointer hover:border-[#ff7e67]/30 transition-all" onClick={() => setSelectedEvent(evt)}>
+                  <div key={evt.id} className="p-4 rounded-2xl border border-stone-100 bg-[#fff5f2] relative group cursor-pointer hover:border-[#fc6e56]/30 transition-all" onClick={() => setSelectedEvent(evt)}>
                     <div className="flex items-center gap-3 mb-3">
                       <Avatar className="h-10 w-10 rounded-full bg-white ring-2 ring-white shadow-sm">
                         <AvatarFallback className="bg-stone-100 text-stone-600 text-xs">

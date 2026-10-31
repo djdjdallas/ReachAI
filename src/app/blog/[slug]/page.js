@@ -46,9 +46,9 @@ function mdxComponents() {
     li: (props) => <li className="leading-relaxed" {...props} />,
     strong: (props) => <strong className="font-bold text-stone-900" {...props} />,
     blockquote: (props) => (
-      <blockquote className="border-l-4 border-[#ff7e67] pl-6 py-2 my-6 italic text-stone-500 bg-[#fff5f2]/50 rounded-r-xl pr-6" {...props} />
+      <blockquote className="border-l-4 border-[#fc6e56] pl-6 py-2 my-6 italic text-stone-500 bg-[#fff5f2]/50 rounded-r-xl pr-6" {...props} />
     ),
-    a: (props) => <a className="text-[#ff7e67] font-semibold hover:underline" {...props} />,
+    a: (props) => <a className="text-[#fc6e56] font-semibold hover:underline" {...props} />,
     table: (props) => (
       <div className="overflow-x-auto my-6">
         <table className="w-full border-collapse text-sm" {...props} />
@@ -134,13 +134,13 @@ export default async function BlogPost({ params }) {
           <div className="flex items-center gap-3 mb-6">
             <Link
               href="/blog"
-              className="text-sm font-bold text-[#ff7e67] hover:underline"
+              className="text-sm font-bold text-[#fc6e56] hover:underline"
             >
               &larr; Back to Blog
             </Link>
           </div>
           <div className="flex items-center gap-3 mb-4">
-            <span className="inline-flex items-center rounded-full bg-[#fff5f2] px-3 py-1 text-xs font-bold text-[#ff7e67]">
+            <span className="inline-flex items-center rounded-full bg-[#fff5f2] px-3 py-1 text-xs font-bold text-[#fc6e56]">
               {frontmatter.category}
             </span>
             <span className="text-xs text-stone-400 font-medium">

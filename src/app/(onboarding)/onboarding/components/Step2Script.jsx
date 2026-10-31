@@ -143,18 +143,18 @@ export default function Step2Script({
       )}
 
       {autoImporting && (
-        <div className="mb-8 flex items-center gap-3 rounded-2xl border border-[#ff7e67]/20 bg-[#fff5f2] p-4 text-sm text-stone-700">
-          <Loader2 className="w-4 h-4 animate-spin text-[#ff7e67]" />
+        <div className="mb-8 flex items-center gap-3 rounded-2xl border border-[#fc6e56]/20 bg-[#fff5f2] p-4 text-sm text-stone-700">
+          <Loader2 className="w-4 h-4 animate-spin text-[#fc6e56]" />
           <span className="font-medium">Personalizing your script from your Instagram...</span>
         </div>
       )}
 
       {!autoImporting && autoImportedSource === "instagram_auto" && (
         <div
-          className="mb-8 flex items-start gap-3 rounded-2xl border border-[#ff7e67]/20 bg-[#fff5f2] p-4 text-sm text-stone-700"
+          className="mb-8 flex items-start gap-3 rounded-2xl border border-[#fc6e56]/20 bg-[#fff5f2] p-4 text-sm text-stone-700"
           title="We pre-filled this from your Instagram bio and recent posts. You can edit anything below."
         >
-          <Sparkles className="w-4 h-4 text-[#ff7e67] shrink-0 mt-0.5" />
+          <Sparkles className="w-4 h-4 text-[#fc6e56] shrink-0 mt-0.5" />
           <div className="flex-1">
             <span className="font-bold">Generated from your Instagram.</span>{" "}
             <span className="text-stone-600">
@@ -170,7 +170,7 @@ export default function Step2Script({
           <div className="bg-white rounded-3xl p-8 soft-shadow border border-stone-100">
             <div className="flex items-center mb-6">
               <h3 className="text-xl font-extrabold flex items-center gap-3">
-                <PenTool className="w-5 h-5 text-[#ff7e67]" />
+                <PenTool className="w-5 h-5 text-[#fc6e56]" />
                 Script Configuration
               </h3>
             </div>
@@ -189,7 +189,7 @@ export default function Step2Script({
                 <textarea
                   rows={3}
                   placeholder="e.g., I sell a 12-week coaching program that helps agency owners scale to $50k/month..."
-                  className="w-full px-5 py-4 bg-stone-50 border border-stone-100 rounded-2xl text-sm focus:outline-none focus:ring-4 focus:ring-[#ff7e67]/5 focus:border-[#ff7e67] transition-all resize-none font-medium"
+                  className="w-full px-5 py-4 bg-stone-50 border border-stone-100 rounded-2xl text-sm focus:outline-none focus:ring-4 focus:ring-[#fc6e56]/5 focus:border-[#fc6e56] transition-all resize-none font-medium"
                   value={offer}
                   onChange={(e) => setOffer(e.target.value)}
                   maxLength={500}
@@ -204,7 +204,7 @@ export default function Step2Script({
                 <textarea
                   rows={3}
                   placeholder="e.g., Agency owners doing $10-30k/month who want to scale but are stuck doing all the fulfillment..."
-                  className="w-full px-5 py-4 bg-stone-50 border border-stone-100 rounded-2xl text-sm focus:outline-none focus:ring-4 focus:ring-[#ff7e67]/5 focus:border-[#ff7e67] transition-all resize-none font-medium"
+                  className="w-full px-5 py-4 bg-stone-50 border border-stone-100 rounded-2xl text-sm focus:outline-none focus:ring-4 focus:ring-[#fc6e56]/5 focus:border-[#fc6e56] transition-all resize-none font-medium"
                   value={targetCustomer}
                   onChange={(e) => setTargetCustomer(e.target.value)}
                 />
@@ -218,15 +218,15 @@ export default function Step2Script({
 
                 <div className="space-y-2">
                   <div className="flex items-center gap-2 px-3 py-1.5 bg-[#fff5f2] rounded-lg w-fit">
-                    <DollarSign className="w-3 h-3 text-[#ff7e67]" />
-                    <span className="text-[10px] font-black text-[#ff7e67] uppercase tracking-widest">
+                    <DollarSign className="w-3 h-3 text-[#fc6e56]" />
+                    <span className="text-[10px] font-black text-[#fc6e56] uppercase tracking-widest">
                       Price &amp; Other Objections
                     </span>
                   </div>
                   <textarea
                     rows={3}
                     placeholder={`e.g., "I don't have time": We actually help you free up time...\n"It's too expensive": The ROI typically covers the investment within the first month...`}
-                    className="w-full px-5 py-4 bg-stone-50 border border-stone-100 rounded-2xl text-sm focus:outline-none focus:ring-4 focus:ring-[#ff7e67]/5 transition-all font-medium resize-none"
+                    className="w-full px-5 py-4 bg-stone-50 border border-stone-100 rounded-2xl text-sm focus:outline-none focus:ring-4 focus:ring-[#fc6e56]/5 transition-all font-medium resize-none"
                     value={objections}
                     onChange={(e) => setObjections(e.target.value)}
                   />
@@ -276,7 +276,7 @@ export default function Step2Script({
                     type="button"
                     onClick={onConnectCalendly}
                     disabled={connectingCalendly || !onConnectCalendly}
-                    className="mb-3 w-full flex items-center justify-center gap-2 rounded-2xl bg-stone-900 px-5 py-4 text-sm font-bold text-white hover:bg-[#ff7e67] transition-all disabled:opacity-50"
+                    className="mb-3 w-full flex items-center justify-center gap-2 rounded-2xl bg-stone-900 px-5 py-4 text-sm font-bold text-white hover:bg-[#fc6e56] transition-all disabled:opacity-50"
                   >
                     {connectingCalendly ? (
                       <Loader2 className="w-4 h-4 animate-spin" />
@@ -290,7 +290,7 @@ export default function Step2Script({
                 <input
                   type="url"
                   placeholder="Or paste any booking link (Cal.com, etc.)"
-                  className="w-full px-5 py-4 bg-stone-50 border border-stone-100 rounded-2xl text-sm focus:outline-none focus:ring-4 focus:ring-[#ff7e67]/5 transition-all font-bold text-stone-900"
+                  className="w-full px-5 py-4 bg-stone-50 border border-stone-100 rounded-2xl text-sm focus:outline-none focus:ring-4 focus:ring-[#fc6e56]/5 transition-all font-bold text-stone-900"
                   value={calendlyUrl}
                   onChange={(e) => setCalendlyUrl(e.target.value)}
                 />
@@ -306,7 +306,7 @@ export default function Step2Script({
               <button
                 onClick={onSave}
                 disabled={saving || !offer || !targetCustomer}
-                className="flex-1 py-4 bg-stone-900 text-white rounded-2xl font-bold flex items-center justify-center gap-2 hover:bg-[#ff7e67] transition-all disabled:opacity-50 disabled:hover:bg-stone-900"
+                className="flex-1 py-4 bg-stone-900 text-white rounded-2xl font-bold flex items-center justify-center gap-2 hover:bg-[#fc6e56] transition-all disabled:opacity-50 disabled:hover:bg-stone-900"
               >
                 {saving ? (
                   <Loader2 className="w-5 h-5 animate-spin" />
@@ -322,7 +322,7 @@ export default function Step2Script({
           <div className="bg-stone-900 rounded-[2rem] p-8 text-white soft-shadow">
             <div className="flex items-center gap-3 mb-6">
               <div className="p-2 bg-white/10 rounded-lg">
-                <Eye className="w-5 h-5 text-[#ff7e67]" />
+                <Eye className="w-5 h-5 text-[#fc6e56]" />
               </div>
               <h3 className="text-xl font-extrabold">Live DM Preview</h3>
               <span className="ml-auto text-xs text-stone-400">
@@ -339,7 +339,7 @@ export default function Step2Script({
               </div>
               <div className="flex flex-col items-end gap-1.5">
                 <div className="flex gap-3 justify-end ml-auto max-w-[85%]">
-                  <div className="bg-[#ff7e67] px-5 py-4 rounded-2xl rounded-br-none text-xs leading-relaxed">
+                  <div className="bg-[#fc6e56] px-5 py-4 rounded-2xl rounded-br-none text-xs leading-relaxed">
                     <span className="font-bold block mb-1 opacity-80 uppercase tracking-tighter text-[10px]">
                       Clinchd
                     </span>
@@ -347,7 +347,7 @@ export default function Step2Script({
                       ? objections.slice(0, 150) + (objections.length > 150 ? "..." : "")
                       : "Your objection handler response will preview here..."}
                   </div>
-                  <div className="w-8 h-8 rounded-full bg-[#ff7e67] flex items-center justify-center flex-shrink-0">
+                  <div className="w-8 h-8 rounded-full bg-[#fc6e56] flex items-center justify-center flex-shrink-0">
                     <Zap className="w-4 h-4 text-white" />
                   </div>
                 </div>
@@ -375,16 +375,16 @@ export default function Step2Script({
                   type="button"
                   key={id}
                   onClick={() => onApplyPreset && onApplyPreset(template)}
-                  className="group w-full text-left p-5 rounded-2xl border border-stone-100 bg-stone-50 hover:bg-white hover:border-[#ff7e67]/30 transition-all cursor-pointer"
+                  className="group w-full text-left p-5 rounded-2xl border border-stone-100 bg-stone-50 hover:bg-white hover:border-[#fc6e56]/30 transition-all cursor-pointer"
                 >
                   <div className="flex items-center justify-between mb-3">
                     <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center shadow-sm group-hover:text-[#ff7e67]">
+                      <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center shadow-sm group-hover:text-[#fc6e56]">
                         <Icon className="w-5 h-5" />
                       </div>
                       <span className="text-sm font-black">{title}</span>
                     </div>
-                    <PlusCircle className="w-5 h-5 text-stone-300 group-hover:text-[#ff7e67] transition-colors" />
+                    <PlusCircle className="w-5 h-5 text-stone-300 group-hover:text-[#fc6e56] transition-colors" />
                   </div>
                   <p className="text-xs text-stone-500 leading-relaxed italic">
                     {preview}
@@ -394,7 +394,7 @@ export default function Step2Script({
             </div>
 
             <div className="mt-10 p-6 bg-stone-900 rounded-3xl text-center relative overflow-hidden">
-              <div className="absolute -right-4 -bottom-4 w-20 h-20 bg-[#ff7e67] rounded-full blur-2xl opacity-20" />
+              <div className="absolute -right-4 -bottom-4 w-20 h-20 bg-[#fc6e56] rounded-full blur-2xl opacity-20" />
               <p className="text-stone-300 text-xs font-medium mb-4 relative z-10">
                 Not sure what to write? Fill in your offer and ideal customer,
                 and the AI drafts the rest of your script.
@@ -402,7 +402,7 @@ export default function Step2Script({
               <button
                 onClick={onGenerate}
                 disabled={generating || !offer || !targetCustomer}
-                className="w-full py-3 bg-[#ff7e67] text-white rounded-xl text-sm font-bold shadow-lg shadow-[#ff7e67]/20 hover:scale-[1.02] transition-all relative z-10 disabled:opacity-50"
+                className="w-full py-3 bg-[#fc6e56] text-white rounded-xl text-sm font-bold shadow-lg shadow-[#fc6e56]/20 hover:scale-[1.02] transition-all relative z-10 disabled:opacity-50"
               >
                 {generating ? (
                   <span className="flex items-center justify-center gap-2">
@@ -416,16 +416,16 @@ export default function Step2Script({
             </div>
           </div>
 
-          <div className="bg-orange-50/50 p-6 rounded-3xl border border-[#ff7e67]/10 flex gap-4 items-start">
-            <AlertCircle className="w-5 h-5 text-[#ff7e67] mt-1" />
+          <div className="bg-orange-50/50 p-6 rounded-3xl border border-[#fc6e56]/10 flex gap-4 items-start">
+            <AlertCircle className="w-5 h-5 text-[#fc6e56] mt-1" />
             <div>
               <h4 className="text-sm font-black text-stone-900 uppercase tracking-widest">
                 Pro Tip
               </h4>
               <p className="text-xs text-stone-500 leading-relaxed mt-1">
                 Using variables like{" "}
-                <span className="text-[#ff7e67] font-bold">[name]</span> and{" "}
-                <span className="text-[#ff7e67] font-bold">[niche]</span>{" "}
+                <span className="text-[#fc6e56] font-bold">[name]</span> and{" "}
+                <span className="text-[#fc6e56] font-bold">[niche]</span>{" "}
                 increases response rates by up to{" "}
                 <span className="font-bold text-stone-900">42%</span>. Clinchd
                 fills these in for you.

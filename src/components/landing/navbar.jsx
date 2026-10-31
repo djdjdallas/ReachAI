@@ -40,8 +40,8 @@ export default function Navbar() {
           </Link>
 
           <div className="hidden md:flex items-center gap-10 text-[15px] font-medium text-stone-500">
-            <a href="/#how-it-works" className="hover:text-[#ff7e67] transition-colors">How it Works</a>
-            <a href="/#pricing" className="hover:text-[#ff7e67] transition-colors">Pricing</a>
+            <a href="/#how-it-works" className="hover:text-[#fc6e56] transition-colors">How it Works</a>
+            <a href="/#pricing" className="hover:text-[#fc6e56] transition-colors">Pricing</a>
 
             {/* Compare dropdown */}
             <div
@@ -49,7 +49,7 @@ export default function Navbar() {
               onMouseEnter={() => setCompareOpen(true)}
               onMouseLeave={() => setCompareOpen(false)}
             >
-              <button className="flex items-center gap-1 hover:text-[#ff7e67] transition-colors">
+              <button className="flex items-center gap-1 hover:text-[#fc6e56] transition-colors">
                 Compare
                 <ChevronDown className={`w-4 h-4 transition-transform ${compareOpen ? "rotate-180" : ""}`} />
               </button>
@@ -60,7 +60,7 @@ export default function Navbar() {
                       <Link
                         key={link.href}
                         href={link.href}
-                        className="block px-4 py-2.5 text-sm font-semibold text-stone-600 hover:text-[#ff7e67] hover:bg-[#fff5f2] rounded-xl transition-colors"
+                        className="block px-4 py-2.5 text-sm font-semibold text-stone-600 hover:text-[#fc6e56] hover:bg-[#fff5f2] rounded-xl transition-colors"
                       >
                         {link.label}
                       </Link>
@@ -76,7 +76,7 @@ export default function Navbar() {
               onMouseEnter={() => setNicheOpen(true)}
               onMouseLeave={() => setNicheOpen(false)}
             >
-              <button className="flex items-center gap-1 hover:text-[#ff7e67] transition-colors">
+              <button className="flex items-center gap-1 hover:text-[#fc6e56] transition-colors">
                 For Coaches
                 <ChevronDown className={`w-4 h-4 transition-transform ${nicheOpen ? "rotate-180" : ""}`} />
               </button>
@@ -87,7 +87,7 @@ export default function Navbar() {
                       <Link
                         key={link.href}
                         href={link.href}
-                        className="block px-4 py-2.5 text-sm font-semibold text-stone-600 hover:text-[#ff7e67] hover:bg-[#fff5f2] rounded-xl transition-colors"
+                        className="block px-4 py-2.5 text-sm font-semibold text-stone-600 hover:text-[#fc6e56] hover:bg-[#fff5f2] rounded-xl transition-colors"
                       >
                         {link.label}
                       </Link>
@@ -97,20 +97,20 @@ export default function Navbar() {
               )}
             </div>
 
-            <Link href="/blog" className="hover:text-[#ff7e67] transition-colors">Blog</Link>
-            <a href="#why-clinchd" className="hover:text-[#ff7e67] transition-colors">Why Clinchd</a>
+            <Link href="/blog" className="hover:text-[#fc6e56] transition-colors">Blog</Link>
+            <a href="#why-clinchd" className="hover:text-[#fc6e56] transition-colors">Why Clinchd</a>
           </div>
 
           <div className="flex items-center gap-4">
             <Link
               href="/login"
-              className="hidden sm:block text-[15px] font-semibold text-stone-900 hover:text-[#ff7e67] transition-colors"
+              className="hidden sm:block text-[15px] font-semibold text-stone-900 hover:text-[#fc6e56] transition-colors"
             >
               Login
             </Link>
             <Link
               href="/signup"
-              className="hidden sm:block bg-stone-900 text-white px-6 py-3 rounded-full text-sm font-bold hover:bg-[#ff7e67] hover:scale-105 active:scale-95 transition-all shadow-sm"
+              className="hidden sm:block bg-stone-900 text-white px-6 py-3 rounded-full text-sm font-bold hover:bg-[#fc6e56] hover:scale-105 active:scale-95 transition-all shadow-sm"
             >
               Start Free Trial
             </Link>
@@ -130,15 +130,15 @@ export default function Navbar() {
       {/* Mobile menu */}
       {mobileOpen && (
         <div className="md:hidden bg-white border-t border-stone-100 px-4 py-6 space-y-1">
-          <a href="/#how-it-works" onClick={() => setMobileOpen(false)} className="block px-4 py-3 text-sm font-semibold text-stone-700 hover:text-[#ff7e67] hover:bg-[#fff5f2] rounded-xl transition-colors">How it Works</a>
-          <a href="/#pricing" onClick={() => setMobileOpen(false)} className="block px-4 py-3 text-sm font-semibold text-stone-700 hover:text-[#ff7e67] hover:bg-[#fff5f2] rounded-xl transition-colors">Pricing</a>
+          <a href="/#how-it-works" onClick={() => setMobileOpen(false)} className="block px-4 py-3 text-sm font-semibold text-stone-700 hover:text-[#fc6e56] hover:bg-[#fff5f2] rounded-xl transition-colors">How it Works</a>
+          <a href="/#pricing" onClick={() => setMobileOpen(false)} className="block px-4 py-3 text-sm font-semibold text-stone-700 hover:text-[#fc6e56] hover:bg-[#fff5f2] rounded-xl transition-colors">Pricing</a>
           <div className="px-4 py-2 text-xs font-bold uppercase tracking-widest text-stone-500">Compare</div>
           {compareLinks.map((link) => (
             <Link
               key={link.href}
               href={link.href}
               onClick={() => setMobileOpen(false)}
-              className="block px-6 py-2.5 text-sm font-semibold text-stone-600 hover:text-[#ff7e67] hover:bg-[#fff5f2] rounded-xl transition-colors"
+              className="block px-6 py-2.5 text-sm font-semibold text-stone-600 hover:text-[#fc6e56] hover:bg-[#fff5f2] rounded-xl transition-colors"
             >
               {link.label}
             </Link>
@@ -149,16 +149,16 @@ export default function Navbar() {
               key={link.href}
               href={link.href}
               onClick={() => setMobileOpen(false)}
-              className="block px-6 py-2.5 text-sm font-semibold text-stone-600 hover:text-[#ff7e67] hover:bg-[#fff5f2] rounded-xl transition-colors"
+              className="block px-6 py-2.5 text-sm font-semibold text-stone-600 hover:text-[#fc6e56] hover:bg-[#fff5f2] rounded-xl transition-colors"
             >
               {link.label}
             </Link>
           ))}
-          <Link href="/blog" onClick={() => setMobileOpen(false)} className="block px-4 py-3 text-sm font-semibold text-stone-700 hover:text-[#ff7e67] hover:bg-[#fff5f2] rounded-xl transition-colors">Blog</Link>
-          <a href="#why-clinchd" onClick={() => setMobileOpen(false)} className="block px-4 py-3 text-sm font-semibold text-stone-700 hover:text-[#ff7e67] hover:bg-[#fff5f2] rounded-xl transition-colors">Why Clinchd</a>
+          <Link href="/blog" onClick={() => setMobileOpen(false)} className="block px-4 py-3 text-sm font-semibold text-stone-700 hover:text-[#fc6e56] hover:bg-[#fff5f2] rounded-xl transition-colors">Blog</Link>
+          <a href="#why-clinchd" onClick={() => setMobileOpen(false)} className="block px-4 py-3 text-sm font-semibold text-stone-700 hover:text-[#fc6e56] hover:bg-[#fff5f2] rounded-xl transition-colors">Why Clinchd</a>
           <div className="pt-4 space-y-3 px-4">
             <Link href="/login" className="block text-center py-3 text-sm font-bold text-stone-900 border border-stone-200 rounded-full hover:border-stone-900 transition-colors">Login</Link>
-            <Link href="/signup" className="block text-center py-3 text-sm font-bold text-white bg-[#ff7e67] rounded-full shadow-lg shadow-[#ff7e67]/20">Start Free Trial</Link>
+            <Link href="/signup" className="block text-center py-3 text-sm font-bold text-white bg-[#fc6e56] rounded-full shadow-lg shadow-[#fc6e56]/20">Start Free Trial</Link>
           </div>
         </div>
       )}

@@ -3,7 +3,7 @@
  * Templates use {{full_name}} and {{app_url}} placeholders.
  *
  * Design system: Cabinet Grotesk headings, Satoshi body, stone palette,
- * coral #ff7e67 primary, rounded-full buttons, pill badges.
+ * coral #fc6e56 primary, rounded-full buttons, pill badges.
  */
 
 function layout({ badge, content }) {
@@ -37,8 +37,8 @@ function layout({ badge, content }) {
 <tr><td style="padding:32px 40px 40px;">
   ${badge ? `<!-- Badge -->
   <table role="presentation" cellpadding="0" cellspacing="0" style="margin-bottom:24px;"><tr>
-    <td style="background-color:#fff5f2;border:1px solid rgba(255,126,103,0.1);border-radius:999px;padding:6px 14px;">
-      <span style="font-size:13px;font-weight:700;color:#ff7e67;letter-spacing:-0.01em;">${badge}</span>
+    <td style="background-color:#fff5f2;border:1px solid rgba(252,110,86,0.1);border-radius:999px;padding:6px 14px;">
+      <span style="font-size:13px;font-weight:700;color:#fc6e56;letter-spacing:-0.01em;">${badge}</span>
     </td>
   </tr></table>` : ""}
 ${content}
@@ -70,7 +70,7 @@ function p(text) {
 
 function button(text, href) {
   return `<table role="presentation" cellpadding="0" cellspacing="0" style="margin:32px 0 0;">
-<tr><td style="background-color:#ff7e67;border-radius:999px;padding:16px 32px;box-shadow:0 8px 24px rgba(255,126,103,0.3);">
+<tr><td style="background-color:#fc6e56;border-radius:999px;padding:16px 32px;box-shadow:0 8px 24px rgba(252,110,86,0.3);">
   <a href="${href}" style="color:#ffffff;font-family:'Satoshi',system-ui,sans-serif;font-size:16px;font-weight:700;text-decoration:none;display:inline-block;">${text} &rarr;</a>
 </td></tr>
 </table>`;
@@ -86,11 +86,11 @@ ${items
   .map(
     (item, i) => `<tr>
   <td style="padding:12px 16px;${i < items.length - 1 ? "border-bottom:1px solid #f5f5f4;" : ""}vertical-align:top;" width="36">
-    <span style="display:inline-block;width:28px;height:28px;line-height:28px;text-align:center;background-color:#fff5f2;color:#ff7e67;font-weight:700;font-size:13px;border-radius:999px;">${i + 1}</span>
+    <span style="display:inline-block;width:28px;height:28px;line-height:28px;text-align:center;background-color:#fff5f2;color:#fc6e56;font-weight:700;font-size:13px;border-radius:999px;">${i + 1}</span>
   </td>
   <td style="padding:12px 8px;${i < items.length - 1 ? "border-bottom:1px solid #f5f5f4;" : ""}vertical-align:middle;">
     <span style="font-size:15px;color:#1c1917;font-weight:600;">${item.title}</span>
-    ${item.link ? `<br/><a href="${item.link}" style="font-size:13px;color:#ff7e67;font-weight:500;text-decoration:none;">${item.linkText || "Go"} &rarr;</a>` : ""}
+    ${item.link ? `<br/><a href="${item.link}" style="font-size:13px;color:#fc6e56;font-weight:500;text-decoration:none;">${item.linkText || "Go"} &rarr;</a>` : ""}
   </td>
 </tr>`
   )
@@ -100,7 +100,7 @@ ${items
 
 function tipBox(text) {
   return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:20px 0;">
-<tr><td style="background-color:#fff5f2;border-radius:12px;padding:16px 20px;border:1px solid rgba(255,126,103,0.1);">
+<tr><td style="background-color:#fff5f2;border-radius:12px;padding:16px 20px;border:1px solid rgba(252,110,86,0.1);">
   <p style="margin:0;font-size:14px;color:#1c1917;line-height:1.6;font-weight:500;">${text}</p>
 </td></tr>
 </table>`;

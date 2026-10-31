@@ -5,7 +5,7 @@ import { Send, Plus, Clock, Loader2, Pencil, Trash2, AlertCircle } from "lucide-
 import { VOICE_ELIGIBLE_CLASSES, VOICE_INTENT_LABELS } from "@/lib/voice/intent-classes";
 import DripTemplateEditor from "@/components/drip/DripTemplateEditor";
 
-const CORAL = "#ff7e67";
+const CORAL = "#fc6e56";
 
 // Short blurbs for the coverage strip. Keyed on the 6 nudge-eligible classes;
 // labels come from VOICE_INTENT_LABELS so display strings stay in lockstep
@@ -196,7 +196,7 @@ export default function DripSequencesClient({ initialSettings, initialTemplates 
           onClick={handleToggle}
           disabled={savingToggle}
           className={`relative inline-flex h-7 w-12 shrink-0 items-center rounded-full transition-colors ${
-            settings.drip_enabled ? "bg-[#ff7e67]" : "bg-stone-300"
+            settings.drip_enabled ? "bg-[#fc6e56]" : "bg-stone-300"
           } ${savingToggle ? "opacity-60" : ""}`}
         >
           <span
@@ -227,7 +227,7 @@ export default function DripSequencesClient({ initialSettings, initialTemplates 
                 disabled={savingDelay}
                 className={`px-4 py-2 rounded-full text-sm font-medium transition-all ${
                   selected
-                    ? "bg-[#ff7e67] text-white shadow-sm shadow-[#ff7e67]/25"
+                    ? "bg-[#fc6e56] text-white shadow-sm shadow-[#fc6e56]/25"
                     : "bg-stone-100 text-stone-600 hover:bg-stone-200"
                 }`}
               >
@@ -268,7 +268,7 @@ export default function DripSequencesClient({ initialSettings, initialTemplates 
                   <div className="text-sm font-semibold text-stone-900">{c.label}</div>
                   <div
                     className={`h-2 w-2 rounded-full ${
-                      covered ? "bg-[#ff7e67]" : "bg-stone-300"
+                      covered ? "bg-[#fc6e56]" : "bg-stone-300"
                     }`}
                   />
                 </div>
@@ -308,7 +308,7 @@ export default function DripSequencesClient({ initialSettings, initialTemplates 
                   <span
                     className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${
                       t.is_active
-                        ? "bg-[#fff5f2] text-[#ff7e67]"
+                        ? "bg-[#fff5f2] text-[#fc6e56]"
                         : "bg-stone-100 text-stone-400"
                     }`}
                   >

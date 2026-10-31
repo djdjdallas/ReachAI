@@ -7,7 +7,7 @@ import {
   Reply,
 } from "lucide-react";
 
-export const CORAL = "#ff7e67";
+export const CORAL = "#fc6e56";
 export const CARD_SHADOW = "0 1px 0 rgba(15,15,15,0.04)";
 
 export const INTENT_BADGE_STYLES = {

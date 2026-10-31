@@ -100,7 +100,7 @@ export default function OnboardingFooter({
             className={`px-10 py-4 rounded-full font-black text-lg transition-all flex items-center justify-center gap-3 ${
               isDisabled
                 ? "bg-stone-200 text-stone-400 cursor-not-allowed shadow-none"
-                : "bg-[#ff7e67] text-white shadow-xl shadow-[#ff7e67]/20 hover:scale-105 active:scale-95 cursor-pointer"
+                : "bg-[#fc6e56] text-white shadow-xl shadow-[#fc6e56]/20 hover:scale-105 active:scale-95 cursor-pointer"
             }`}
           >
             {primaryLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : null}

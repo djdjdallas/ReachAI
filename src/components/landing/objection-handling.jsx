@@ -7,7 +7,7 @@ export default function ObjectionHandling() {
     <section className="py-32 bg-[#fafaf9]">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="text-center max-w-3xl mx-auto mb-20 reveal-up">
-          <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-white text-[#ff7e67] text-[13px] font-bold tracking-tight mb-6 border border-[#ff7e67]/15">
+          <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-white text-[#fc6e56] text-[13px] font-bold tracking-tight mb-6 border border-[#fc6e56]/15">
             <ShieldAlert className="w-4 h-4" />
             Trained on your sales script
           </div>
@@ -15,7 +15,7 @@ export default function ObjectionHandling() {
             Generic AI gives generic replies.
             <br />
             Clinchd handles the real{" "}
-            <span className="text-[#ff7e67]">objections.</span>
+            <span className="text-[#fc6e56]">objections.</span>
           </h2>
           <p className="text-stone-600 text-lg md:text-xl font-medium leading-relaxed">
             Most Instagram AI tools train on broad templates. Clinchd is trained on your exact
@@ -50,9 +50,9 @@ export default function ObjectionHandling() {
                 </p>
               </div>
 
-              <div className="rounded-2xl bg-[#fff5f2] border border-[#ff7e67]/15 p-5">
+              <div className="rounded-2xl bg-[#fff5f2] border border-[#fc6e56]/15 p-5">
                 <div className="flex items-center gap-2 mb-2">
-                  <span className="text-[11px] font-bold uppercase tracking-widest text-[#ff7e67]">
+                  <span className="text-[11px] font-bold uppercase tracking-widest text-[#fc6e56]">
                     Clinchd (your script)
                   </span>
                 </div>

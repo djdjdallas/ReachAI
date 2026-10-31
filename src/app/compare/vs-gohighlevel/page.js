@@ -74,7 +74,7 @@ export default function VsGoHighLevel() {
       {/* Hero */}
       <section className="pt-20 pb-16 md:pt-32 md:pb-24 bg-white">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-          <span className="inline-flex items-center px-4 py-1.5 rounded-full bg-[#fff5f2] text-[#ff7e67] text-[13px] font-bold tracking-tight mb-6">
+          <span className="inline-flex items-center px-4 py-1.5 rounded-full bg-[#fff5f2] text-[#fc6e56] text-[13px] font-bold tracking-tight mb-6">
             Comparison
           </span>
           <h1 className="text-4xl md:text-6xl font-black tracking-tight text-stone-900 mb-6 leading-[1.1]">
@@ -187,7 +187,7 @@ export default function VsGoHighLevel() {
               </p>
             </div>
 
-            <div className="bg-white rounded-2xl border border-[#ff7e67]/20 p-8 soft-shadow bg-[#fff5f2]/30">
+            <div className="bg-white rounded-2xl border border-[#fc6e56]/20 p-8 soft-shadow bg-[#fff5f2]/30">
               <h3 className="text-lg font-extrabold text-stone-900 mb-3">
                 Replace GHL with Clinchd
               </h3>
@@ -205,7 +205,7 @@ export default function VsGoHighLevel() {
       {/* Why we don't do platform sprawl */}
       <section className="py-16 bg-white">
         <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
-          <p className="text-xs font-bold uppercase tracking-widest text-[#ff7e67] mb-4 text-center">
+          <p className="text-xs font-bold uppercase tracking-widest text-[#fc6e56] mb-4 text-center">
             Why we don't do everything
           </p>
           <h2 className="text-2xl md:text-3xl font-black text-stone-900 mb-6 text-center">
@@ -257,19 +257,19 @@ export default function VsGoHighLevel() {
             Related comparisons &amp; guides
           </h3>
           <div className="flex flex-wrap gap-4">
-            <Link href="/compare/vs-manychat" className="text-sm font-bold text-[#ff7e67] hover:underline">
+            <Link href="/compare/vs-manychat" className="text-sm font-bold text-[#fc6e56] hover:underline">
               Clinchd vs ManyChat &rarr;
             </Link>
-            <Link href="/compare/vs-inro" className="text-sm font-bold text-[#ff7e67] hover:underline">
+            <Link href="/compare/vs-inro" className="text-sm font-bold text-[#fc6e56] hover:underline">
               Clinchd vs Inro &rarr;
             </Link>
-            <Link href="/compare/vs-setter-ai" className="text-sm font-bold text-[#ff7e67] hover:underline">
+            <Link href="/compare/vs-setter-ai" className="text-sm font-bold text-[#fc6e56] hover:underline">
               Clinchd vs Setter AI &rarr;
             </Link>
-            <Link href="/blog/manychat-alternative-for-coaches" className="text-sm font-bold text-[#ff7e67] hover:underline">
+            <Link href="/blog/manychat-alternative-for-coaches" className="text-sm font-bold text-[#fc6e56] hover:underline">
               Best ManyChat Alternatives for Coaches &rarr;
             </Link>
-            <Link href="/blog/ai-instagram-dm-bot-for-coaches" className="text-sm font-bold text-[#ff7e67] hover:underline">
+            <Link href="/blog/ai-instagram-dm-bot-for-coaches" className="text-sm font-bold text-[#fc6e56] hover:underline">
               AI Instagram DM Bots for Coaches &rarr;
             </Link>
           </div>

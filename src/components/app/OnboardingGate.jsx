@@ -118,7 +118,7 @@ export default function OnboardingGate() {
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <div className="w-12 h-12 rounded-2xl bg-[#fff5f2] flex items-center justify-center mb-3">
-              <Sparkles className="h-6 w-6 text-[#ff7e67]" />
+              <Sparkles className="h-6 w-6 text-[#fc6e56]" />
             </div>
             <DialogTitle>Welcome to Clinchd!</DialogTitle>
             <DialogDescription className="leading-relaxed">

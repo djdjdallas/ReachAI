@@ -829,7 +829,7 @@ function ConversationsPage() {
               placeholder="Search conversations..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-9 bg-stone-50 border-stone-200 focus-visible:border-[#ff7e67] h-9"
+              className="pl-9 bg-stone-50 border-stone-200 focus-visible:border-[#fc6e56] h-9"
             />
           </div>
           {/* Status filter tabs */}
@@ -840,7 +840,7 @@ function ConversationsPage() {
                 onClick={() => setStatusFilter(filter.value)}
                 className={`px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-all ${
                   statusFilter === filter.value
-                    ? "bg-[#ff7e67] text-white shadow-sm shadow-[#ff7e67]/25"
+                    ? "bg-[#fc6e56] text-white shadow-sm shadow-[#fc6e56]/25"
                     : "bg-stone-100 text-stone-500 hover:bg-stone-200 hover:text-stone-700"
                 }`}
               >
@@ -882,7 +882,7 @@ function ConversationsPage() {
                   }`}
                 >
                   {selectedConvo?.id === convo.id && (
-                    <div className="absolute left-0 top-2 bottom-2 w-[3px] rounded-r-full bg-[#ff7e67]" />
+                    <div className="absolute left-0 top-2 bottom-2 w-[3px] rounded-r-full bg-[#fc6e56]" />
                   )}
                   <div className="flex items-start gap-3">
                     <Avatar className="h-10 w-10 shrink-0 mt-0.5">
@@ -987,7 +987,7 @@ function ConversationsPage() {
                     </p>
                     {scheduledDrip && scheduledDrip.status === "scheduled" && (
                       <div className="mt-1 inline-flex items-center gap-2">
-                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase bg-[#fff5f2] text-[#ff7e67] border border-[#ff7e67]/20">
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase bg-[#fff5f2] text-[#fc6e56] border border-[#fc6e56]/20">
                           <Send className="h-2.5 w-2.5" />
                           Follow-up in {dripHoursFromNow(scheduledDrip.scheduled_at)}
                         </span>
@@ -1281,7 +1281,7 @@ function ConversationsPage() {
                                 className={`px-4 py-3 text-sm leading-relaxed ${
                                   isManualReply
                                     ? "bg-stone-700 text-white"
-                                    : "bg-[#ff7e67] text-white"
+                                    : "bg-[#fc6e56] text-white"
                                 }`}
                                 style={{ borderRadius: "18px 18px 4px 18px" }}
                               >
@@ -1338,7 +1338,7 @@ function ConversationsPage() {
             {/* AI Smart Replies — horizontal swipe row on mobile, grid on desktop */}
             <div className="px-3 md:px-6 py-3 md:py-4 border-t border-stone-100 bg-[#fafaf9]/50">
               <div className="flex items-center gap-2 mb-2 md:mb-3">
-                <Sparkles className="h-4 w-4 text-[#ff7e67]" />
+                <Sparkles className="h-4 w-4 text-[#fc6e56]" />
                 <span className="text-[11px] font-black uppercase tracking-widest text-stone-400">
                   AI Smart Replies
                 </span>
@@ -1354,9 +1354,9 @@ function ConversationsPage() {
                         conversation_id: selectedConvo?.id,
                       });
                     }}
-                    className="group p-3 bg-white border border-stone-200 rounded-xl text-left hover:border-[#ff7e67] hover:shadow-sm transition-all w-[240px] shrink-0 snap-start md:w-auto md:shrink"
+                    className="group p-3 bg-white border border-stone-200 rounded-xl text-left hover:border-[#fc6e56] hover:shadow-sm transition-all w-[240px] shrink-0 snap-start md:w-auto md:shrink"
                   >
-                    <div className="text-[10px] font-bold text-stone-400 mb-1 group-hover:text-[#ff7e67]">
+                    <div className="text-[10px] font-bold text-stone-400 mb-1 group-hover:text-[#fc6e56]">
                       {reply.label}
                     </div>
                     <p className="text-xs text-stone-600 line-clamp-2 italic leading-relaxed">
@@ -1383,12 +1383,12 @@ function ConversationsPage() {
                     value={newMessage}
                     onChange={(e) => setNewMessage(e.target.value)}
                     disabled={sending || !replyWindowOpen}
-                    className="w-full min-w-0 px-4 md:px-5 py-3 bg-stone-50 border border-stone-200 rounded-2xl text-base md:text-sm focus:outline-none focus:ring-2 focus:ring-[#ff7e67]/20 focus:border-[#ff7e67] transition-all"
+                    className="w-full min-w-0 px-4 md:px-5 py-3 bg-stone-50 border border-stone-200 rounded-2xl text-base md:text-sm focus:outline-none focus:ring-2 focus:ring-[#fc6e56]/20 focus:border-[#fc6e56] transition-all"
                   />
                   <button
                     type="submit"
                     disabled={!newMessage.trim() || sending || !replyWindowOpen}
-                    className="w-12 h-12 bg-[#ff7e67] text-white rounded-2xl flex items-center justify-center shadow-lg shadow-[#ff7e67]/20 hover:scale-105 active:scale-95 transition-all disabled:opacity-50 disabled:hover:scale-100 shrink-0"
+                    className="w-12 h-12 bg-[#fc6e56] text-white rounded-2xl flex items-center justify-center shadow-lg shadow-[#fc6e56]/20 hover:scale-105 active:scale-95 transition-all disabled:opacity-50 disabled:hover:scale-100 shrink-0"
                   >
                     {sending ? (
                       <Loader2 className="h-5 w-5 animate-spin" />

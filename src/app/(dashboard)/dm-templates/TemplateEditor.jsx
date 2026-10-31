@@ -13,7 +13,7 @@ import {
 import { renderTemplate } from "@/lib/comment-trigger-rules";
 import { renderTreatmentTokens } from "@/lib/verticals/clinic/treatment";
 
-const CORAL = "#ff7e67";
+const CORAL = "#fc6e56";
 
 // Regex used in two places: (a) inline bracket-syntax warning beneath the
 // textarea, (b) one-click convert to {{CURLY_BRACE_SYNTAX}}. Matches any

@@ -58,13 +58,13 @@ function MessageBubble({ message }) {
         className={`w-7 h-7 rounded-full flex items-center justify-center shrink-0 mb-1 ${
           isUser
             ? "bg-stone-200"
-            : "bg-[#ff7e67]/10 border border-[#ff7e67]/20"
+            : "bg-[#fc6e56]/10 border border-[#fc6e56]/20"
         }`}
       >
         {isUser ? (
           <User className="h-3.5 w-3.5 text-stone-500" />
         ) : (
-          <Zap className="h-3 w-3 text-[#ff7e67]" />
+          <Zap className="h-3 w-3 text-[#fc6e56]" />
         )}
       </div>
 
@@ -76,14 +76,14 @@ function MessageBubble({ message }) {
         <div
           className={`px-3.5 py-2.5 rounded-2xl text-sm leading-relaxed ${
             isUser
-              ? "bg-[#ff7e67] text-white rounded-br-sm"
+              ? "bg-[#fc6e56] text-white rounded-br-sm"
               : "bg-white text-stone-800 border border-stone-200 rounded-bl-sm shadow-sm"
           }`}
         >
           {message.content}
 
           {message.hasBookingLink && (
-            <div className="mt-2 flex items-center gap-1.5 text-xs text-[#ff7e67]">
+            <div className="mt-2 flex items-center gap-1.5 text-xs text-[#fc6e56]">
               <Link2 className="h-3 w-3" />
               <span>Booking link included</span>
             </div>
@@ -110,8 +110,8 @@ function MessageBubble({ message }) {
 function TypingIndicator() {
   return (
     <div className="flex items-end gap-2">
-      <div className="w-7 h-7 rounded-full bg-[#ff7e67]/20 border border-[#ff7e67]/30 flex items-center justify-center shrink-0">
-        <Zap className="h-3 w-3 text-[#ff7e67]" />
+      <div className="w-7 h-7 rounded-full bg-[#fc6e56]/20 border border-[#fc6e56]/30 flex items-center justify-center shrink-0">
+        <Zap className="h-3 w-3 text-[#fc6e56]" />
       </div>
       <div className="bg-white border border-stone-200 px-4 py-3 rounded-2xl rounded-bl-sm shadow-sm">
         <div className="flex items-center gap-1">
@@ -321,7 +321,7 @@ export default function PlaygroundPage() {
       <div className="flex items-start justify-between gap-4 shrink-0">
         <div>
           <div className="flex items-center gap-2 mb-1">
-            <FlaskConical className="h-5 w-5 text-[#ff7e67]" />
+            <FlaskConical className="h-5 w-5 text-[#fc6e56]" />
             <h1 className="text-xl font-bold">Agent Playground</h1>
             <Badge variant="secondary" className="text-xs">
               Test Mode
@@ -393,8 +393,8 @@ export default function PlaygroundPage() {
           <ScrollArea className="flex-1 p-4">
             {messages.length === 0 ? (
               <div className="h-full flex flex-col items-center justify-center text-center px-4 py-12 gap-6">
-                <div className="w-14 h-14 bg-[#ff7e67]/10 rounded-full flex items-center justify-center">
-                  <Zap className="h-6 w-6 text-[#ff7e67]" />
+                <div className="w-14 h-14 bg-[#fc6e56]/10 rounded-full flex items-center justify-center">
+                  <Zap className="h-6 w-6 text-[#fc6e56]" />
                 </div>
                 <div>
                   <p className="text-sm font-medium text-foreground mb-1">
@@ -452,7 +452,7 @@ export default function PlaygroundPage() {
                   onKeyDown={handleKeyDown}
                   placeholder="Message as a test lead..."
                   disabled={isThinking}
-                  className="bg-stone-50 border-stone-200 focus-visible:border-[#ff7e67] pr-4 text-sm"
+                  className="bg-stone-50 border-stone-200 focus-visible:border-[#fc6e56] pr-4 text-sm"
                   autoFocus
                 />
               </div>
@@ -460,7 +460,7 @@ export default function PlaygroundPage() {
                 size="icon"
                 onClick={() => sendMessage()}
                 disabled={!input.trim() || isThinking}
-                className="shrink-0 bg-[#ff7e67] hover:bg-[#ff6b52] text-white"
+                className="shrink-0 bg-[#fc6e56] hover:bg-[#fc5b41] text-white"
               >
                 {isThinking ? (
                   <Loader2 className="h-4 w-4 animate-spin" />
@@ -542,7 +542,7 @@ export default function PlaygroundPage() {
             </CardContent>
           </Card>
 
-          <Card className="bg-[#ff7e67]/5 border-[#ff7e67]/20">
+          <Card className="bg-[#fc6e56]/5 border-[#fc6e56]/20">
             <CardContent className="pt-4 pb-4 space-y-3">
               <div>
                 <p className="text-sm font-semibold">Happy with it?</p>
@@ -559,7 +559,7 @@ export default function PlaygroundPage() {
               ) : (
                 <Button
                   size="sm"
-                  className="w-full bg-[#ff7e67] hover:bg-[#ff6b52] text-white"
+                  className="w-full bg-[#fc6e56] hover:bg-[#fc5b41] text-white"
                   asChild
                 >
                   <Link href="/dashboard">

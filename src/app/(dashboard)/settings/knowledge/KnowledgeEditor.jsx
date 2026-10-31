@@ -35,7 +35,7 @@ import {
 } from "@/lib/knowledge/limits";
 import { KNOWLEDGE_TEMPLATES } from "@/lib/knowledge/templates";
 
-const CORAL = "#ff7e67";
+const CORAL = "#fc6e56";
 const TYPE_LABELS = { faq: "FAQ", policy: "Policy", note: "Note" };
 
 // Placeholder text for template questions, looked up by question.

@@ -195,7 +195,7 @@ function LeadsPage() {
               placeholder="Search by name..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-9 bg-stone-50 border-stone-200 focus-visible:border-[#ff7e67] h-9"
+              className="pl-9 bg-stone-50 border-stone-200 focus-visible:border-[#fc6e56] h-9"
             />
           </div>
 
@@ -219,7 +219,7 @@ function LeadsPage() {
               onClick={() => setStatusFilter(tab.value)}
               className={`px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-all ${
                 statusFilter === tab.value
-                  ? "bg-[#ff7e67] text-white shadow-sm shadow-[#ff7e67]/25"
+                  ? "bg-[#fc6e56] text-white shadow-sm shadow-[#fc6e56]/25"
                   : "bg-stone-100 text-stone-500 hover:bg-stone-200 hover:text-stone-700"
               }`}
             >
@@ -353,7 +353,7 @@ function LeadsPage() {
                       >
                         <a
                           href={`/conversations?thread=${lead.id}`}
-                          className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium text-[#ff7e67] hover:bg-[#fff5f2] rounded-lg transition-colors"
+                          className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium text-[#fc6e56] hover:bg-[#fff5f2] rounded-lg transition-colors"
                         >
                           <ExternalLink className="h-3 w-3" />
                           View Chat

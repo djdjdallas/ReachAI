@@ -132,8 +132,8 @@ function alertEmail({ badge, heading, body, ctaText, ctaUrl }) {
 <tr><td style="padding:32px 40px 40px;">
   <!-- Badge -->
   <table role="presentation" cellpadding="0" cellspacing="0" style="margin-bottom:24px;"><tr>
-    <td style="background-color:#fff5f2;border:1px solid rgba(255,126,103,0.1);border-radius:999px;padding:6px 14px;">
-      <span style="font-size:13px;font-weight:700;color:#ff7e67;letter-spacing:-0.01em;">${badge}</span>
+    <td style="background-color:#fff5f2;border:1px solid rgba(252,110,86,0.1);border-radius:999px;padding:6px 14px;">
+      <span style="font-size:13px;font-weight:700;color:#fc6e56;letter-spacing:-0.01em;">${badge}</span>
     </td>
   </tr></table>
 
@@ -143,7 +143,7 @@ function alertEmail({ badge, heading, body, ctaText, ctaUrl }) {
 
   <!-- CTA Button -->
   <table role="presentation" cellpadding="0" cellspacing="0"><tr>
-    <td style="background-color:#ff7e67;border-radius:999px;padding:16px 32px;box-shadow:0 8px 24px rgba(255,126,103,0.3);">
+    <td style="background-color:#fc6e56;border-radius:999px;padding:16px 32px;box-shadow:0 8px 24px rgba(252,110,86,0.3);">
       <a href="${ctaUrl}" style="color:#ffffff;font-family:'Satoshi',system-ui,sans-serif;font-size:16px;font-weight:700;text-decoration:none;display:inline-block;">${ctaText} &rarr;</a>
     </td>
   </tr></table>

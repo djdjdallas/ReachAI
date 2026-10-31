@@ -15,7 +15,7 @@ export const metadata = {
   robots: { index: false, follow: false },
 };
 
-const CORAL = "#ff7e67";
+const CORAL = "#fc6e56";
 
 export default async function DmTemplatesPage() {
   const supabase = await createClient();

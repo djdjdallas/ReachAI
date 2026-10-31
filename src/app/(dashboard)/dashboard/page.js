@@ -256,7 +256,7 @@ export default function DashboardPage() {
       subtitle: `+${stats.callsBookedThisWeek} this week`,
       icon: CalendarCheck,
       iconBg: "bg-orange-50",
-      iconColor: "text-[#ff7e67]",
+      iconColor: "text-[#fc6e56]",
     },
     {
       title: "Response Rate",
@@ -408,7 +408,7 @@ export default function DashboardPage() {
         })}
 
         {/* Revenue Card (brand color) */}
-        <div className="bg-[#ff7e67] p-6 rounded-3xl shadow-xl shadow-[#ff7e67]/20 text-white relative overflow-hidden">
+        <div className="bg-[#fc6e56] p-6 rounded-3xl shadow-xl shadow-[#fc6e56]/20 text-white relative overflow-hidden">
           <TrendingUp className="absolute -right-4 -top-4 h-16 w-16 opacity-10" />
           <div className="flex items-center gap-3 mb-4">
             <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center">
@@ -474,7 +474,7 @@ export default function DashboardPage() {
                     </div>
                     <p className="text-sm text-stone-600 truncate">
                       {convo.last_message_role === "assistant" && (
-                        <span className="font-bold text-[#ff7e67]">AI: </span>
+                        <span className="font-bold text-[#fc6e56]">AI: </span>
                       )}
                       {convo.last_message
                         ? convo.last_message.length > 70
@@ -486,7 +486,7 @@ export default function DashboardPage() {
                   <div className="flex flex-col items-end gap-2">
                     <StatusBadge status={convo.status} />
                     <div className="flex gap-2 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
-                      <span className="w-8 h-8 rounded-lg bg-white border border-stone-200 flex items-center justify-center text-stone-500 hover:text-[#ff7e67] shadow-sm">
+                      <span className="w-8 h-8 rounded-lg bg-white border border-stone-200 flex items-center justify-center text-stone-500 hover:text-[#fc6e56] shadow-sm">
                         <Eye className="h-4 w-4" />
                       </span>
                     </div>
@@ -554,20 +554,20 @@ export default function DashboardPage() {
             </div>
             <Link
               href="/calendar"
-              className="block w-full mt-6 py-3 border-2 border-stone-100 rounded-2xl text-xs font-bold text-stone-500 hover:border-[#ff7e67] hover:text-[#ff7e67] transition-all text-center"
+              className="block w-full mt-6 py-3 border-2 border-stone-100 rounded-2xl text-xs font-bold text-stone-500 hover:border-[#fc6e56] hover:text-[#fc6e56] transition-all text-center"
             >
               View Full Calendar
             </Link>
           </div>
 
           {/* Script Performance */}
-          <div className="bg-[#fff5f2] p-6 rounded-3xl border border-[#ff7e67]/20">
+          <div className="bg-[#fff5f2] p-6 rounded-3xl border border-[#fc6e56]/20">
             <h3 className="text-lg font-extrabold mb-4">Script Performance</h3>
             <div className="space-y-4">
               <div>
                 <div className="flex justify-between text-xs font-bold mb-1.5">
                   <span>Qualification Rate</span>
-                  <span className="text-[#ff7e67]">
+                  <span className="text-[#fc6e56]">
                     {stats.dmsHandled > 0
                       ? Math.round(
                           ((stats.activeConversations + stats.callsBooked) /
@@ -580,7 +580,7 @@ export default function DashboardPage() {
                 </div>
                 <div className="h-1.5 bg-white rounded-full overflow-hidden">
                   <div
-                    className="h-full bg-[#ff7e67]"
+                    className="h-full bg-[#fc6e56]"
                     style={{
                       width: `${
                         stats.dmsHandled > 0
@@ -598,23 +598,23 @@ export default function DashboardPage() {
               <div>
                 <div className="flex justify-between text-xs font-bold mb-1.5">
                   <span>Booking Rate</span>
-                  <span className="text-[#ff7e67]">{stats.conversionRate}%</span>
+                  <span className="text-[#fc6e56]">{stats.conversionRate}%</span>
                 </div>
                 <div className="h-1.5 bg-white rounded-full overflow-hidden">
                   <div
-                    className="h-full bg-[#ff7e67]"
+                    className="h-full bg-[#fc6e56]"
                     style={{ width: `${stats.conversionRate}%` }}
                   />
                 </div>
               </div>
               <div className="pt-4 flex gap-4">
-                <div className="flex-1 bg-white p-3 rounded-2xl shadow-sm border border-[#ff7e67]/10">
+                <div className="flex-1 bg-white p-3 rounded-2xl shadow-sm border border-[#fc6e56]/10">
                   <p className="text-[10px] font-bold text-stone-400 uppercase">
                     Total DMs
                   </p>
                   <p className="text-xl font-extrabold">{stats.dmsHandled}</p>
                 </div>
-                <div className="flex-1 bg-white p-3 rounded-2xl shadow-sm border border-[#ff7e67]/10">
+                <div className="flex-1 bg-white p-3 rounded-2xl shadow-sm border border-[#fc6e56]/10">
                   <p className="text-[10px] font-bold text-stone-400 uppercase">
                     Active Leads
                   </p>

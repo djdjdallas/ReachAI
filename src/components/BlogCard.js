@@ -5,13 +5,13 @@ export default function BlogCard({ title, description, date, slug, category, rea
   return (
     <article className="bg-white rounded-2xl border border-stone-100 p-8 hover:shadow-lg hover:border-stone-200 transition-all group">
       <div className="flex items-center gap-3 mb-4">
-        <span className="inline-flex items-center rounded-full bg-[#fff5f2] px-3 py-1 text-xs font-bold text-[#ff7e67]">
+        <span className="inline-flex items-center rounded-full bg-[#fff5f2] px-3 py-1 text-xs font-bold text-[#fc6e56]">
           {category}
         </span>
         <span className="text-xs text-stone-400 font-medium">{readTime}</span>
       </div>
 
-      <h3 className="text-xl font-extrabold text-stone-900 mb-3 leading-tight group-hover:text-[#ff7e67] transition-colors">
+      <h3 className="text-xl font-extrabold text-stone-900 mb-3 leading-tight group-hover:text-[#fc6e56] transition-colors">
         <Link href={`/blog/${slug}`}>{title}</Link>
       </h3>
 
@@ -29,7 +29,7 @@ export default function BlogCard({ title, description, date, slug, category, rea
         </time>
         <Link
           href={`/blog/${slug}`}
-          className="inline-flex items-center gap-1 text-sm font-bold text-[#ff7e67] group-hover:gap-2 transition-all"
+          className="inline-flex items-center gap-1 text-sm font-bold text-[#fc6e56] group-hover:gap-2 transition-all"
         >
           Read more
           <ArrowRight className="w-4 h-4" />

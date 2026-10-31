@@ -207,7 +207,7 @@ export default function BestAiDmToolForCoaches2026() {
 
       <section className="pt-20 pb-16 md:pt-32 md:pb-24 bg-white">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-          <span className="inline-flex items-center px-4 py-1.5 rounded-full bg-[#fff5f2] text-[#ff7e67] text-[13px] font-bold tracking-tight mb-6">
+          <span className="inline-flex items-center px-4 py-1.5 rounded-full bg-[#fff5f2] text-[#fc6e56] text-[13px] font-bold tracking-tight mb-6">
             Ranked Listicle
           </span>
           <h1 className="text-4xl md:text-6xl font-black tracking-tight text-stone-900 mb-6 leading-[1.1]">
@@ -239,7 +239,7 @@ export default function BestAiDmToolForCoaches2026() {
                 className="bg-white rounded-[2rem] border border-stone-100 p-8 md:p-10 soft-shadow"
               >
                 <div className="flex items-start gap-6 mb-6 flex-wrap">
-                  <div className="flex-shrink-0 inline-flex items-center justify-center w-14 h-14 rounded-full bg-[#fff5f2] text-[#ff7e67] font-black text-2xl">
+                  <div className="flex-shrink-0 inline-flex items-center justify-center w-14 h-14 rounded-full bg-[#fff5f2] text-[#fc6e56] font-black text-2xl">
                     {tool.rank}
                   </div>
                   <div className="flex-1 min-w-[200px]">
@@ -286,13 +286,13 @@ export default function BestAiDmToolForCoaches2026() {
                   </div>
                 </div>
                 <div>
-                  <p className="text-xs font-bold uppercase tracking-widest text-[#ff7e67] mb-2">
+                  <p className="text-xs font-bold uppercase tracking-widest text-[#fc6e56] mb-2">
                     Verdict
                   </p>
                   <p className="text-stone-700 leading-relaxed mb-4">{tool.verdict}</p>
                   <Link
                     href={tool.href}
-                    className="text-sm font-bold text-[#ff7e67] hover:underline"
+                    className="text-sm font-bold text-[#fc6e56] hover:underline"
                   >
                     {tool.rank === 1 ? "Try Clinchd free" : `Compare to Clinchd`} &rarr;
                   </Link>
@@ -344,15 +344,15 @@ export default function BestAiDmToolForCoaches2026() {
             Individual comparisons
           </h3>
           <div className="flex flex-wrap gap-4">
-            <Link href="/compare/vs-setsmart" className="text-sm font-bold text-[#ff7e67] hover:underline">Clinchd vs SetSmart &rarr;</Link>
-            <Link href="/compare/vs-manychat" className="text-sm font-bold text-[#ff7e67] hover:underline">Clinchd vs ManyChat &rarr;</Link>
-            <Link href="/compare/vs-inro" className="text-sm font-bold text-[#ff7e67] hover:underline">Clinchd vs Inro &rarr;</Link>
-            <Link href="/compare/vs-setter-ai" className="text-sm font-bold text-[#ff7e67] hover:underline">Clinchd vs Setter AI &rarr;</Link>
-            <Link href="/compare/vs-gohighlevel" className="text-sm font-bold text-[#ff7e67] hover:underline">Clinchd vs GoHighLevel &rarr;</Link>
-            <Link href="/compare/setsmart-alternative" className="text-sm font-bold text-[#ff7e67] hover:underline">SetSmart alternative &rarr;</Link>
-            <Link href="/compare/inro-alternative" className="text-sm font-bold text-[#ff7e67] hover:underline">Inro alternative &rarr;</Link>
-            <Link href="/compare/chatplace-alternative" className="text-sm font-bold text-[#ff7e67] hover:underline">ChatPlace alternative &rarr;</Link>
-            <Link href="/compare/tailortalk-alternative" className="text-sm font-bold text-[#ff7e67] hover:underline">TailorTalk alternative &rarr;</Link>
+            <Link href="/compare/vs-setsmart" className="text-sm font-bold text-[#fc6e56] hover:underline">Clinchd vs SetSmart &rarr;</Link>
+            <Link href="/compare/vs-manychat" className="text-sm font-bold text-[#fc6e56] hover:underline">Clinchd vs ManyChat &rarr;</Link>
+            <Link href="/compare/vs-inro" className="text-sm font-bold text-[#fc6e56] hover:underline">Clinchd vs Inro &rarr;</Link>
+            <Link href="/compare/vs-setter-ai" className="text-sm font-bold text-[#fc6e56] hover:underline">Clinchd vs Setter AI &rarr;</Link>
+            <Link href="/compare/vs-gohighlevel" className="text-sm font-bold text-[#fc6e56] hover:underline">Clinchd vs GoHighLevel &rarr;</Link>
+            <Link href="/compare/setsmart-alternative" className="text-sm font-bold text-[#fc6e56] hover:underline">SetSmart alternative &rarr;</Link>
+            <Link href="/compare/inro-alternative" className="text-sm font-bold text-[#fc6e56] hover:underline">Inro alternative &rarr;</Link>
+            <Link href="/compare/chatplace-alternative" className="text-sm font-bold text-[#fc6e56] hover:underline">ChatPlace alternative &rarr;</Link>
+            <Link href="/compare/tailortalk-alternative" className="text-sm font-bold text-[#fc6e56] hover:underline">TailorTalk alternative &rarr;</Link>
           </div>
         </div>
       </section>

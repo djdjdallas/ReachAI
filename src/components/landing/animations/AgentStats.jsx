@@ -218,19 +218,19 @@ export default function AgentStats() {
           <div className="flex items-center gap-2">
             <span
               className="text-[11px] font-bold uppercase tracking-[0.12em]"
-              style={{ color: "#ff7e67" }}
+              style={{ color: "#fc6e56" }}
             >
               Sample
             </span>
             <span
               className="relative block w-2 h-2 rounded-full"
-              style={{ background: "#ff7e67" }}
+              style={{ background: "#fc6e56" }}
             >
               <span
                 className="as-live-pulse absolute rounded-full"
                 style={{
                   inset: "-4px",
-                  background: "#ff7e67",
+                  background: "#fc6e56",
                   opacity: 0.4,
                 }}
               />
@@ -276,7 +276,7 @@ export default function AgentStats() {
             <span
               className="text-[12px] font-semibold"
               style={{
-                color: "#ff7e67",
+                color: "#fc6e56",
                 fontVariantNumeric: "tabular-nums",
               }}
             >
@@ -305,7 +305,7 @@ function KpiTile({ label, value, suffix = "", accent }) {
       style={{
         background: accent ? "#fff5f2" : "#fafaf9",
         border: accent
-          ? "1px solid rgba(255, 126, 103, 0.25)"
+          ? "1px solid rgba(252, 110, 86, 0.25)"
           : "1px solid #f5f5f4",
       }}
     >
@@ -313,7 +313,7 @@ function KpiTile({ label, value, suffix = "", accent }) {
         className="text-[10px] font-bold uppercase mb-2"
         style={{
           letterSpacing: "0.12em",
-          color: accent ? "#ff7e67" : "#a8a29e",
+          color: accent ? "#fc6e56" : "#a8a29e",
         }}
       >
         {label}
@@ -370,7 +370,7 @@ function ProgressRing({ target, progress }) {
           cy={SIZE / 2}
           r={RADIUS}
           fill="none"
-          stroke="#ff7e67"
+          stroke="#fc6e56"
           strokeWidth={STROKE}
           strokeLinecap="round"
           strokeDasharray={CIRCUMFERENCE}
@@ -458,8 +458,8 @@ function ChartSvg({ data, pathRef, pathLength }) {
 
         <defs>
           <linearGradient id="agentChartFill" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="#ff7e67" stopOpacity="0.12" />
-            <stop offset="100%" stopColor="#ff7e67" stopOpacity="0" />
+            <stop offset="0%" stopColor="#fc6e56" stopOpacity="0.12" />
+            <stop offset="100%" stopColor="#fc6e56" stopOpacity="0" />
           </linearGradient>
         </defs>
 
@@ -469,7 +469,7 @@ function ChartSvg({ data, pathRef, pathLength }) {
           ref={pathRef}
           d={path}
           fill="none"
-          stroke="#ff7e67"
+          stroke="#fc6e56"
           strokeWidth="2.5"
           strokeLinecap="round"
           strokeLinejoin="round"
@@ -491,9 +491,9 @@ function ChartSvg({ data, pathRef, pathLength }) {
           width: "10px",
           height: "10px",
           borderRadius: "9999px",
-          background: "#ff7e67",
+          background: "#fc6e56",
           transform: "translate(50%, -50%)",
-          boxShadow: "0 0 0 4px rgba(255, 126, 103, 0.18)",
+          boxShadow: "0 0 0 4px rgba(252, 110, 86, 0.18)",
           pointerEvents: "none",
         }}
       >
@@ -501,7 +501,7 @@ function ChartSvg({ data, pathRef, pathLength }) {
           className="as-chart-dot-pulse absolute rounded-full"
           style={{
             inset: "-4px",
-            background: "#ff7e67",
+            background: "#fc6e56",
             opacity: 0.4,
           }}
         />

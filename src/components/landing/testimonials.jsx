@@ -27,7 +27,7 @@ export default function Testimonials() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex flex-col items-center mb-16 reveal-up text-center">
           <div className="inline-flex items-center gap-3 px-6 py-2 rounded-full bg-stone-900 text-white text-sm font-bold mb-4 shadow-xl">
-            <Sparkles className="w-4 h-4 text-[#ff7e67]" />
+            <Sparkles className="w-4 h-4 text-[#fc6e56]" />
             Early access
           </div>
         </div>
@@ -53,7 +53,7 @@ export default function Testimonials() {
                   key={card.title}
                   className="bg-white p-8 rounded-[2rem] soft-shadow border border-stone-50 reveal-up"
                 >
-                  <div className="inline-flex items-center justify-center w-10 h-10 rounded-full bg-[#fff5f2] text-[#ff7e67] mb-5">
+                  <div className="inline-flex items-center justify-center w-10 h-10 rounded-full bg-[#fff5f2] text-[#fc6e56] mb-5">
                     <Icon className="w-5 h-5" />
                   </div>
                   <h3 className="font-extrabold text-stone-900 mb-3 leading-tight">

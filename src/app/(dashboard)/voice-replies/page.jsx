@@ -11,7 +11,7 @@ export const metadata = {
   robots: { index: false, follow: false },
 };
 
-const CORAL = "#ff7e67";
+const CORAL = "#fc6e56";
 
 export default async function VoiceRepliesPage() {
   const supabase = await createClient();

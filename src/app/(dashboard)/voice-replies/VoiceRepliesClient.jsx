@@ -6,7 +6,7 @@ import { VOICE_ELIGIBLE_CLASSES, VOICE_INTENT_LABELS } from "@/lib/voice/intent-
 import VoiceUploader from "@/components/voice/VoiceUploader";
 import VoiceSnippetCard from "@/components/voice/VoiceSnippetCard";
 
-const CORAL = "#ff7e67";
+const CORAL = "#fc6e56";
 
 // Short blurbs for the coverage strip. Keyed on VOICE_ELIGIBLE_CLASSES;
 // the labels themselves come from VOICE_INTENT_LABELS so display strings
@@ -140,7 +140,7 @@ export default function VoiceRepliesClient({ initialSnippets, killSwitchActive }
                   </div>
                   <div
                     className={`h-2 w-2 rounded-full ${
-                      covered ? "bg-[#ff7e67]" : "bg-stone-300"
+                      covered ? "bg-[#fc6e56]" : "bg-stone-300"
                     }`}
                   />
                 </div>

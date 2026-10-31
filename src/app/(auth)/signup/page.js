@@ -139,7 +139,7 @@ export default function SignupPage() {
       style={{
         backgroundColor: "#fafaf9",
         backgroundImage:
-          "radial-gradient(at 0% 0%, rgba(255, 126, 103, 0.05) 0px, transparent 50%), radial-gradient(at 100% 100%, rgba(255, 126, 103, 0.05) 0px, transparent 50%)",
+          "radial-gradient(at 0% 0%, rgba(252, 110, 86, 0.05) 0px, transparent 50%), radial-gradient(at 100% 100%, rgba(252, 110, 86, 0.05) 0px, transparent 50%)",
       }}
     >
       {/* Header */}
@@ -173,13 +173,13 @@ export default function SignupPage() {
           {/* Hero */}
           <div className="hidden lg:flex flex-col space-y-10">
             <div className="space-y-6">
-              <div className="inline-flex items-center gap-2 px-4 py-1.5 bg-orange-50 text-[#ff7e67] rounded-full text-xs font-black uppercase tracking-widest">
-                <span className="w-1.5 h-1.5 bg-[#ff7e67] rounded-full animate-pulse" />
+              <div className="inline-flex items-center gap-2 px-4 py-1.5 bg-orange-50 text-[#fc6e56] rounded-full text-xs font-black uppercase tracking-widest">
+                <span className="w-1.5 h-1.5 bg-[#fc6e56] rounded-full animate-pulse" />
                 Replace Your $5K/mo Setter
               </div>
               <h1 className="text-6xl font-black leading-[1.1] text-stone-900">
                 Start closing with{" "}
-                <span className="text-[#ff7e67]">Clinchd</span>
+                <span className="text-[#fc6e56]">Clinchd</span>
               </h1>
               <p className="text-xl text-stone-500 font-medium leading-relaxed max-w-md">
                 Create your account and launch an AI sales agent that qualifies
@@ -204,7 +204,7 @@ export default function SignupPage() {
               </div>
 
               <div className="flex items-start gap-5">
-                <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center text-[#ff7e67] soft-shadow">
+                <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center text-[#fc6e56] soft-shadow">
                   <MessageSquareText className="w-6 h-6" />
                 </div>
                 <div>
@@ -301,7 +301,7 @@ export default function SignupPage() {
                     <button
                       type="button"
                       onClick={handleStartOver}
-                      className="text-[#ff7e67] font-bold hover:underline"
+                      className="text-[#fc6e56] font-bold hover:underline"
                     >
                       Sign up again
                     </button>
@@ -370,7 +370,7 @@ export default function SignupPage() {
                       onChange={(e) => setFullName(e.target.value)}
                       required
                       disabled={loading}
-                      className="w-full pl-12 pr-5 py-4 bg-stone-50 border border-stone-100 rounded-2xl text-sm font-medium transition-all focus:outline-none focus:border-[#ff7e67] focus:ring-4 focus:ring-[#fff5f2]"
+                      className="w-full pl-12 pr-5 py-4 bg-stone-50 border border-stone-100 rounded-2xl text-sm font-medium transition-all focus:outline-none focus:border-[#fc6e56] focus:ring-4 focus:ring-[#fff5f2]"
                     />
                   </div>
                 </div>
@@ -392,7 +392,7 @@ export default function SignupPage() {
                       onChange={(e) => setEmail(e.target.value)}
                       required
                       disabled={loading}
-                      className="w-full pl-12 pr-5 py-4 bg-stone-50 border border-stone-100 rounded-2xl text-sm font-medium transition-all focus:outline-none focus:border-[#ff7e67] focus:ring-4 focus:ring-[#fff5f2]"
+                      className="w-full pl-12 pr-5 py-4 bg-stone-50 border border-stone-100 rounded-2xl text-sm font-medium transition-all focus:outline-none focus:border-[#fc6e56] focus:ring-4 focus:ring-[#fff5f2]"
                     />
                   </div>
                 </div>
@@ -414,7 +414,7 @@ export default function SignupPage() {
                       onChange={(e) => setPassword(e.target.value)}
                       required
                       disabled={loading}
-                      className="w-full pl-12 pr-5 py-4 bg-stone-50 border border-stone-100 rounded-2xl text-sm font-medium transition-all focus:outline-none focus:border-[#ff7e67] focus:ring-4 focus:ring-[#fff5f2]"
+                      className="w-full pl-12 pr-5 py-4 bg-stone-50 border border-stone-100 rounded-2xl text-sm font-medium transition-all focus:outline-none focus:border-[#fc6e56] focus:ring-4 focus:ring-[#fff5f2]"
                     />
                   </div>
                 </div>
@@ -428,7 +428,7 @@ export default function SignupPage() {
                 <button
                   type="submit"
                   disabled={loading}
-                  className="w-full py-5 bg-[#ff7e67] text-white rounded-2xl text-lg font-black shadow-xl shadow-[#ff7e67]/30 hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center justify-center gap-3 disabled:opacity-70 disabled:hover:scale-100"
+                  className="w-full py-5 bg-[#fc6e56] text-white rounded-2xl text-lg font-black shadow-xl shadow-[#fc6e56]/30 hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center justify-center gap-3 disabled:opacity-70 disabled:hover:scale-100"
                 >
                   {loading ? (
                     <Loader2 className="w-5 h-5 animate-spin" />
@@ -465,7 +465,7 @@ export default function SignupPage() {
                   Already have an account?
                   <Link
                     href="/login"
-                    className="text-[#ff7e67] font-black uppercase tracking-widest text-[11px] ml-2 hover:underline"
+                    className="text-[#fc6e56] font-black uppercase tracking-widest text-[11px] ml-2 hover:underline"
                   >
                     Log In
                   </Link>

@@ -44,11 +44,11 @@ export default function BookingConfirmed() {
         });
         gsap.set(".bc-slot-target", {
           backgroundColor: "#fff5f2",
-          borderColor: "#ff7e67",
+          borderColor: "#fc6e56",
           scale: 1.015,
         });
         gsap.set(".bc-slot-other", { opacity: 0.35 });
-        gsap.set(".bc-target-time", { color: "#ff7e67" });
+        gsap.set(".bc-target-time", { color: "#fc6e56" });
         gsap.set(".bc-cursor", { opacity: 0 });
         gsap.set(".bc-cursor-trail", { opacity: 0 });
         gsap.set(".bc-check", { scale: 1 });
@@ -113,13 +113,13 @@ export default function BookingConfirmed() {
         ".bc-slot-target",
         {
           backgroundColor: "#fff5f2",
-          borderColor: "#ff7e67",
+          borderColor: "#fc6e56",
           scale: 1.015,
           duration: 0.5,
         },
         3.0
       );
-      tl.to(".bc-target-time", { color: "#ff7e67", duration: 0.5 }, 3.0);
+      tl.to(".bc-target-time", { color: "#fc6e56", duration: 0.5 }, 3.0);
       tl.to(".bc-slot-other", { opacity: 0.35, duration: 0.5 }, 3.0);
 
       // Beat 4: Helper text
@@ -243,7 +243,7 @@ export default function BookingConfirmed() {
               width: "20px",
               height: "20px",
               borderRadius: "9999px",
-              background: "#ff7e67",
+              background: "#fc6e56",
               right: "1.5rem",
               // Target index 2 → vertical center: 2 * (slotHeight + gap) + slotHeight/2
               // Slots are ~52px tall with 8px gap between them.
@@ -263,11 +263,11 @@ export default function BookingConfirmed() {
               width: "10px",
               height: "10px",
               borderRadius: "9999px",
-              background: "#ff7e67",
+              background: "#fc6e56",
               right: "1.5rem",
               top: "calc(2 * 60px + 26px)",
               transform: "translateY(-50%)",
-              boxShadow: "0 0 0 4px rgba(255, 126, 103, 0.18)",
+              boxShadow: "0 0 0 4px rgba(252, 110, 86, 0.18)",
               pointerEvents: "none",
               zIndex: 6,
             }}
@@ -289,7 +289,7 @@ export default function BookingConfirmed() {
             marginTop: "1.25rem",
             padding: "1.125rem 1.25rem",
             background: "#fff5f2",
-            border: "1px solid rgba(255, 126, 103, 0.25)",
+            border: "1px solid rgba(252, 110, 86, 0.25)",
             borderRadius: "1.25rem",
           }}
         >
@@ -299,7 +299,7 @@ export default function BookingConfirmed() {
               width: "40px",
               height: "40px",
               borderRadius: "9999px",
-              background: "#ff7e67",
+              background: "#fc6e56",
             }}
           >
             <svg
@@ -323,7 +323,7 @@ export default function BookingConfirmed() {
                 fontWeight: 800,
                 textTransform: "uppercase",
                 letterSpacing: "0.12em",
-                color: "#ff7e67",
+                color: "#fc6e56",
                 marginBottom: "2px",
               }}
             >
@@ -359,7 +359,7 @@ export default function BookingConfirmed() {
               width: "8px",
               height: "8px",
               borderRadius: "9999px",
-              background: "#ff7e67",
+              background: "#fc6e56",
             }}
           />
         </div>

@@ -17,7 +17,7 @@ export const metadata = {
   robots: { index: false, follow: false },
 };
 
-const CORAL = "#ff7e67";
+const CORAL = "#fc6e56";
 const CARD_SHADOW = "0 1px 0 rgba(15,15,15,0.04)";
 
 export default async function CommentToDmLandingPage() {

@@ -76,7 +76,7 @@ export default function VsInro() {
       {/* Hero */}
       <section className="pt-20 pb-16 md:pt-32 md:pb-24 bg-white">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-          <span className="inline-flex items-center px-4 py-1.5 rounded-full bg-[#fff5f2] text-[#ff7e67] text-[13px] font-bold tracking-tight mb-6">
+          <span className="inline-flex items-center px-4 py-1.5 rounded-full bg-[#fff5f2] text-[#fc6e56] text-[13px] font-bold tracking-tight mb-6">
             Comparison
           </span>
           <h1 className="text-4xl md:text-6xl font-black tracking-tight text-stone-900 mb-6 leading-[1.1]">
@@ -201,25 +201,25 @@ export default function VsInro() {
               </ul>
             </div>
 
-            <div className="bg-white rounded-2xl border border-[#ff7e67]/20 p-8 soft-shadow bg-[#fff5f2]/30">
-              <h3 className="text-lg font-extrabold text-[#ff7e67] mb-3">
+            <div className="bg-white rounded-2xl border border-[#fc6e56]/20 p-8 soft-shadow bg-[#fff5f2]/30">
+              <h3 className="text-lg font-extrabold text-[#fc6e56] mb-3">
                 Choose Clinchd if&hellip;
               </h3>
               <ul className="space-y-3 text-stone-500 text-sm">
                 <li className="flex items-start gap-2">
-                  <span className="text-[#ff7e67] mt-1">&#8226;</span>
+                  <span className="text-[#fc6e56] mt-1">&#8226;</span>
                   You&apos;re a coach or course creator selling high-ticket offers
                 </li>
                 <li className="flex items-start gap-2">
-                  <span className="text-[#ff7e67] mt-1">&#8226;</span>
+                  <span className="text-[#fc6e56] mt-1">&#8226;</span>
                   Your AI needs to handle &ldquo;I can&apos;t afford it&rdquo; on the spot
                 </li>
                 <li className="flex items-start gap-2">
-                  <span className="text-[#ff7e67] mt-1">&#8226;</span>
+                  <span className="text-[#fc6e56] mt-1">&#8226;</span>
                   Booking a discovery call is the conversion event
                 </li>
                 <li className="flex items-start gap-2">
-                  <span className="text-[#ff7e67] mt-1">&#8226;</span>
+                  <span className="text-[#fc6e56] mt-1">&#8226;</span>
                   You want flat $197 unlimited — no surprise bills when a Reel pops
                 </li>
               </ul>
@@ -252,7 +252,7 @@ export default function VsInro() {
                 annual commitment.
               </p>
             </div>
-            <div className="bg-[#ff7e67] text-white rounded-2xl p-8 shadow-xl shadow-[#ff7e67]/20">
+            <div className="bg-[#fc6e56] text-white rounded-2xl p-8 shadow-xl shadow-[#fc6e56]/20">
               <div className="text-xs font-bold uppercase tracking-widest text-white/70 mb-3">
                 Clinchd Unlimited
               </div>
@@ -269,7 +269,7 @@ export default function VsInro() {
       {/* Why we focus on coaching */}
       <section className="py-16 bg-[#fafaf9]">
         <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
-          <p className="text-xs font-bold uppercase tracking-widest text-[#ff7e67] mb-4 text-center">
+          <p className="text-xs font-bold uppercase tracking-widest text-[#fc6e56] mb-4 text-center">
             Why we built only for coaches
           </p>
           <h2 className="text-2xl md:text-3xl font-black text-stone-900 mb-6 text-center">
@@ -321,16 +321,16 @@ export default function VsInro() {
             Related comparisons &amp; guides
           </h3>
           <div className="flex flex-wrap gap-4">
-            <Link href="/compare/vs-manychat" className="text-sm font-bold text-[#ff7e67] hover:underline">
+            <Link href="/compare/vs-manychat" className="text-sm font-bold text-[#fc6e56] hover:underline">
               Clinchd vs ManyChat &rarr;
             </Link>
-            <Link href="/compare/vs-setter-ai" className="text-sm font-bold text-[#ff7e67] hover:underline">
+            <Link href="/compare/vs-setter-ai" className="text-sm font-bold text-[#fc6e56] hover:underline">
               Clinchd vs Setter AI &rarr;
             </Link>
-            <Link href="/compare/vs-gohighlevel" className="text-sm font-bold text-[#ff7e67] hover:underline">
+            <Link href="/compare/vs-gohighlevel" className="text-sm font-bold text-[#fc6e56] hover:underline">
               Clinchd vs GoHighLevel &rarr;
             </Link>
-            <Link href="/blog/ai-instagram-dm-bot-for-coaches" className="text-sm font-bold text-[#ff7e67] hover:underline">
+            <Link href="/blog/ai-instagram-dm-bot-for-coaches" className="text-sm font-bold text-[#fc6e56] hover:underline">
               AI Instagram DM Bots for Coaches &rarr;
             </Link>
           </div>

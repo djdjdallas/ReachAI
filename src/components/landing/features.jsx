@@ -105,7 +105,7 @@ export default function Features() {
                   <div
                     className={`w-14 h-14 rounded-2xl ${feature.bgClass} flex items-center justify-center shrink-0`}
                   >
-                    <Icon className="w-7 h-7 text-[#ff7e67]" />
+                    <Icon className="w-7 h-7 text-[#fc6e56]" />
                   </div>
                   {feature.comingSoon && (
                     <div className="flex flex-col items-end gap-1">

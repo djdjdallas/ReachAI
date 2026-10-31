@@ -145,7 +145,7 @@ export default function InstagramLeadQualificationPage() {
       {/* Hero */}
       <section className="pt-20 pb-16 md:pt-32 md:pb-24 bg-white">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-          <span className="inline-flex items-center px-4 py-1.5 rounded-full bg-[#fff5f2] text-[#ff7e67] text-[13px] font-bold tracking-tight mb-6">
+          <span className="inline-flex items-center px-4 py-1.5 rounded-full bg-[#fff5f2] text-[#fc6e56] text-[13px] font-bold tracking-tight mb-6">
             Lead Qualification Playbook
           </span>
           <h1 className="text-4xl md:text-6xl font-black tracking-tight text-stone-900 mb-6 leading-[1.1]">
@@ -157,7 +157,7 @@ export default function InstagramLeadQualificationPage() {
           <div className="mt-10">
             <Link
               href="/signup"
-              className="inline-flex items-center bg-stone-900 text-white px-8 py-4 rounded-full font-bold hover:bg-[#ff7e67] transition-all shadow-sm"
+              className="inline-flex items-center bg-stone-900 text-white px-8 py-4 rounded-full font-bold hover:bg-[#fc6e56] transition-all shadow-sm"
             >
               Start Free Trial
             </Link>
@@ -200,7 +200,7 @@ export default function InstagramLeadQualificationPage() {
                 key={d.title}
                 className="bg-white rounded-[2rem] border border-stone-100 p-8 soft-shadow"
               >
-                <div className="inline-flex items-center justify-center w-10 h-10 rounded-full bg-[#fff5f2] text-[#ff7e67] font-black mb-4">
+                <div className="inline-flex items-center justify-center w-10 h-10 rounded-full bg-[#fff5f2] text-[#fc6e56] font-black mb-4">
                   {i + 1}
                 </div>
                 <h3 className="text-xl font-extrabold text-stone-900 mb-3">
@@ -232,7 +232,7 @@ export default function InstagramLeadQualificationPage() {
               >
                 <div className="flex items-start justify-between flex-wrap gap-4 mb-4">
                   <h3 className="text-lg font-extrabold text-stone-900">{m.title}</h3>
-                  <span className="text-xs font-bold uppercase tracking-widest text-[#ff7e67] bg-[#fff5f2] rounded-full px-3 py-1">
+                  <span className="text-xs font-bold uppercase tracking-widest text-[#fc6e56] bg-[#fff5f2] rounded-full px-3 py-1">
                     Best for: {m.bestFor}
                   </span>
                 </div>
@@ -272,12 +272,12 @@ export default function InstagramLeadQualificationPage() {
             <p>
               The result: every qualified lead lands on your calendar with full context already gathered, and every unqualified lead gets a respectful response that keeps your reputation clean. No more 30-minute discovery calls with people looking for free advice.
             </p>
-            <div className="bg-[#fff5f2] rounded-2xl p-6 border border-[#ff7e67]/20 mt-6">
+            <div className="bg-[#fff5f2] rounded-2xl p-6 border border-[#fc6e56]/20 mt-6">
               <p className="text-sm text-stone-700 font-medium leading-relaxed">
                 <strong className="text-stone-900">See it in action:</strong> Clinchd qualifies on all 4 dimensions automatically.{" "}
                 <Link
                   href="/ai-dm-setter-for-coaches"
-                  className="font-bold text-[#ff7e67] hover:underline"
+                  className="font-bold text-[#fc6e56] hover:underline"
                 >
                   Read about the AI DM setter for coaches &rarr;
                 </Link>
@@ -324,19 +324,19 @@ export default function InstagramLeadQualificationPage() {
             Related guides
           </h3>
           <div className="flex flex-wrap gap-4">
-            <Link href="/qualify-leads-on-instagram" className="text-sm font-bold text-[#ff7e67] hover:underline">
+            <Link href="/qualify-leads-on-instagram" className="text-sm font-bold text-[#fc6e56] hover:underline">
               Qualify Leads on Instagram (variant guide) &rarr;
             </Link>
-            <Link href="/ai-dm-setter-for-coaches" className="text-sm font-bold text-[#ff7e67] hover:underline">
+            <Link href="/ai-dm-setter-for-coaches" className="text-sm font-bold text-[#fc6e56] hover:underline">
               AI DM Setter for Coaches &rarr;
             </Link>
-            <Link href="/book-discovery-calls-from-instagram" className="text-sm font-bold text-[#ff7e67] hover:underline">
+            <Link href="/book-discovery-calls-from-instagram" className="text-sm font-bold text-[#fc6e56] hover:underline">
               Book Discovery Calls From Instagram &rarr;
             </Link>
-            <Link href="/instagram-dm-automation-for-coaches" className="text-sm font-bold text-[#ff7e67] hover:underline">
+            <Link href="/instagram-dm-automation-for-coaches" className="text-sm font-bold text-[#fc6e56] hover:underline">
               Instagram DM Automation Guide &rarr;
             </Link>
-            <Link href="/blog/how-to-qualify-leads-on-instagram-dms" className="text-sm font-bold text-[#ff7e67] hover:underline">
+            <Link href="/blog/how-to-qualify-leads-on-instagram-dms" className="text-sm font-bold text-[#fc6e56] hover:underline">
               Long read: How to qualify leads on Instagram DMs &rarr;
             </Link>
           </div>

@@ -178,19 +178,19 @@ export default function AlwaysOn() {
           <div className="flex items-center gap-2">
             <span
               className="text-[11px] font-bold uppercase tracking-[0.12em]"
-              style={{ color: "#ff7e67" }}
+              style={{ color: "#fc6e56" }}
             >
               24/7
             </span>
             <span
               className="relative block w-2 h-2 rounded-full"
-              style={{ background: "#ff7e67" }}
+              style={{ background: "#fc6e56" }}
             >
               <span
                 className="ao-live-pulse absolute rounded-full"
                 style={{
                   inset: "-4px",
-                  background: "#ff7e67",
+                  background: "#fc6e56",
                   opacity: 0.4,
                 }}
               />
@@ -244,7 +244,7 @@ export default function AlwaysOn() {
                   y1={y1}
                   x2={x2}
                   y2={y2}
-                  stroke={isLit ? "#ff7e67" : isMajor ? "#a8a29e" : "#d6d3d1"}
+                  stroke={isLit ? "#fc6e56" : isMajor ? "#a8a29e" : "#d6d3d1"}
                   strokeWidth={isMajor ? "1.5" : "1"}
                   opacity={isLit ? 0.6 : 1}
                   style={{ transition: "stroke 0.3s ease-out" }}
@@ -290,9 +290,9 @@ export default function AlwaysOn() {
               top: `${(dotY / RING_SIZE) * 100}%`,
               width: "12px",
               height: "12px",
-              background: "#ff7e67",
+              background: "#fc6e56",
               transform: "translate(-50%, -50%)",
-              boxShadow: "0 0 0 4px rgba(255, 126, 103, 0.18)",
+              boxShadow: "0 0 0 4px rgba(252, 110, 86, 0.18)",
             }}
           />
 
@@ -346,7 +346,7 @@ export default function AlwaysOn() {
                     padding: "0.4rem 0.8rem",
                     background: "#ffffff",
                     border: notif.accent
-                      ? "1px solid rgba(255, 126, 103, 0.3)"
+                      ? "1px solid rgba(252, 110, 86, 0.3)"
                       : "1px solid #e7e5e4",
                     boxShadow: "0 4px 16px rgba(0, 0, 0, 0.04)",
                   }}
@@ -354,13 +354,13 @@ export default function AlwaysOn() {
                   {notif.accent && (
                     <span
                       className="block w-1.5 h-1.5 rounded-full flex-shrink-0"
-                      style={{ background: "#ff7e67" }}
+                      style={{ background: "#fc6e56" }}
                     />
                   )}
                   <span
                     className="text-[10px] font-bold"
                     style={{
-                      color: notif.accent ? "#ff7e67" : "#1c1917",
+                      color: notif.accent ? "#fc6e56" : "#1c1917",
                       letterSpacing: "0.04em",
                       fontVariantNumeric: "tabular-nums",
                     }}

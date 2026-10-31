@@ -59,7 +59,7 @@ export default function HowItWorks() {
               >
                 {/* Text */}
                 <div className="flex-1 md:max-w-md">
-                  <div className="inline-flex items-center justify-center w-12 h-12 rounded-2xl bg-[#ff7e67] text-white text-lg font-black mb-6 shadow-lg shadow-[#ff7e67]/20">
+                  <div className="inline-flex items-center justify-center w-12 h-12 rounded-2xl bg-[#fc6e56] text-white text-lg font-black mb-6 shadow-lg shadow-[#fc6e56]/20">
                     {step.number}
                   </div>
                   <h3 className="text-2xl md:text-3xl font-black text-stone-900 mb-4">

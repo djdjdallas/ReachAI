@@ -81,12 +81,12 @@ export default function Hero() {
             {/* Pre-headline badge */}
             <div
               ref={badgeRef}
-              className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-[#fff5f2] border border-[#ff7e67]/15 mb-6 shadow-sm"
+              className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-[#fff5f2] border border-[#fc6e56]/15 mb-6 shadow-sm"
             >
-              <span className="relative block w-1.5 h-1.5 rounded-full bg-[#ff7e67]">
-                <span className="absolute -inset-1 rounded-full bg-[#ff7e67] opacity-40 animate-ping" />
+              <span className="relative block w-1.5 h-1.5 rounded-full bg-[#fc6e56]">
+                <span className="absolute -inset-1 rounded-full bg-[#fc6e56] opacity-40 animate-ping" />
               </span>
-              <span className="text-[13px] font-bold text-[#ff7e67] tracking-tight">
+              <span className="text-[13px] font-bold text-[#fc6e56] tracking-tight">
                 Built for coaches selling 1k+ offers
               </span>
             </div>
@@ -103,10 +103,10 @@ export default function Hero() {
             >
               Turn Instagram DMs into{" "}
               <span className="relative inline-block">
-                <span className="text-[#ff7e67] relative z-10">
+                <span className="text-[#fc6e56] relative z-10">
                   booked calls
                 </span>
-                <span className="absolute bottom-2 left-0 w-full h-[0.4em] bg-[#ff7e67]/12 -z-0" />
+                <span className="absolute bottom-2 left-0 w-full h-[0.4em] bg-[#fc6e56]/12 -z-0" />
               </span>
             </h1>
 
@@ -123,7 +123,7 @@ export default function Hero() {
             <div ref={ctaRef} className="flex flex-wrap gap-3 mb-5">
               <Link
                 href="/signup"
-                className="inline-flex items-center gap-2 px-7 py-4 bg-[#ff7e67] text-white rounded-full text-[15px] font-bold tracking-tight shadow-[0_4px_14px_rgba(255,126,103,0.35)] hover:shadow-[0_6px_20px_rgba(255,126,103,0.45)] hover:-translate-y-px transition-all"
+                className="inline-flex items-center gap-2 px-7 py-4 bg-[#fc6e56] text-white rounded-full text-[15px] font-bold tracking-tight shadow-[0_4px_14px_rgba(252,110,86,0.35)] hover:shadow-[0_6px_20px_rgba(252,110,86,0.45)] hover:-translate-y-px transition-all"
               >
                 Start Free Trial
                 <ArrowRight className="w-4 h-4" />
@@ -164,7 +164,7 @@ export default function Hero() {
             className="w-full lg:flex-1 lg:max-w-[480px] relative"
           >
             {/* Soft coral glow behind the demo card */}
-            <div className="absolute -inset-8 bg-[#ff7e67]/5 blur-3xl rounded-full -z-10" />
+            <div className="absolute -inset-8 bg-[#fc6e56]/5 blur-3xl rounded-full -z-10" />
             <DMConversation />
           </div>
         </div>

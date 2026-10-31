@@ -65,18 +65,18 @@ export default function FaqHowFastRespondToDms() {
           <div className="flex items-center gap-3 mb-6">
             <Link
               href="/"
-              className="text-sm font-bold text-[#ff7e67] hover:underline"
+              className="text-sm font-bold text-[#fc6e56] hover:underline"
             >
               &larr; Clinchd
             </Link>
           </div>
-          <span className="inline-flex items-center px-4 py-1.5 rounded-full bg-[#fff5f2] text-[#ff7e67] text-[13px] font-bold tracking-tight mb-6">
+          <span className="inline-flex items-center px-4 py-1.5 rounded-full bg-[#fff5f2] text-[#fc6e56] text-[13px] font-bold tracking-tight mb-6">
             Quick Answer
           </span>
           <h1 className="text-3xl md:text-5xl font-black tracking-tight text-stone-900 mb-6 leading-[1.1]">
             How fast should you respond to Instagram DMs?
           </h1>
-          <div className="bg-[#fff5f2] rounded-[2rem] border border-[#ff7e67]/20 p-8 md:p-10 mb-10">
+          <div className="bg-[#fff5f2] rounded-[2rem] border border-[#fc6e56]/20 p-8 md:p-10 mb-10">
             <p className="text-lg md:text-xl text-stone-700 font-medium leading-relaxed">
               {directAnswer}
             </p>
@@ -158,7 +158,7 @@ export default function FaqHowFastRespondToDms() {
               An AI DM setter replies in seconds, qualifies leads on budget and timeline, and books discovery calls inside the conversation. The response time goes from {`"hours"`} to {`"seconds"`} overnight, and the conversion lift follows.
             </p>
             <p>
-              <Link href="/ai-dm-setter-for-coaches" className="font-bold text-[#ff7e67] hover:underline">
+              <Link href="/ai-dm-setter-for-coaches" className="font-bold text-[#fc6e56] hover:underline">
                 See how Clinchd handles every DM in seconds &rarr;
               </Link>
             </p>
@@ -173,19 +173,19 @@ export default function FaqHowFastRespondToDms() {
             Related questions
           </h3>
           <div className="flex flex-wrap gap-4">
-            <Link href="/faq/what-is-an-ai-dm-setter" className="text-sm font-bold text-[#ff7e67] hover:underline">
+            <Link href="/faq/what-is-an-ai-dm-setter" className="text-sm font-bold text-[#fc6e56] hover:underline">
               What is an AI DM setter? &rarr;
             </Link>
-            <Link href="/faq/how-much-does-a-human-dm-setter-cost" className="text-sm font-bold text-[#ff7e67] hover:underline">
+            <Link href="/faq/how-much-does-a-human-dm-setter-cost" className="text-sm font-bold text-[#fc6e56] hover:underline">
               How much does a human DM setter cost? &rarr;
             </Link>
-            <Link href="/faq/can-ai-book-discovery-calls-from-instagram" className="text-sm font-bold text-[#ff7e67] hover:underline">
+            <Link href="/faq/can-ai-book-discovery-calls-from-instagram" className="text-sm font-bold text-[#fc6e56] hover:underline">
               Can AI book discovery calls from Instagram? &rarr;
             </Link>
-            <Link href="/instagram-dm-automation-for-coaches" className="text-sm font-bold text-[#ff7e67] hover:underline">
+            <Link href="/instagram-dm-automation-for-coaches" className="text-sm font-bold text-[#fc6e56] hover:underline">
               Instagram DM Automation Guide &rarr;
             </Link>
-            <Link href="/compare/best-ai-dm-tool-for-coaches-2026" className="text-sm font-bold text-[#ff7e67] hover:underline">
+            <Link href="/compare/best-ai-dm-tool-for-coaches-2026" className="text-sm font-bold text-[#fc6e56] hover:underline">
               Best AI DM tool for coaches 2026 &rarr;
             </Link>
           </div>

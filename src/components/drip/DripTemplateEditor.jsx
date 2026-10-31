@@ -4,7 +4,7 @@ import { useState } from "react";
 import { X, Loader2 } from "lucide-react";
 import { VOICE_ELIGIBLE_CLASSES, VOICE_INTENT_LABELS } from "@/lib/voice/intent-classes";
 
-const CORAL = "#ff7e67";
+const CORAL = "#fc6e56";
 const MIN_CONTENT = 10;
 const MAX_CONTENT = 1000;
 const MAX_LABEL = 80;
@@ -86,7 +86,7 @@ export default function DripTemplateEditor({
               value={intentClass}
               onChange={(e) => setIntentClass(e.target.value)}
               disabled={isEdit}
-              className="w-full px-3 py-2 bg-stone-50 border border-stone-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#ff7e67]/20 focus:border-[#ff7e67] disabled:opacity-60"
+              className="w-full px-3 py-2 bg-stone-50 border border-stone-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#fc6e56]/20 focus:border-[#fc6e56] disabled:opacity-60"
             >
               {VOICE_ELIGIBLE_CLASSES.map((cls) => {
                 const covered = existingActiveClasses.includes(cls) && cls !== template?.intent_class;
@@ -115,7 +115,7 @@ export default function DripTemplateEditor({
               onChange={(e) => setLabel(e.target.value)}
               maxLength={MAX_LABEL}
               placeholder="e.g. Gentle price nudge"
-              className="w-full px-3 py-2 bg-stone-50 border border-stone-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#ff7e67]/20 focus:border-[#ff7e67]"
+              className="w-full px-3 py-2 bg-stone-50 border border-stone-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#fc6e56]/20 focus:border-[#fc6e56]"
             />
           </div>
 
@@ -136,7 +136,7 @@ export default function DripTemplateEditor({
               onChange={(e) => setContent(e.target.value)}
               rows={4}
               placeholder="hey just wanted to check if you saw my last message — happy to chat whenever works."
-              className="w-full px-3 py-2 bg-stone-50 border border-stone-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#ff7e67]/20 focus:border-[#ff7e67] resize-none"
+              className="w-full px-3 py-2 bg-stone-50 border border-stone-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#fc6e56]/20 focus:border-[#fc6e56] resize-none"
             />
             <p className="text-[11px] text-stone-400 leading-relaxed">
               Write this as a gentle nudge, not a sales pitch. Example: &quot;hey

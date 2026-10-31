@@ -764,7 +764,7 @@ export default function SettingsPage() {
                 {REQUIRED_WEBHOOK_FIELDS.length})
               </p>
             ) : (
-              <p className="text-xs text-[#ff7e67]">
+              <p className="text-xs text-[#fc6e56]">
                 {Array.isArray(webhookHealth.missing_fields) &&
                 webhookHealth.missing_fields.length > 0
                   ? `Webhook delivery incomplete — missing: ${webhookHealth.missing_fields.join(", ")}. `

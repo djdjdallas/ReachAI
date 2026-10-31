@@ -62,11 +62,11 @@ export default function HeroDemo() {
         );
         gsap.set(".hd-slot-target", {
           backgroundColor: "#fff5f2",
-          borderColor: "#ff7e67",
+          borderColor: "#fc6e56",
           scale: 1.015,
         });
         gsap.set(".hd-slot-other", { opacity: 0.4 });
-        gsap.set(".hd-target-time", { color: "#ff7e67" });
+        gsap.set(".hd-target-time", { color: "#fc6e56" });
         gsap.set([".hd-typing-1", ".hd-typing-2"], { opacity: 0 });
       }, rootRef);
       return () => ctx.revert();
@@ -159,13 +159,13 @@ export default function HeroDemo() {
         ".hd-slot-target",
         {
           backgroundColor: "#fff5f2",
-          borderColor: "#ff7e67",
+          borderColor: "#fc6e56",
           scale: 1.015,
           duration: 0.5,
         },
         9.0
       );
-      tl.to(".hd-target-time", { color: "#ff7e67", duration: 0.5 }, 9.0);
+      tl.to(".hd-target-time", { color: "#fc6e56", duration: 0.5 }, 9.0);
       tl.to(".hd-slot-other", { opacity: 0.4, duration: 0.5 }, 9.0);
 
       // Beat 8: BOOKED card slides up
@@ -224,7 +224,7 @@ export default function HeroDemo() {
             </span>
             <span
               className="hd-live-dot block w-2 h-2 rounded-full"
-              style={{ background: "#ff7e67" }}
+              style={{ background: "#fc6e56" }}
             />
           </div>
 
@@ -399,7 +399,7 @@ export default function HeroDemo() {
               marginTop: "1.25rem",
               padding: "1rem 1.25rem",
               background: "#fff5f2",
-              border: "1px solid rgba(255, 126, 103, 0.25)",
+              border: "1px solid rgba(252, 110, 86, 0.25)",
               borderRadius: "1.25rem",
               display: "flex",
               alignItems: "center",
@@ -411,7 +411,7 @@ export default function HeroDemo() {
                 width: "36px",
                 height: "36px",
                 borderRadius: "9999px",
-                background: "#ff7e67",
+                background: "#fc6e56",
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
@@ -439,7 +439,7 @@ export default function HeroDemo() {
                   fontWeight: 800,
                   textTransform: "uppercase",
                   letterSpacing: "0.12em",
-                  color: "#ff7e67",
+                  color: "#fc6e56",
                   marginBottom: "2px",
                 }}
               >

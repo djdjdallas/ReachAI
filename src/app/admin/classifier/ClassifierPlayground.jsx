@@ -24,7 +24,7 @@ import {
   Settings2,
 } from "lucide-react";
 
-const CORAL = "#ff7e67";
+const CORAL = "#fc6e56";
 
 // Placeholder JSON shown in the override textarea's placeholder= attribute
 // when no saved offer exists — documents the schema without ever being
@@ -503,7 +503,7 @@ function Metric({ label, value, highlight }) {
   return (
     <div
       className={`rounded-lg border px-3 py-2 ${
-        highlight ? "border-[#ff7e67]/40 bg-[#ff7e67]/5" : "border-stone-200"
+        highlight ? "border-[#fc6e56]/40 bg-[#fc6e56]/5" : "border-stone-200"
       }`}
     >
       <p className="text-[10px] uppercase tracking-wide text-stone-500">{label}</p>

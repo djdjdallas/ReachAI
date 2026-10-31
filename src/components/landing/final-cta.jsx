@@ -6,17 +6,17 @@ export default function FinalCta() {
     <section className="py-32 bg-white">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="bg-[#fff5f2] rounded-[3.5rem] p-16 md:p-32 text-center relative overflow-hidden reveal-scale">
-          <div className="absolute -top-24 -right-24 w-96 h-96 bg-[#ff7e67]/10 blur-[120px] rounded-full" />
-          <div className="absolute -bottom-24 -left-24 w-96 h-96 bg-[#ff7e67]/5 blur-[120px] rounded-full" />
+          <div className="absolute -top-24 -right-24 w-96 h-96 bg-[#fc6e56]/10 blur-[120px] rounded-full" />
+          <div className="absolute -bottom-24 -left-24 w-96 h-96 bg-[#fc6e56]/5 blur-[120px] rounded-full" />
 
           <h2 className="text-4xl md:text-6xl font-black mb-12 max-w-3xl mx-auto leading-[1.1] tracking-tight text-stone-900 relative">
             Stop losing leads at 2 AM.{" "}
-            <span className="text-[#ff7e67]">Start booking.</span>
+            <span className="text-[#fc6e56]">Start booking.</span>
           </h2>
           <div className="flex flex-col items-center gap-6 relative">
             <Link
               href="/signup"
-              className="inline-flex items-center gap-3 bg-stone-900 text-white px-12 py-6 rounded-full text-xl font-black hover:bg-[#ff7e67] hover:scale-105 active:scale-95 transition-all shadow-2xl"
+              className="inline-flex items-center gap-3 bg-stone-900 text-white px-12 py-6 rounded-full text-xl font-black hover:bg-[#fc6e56] hover:scale-105 active:scale-95 transition-all shadow-2xl"
             >
               Start Free Trial
               <Rocket className="w-5 h-5" />

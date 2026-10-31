@@ -11,7 +11,7 @@ import {
   RotateCcw,
 } from "lucide-react";
 
-const CORAL = "#ff7e67";
+const CORAL = "#fc6e56";
 const AMBER = "#f59e0b";
 
 // Pulled at module load from src/lib/comment-trigger-rules.js so the

@@ -89,7 +89,7 @@ export default function Pricing() {
                   key={f}
                   className="flex items-center gap-3 font-bold text-stone-600"
                 >
-                  <Check className="w-5 h-5 shrink-0 text-[#ff7e67]" />
+                  <Check className="w-5 h-5 shrink-0 text-[#fc6e56]" />
                   {f}
                 </li>
               ))}
@@ -109,7 +109,7 @@ export default function Pricing() {
           </div>
 
           {/* Unlimited Plan */}
-          <div className="bg-[#ff7e67] text-white rounded-[2.5rem] p-12 flex flex-col relative shadow-2xl shadow-[#ff7e67]/30 reveal-up">
+          <div className="bg-[#fc6e56] text-white rounded-[2.5rem] p-12 flex flex-col relative shadow-2xl shadow-[#fc6e56]/30 reveal-up">
             <div className="absolute -top-5 left-1/2 -translate-x-1/2 bg-stone-900 text-white text-[11px] font-black uppercase tracking-[0.2em] px-5 py-2 rounded-full">
               MOST POPULAR
             </div>
@@ -137,7 +137,7 @@ export default function Pricing() {
               <Link
                 href="/signup"
                 onClick={() => posthog.capture("pricing_cta_clicked", { plan: "unlimited", price: "$197" })}
-                className="w-full block py-5 rounded-full bg-white text-[#ff7e67] font-black hover:scale-105 active:scale-95 transition-all shadow-xl mb-3"
+                className="w-full block py-5 rounded-full bg-white text-[#fc6e56] font-black hover:scale-105 active:scale-95 transition-all shadow-xl mb-3"
               >
                 Start Free Trial
               </Link>
@@ -151,9 +151,9 @@ export default function Pricing() {
         {/* Transparent, flat-rate wedge — anchored to the setter cost, no competitor names */}
         <div className="mt-20 max-w-4xl mx-auto reveal-up">
           <div className="rounded-[2rem] bg-stone-900 text-white p-10 md:p-14 relative overflow-hidden">
-            <div className="absolute -right-20 -top-20 w-72 h-72 bg-[#ff7e67]/20 rounded-full blur-3xl" />
+            <div className="absolute -right-20 -top-20 w-72 h-72 bg-[#fc6e56]/20 rounded-full blur-3xl" />
             <div className="relative">
-              <div className="text-[11px] font-bold uppercase tracking-widest text-[#ff7e67] mb-4">
+              <div className="text-[11px] font-bold uppercase tracking-widest text-[#fc6e56] mb-4">
                 What it costs. Really.
               </div>
               <h3 className="text-2xl md:text-4xl font-black mb-6 leading-tight tracking-tight">
@@ -180,7 +180,7 @@ export default function Pricing() {
                   <div className="text-2xl font-black mb-1">Price on a call</div>
                   <div className="text-xs text-white/60">+ application and a 72 hour build</div>
                 </div>
-                <div className="bg-[#ff7e67] rounded-2xl p-5 border border-[#ff7e67]">
+                <div className="bg-[#fc6e56] rounded-2xl p-5 border border-[#fc6e56]">
                   <div className="text-[11px] font-bold uppercase tracking-widest text-white/80 mb-2">
                     Clinchd Unlimited
                   </div>

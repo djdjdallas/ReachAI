@@ -1251,7 +1251,7 @@ export default function ScriptBuilderPage() {
                 <div className="rounded-lg border bg-background p-4">
                   {/* Chat Header */}
                   <div className="flex items-center gap-2 pb-3 mb-3 border-b">
-                    <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[#ff7e67]">
+                    <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[#fc6e56]">
                       <MessageSquare className="h-4 w-4 text-white" />
                     </div>
                     <div>

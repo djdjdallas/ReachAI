@@ -147,7 +147,7 @@ export default function BookDiscoveryCallsFromInstagramPage() {
       {/* Hero */}
       <section className="pt-20 pb-16 md:pt-32 md:pb-24 bg-white">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-          <span className="inline-flex items-center px-4 py-1.5 rounded-full bg-[#fff5f2] text-[#ff7e67] text-[13px] font-bold tracking-tight mb-6">
+          <span className="inline-flex items-center px-4 py-1.5 rounded-full bg-[#fff5f2] text-[#fc6e56] text-[13px] font-bold tracking-tight mb-6">
             How-To Pillar
           </span>
           <h1 className="text-4xl md:text-6xl font-black tracking-tight text-stone-900 mb-6 leading-[1.1]">
@@ -159,7 +159,7 @@ export default function BookDiscoveryCallsFromInstagramPage() {
           <div className="mt-10">
             <Link
               href="/signup"
-              className="inline-flex items-center bg-stone-900 text-white px-8 py-4 rounded-full font-bold hover:bg-[#ff7e67] transition-all shadow-sm"
+              className="inline-flex items-center bg-stone-900 text-white px-8 py-4 rounded-full font-bold hover:bg-[#fc6e56] transition-all shadow-sm"
             >
               Start Free Trial
             </Link>
@@ -188,8 +188,8 @@ export default function BookDiscoveryCallsFromInstagramPage() {
                 <p className="text-stone-600 leading-relaxed mb-4">
                   {stage.description}
                 </p>
-                <div className="bg-[#fff5f2] rounded-2xl p-5 border border-[#ff7e67]/20">
-                  <p className="text-xs font-bold uppercase tracking-widest text-[#ff7e67] mb-2">
+                <div className="bg-[#fff5f2] rounded-2xl p-5 border border-[#fc6e56]/20">
+                  <p className="text-xs font-bold uppercase tracking-widest text-[#fc6e56] mb-2">
                     Where coaches lose
                   </p>
                   <p className="text-sm text-stone-700 leading-relaxed">{stage.losePoint}</p>
@@ -314,16 +314,16 @@ export default function BookDiscoveryCallsFromInstagramPage() {
             Related guides
           </h3>
           <div className="flex flex-wrap gap-4">
-            <Link href="/ai-dm-setter-for-coaches" className="text-sm font-bold text-[#ff7e67] hover:underline">
+            <Link href="/ai-dm-setter-for-coaches" className="text-sm font-bold text-[#fc6e56] hover:underline">
               AI DM Setter for Coaches &rarr;
             </Link>
-            <Link href="/instagram-lead-qualification" className="text-sm font-bold text-[#ff7e67] hover:underline">
+            <Link href="/instagram-lead-qualification" className="text-sm font-bold text-[#fc6e56] hover:underline">
               Instagram Lead Qualification &rarr;
             </Link>
-            <Link href="/instagram-dm-automation-for-coaches" className="text-sm font-bold text-[#ff7e67] hover:underline">
+            <Link href="/instagram-dm-automation-for-coaches" className="text-sm font-bold text-[#fc6e56] hover:underline">
               Instagram DM Automation Guide &rarr;
             </Link>
-            <Link href="/blog/how-to-book-more-discovery-calls-from-instagram" className="text-sm font-bold text-[#ff7e67] hover:underline">
+            <Link href="/blog/how-to-book-more-discovery-calls-from-instagram" className="text-sm font-bold text-[#fc6e56] hover:underline">
               Long read: How to book more discovery calls &rarr;
             </Link>
           </div>

@@ -71,7 +71,7 @@ export default function UpdatePasswordPage() {
       style={{
         backgroundColor: "#fafaf9",
         backgroundImage:
-          "radial-gradient(at 0% 0%, rgba(255, 126, 103, 0.05) 0px, transparent 50%), radial-gradient(at 100% 100%, rgba(255, 126, 103, 0.05) 0px, transparent 50%)",
+          "radial-gradient(at 0% 0%, rgba(252, 110, 86, 0.05) 0px, transparent 50%), radial-gradient(at 100% 100%, rgba(252, 110, 86, 0.05) 0px, transparent 50%)",
       }}
     >
       <header className="w-full max-w-7xl mx-auto px-6 sm:px-8 h-24 flex items-center">
@@ -130,7 +130,7 @@ export default function UpdatePasswordPage() {
                         required
                         disabled={loading || !ready}
                         minLength={8}
-                        className="w-full pl-12 pr-5 py-4 bg-stone-50 border border-stone-100 rounded-2xl text-sm font-medium transition-all focus:outline-none focus:border-[#ff7e67] focus:ring-4 focus:ring-[#fff5f2]"
+                        className="w-full pl-12 pr-5 py-4 bg-stone-50 border border-stone-100 rounded-2xl text-sm font-medium transition-all focus:outline-none focus:border-[#fc6e56] focus:ring-4 focus:ring-[#fff5f2]"
                       />
                     </div>
                   </div>
@@ -153,7 +153,7 @@ export default function UpdatePasswordPage() {
                         required
                         disabled={loading || !ready}
                         minLength={8}
-                        className="w-full pl-12 pr-5 py-4 bg-stone-50 border border-stone-100 rounded-2xl text-sm font-medium transition-all focus:outline-none focus:border-[#ff7e67] focus:ring-4 focus:ring-[#fff5f2]"
+                        className="w-full pl-12 pr-5 py-4 bg-stone-50 border border-stone-100 rounded-2xl text-sm font-medium transition-all focus:outline-none focus:border-[#fc6e56] focus:ring-4 focus:ring-[#fff5f2]"
                       />
                     </div>
                   </div>
@@ -173,7 +173,7 @@ export default function UpdatePasswordPage() {
                   <button
                     type="submit"
                     disabled={loading || !ready}
-                    className="w-full py-5 bg-[#ff7e67] text-white rounded-2xl text-lg font-black shadow-xl shadow-[#ff7e67]/30 hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center justify-center gap-3 disabled:opacity-70 disabled:hover:scale-100"
+                    className="w-full py-5 bg-[#fc6e56] text-white rounded-2xl text-lg font-black shadow-xl shadow-[#fc6e56]/30 hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center justify-center gap-3 disabled:opacity-70 disabled:hover:scale-100"
                   >
                     {loading ? (
                       <Loader2 className="w-5 h-5 animate-spin" />

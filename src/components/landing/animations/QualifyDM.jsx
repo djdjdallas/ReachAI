@@ -154,7 +154,7 @@ export default function QualifyDM() {
           </span>
           <span
             className="qdm-live-dot block w-2 h-2 rounded-full"
-            style={{ background: "#ff7e67" }}
+            style={{ background: "#fc6e56" }}
           />
         </div>
 
@@ -229,11 +229,11 @@ export default function QualifyDM() {
           <div className="flex items-center gap-2">
             <span
               className="block w-1.5 h-1.5 rounded-full"
-              style={{ background: "#ff7e67" }}
+              style={{ background: "#fc6e56" }}
             />
             <span
               className="text-[11px] font-bold uppercase tracking-[0.12em]"
-              style={{ color: "#ff7e67" }}
+              style={{ color: "#fc6e56" }}
             >
               Lead Qualified
             </span>

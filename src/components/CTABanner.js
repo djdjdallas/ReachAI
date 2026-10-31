@@ -20,12 +20,12 @@ export default function CTABanner({
     >
       <div
         className={`absolute -top-24 -right-24 w-96 h-96 rounded-full blur-[120px] ${
-          isDark ? "bg-[#ff7e67]/20" : "bg-[#ff7e67]/10"
+          isDark ? "bg-[#fc6e56]/20" : "bg-[#fc6e56]/10"
         }`}
       />
       <div
         className={`absolute -bottom-24 -left-24 w-96 h-96 rounded-full blur-[120px] ${
-          isDark ? "bg-[#ff7e67]/10" : "bg-[#ff7e67]/5"
+          isDark ? "bg-[#fc6e56]/10" : "bg-[#fc6e56]/5"
         }`}
       />
 
@@ -42,7 +42,7 @@ export default function CTABanner({
         </p>
         <Link
           href={buttonHref}
-          className="inline-flex items-center gap-2 bg-[#ff7e67] text-white px-8 py-4 rounded-full text-lg font-bold hover:scale-105 active:scale-95 transition-all shadow-xl shadow-[#ff7e67]/30 group"
+          className="inline-flex items-center gap-2 bg-[#fc6e56] text-white px-8 py-4 rounded-full text-lg font-bold hover:scale-105 active:scale-95 transition-all shadow-xl shadow-[#fc6e56]/30 group"
         >
           {buttonText}
           <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />

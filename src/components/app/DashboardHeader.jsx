@@ -204,7 +204,7 @@ export default function DashboardHeader() {
           >
             <Bell className="h-5 w-5" />
             {unreadCount > 0 && (
-              <span className="absolute top-2.5 right-2.5 w-2 h-2 bg-[#ff7e67] rounded-full ring-2 ring-white" />
+              <span className="absolute top-2.5 right-2.5 w-2 h-2 bg-[#fc6e56] rounded-full ring-2 ring-white" />
             )}
           </button>
 
@@ -219,7 +219,7 @@ export default function DashboardHeader() {
                 {unreadCount > 0 && (
                   <button
                     onClick={markAllRead}
-                    className="flex items-center gap-1 text-xs font-medium text-[#ff7e67] hover:text-[#e86b55] transition-colors"
+                    className="flex items-center gap-1 text-xs font-medium text-[#fc6e56] hover:text-[#e25d47] transition-colors"
                   >
                     <Check className="h-3 w-3" />
                     Mark all read
@@ -283,7 +283,7 @@ export default function DashboardHeader() {
                           {timeAgo(n.sent_at)}
                         </span>
                         {!n.read_at && (
-                          <span className="w-2 h-2 bg-[#ff7e67] rounded-full" />
+                          <span className="w-2 h-2 bg-[#fc6e56] rounded-full" />
                         )}
                       </div>
                     </button>

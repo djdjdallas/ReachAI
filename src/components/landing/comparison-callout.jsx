@@ -30,7 +30,7 @@ export default function ComparisonCallout() {
             <div className="py-5 px-4 text-sm font-bold text-stone-500 uppercase tracking-wider border-x border-stone-100">
               Human setter
             </div>
-            <div className="py-5 px-4 text-sm font-bold text-[#ff7e67] uppercase tracking-wider bg-[#fff5f2]">
+            <div className="py-5 px-4 text-sm font-bold text-[#fc6e56] uppercase tracking-wider bg-[#fff5f2]">
               Clinchd
             </div>
           </div>
@@ -65,7 +65,7 @@ export default function ComparisonCallout() {
         <div className="text-center mt-10 reveal-up">
           <Link
             href="/signup"
-            className="inline-flex items-center gap-2 text-[#ff7e67] font-bold text-lg hover:gap-3 transition-all group"
+            className="inline-flex items-center gap-2 text-[#fc6e56] font-bold text-lg hover:gap-3 transition-all group"
           >
             See it on your own offer
             <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />

@@ -107,7 +107,7 @@ function SidebarContent({
                   expanded ? "gap-3 px-3" : "justify-center px-2"
                 } py-2.5 rounded-xl transition-colors ${
                   isActive
-                    ? "bg-[#fff5f2] text-[#ff7e67] font-semibold"
+                    ? "bg-[#fff5f2] text-[#fc6e56] font-semibold"
                     : "text-stone-500 hover:bg-stone-50 hover:text-stone-900 font-medium"
                 }`}
               >
@@ -116,14 +116,14 @@ function SidebarContent({
                   <>
                     <span className="whitespace-nowrap">{label}</span>
                     {showBadge && conversationCount > 0 && (
-                      <span className="ml-auto bg-[#ff7e67] text-white text-[10px] px-2 py-0.5 rounded-full">
+                      <span className="ml-auto bg-[#fc6e56] text-white text-[10px] px-2 py-0.5 rounded-full">
                         {conversationCount}
                       </span>
                     )}
                   </>
                 )}
                 {!expanded && showBadge && conversationCount > 0 && (
-                  <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-[#ff7e67]" />
+                  <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-[#fc6e56]" />
                 )}
               </Link>
               {expanded && isActive && subLinks && subLinks.length > 0 && (
@@ -139,7 +139,7 @@ function SidebarContent({
                         onClick={onLinkClick}
                         className={`block px-3 py-1.5 rounded-lg text-sm transition-colors ${
                           subActive
-                            ? "text-[#ff7e67] font-semibold"
+                            ? "text-[#fc6e56] font-semibold"
                             : "text-stone-500 hover:text-stone-900 font-medium"
                         }`}
                       >
@@ -174,7 +174,7 @@ function SidebarContent({
                 expanded ? "gap-3 px-3" : "justify-center px-2"
               } py-2.5 rounded-xl transition-colors ${
                 isActive
-                  ? "bg-[#fff5f2] text-[#ff7e67] font-semibold"
+                  ? "bg-[#fff5f2] text-[#fc6e56] font-semibold"
                   : "text-stone-500 hover:bg-stone-50 hover:text-stone-900 font-medium"
               }`}
             >

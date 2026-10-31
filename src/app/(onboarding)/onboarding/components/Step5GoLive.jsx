@@ -35,7 +35,7 @@ export default function Step5GoLive({
       {/* Progress Header (inline for Step 5 as it has its own style) */}
       <header className="w-full max-w-7xl mx-auto px-6 py-8 flex flex-col items-center justify-center">
         <div className="flex items-center gap-2 mb-10">
-          <div className="w-8 h-8 bg-[#ff7e67] rounded-lg flex items-center justify-center shadow-lg shadow-[#ff7e67]/20">
+          <div className="w-8 h-8 bg-[#fc6e56] rounded-lg flex items-center justify-center shadow-lg shadow-[#fc6e56]/20">
             <Zap className="w-4 h-4 text-white" />
           </div>
           <span className="text-xl font-extrabold tracking-tight">
@@ -46,11 +46,11 @@ export default function Step5GoLive({
         <div className="w-full max-w-3xl">
           <div className="flex justify-between items-center relative mb-4">
             <div className="absolute top-1/2 left-0 w-full h-1 bg-stone-200 -z-10 -translate-y-1/2" />
-            <div className="absolute top-1/2 left-0 w-full h-1 bg-[#ff7e67] -z-10 -translate-y-1/2 origin-left scale-x-100" />
+            <div className="absolute top-1/2 left-0 w-full h-1 bg-[#fc6e56] -z-10 -translate-y-1/2 origin-left scale-x-100" />
 
             {["Instagram", "Script", "Voice", "Preview"].map((label) => (
               <div key={label} className="flex flex-col items-center gap-2">
-                <div className="w-10 h-10 bg-[#ff7e67] text-white rounded-full flex items-center justify-center text-xl shadow-lg border-4 border-[#fafaf9]">
+                <div className="w-10 h-10 bg-[#fc6e56] text-white rounded-full flex items-center justify-center text-xl shadow-lg border-4 border-[#fafaf9]">
                   <Check className="w-5 h-5" />
                 </div>
                 <span className="text-[10px] font-bold text-stone-500 uppercase tracking-widest">
@@ -60,11 +60,11 @@ export default function Step5GoLive({
             ))}
 
             <div className="flex flex-col items-center gap-2">
-              <div className="w-10 h-10 bg-white border-4 border-[#ff7e67] text-[#ff7e67] rounded-full flex items-center justify-center text-lg font-black shadow-lg shadow-[#ff7e67]/10 relative">
-                <div className="absolute inset-0 rounded-full animate-ping bg-[#ff7e67]/20" />
+              <div className="w-10 h-10 bg-white border-4 border-[#fc6e56] text-[#fc6e56] rounded-full flex items-center justify-center text-lg font-black shadow-lg shadow-[#fc6e56]/10 relative">
+                <div className="absolute inset-0 rounded-full animate-ping bg-[#fc6e56]/20" />
                 <span className="relative z-10">5</span>
               </div>
-              <span className="text-[10px] font-bold text-[#ff7e67] uppercase tracking-widest">
+              <span className="text-[10px] font-bold text-[#fc6e56] uppercase tracking-widest">
                 Go Live
               </span>
             </div>
@@ -75,7 +75,7 @@ export default function Step5GoLive({
       <main className="flex-1 w-full max-w-7xl mx-auto px-6 pb-20">
         {/* Hero Section */}
         <section className="text-center space-y-6 mb-20 pt-10">
-          <div className="inline-flex items-center gap-2 px-4 py-1.5 bg-orange-50 text-[#ff7e67] rounded-full text-xs font-black uppercase tracking-widest mb-4">
+          <div className="inline-flex items-center gap-2 px-4 py-1.5 bg-orange-50 text-[#fc6e56] rounded-full text-xs font-black uppercase tracking-widest mb-4">
             Step 5 of 5: Final Step
           </div>
           <h1 className="text-5xl md:text-6xl font-black max-w-3xl mx-auto">
@@ -105,7 +105,7 @@ export default function Step5GoLive({
                   }}
                   disabled={activating || (!aiActive && !scriptReady)}
                   className={`relative inline-flex h-11 w-20 items-center rounded-full transition-colors cursor-pointer disabled:cursor-not-allowed disabled:opacity-50 ${
-                    aiActive ? "bg-[#ff7e67]" : "bg-stone-200"
+                    aiActive ? "bg-[#fc6e56]" : "bg-stone-200"
                   }`}
                 >
                   <span
@@ -117,11 +117,11 @@ export default function Step5GoLive({
 
                 <div
                   className={`flex items-center gap-2 ${
-                    aiActive ? "text-[#ff7e67]" : "text-stone-400"
+                    aiActive ? "text-[#fc6e56]" : "text-stone-400"
                   }`}
                 >
                   {aiActive && (
-                    <span className="w-2 h-2 bg-[#ff7e67] rounded-full animate-pulse" />
+                    <span className="w-2 h-2 bg-[#fc6e56] rounded-full animate-pulse" />
                   )}
                   <span className="text-sm font-black">
                     {activating ? (
@@ -161,7 +161,7 @@ export default function Step5GoLive({
               icon: UserCheck,
               title: "Leads Qualified",
               desc: "Every prospect is vetted against your criteria. No more wasted time on low-quality discovery calls.",
-              color: "bg-orange-50 text-[#ff7e67]",
+              color: "bg-orange-50 text-[#fc6e56]",
             },
             {
               icon: CalendarCheck,
@@ -187,10 +187,10 @@ export default function Step5GoLive({
 
         {/* Control Section */}
         <section className="bg-stone-900 rounded-[3rem] p-12 text-white relative overflow-hidden mb-20">
-          <div className="absolute top-0 right-0 w-96 h-96 bg-[#ff7e67]/10 blur-[120px] rounded-full" />
+          <div className="absolute top-0 right-0 w-96 h-96 bg-[#fc6e56]/10 blur-[120px] rounded-full" />
           <div className="relative z-10 flex flex-col md:flex-row items-center justify-between gap-12">
             <div className="max-w-xl">
-              <span className="text-[#ff7e67] text-xs font-black uppercase tracking-widest">
+              <span className="text-[#fc6e56] text-xs font-black uppercase tracking-widest">
                 Absolute Peace of Mind
               </span>
               <h2 className="text-3xl md:text-4xl font-black mt-4 mb-6">
@@ -207,7 +207,7 @@ export default function Step5GoLive({
                   icon: Zap,
                   title: "Manual Override",
                   desc: "Jump into any DM instantly",
-                  iconBg: "bg-[#ff7e67]/20 text-[#ff7e67]",
+                  iconBg: "bg-[#fc6e56]/20 text-[#fc6e56]",
                 },
                 {
                   icon: PauseCircle,
@@ -247,7 +247,7 @@ export default function Step5GoLive({
             <button
               onClick={onFinalize}
               disabled={activating}
-              className="px-12 py-6 bg-[#ff7e67] text-white rounded-full text-xl font-black shadow-2xl shadow-[#ff7e67]/40 hover:scale-105 active:scale-95 transition-all flex items-center gap-3 group disabled:opacity-60"
+              className="px-12 py-6 bg-[#fc6e56] text-white rounded-full text-xl font-black shadow-2xl shadow-[#fc6e56]/40 hover:scale-105 active:scale-95 transition-all flex items-center gap-3 group disabled:opacity-60"
             >
               {finishLabel(aiActive)}
               <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
@@ -267,7 +267,7 @@ export default function Step5GoLive({
         {/* Dashboard Preview Skeleton */}
         <div className="mt-20 p-8 border-2 border-dashed border-stone-200 rounded-[2.5rem] flex flex-col md:flex-row items-center justify-between gap-8 opacity-60 grayscale hover:grayscale-0 hover:opacity-100 transition-all cursor-not-allowed group">
           <div>
-            <p className="text-xs font-black uppercase tracking-[0.2em] text-[#ff7e67] mb-2">
+            <p className="text-xs font-black uppercase tracking-[0.2em] text-[#fc6e56] mb-2">
               Dashboard Preview
             </p>
             <h4 className="text-2xl font-black mb-2">

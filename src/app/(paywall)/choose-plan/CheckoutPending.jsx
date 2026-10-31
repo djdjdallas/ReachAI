@@ -39,7 +39,7 @@ export default function CheckoutPending() {
 
   return (
     <div className="pt-24 text-center max-w-md mx-auto">
-      <Loader2 className="mx-auto h-8 w-8 animate-spin text-[#ff7e67]" />
+      <Loader2 className="mx-auto h-8 w-8 animate-spin text-[#fc6e56]" />
       <h1 className="mt-6 text-2xl font-black">Setting up your account</h1>
       <p className="mt-3 text-stone-600">
         Confirming your subscription with Stripe. This usually takes a few seconds.

@@ -31,7 +31,7 @@ export default function ConnectedAccountBadge({ profile }) {
     return (
       <Link
         href="/settings"
-        className="flex items-center gap-1.5 px-3 py-1 rounded-3xl bg-[#fff5f2] text-[#ff7e67] text-xs font-bold hover:bg-[#ffece7] transition-colors"
+        className="flex items-center gap-1.5 px-3 py-1 rounded-3xl bg-[#fff5f2] text-[#fc6e56] text-xs font-bold hover:bg-[#ffece7] transition-colors"
       >
         <Instagram className="h-3 w-3 flex-shrink-0" />
         No Instagram connected
@@ -43,7 +43,7 @@ export default function ConnectedAccountBadge({ profile }) {
     return (
       <Link
         href="/settings"
-        className="flex items-center gap-1.5 px-3 py-1 rounded-3xl bg-[#fff5f2] text-[#ff7e67] text-xs font-bold hover:bg-[#ffece7] transition-colors"
+        className="flex items-center gap-1.5 px-3 py-1 rounded-3xl bg-[#fff5f2] text-[#fc6e56] text-xs font-bold hover:bg-[#ffece7] transition-colors"
       >
         <Instagram className="h-3 w-3 flex-shrink-0" />
         {handle} · reconnect needed

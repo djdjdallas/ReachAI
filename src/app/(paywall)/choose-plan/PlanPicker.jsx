@@ -56,11 +56,11 @@ export default function PlanPicker({ heading, subheading, plans, missedLeadsLine
           <div
             key={plan.id}
             className={`relative flex flex-col rounded-3xl border bg-white p-7 ${
-              plan.popular ? "border-[#ff7e67] shadow-xl shadow-[#ff7e67]/10" : "border-stone-200"
+              plan.popular ? "border-[#fc6e56] shadow-xl shadow-[#fc6e56]/10" : "border-stone-200"
             }`}
           >
             {plan.popular && (
-              <span className="absolute -top-3 left-7 rounded-full bg-[#ff7e67] px-3 py-1 text-xs font-bold text-white">
+              <span className="absolute -top-3 left-7 rounded-full bg-[#fc6e56] px-3 py-1 text-xs font-bold text-white">
                 Most popular
               </span>
             )}
@@ -73,7 +73,7 @@ export default function PlanPicker({ heading, subheading, plans, missedLeadsLine
             <ul className="mt-6 space-y-2.5 flex-1">
               {plan.features.map((f) => (
                 <li key={f} className="flex items-start gap-2 text-sm text-stone-700">
-                  <Check className="mt-0.5 h-4 w-4 shrink-0 text-[#ff7e67]" />
+                  <Check className="mt-0.5 h-4 w-4 shrink-0 text-[#fc6e56]" />
                   {f}
                 </li>
               ))}
@@ -83,7 +83,7 @@ export default function PlanPicker({ heading, subheading, plans, missedLeadsLine
               onClick={() => choose(plan.id)}
               disabled={loadingPlan !== null}
               className={`mt-7 w-full rounded-2xl py-4 font-bold transition-all disabled:opacity-60 flex items-center justify-center gap-2 ${
-                plan.popular ? "bg-[#ff7e67] text-white hover:bg-[#ff6a50]" : "bg-stone-900 text-white hover:bg-stone-800"
+                plan.popular ? "bg-[#fc6e56] text-white hover:bg-[#fc5a3f]" : "bg-stone-900 text-white hover:bg-stone-800"
               }`}
             >
               {loadingPlan === plan.id && <Loader2 className="h-4 w-4 animate-spin" />}

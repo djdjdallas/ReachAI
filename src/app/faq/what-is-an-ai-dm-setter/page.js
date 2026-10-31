@@ -88,18 +88,18 @@ export default function FaqWhatIsAnAiDmSetter() {
           <div className="flex items-center gap-3 mb-6">
             <Link
               href="/"
-              className="text-sm font-bold text-[#ff7e67] hover:underline"
+              className="text-sm font-bold text-[#fc6e56] hover:underline"
             >
               &larr; Clinchd
             </Link>
           </div>
-          <span className="inline-flex items-center px-4 py-1.5 rounded-full bg-[#fff5f2] text-[#ff7e67] text-[13px] font-bold tracking-tight mb-6">
+          <span className="inline-flex items-center px-4 py-1.5 rounded-full bg-[#fff5f2] text-[#fc6e56] text-[13px] font-bold tracking-tight mb-6">
             Quick Answer
           </span>
           <h1 className="text-3xl md:text-5xl font-black tracking-tight text-stone-900 mb-6 leading-[1.1]">
             What is an AI DM setter?
           </h1>
-          <div className="bg-[#fff5f2] rounded-[2rem] border border-[#ff7e67]/20 p-8 md:p-10 mb-10">
+          <div className="bg-[#fff5f2] rounded-[2rem] border border-[#fc6e56]/20 p-8 md:p-10 mb-10">
             <p className="text-lg md:text-xl text-stone-700 font-medium leading-relaxed">
               {directAnswer}
             </p>
@@ -139,7 +139,7 @@ export default function FaqWhatIsAnAiDmSetter() {
               AI DM setters generally fall in the $97 to $197 per month range for unlimited conversations. Compared to a human setter at $2,000 to $4,000 per month for part-time work, the math is the headline. One month of a human setter pays for almost two years of AI.
             </p>
             <p>
-              <Link href="/faq/how-much-does-a-human-dm-setter-cost" className="font-bold text-[#ff7e67] hover:underline">
+              <Link href="/faq/how-much-does-a-human-dm-setter-cost" className="font-bold text-[#fc6e56] hover:underline">
                 See full cost breakdown for human DM setters &rarr;
               </Link>
             </p>
@@ -151,7 +151,7 @@ export default function FaqWhatIsAnAiDmSetter() {
           <div className="space-y-4 text-stone-600 leading-relaxed">
             <p>
               For the full breakdown including a real coaching example, what to look for in an AI DM setter, and how the technology actually works,{" "}
-              <Link href="/blog/what-is-an-ai-dm-setter" className="font-bold text-[#ff7e67] hover:underline">
+              <Link href="/blog/what-is-an-ai-dm-setter" className="font-bold text-[#fc6e56] hover:underline">
                 read the long-form article &rarr;
               </Link>
             </p>
@@ -166,19 +166,19 @@ export default function FaqWhatIsAnAiDmSetter() {
             Related questions
           </h3>
           <div className="flex flex-wrap gap-4">
-            <Link href="/faq/how-much-does-a-human-dm-setter-cost" className="text-sm font-bold text-[#ff7e67] hover:underline">
+            <Link href="/faq/how-much-does-a-human-dm-setter-cost" className="text-sm font-bold text-[#fc6e56] hover:underline">
               How much does a human DM setter cost? &rarr;
             </Link>
-            <Link href="/faq/can-ai-book-discovery-calls-from-instagram" className="text-sm font-bold text-[#ff7e67] hover:underline">
+            <Link href="/faq/can-ai-book-discovery-calls-from-instagram" className="text-sm font-bold text-[#fc6e56] hover:underline">
               Can AI book discovery calls from Instagram? &rarr;
             </Link>
-            <Link href="/faq/how-fast-should-you-respond-to-instagram-dms" className="text-sm font-bold text-[#ff7e67] hover:underline">
+            <Link href="/faq/how-fast-should-you-respond-to-instagram-dms" className="text-sm font-bold text-[#fc6e56] hover:underline">
               How fast should you respond to Instagram DMs? &rarr;
             </Link>
-            <Link href="/ai-dm-setter" className="text-sm font-bold text-[#ff7e67] hover:underline">
+            <Link href="/ai-dm-setter" className="text-sm font-bold text-[#fc6e56] hover:underline">
               Full AI DM Setter Guide &rarr;
             </Link>
-            <Link href="/compare/best-ai-dm-tool-for-coaches-2026" className="text-sm font-bold text-[#ff7e67] hover:underline">
+            <Link href="/compare/best-ai-dm-tool-for-coaches-2026" className="text-sm font-bold text-[#fc6e56] hover:underline">
               Best AI DM tool for coaches 2026 &rarr;
             </Link>
           </div>

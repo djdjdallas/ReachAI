@@ -124,7 +124,7 @@ export default function AnalyticsPage() {
       deltaPositive: kpis.bookings.deltaPositive,
       icon: CalendarCheck,
       iconBg: "bg-orange-50",
-      iconColor: "text-[#ff7e67]",
+      iconColor: "text-[#fc6e56]",
     },
     {
       title: "Conversion Rate",
@@ -186,7 +186,7 @@ export default function AnalyticsPage() {
               disabled={fetching}
               className={`px-4 py-2 text-xs font-bold transition-colors rounded-xl ${
                 timePeriod === period
-                  ? "bg-[#fff5f2] text-[#ff7e67]"
+                  ? "bg-[#fff5f2] text-[#fc6e56]"
                   : "text-stone-400 hover:text-stone-900"
               } disabled:opacity-50`}
             >
@@ -281,7 +281,7 @@ export default function AnalyticsPage() {
           <p className="text-xs text-stone-400 mb-6">
             Total messages (inbound + AI replies) per day in the selected period.
           </p>
-          <Sparkline points={dailyActivity} color="#ff7e67" />
+          <Sparkline points={dailyActivity} color="#fc6e56" />
         </div>
 
         {/* Conversion Funnel */}
@@ -346,7 +346,7 @@ export default function AnalyticsPage() {
                 total={totalLeads}
               />
               <div className="flex-1 space-y-3 w-full">
-                <LegendRow color="#ff7e67" label="Hot" percent={hotPercent} count={leadQuality.hot} />
+                <LegendRow color="#fc6e56" label="Hot" percent={hotPercent} count={leadQuality.hot} />
                 <LegendRow color="#22c55e" label="Booked" percent={bookedPercent} count={leadQuality.booked} />
                 <LegendRow color="#3b82f6" label="Warm" percent={warmPercent} count={leadQuality.warm} />
                 <LegendRow color="#cbd5e1" label="Cold" percent={coldPercent} count={leadQuality.cold} />
@@ -362,7 +362,7 @@ export default function AnalyticsPage() {
           <h3 className="text-xl font-extrabold">Recent Bookings</h3>
           <Link
             href="/calendar"
-            className="text-[11px] font-bold text-[#ff7e67] hover:underline"
+            className="text-[11px] font-bold text-[#fc6e56] hover:underline"
           >
             View Calendar
           </Link>
@@ -484,16 +484,16 @@ function FunnelRow({ icon: Icon, label, value, percent, suffix }) {
     <div>
       <div className="flex justify-between text-xs font-bold mb-1.5">
         <span className="flex items-center gap-2">
-          <Icon className="h-4 w-4 text-[#ff7e67]" /> {label}
+          <Icon className="h-4 w-4 text-[#fc6e56]" /> {label}
         </span>
         <span>
           {value} {suffix || ""}
         </span>
       </div>
       <div className="h-10 bg-stone-50 rounded-xl overflow-hidden">
-        <div className="h-full bg-[#ff7e67]/20 w-full flex items-center px-4">
+        <div className="h-full bg-[#fc6e56]/20 w-full flex items-center px-4">
           <div
-            className="h-2 bg-[#ff7e67] rounded-full transition-all"
+            className="h-2 bg-[#fc6e56] rounded-full transition-all"
             style={{ width: `${Math.min(Math.max(percent, 0), 100)}%` }}
           />
         </div>
@@ -505,7 +505,7 @@ function FunnelRow({ icon: Icon, label, value, percent, suffix }) {
 function Donut({ hot, warm, cold, booked, total }) {
   // Draw stacked segments on a 100-unit circumference circle.
   const segments = [
-    { value: hot, color: "#ff7e67" },
+    { value: hot, color: "#fc6e56" },
     { value: booked, color: "#22c55e" },
     { value: warm, color: "#3b82f6" },
     { value: cold, color: "#cbd5e1" },

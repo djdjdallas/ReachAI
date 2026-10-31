@@ -4,7 +4,7 @@ import { useRef, useState } from "react";
 import { X, Upload, Loader2 } from "lucide-react";
 import { VOICE_ELIGIBLE_CLASSES, VOICE_INTENT_LABELS } from "@/lib/voice/intent-classes";
 
-const CORAL = "#ff7e67";
+const CORAL = "#fc6e56";
 
 const VOICE_INTENT_OPTIONS = VOICE_ELIGIBLE_CLASSES.map((key) => ({
   key,

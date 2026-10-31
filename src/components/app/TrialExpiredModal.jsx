@@ -71,7 +71,7 @@ export default function TrialExpiredModal() {
               posthog.capture("choose_plan_opened", { source: "trial_expired_modal" });
               window.location.href = "/choose-plan";
             }}
-            className="gap-1.5 bg-[#ff7e67] hover:bg-[#ff7e67]/90 text-white"
+            className="gap-1.5 bg-[#fc6e56] hover:bg-[#fc6e56]/90 text-white"
           >
             <ArrowRight className="h-4 w-4" />
             Choose a plan

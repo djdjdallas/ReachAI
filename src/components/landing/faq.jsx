@@ -82,7 +82,7 @@ export default function Faq() {
               key={faq.question}
               className={`faq-item bg-white rounded-3xl p-6 soft-shadow transition-all border cursor-pointer ${
                 openIndex === i
-                  ? "border-[#ff7e67]/20"
+                  ? "border-[#fc6e56]/20"
                   : "border-transparent"
               } ${openIndex === i ? "open" : ""} reveal-up`}
               onClick={() => setOpenIndex(openIndex === i ? null : i)}
@@ -90,7 +90,7 @@ export default function Faq() {
               <div className="flex justify-between items-center">
                 <h4 className="font-black text-stone-900">{faq.question}</h4>
                 <ChevronDown
-                  className={`w-5 h-5 text-[#ff7e67] faq-icon flex-shrink-0 ml-4`}
+                  className={`w-5 h-5 text-[#fc6e56] faq-icon flex-shrink-0 ml-4`}
                 />
               </div>
               <div className="faq-answer text-stone-600 font-medium text-[15px] leading-relaxed">

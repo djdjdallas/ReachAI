@@ -6,7 +6,7 @@ const FONT = "'Cabinet Grotesk', system-ui, sans-serif";
 const BORDER = "#e7e5e4";
 const GRAY_BUBBLE_BG = "#ffffff";
 const GRAY_TEXT = "#1c1917";
-const CORAL = "#ff7e67";
+const CORAL = "#fc6e56";
 const CORAL_TINT = "#fff5f2";
 
 const SCRIPT = [

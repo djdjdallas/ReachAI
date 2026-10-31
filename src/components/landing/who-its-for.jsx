@@ -28,12 +28,12 @@ export default function WhoItsFor() {
     <section className="py-24 md:py-32 bg-[#fff5f2]">
       <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="text-center max-w-3xl mx-auto mb-16 reveal-up">
-          <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-white text-[#ff7e67] text-[13px] font-bold tracking-tight mb-6 border border-[#ff7e67]/15">
+          <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-white text-[#fc6e56] text-[13px] font-bold tracking-tight mb-6 border border-[#fc6e56]/15">
             The wedge
           </div>
           <h2 className="text-4xl md:text-6xl font-black mb-6 tracking-tight text-stone-900 leading-[1.05]">
             Built for coaches selling{" "}
-            <span className="text-[#ff7e67]">1k+ offers.</span>
+            <span className="text-[#fc6e56]">1k+ offers.</span>
           </h2>
           <p className="text-stone-600 text-lg md:text-xl font-medium leading-relaxed">
             The big done-for-you tools have a minimum. Fill out the form, book the
@@ -64,15 +64,15 @@ export default function WhoItsFor() {
 
           {/* Is you */}
           <div className="bg-stone-900 text-white rounded-[2rem] p-8 md:p-10 relative overflow-hidden soft-shadow">
-            <div className="absolute -right-16 -top-16 w-56 h-56 bg-[#ff7e67]/20 rounded-full blur-3xl" />
+            <div className="absolute -right-16 -top-16 w-56 h-56 bg-[#fc6e56]/20 rounded-full blur-3xl" />
             <div className="relative">
-              <div className="text-[11px] font-bold uppercase tracking-widest text-[#ff7e67] mb-6">
+              <div className="text-[11px] font-bold uppercase tracking-widest text-[#fc6e56] mb-6">
                 Who Clinchd is for
               </div>
               <ul className="space-y-4">
                 {isYou.map((item) => (
                   <li key={item} className="flex items-start gap-3">
-                    <span className="mt-0.5 flex-shrink-0 w-6 h-6 rounded-full bg-[#ff7e67] flex items-center justify-center">
+                    <span className="mt-0.5 flex-shrink-0 w-6 h-6 rounded-full bg-[#fc6e56] flex items-center justify-center">
                       <Check className="w-3.5 h-3.5 text-white" />
                     </span>
                     <span className="text-white/90 font-semibold leading-snug">

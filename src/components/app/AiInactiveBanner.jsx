@@ -80,7 +80,7 @@ export default function AiInactiveBanner() {
       <button
         onClick={turnOn}
         disabled={turningOn}
-        className="shrink-0 inline-flex items-center gap-1.5 rounded-full bg-[#ff7e67] px-3 py-1 text-xs font-bold text-white hover:bg-[#ff6a50] disabled:opacity-60"
+        className="shrink-0 inline-flex items-center gap-1.5 rounded-full bg-[#fc6e56] px-3 py-1 text-xs font-bold text-white hover:bg-[#fc5a3f] disabled:opacity-60"
       >
         {turningOn && <Loader2 className="h-3 w-3 animate-spin" />}
         Turn it on

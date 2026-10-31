@@ -192,7 +192,7 @@ export default function NativeSendPage() {
               />
             </div>
             <div className="flex justify-end">
-              <Button type="submit" disabled={saving} className="bg-[#ff7e67] hover:bg-[#ff6b50] text-white">
+              <Button type="submit" disabled={saving} className="bg-[#fc6e56] hover:bg-[#fc5b3f] text-white">
                 {saving ? (
                   <>
                     <Loader2 className="h-4 w-4 mr-2 animate-spin" />
@@ -273,7 +273,7 @@ function NativeSendRow({ row }) {
           {matched ? (
             <Link
               href={`/conversations?thread=${row.matched_conversation_id}`}
-              className="text-[#ff7e67] hover:underline"
+              className="text-[#fc6e56] hover:underline"
             >
               View thread →
             </Link>

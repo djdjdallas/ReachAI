@@ -3,7 +3,7 @@
 import { useRef, useState } from "react";
 import { Play, Pause, Trash2, Loader2 } from "lucide-react";
 
-const CORAL = "#ff7e67";
+const CORAL = "#fc6e56";
 
 const INTENT_LABELS = {
   warm_intent: "Warm intent",
@@ -131,7 +131,7 @@ export default function VoiceSnippetCard({ snippet, onToggled, onDeleted }) {
         <span
           className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${
             snippet.is_active
-              ? "bg-[#fff5f2] text-[#ff7e67]"
+              ? "bg-[#fff5f2] text-[#fc6e56]"
               : "bg-stone-100 text-stone-500"
           }`}
         >

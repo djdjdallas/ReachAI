@@ -11,7 +11,7 @@ import {
 } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 
-const CORAL = "#ff7e67";
+const CORAL = "#fc6e56";
 
 // Suggestions only — rendered in the UI, never written to the DB until the
 // coach explicitly adds one. Keeping them client-side preserves the

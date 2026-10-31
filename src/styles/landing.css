@@ -7,8 +7,8 @@
    Landing Theme Scope
    -------------------------------------------------------------------------- */
 .landing-theme {
-  --brand: #ff7e67;
-  --brand-dark: #e8664f;
+  --brand: #fc6e56;
+  --brand-dark: #e25841;
   --brand-soft: #fff5f2;
   --bg: #fafaf9;
   --bg-white: #ffffff;
@@ -23,11 +23,11 @@
   --emerald-800: #065f46;
 
   /* Override shadcn vars so Button etc. pick up coral */
-  --primary: #ff7e67;
+  --primary: #fc6e56;
   --primary-foreground: #ffffff;
   --background: #fafaf9;
   --foreground: #1c1917;
-  --ring: #ff7e67;
+  --ring: #fc6e56;
 
   font-family: 'Satoshi', system-ui, sans-serif;
   color: var(--primary-text);
@@ -96,7 +96,7 @@
   left: 100%;
   width: calc(100% - 4rem);
   height: 2px;
-  background-image: linear-gradient(to right, #ff7e67 30%, transparent 30%);
+  background-image: linear-gradient(to right, #fc6e56 30%, transparent 30%);
   background-position: bottom;
   background-size: 8px 1px;
   background-repeat: repeat-x;

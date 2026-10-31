@@ -141,7 +141,7 @@ export default function LoginPage() {
       style={{
         backgroundColor: "#fafaf9",
         backgroundImage:
-          "radial-gradient(at 0% 0%, rgba(255, 126, 103, 0.05) 0px, transparent 50%), radial-gradient(at 100% 100%, rgba(255, 126, 103, 0.05) 0px, transparent 50%)",
+          "radial-gradient(at 0% 0%, rgba(252, 110, 86, 0.05) 0px, transparent 50%), radial-gradient(at 100% 100%, rgba(252, 110, 86, 0.05) 0px, transparent 50%)",
       }}
     >
       {/* Header */}
@@ -175,12 +175,12 @@ export default function LoginPage() {
           {/* Hero */}
           <div className="hidden lg:flex flex-col space-y-10">
             <div className="space-y-6">
-              <div className="inline-flex items-center gap-2 px-4 py-1.5 bg-orange-50 text-[#ff7e67] rounded-full text-xs font-black uppercase tracking-widest">
-                <span className="w-1.5 h-1.5 bg-[#ff7e67] rounded-full animate-pulse" />
+              <div className="inline-flex items-center gap-2 px-4 py-1.5 bg-orange-50 text-[#fc6e56] rounded-full text-xs font-black uppercase tracking-widest">
+                <span className="w-1.5 h-1.5 bg-[#fc6e56] rounded-full animate-pulse" />
                 24/7 Sales Support
               </div>
               <h1 className="text-6xl font-black leading-[1.1] text-stone-900">
-                Welcome back to <span className="text-[#ff7e67]">Clinchd</span>
+                Welcome back to <span className="text-[#fc6e56]">Clinchd</span>
               </h1>
               <p className="text-xl text-stone-500 font-medium leading-relaxed max-w-md">
                 Log in to manage your shared inbox and watch AI-assisted replies
@@ -205,7 +205,7 @@ export default function LoginPage() {
               </div>
 
               <div className="flex items-start gap-5">
-                <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center text-[#ff7e67] soft-shadow">
+                <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center text-[#fc6e56] soft-shadow">
                   <MessageSquareText className="w-6 h-6" />
                 </div>
                 <div>
@@ -338,7 +338,7 @@ export default function LoginPage() {
                       onChange={(e) => setEmail(e.target.value)}
                       required
                       disabled={loading}
-                      className="w-full pl-12 pr-5 py-4 bg-stone-50 border border-stone-100 rounded-2xl text-sm font-medium transition-all focus:outline-none focus:border-[#ff7e67] focus:ring-4 focus:ring-[#fff5f2]"
+                      className="w-full pl-12 pr-5 py-4 bg-stone-50 border border-stone-100 rounded-2xl text-sm font-medium transition-all focus:outline-none focus:border-[#fc6e56] focus:ring-4 focus:ring-[#fff5f2]"
                     />
                   </div>
                 </div>
@@ -353,7 +353,7 @@ export default function LoginPage() {
                     </label>
                     <Link
                       href="/forgot-password"
-                      className="text-[11px] font-black text-[#ff7e67] uppercase tracking-widest hover:underline"
+                      className="text-[11px] font-black text-[#fc6e56] uppercase tracking-widest hover:underline"
                     >
                       Forgot?
                     </Link>
@@ -368,7 +368,7 @@ export default function LoginPage() {
                       onChange={(e) => setPassword(e.target.value)}
                       required
                       disabled={loading}
-                      className="w-full pl-12 pr-5 py-4 bg-stone-50 border border-stone-100 rounded-2xl text-sm font-medium transition-all focus:outline-none focus:border-[#ff7e67] focus:ring-4 focus:ring-[#fff5f2]"
+                      className="w-full pl-12 pr-5 py-4 bg-stone-50 border border-stone-100 rounded-2xl text-sm font-medium transition-all focus:outline-none focus:border-[#fc6e56] focus:ring-4 focus:ring-[#fff5f2]"
                     />
                   </div>
                 </div>
@@ -381,7 +381,7 @@ export default function LoginPage() {
                       checked={remember}
                       onChange={(e) => setRemember(e.target.checked)}
                     />
-                    <div className="w-5 h-5 bg-stone-100 border border-stone-200 rounded-md peer-checked:bg-[#ff7e67] peer-checked:border-[#ff7e67] transition-all flex items-center justify-center">
+                    <div className="w-5 h-5 bg-stone-100 border border-stone-200 rounded-md peer-checked:bg-[#fc6e56] peer-checked:border-[#fc6e56] transition-all flex items-center justify-center">
                       <Check className="text-white w-3 h-3 opacity-0 peer-checked:opacity-100 transition-opacity" />
                     </div>
                     <span className="ml-3 text-sm font-medium text-stone-500">
@@ -428,7 +428,7 @@ export default function LoginPage() {
                 <button
                   type="submit"
                   disabled={loading}
-                  className="w-full py-5 bg-[#ff7e67] text-white rounded-2xl text-lg font-black shadow-xl shadow-[#ff7e67]/30 hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center justify-center gap-3 disabled:opacity-70 disabled:hover:scale-100"
+                  className="w-full py-5 bg-[#fc6e56] text-white rounded-2xl text-lg font-black shadow-xl shadow-[#fc6e56]/30 hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center justify-center gap-3 disabled:opacity-70 disabled:hover:scale-100"
                 >
                   {loading ? (
                     <Loader2 className="w-5 h-5 animate-spin" />
@@ -447,7 +447,7 @@ export default function LoginPage() {
                   Don&apos;t have an account?
                   <Link
                     href="/signup"
-                    className="text-[#ff7e67] font-black uppercase tracking-widest text-[11px] ml-2 hover:underline"
+                    className="text-[#fc6e56] font-black uppercase tracking-widest text-[11px] ml-2 hover:underline"
                   >
                     Sign Up Now
                   </Link>

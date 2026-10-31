@@ -105,7 +105,7 @@ export default function ObjectionChatAnimation() {
     <div ref={containerRef} className="max-w-md mx-auto mb-16 reveal-up">
       <div className="rounded-[2rem] bg-white soft-shadow border border-stone-100 overflow-hidden">
         <div className="flex items-center gap-3 px-5 py-4 border-b border-stone-100">
-          <div className="w-9 h-9 rounded-full bg-gradient-to-br from-[#ff7e67] to-[#f43f5e] flex items-center justify-center text-white">
+          <div className="w-9 h-9 rounded-full bg-gradient-to-br from-[#fc6e56] to-[#f43f5e] flex items-center justify-center text-white">
             <Instagram className="w-4 h-4" strokeWidth={2.5} />
           </div>
           <div className="flex-1 min-w-0">
@@ -164,7 +164,7 @@ export default function ObjectionChatAnimation() {
               className="absolute top-[150px] left-16 right-5 flex justify-end"
               style={{ willChange: "transform, opacity" }}
             >
-              <div className="inline-block max-w-full rounded-2xl rounded-tr-sm bg-[#ff7e67] px-4 py-2.5">
+              <div className="inline-block max-w-full rounded-2xl rounded-tr-sm bg-[#fc6e56] px-4 py-2.5">
                 <p className="text-[15px] text-white leading-snug font-medium">
                   {item.shortClinchd}
                 </p>
@@ -179,7 +179,7 @@ export default function ObjectionChatAnimation() {
               key={i}
               className={`h-1.5 rounded-full transition-all duration-300 ${
                 i === activeIndex
-                  ? "w-6 bg-[#ff7e67]"
+                  ? "w-6 bg-[#fc6e56]"
                   : "w-1.5 bg-stone-200"
               }`}
             />

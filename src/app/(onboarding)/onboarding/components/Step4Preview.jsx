@@ -65,7 +65,7 @@ export default function Step4Preview({
         <header className="max-w-3xl mb-12">
           <h1 className="text-4xl md:text-5xl font-extrabold mb-4">
             Preview Your AI Sales Script{" "}
-            <span className="text-[#ff7e67]">in Action</span>
+            <span className="text-[#fc6e56]">in Action</span>
           </h1>
           <p className="text-xl text-stone-500 font-medium">
             See how Clinchd will respond to real prospects using the data
@@ -89,8 +89,8 @@ export default function Step4Preview({
 
         {/* No-script callout — the ONLY path to enable "Next: Go Live" */}
         {!greeting && (
-          <div className="mb-8 rounded-3xl border-2 border-[#ff7e67]/30 bg-[#fff5f2] p-6 flex items-start gap-4">
-            <div className="w-10 h-10 rounded-xl bg-white flex items-center justify-center text-[#ff7e67] shadow-sm shrink-0">
+          <div className="mb-8 rounded-3xl border-2 border-[#fc6e56]/30 bg-[#fff5f2] p-6 flex items-start gap-4">
+            <div className="w-10 h-10 rounded-xl bg-white flex items-center justify-center text-[#fc6e56] shadow-sm shrink-0">
               <AlertCircle className="w-5 h-5" />
             </div>
             <div className="flex-1">
@@ -106,7 +106,7 @@ export default function Step4Preview({
               <button
                 onClick={onGenerate}
                 disabled={generating}
-                className="mt-4 px-6 py-3 bg-[#ff7e67] text-white rounded-2xl font-bold flex items-center gap-2 hover:scale-105 active:scale-95 transition-all shadow-lg shadow-[#ff7e67]/20 disabled:opacity-50 disabled:hover:scale-100"
+                className="mt-4 px-6 py-3 bg-[#fc6e56] text-white rounded-2xl font-bold flex items-center gap-2 hover:scale-105 active:scale-95 transition-all shadow-lg shadow-[#fc6e56]/20 disabled:opacity-50 disabled:hover:scale-100"
               >
                 {generating ? (
                   <Loader2 className="w-5 h-5 animate-spin" />
@@ -132,7 +132,7 @@ export default function Step4Preview({
                       block: "start",
                     })
                   }
-                  className="text-xs font-black text-[#ff7e67] uppercase tracking-widest hover:underline"
+                  className="text-xs font-black text-[#fc6e56] uppercase tracking-widest hover:underline"
                 >
                   Edit Full Script
                 </button>
@@ -185,9 +185,9 @@ export default function Step4Preview({
                     </button>
                   </div>
 
-                  <label className="flex items-center justify-between cursor-pointer p-4 bg-stone-50 rounded-2xl border border-stone-100 group hover:border-[#ff7e67]/30 transition-all">
+                  <label className="flex items-center justify-between cursor-pointer p-4 bg-stone-50 rounded-2xl border border-stone-100 group hover:border-[#fc6e56]/30 transition-all">
                     <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center text-[#ff7e67] shadow-sm">
+                      <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center text-[#fc6e56] shadow-sm">
                         <UserPlus className="w-5 h-5" />
                       </div>
                       <div>
@@ -203,7 +203,7 @@ export default function Step4Preview({
                       aria-checked={humanInLoop}
                       onClick={() => setHumanInLoop(!humanInLoop)}
                       className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                        humanInLoop ? "bg-[#ff7e67]" : "bg-stone-200"
+                        humanInLoop ? "bg-[#fc6e56]" : "bg-stone-200"
                       }`}
                     >
                       <span
@@ -234,7 +234,7 @@ export default function Step4Preview({
                     id: "objection",
                     label: "Has Objections",
                     icon: AlertCircle,
-                    activeColor: "text-[#ff7e67]",
+                    activeColor: "text-[#fc6e56]",
                   },
                   {
                     id: "ready",
@@ -248,14 +248,14 @@ export default function Step4Preview({
                     onClick={() => setActiveScenario(id)}
                     className={`w-full flex items-center justify-between p-4 rounded-2xl border-2 transition-all group ${
                       activeScenario === id
-                        ? "border-[#ff7e67] bg-[#fff5f2]"
+                        ? "border-[#fc6e56] bg-[#fff5f2]"
                         : "border-stone-100 hover:border-stone-200"
                     }`}
                   >
                     <span
                       className={`font-bold ${
                         activeScenario === id
-                          ? "font-black text-[#ff7e67]"
+                          ? "font-black text-[#fc6e56]"
                           : "text-stone-600 group-hover:text-stone-900"
                       }`}
                     >
@@ -279,7 +279,7 @@ export default function Step4Preview({
               className="bg-white p-8 rounded-[2.5rem] soft-shadow border border-stone-100 scroll-mt-24"
             >
               <h3 className="text-xl font-bold mb-2 flex items-center gap-2">
-                <PenTool className="w-5 h-5 text-[#ff7e67]" />
+                <PenTool className="w-5 h-5 text-[#fc6e56]" />
                 Edit Your Script
               </h3>
               <p className="text-xs text-stone-400 font-medium mb-6">
@@ -306,12 +306,12 @@ export default function Step4Preview({
                       onClick={() => setScriptMode(id)}
                       className={`flex flex-col items-center gap-1 rounded-xl border-2 p-3 transition-all ${
                         scriptMode === id
-                          ? "border-[#ff7e67] bg-[#fff5f2]"
+                          ? "border-[#fc6e56] bg-[#fff5f2]"
                           : "border-transparent hover:border-stone-200"
                       }`}
                     >
-                      <Icon className={`h-4 w-4 ${scriptMode === id ? "text-[#ff7e67]" : "text-stone-400"}`} />
-                      <span className={`text-xs font-bold ${scriptMode === id ? "text-[#ff7e67]" : "text-stone-600"}`}>
+                      <Icon className={`h-4 w-4 ${scriptMode === id ? "text-[#fc6e56]" : "text-stone-400"}`} />
+                      <span className={`text-xs font-bold ${scriptMode === id ? "text-[#fc6e56]" : "text-stone-600"}`}>
                         {label}
                       </span>
                       <span className="text-[10px] text-stone-400">{desc}</span>
@@ -347,7 +347,7 @@ export default function Step4Preview({
                     value={greeting}
                     onChange={(e) => setGreeting(e.target.value)}
                     placeholder="Your first reply when someone messages you..."
-                    className="w-full px-4 py-3 bg-stone-50 border border-stone-100 rounded-2xl text-sm font-medium focus:outline-none focus:ring-4 focus:ring-[#ff7e67]/10 focus:border-[#ff7e67] transition-all resize-none"
+                    className="w-full px-4 py-3 bg-stone-50 border border-stone-100 rounded-2xl text-sm font-medium focus:outline-none focus:ring-4 focus:ring-[#fc6e56]/10 focus:border-[#fc6e56] transition-all resize-none"
                   />
                 </div>
 
@@ -360,7 +360,7 @@ export default function Step4Preview({
                     value={qualifyingQuestions}
                     onChange={(e) => setQualifyingQuestions(e.target.value)}
                     placeholder={"What's your current situation?\nWhat's your main goal?\nWhat have you tried before?"}
-                    className="w-full px-4 py-3 bg-stone-50 border border-stone-100 rounded-2xl text-sm font-medium focus:outline-none focus:ring-4 focus:ring-[#ff7e67]/10 focus:border-[#ff7e67] transition-all resize-none"
+                    className="w-full px-4 py-3 bg-stone-50 border border-stone-100 rounded-2xl text-sm font-medium focus:outline-none focus:ring-4 focus:ring-[#fc6e56]/10 focus:border-[#fc6e56] transition-all resize-none"
                   />
                 </div>
 
@@ -373,7 +373,7 @@ export default function Step4Preview({
                     value={interestResponse}
                     onChange={(e) => setInterestResponse(e.target.value)}
                     placeholder="Your response when a lead says they're interested..."
-                    className="w-full px-4 py-3 bg-stone-50 border border-stone-100 rounded-2xl text-sm font-medium focus:outline-none focus:ring-4 focus:ring-[#ff7e67]/10 focus:border-[#ff7e67] transition-all resize-none"
+                    className="w-full px-4 py-3 bg-stone-50 border border-stone-100 rounded-2xl text-sm font-medium focus:outline-none focus:ring-4 focus:ring-[#fc6e56]/10 focus:border-[#fc6e56] transition-all resize-none"
                   />
                 </div>
 
@@ -386,7 +386,7 @@ export default function Step4Preview({
                     value={objectionHandlers}
                     onChange={(e) => setObjectionHandlers(e.target.value)}
                     placeholder={"too expensive: the ROI covers the investment...\nnot the right time: when do you think you'd be ready?"}
-                    className="w-full px-4 py-3 bg-stone-50 border border-stone-100 rounded-2xl text-sm font-medium focus:outline-none focus:ring-4 focus:ring-[#ff7e67]/10 focus:border-[#ff7e67] transition-all resize-none"
+                    className="w-full px-4 py-3 bg-stone-50 border border-stone-100 rounded-2xl text-sm font-medium focus:outline-none focus:ring-4 focus:ring-[#fc6e56]/10 focus:border-[#fc6e56] transition-all resize-none"
                   />
                 </div>
 
@@ -399,7 +399,7 @@ export default function Step4Preview({
                     value={bookingMessage}
                     onChange={(e) => setBookingMessage(e.target.value)}
                     placeholder="Use {{BOOKING_LINK}} as a placeholder for your Calendly URL..."
-                    className="w-full px-4 py-3 bg-stone-50 border border-stone-100 rounded-2xl text-sm font-medium focus:outline-none focus:ring-4 focus:ring-[#ff7e67]/10 focus:border-[#ff7e67] transition-all resize-none"
+                    className="w-full px-4 py-3 bg-stone-50 border border-stone-100 rounded-2xl text-sm font-medium focus:outline-none focus:ring-4 focus:ring-[#fc6e56]/10 focus:border-[#fc6e56] transition-all resize-none"
                   />
                 </div>
 
@@ -412,7 +412,7 @@ export default function Step4Preview({
                     value={notAFitMessage}
                     onChange={(e) => setNotAFitMessage(e.target.value)}
                     placeholder="Polite decline when a prospect isn't a match..."
-                    className="w-full px-4 py-3 bg-stone-50 border border-stone-100 rounded-2xl text-sm font-medium focus:outline-none focus:ring-4 focus:ring-[#ff7e67]/10 focus:border-[#ff7e67] transition-all resize-none"
+                    className="w-full px-4 py-3 bg-stone-50 border border-stone-100 rounded-2xl text-sm font-medium focus:outline-none focus:ring-4 focus:ring-[#fc6e56]/10 focus:border-[#fc6e56] transition-all resize-none"
                   />
                 </div>
               </div>
@@ -465,7 +465,7 @@ export default function Step4Preview({
                 {/* AI Response */}
                 <div className="flex gap-3 justify-end ml-auto max-w-[85%]">
                   <div className="space-y-1 text-right">
-                    <div className="bg-[#ff7e67] px-5 py-3 text-sm font-medium leading-relaxed shadow-lg shadow-[#ff7e67]/20 text-white rounded-2xl rounded-br-none">
+                    <div className="bg-[#fc6e56] px-5 py-3 text-sm font-medium leading-relaxed shadow-lg shadow-[#fc6e56]/20 text-white rounded-2xl rounded-br-none">
                       <div className="flex items-center gap-2 mb-1 justify-end">
                         <span className="bg-white/20 text-[9px] font-black px-1.5 py-0.5 rounded uppercase tracking-widest">
                           Clinchd Agent
@@ -483,7 +483,7 @@ export default function Step4Preview({
                     </p>
                   </div>
                   <div className="flex-shrink-0">
-                    <div className="w-8 h-8 bg-[#ff7e67] rounded-full flex items-center justify-center">
+                    <div className="w-8 h-8 bg-[#fc6e56] rounded-full flex items-center justify-center">
                       <Zap className="w-4 h-4 text-white" />
                     </div>
                   </div>
@@ -511,7 +511,7 @@ export default function Step4Preview({
                     {/* AI Objection Handler */}
                     <div className="flex gap-3 justify-end ml-auto max-w-[85%]">
                       <div className="space-y-1 text-right">
-                        <div className="bg-[#ff7e67] px-5 py-3 text-sm font-medium leading-relaxed shadow-lg shadow-[#ff7e67]/20 text-white rounded-2xl rounded-br-none">
+                        <div className="bg-[#fc6e56] px-5 py-3 text-sm font-medium leading-relaxed shadow-lg shadow-[#fc6e56]/20 text-white rounded-2xl rounded-br-none">
                           <div className="flex items-center gap-2 mb-1 justify-end">
                             <span className="bg-white/20 text-[9px] font-black px-1.5 py-0.5 rounded uppercase tracking-widest">
                               Clinchd Agent
@@ -523,12 +523,12 @@ export default function Step4Preview({
                               : "Fair question! We focus on the ROI of your time. Our average client saves 20+ hours a week within the first 30 days."
                             : "Fair question, Jordan! We don't focus on 'more software.' We focus on the ROI of your time. Our average client at your revenue level saves 20+ hours a week within the first 30 days."}
                         </div>
-                        <p className="text-[10px] text-stone-400 font-bold px-1 italic text-[#ff7e67]">
+                        <p className="text-[10px] text-stone-400 font-bold px-1 italic text-[#fc6e56]">
                           Typing...
                         </p>
                       </div>
                       <div className="flex-shrink-0">
-                        <div className="w-8 h-8 bg-[#ff7e67] rounded-full flex items-center justify-center">
+                        <div className="w-8 h-8 bg-[#fc6e56] rounded-full flex items-center justify-center">
                           <Zap className="w-4 h-4 text-white" />
                         </div>
                       </div>
@@ -545,7 +545,7 @@ export default function Step4Preview({
                 <button
                   onClick={onGenerate}
                   disabled={generating}
-                  className="p-3 rounded-2xl bg-stone-900 text-white hover:bg-[#ff7e67] transition-all"
+                  className="p-3 rounded-2xl bg-stone-900 text-white hover:bg-[#fc6e56] transition-all"
                 >
                   {generating ? (
                     <Loader2 className="w-5 h-5 animate-spin" />

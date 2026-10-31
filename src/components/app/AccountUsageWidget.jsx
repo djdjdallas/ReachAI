@@ -44,7 +44,7 @@ export default function AccountUsageWidget() {
       </div>
       <div className="h-1.5 bg-stone-800 rounded-full overflow-hidden">
         <div
-          className="h-full bg-[#ff7e67] transition-all"
+          className="h-full bg-[#fc6e56] transition-all"
           style={{ width: `${usage.percent}%` }}
         />
       </div>

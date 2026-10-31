@@ -902,7 +902,7 @@ function OnboardingPage() {
             <button
               type="button"
               onClick={() => setStep(offer && targetCustomer ? 4 : 2)}
-              className="shrink-0 rounded-full bg-[#ff7e67] px-4 py-2 text-xs font-bold text-white hover:bg-[#ff6a50]"
+              className="shrink-0 rounded-full bg-[#fc6e56] px-4 py-2 text-xs font-bold text-white hover:bg-[#fc5a3f]"
             >
               Finish setup
             </button>

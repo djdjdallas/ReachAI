@@ -9,7 +9,7 @@ export default function OnboardingHeader({ currentStep }) {
     <header className="bg-white/80 backdrop-blur-md border-b border-stone-200 py-6 px-8 sticky top-0 z-50">
       <div className="max-w-6xl mx-auto flex flex-col md:flex-row items-center justify-between gap-6">
         <div className="flex items-center gap-2.5">
-          <div className="w-8 h-8 bg-[#ff7e67] rounded-lg flex items-center justify-center shadow-lg shadow-[#ff7e67]/20">
+          <div className="w-8 h-8 bg-[#fc6e56] rounded-lg flex items-center justify-center shadow-lg shadow-[#fc6e56]/20">
             <Zap className="w-4 h-4 text-white" />
           </div>
           <span className="text-xl font-extrabold tracking-tight">Clinchd</span>
@@ -27,9 +27,9 @@ export default function OnboardingHeader({ currentStep }) {
                   <div
                     className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold shadow-sm transition-all ${
                       isComplete
-                        ? "bg-[#ff7e67] text-white"
+                        ? "bg-[#fc6e56] text-white"
                         : isActive
-                        ? "bg-white border-2 border-[#ff7e67] text-[#ff7e67] ring-4 ring-[#fff5f2]"
+                        ? "bg-white border-2 border-[#fc6e56] text-[#fc6e56] ring-4 ring-[#fff5f2]"
                         : "bg-stone-100 text-stone-400"
                     }`}
                   >
@@ -42,7 +42,7 @@ export default function OnboardingHeader({ currentStep }) {
                   <span
                     className={`text-[10px] font-bold uppercase tracking-widest ${
                       isActive
-                        ? "text-[#ff7e67]"
+                        ? "text-[#fc6e56]"
                         : isComplete
                         ? "text-stone-500"
                         : "text-stone-400"

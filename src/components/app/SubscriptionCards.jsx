@@ -117,7 +117,7 @@ export default function SubscriptionCards({ profile }) {
               {summary.showManage && (
                 <Link
                   href={summary.choosePlan ? "/choose-plan" : "/billing"}
-                  className="inline-block text-sm font-semibold text-[#ff7e67] hover:underline"
+                  className="inline-block text-sm font-semibold text-[#fc6e56] hover:underline"
                 >
                   {summary.choosePlan ? "Choose a plan" : summary.pastDue ? "Update card" : "Manage billing"}
                 </Link>
@@ -137,7 +137,7 @@ export default function SubscriptionCards({ profile }) {
         <CardContent>
           <p className="text-sm">
             Questions? Email{" "}
-            <a href={SUPPORT_MAILTO} className="font-semibold text-[#ff7e67] underline">
+            <a href={SUPPORT_MAILTO} className="font-semibold text-[#fc6e56] underline">
               {SUPPORT_EMAIL}
             </a>
             . I reply within 24 hours.

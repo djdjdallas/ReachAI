@@ -118,7 +118,7 @@ export default function Step3Voice({
               {/* Tone Selection */}
               <div className="bg-white rounded-3xl p-8 soft-shadow border border-stone-100">
                 <h3 className="text-lg font-black mb-2 flex items-center gap-2">
-                  <Mic2 className="w-5 h-5 text-[#ff7e67]" />
+                  <Mic2 className="w-5 h-5 text-[#fc6e56]" />
                   1. Select Your Core Tone
                 </h3>
                 {voiceProfile?.status === "ready" && (
@@ -136,7 +136,7 @@ export default function Step3Voice({
                       key={tone.id}
                       className={`block p-5 rounded-2xl border-2 cursor-pointer transition-all ${
                         selectedTone === tone.id
-                          ? "border-[#ff7e67] bg-[#fff5f2]"
+                          ? "border-[#fc6e56] bg-[#fff5f2]"
                           : "border-stone-100 hover:border-stone-200"
                       }`}
                     >
@@ -158,7 +158,7 @@ export default function Step3Voice({
               {/* Personality Traits */}
               <div className="bg-white rounded-3xl p-8 soft-shadow border border-stone-100">
                 <h3 className="text-lg font-black mb-6 flex items-center gap-2">
-                  <Sparkles className="w-5 h-5 text-[#ff7e67]" />
+                  <Sparkles className="w-5 h-5 text-[#fc6e56]" />
                   2. Personality Traits
                 </h3>
                 <div className="grid grid-cols-2 gap-y-6 gap-x-12">
@@ -186,7 +186,7 @@ export default function Step3Voice({
                           }))
                         }
                         className={`relative inline-flex h-6 w-10 items-center rounded-full transition-colors ${
-                          traits[key] ? "bg-[#ff7e67]" : "bg-stone-200"
+                          traits[key] ? "bg-[#fc6e56]" : "bg-stone-200"
                         }`}
                       >
                         <span
@@ -210,7 +210,7 @@ export default function Step3Voice({
                         onClick={() => setResponseLength(len)}
                         className={`flex-1 py-2.5 text-xs font-bold rounded-xl transition-all capitalize ${
                           responseLength === len
-                            ? "bg-white text-[#ff7e67] shadow-sm"
+                            ? "bg-white text-[#fc6e56] shadow-sm"
                             : ""
                         }`}
                       >
@@ -224,7 +224,7 @@ export default function Step3Voice({
               {/* Brand Voice Sample */}
               <div className="bg-white rounded-3xl p-8 soft-shadow border border-stone-100">
                 <h3 className="text-lg font-black mb-2 flex items-center gap-2">
-                  <PenTool className="w-5 h-5 text-[#ff7e67]" />
+                  <PenTool className="w-5 h-5 text-[#fc6e56]" />
                   3. Brand Voice Sample
                 </h3>
                 <p className="text-xs text-stone-500 mb-6 font-medium">
@@ -233,8 +233,8 @@ export default function Step3Voice({
                 </p>
 
                 {autoImporting && !voiceProfile?.status ? (
-                  <div className="rounded-2xl border border-[#ff7e67]/20 bg-[#fff5f2] p-4 flex items-center gap-3">
-                    <Loader2 className="w-4 h-4 animate-spin text-[#ff7e67]" />
+                  <div className="rounded-2xl border border-[#fc6e56]/20 bg-[#fff5f2] p-4 flex items-center gap-3">
+                    <Loader2 className="w-4 h-4 animate-spin text-[#fc6e56]" />
                     <span className="text-sm font-medium text-stone-700">
                       Personalizing from your Instagram...
                     </span>
@@ -249,7 +249,7 @@ export default function Step3Voice({
                         </span>
                         {voiceProfile?.source === "instagram_auto" && (
                           <span
-                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-[#ff7e67]/10 text-[#ff7e67] text-[10px] font-bold uppercase tracking-widest"
+                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-[#fc6e56]/10 text-[#fc6e56] text-[10px] font-bold uppercase tracking-widest"
                             title="We generated this from your Instagram bio and recent posts. Paste a few real DMs to refine it."
                           >
                             <Sparkles className="w-3 h-3" />
@@ -310,7 +310,7 @@ export default function Step3Voice({
                     <div className="flex items-center gap-4 flex-wrap">
                       <button
                         onClick={() => setVoiceMode("paste")}
-                        className="text-sm text-[#ff7e67] font-bold flex items-center gap-1"
+                        className="text-sm text-[#fc6e56] font-bold flex items-center gap-1"
                       >
                         <Sparkles className="w-3.5 h-3.5" />
                         Re-analyze with new samples
@@ -340,7 +340,7 @@ export default function Step3Voice({
                     <textarea
                       rows={6}
                       placeholder={`Paste real messages you've sent: DMs, texts, or social posts. One message per line.\n\nExample:\nhey! saw your post, that's fire. what made you start your agency?\nhonestly that's impressive for 6 months in. what's your biggest bottleneck rn?`}
-                      className="w-full bg-stone-50 border border-stone-200 rounded-2xl p-5 text-sm focus:outline-none focus:ring-2 focus:ring-[#ff7e67]/20 focus:border-[#ff7e67] transition-all resize-none"
+                      className="w-full bg-stone-50 border border-stone-200 rounded-2xl p-5 text-sm focus:outline-none focus:ring-2 focus:ring-[#fc6e56]/20 focus:border-[#fc6e56] transition-all resize-none"
                       value={sampleText}
                       onChange={(e) => setSampleText(e.target.value)}
                     />
@@ -357,7 +357,7 @@ export default function Step3Voice({
                       <button
                         onClick={onAnalyzeVoice}
                         disabled={analyzingVoice || sampleMessageCount < 3}
-                        className="px-6 py-3 bg-[#ff7e67] text-white rounded-xl text-sm font-bold flex items-center gap-2 disabled:opacity-50"
+                        className="px-6 py-3 bg-[#fc6e56] text-white rounded-xl text-sm font-bold flex items-center gap-2 disabled:opacity-50"
                       >
                         {analyzingVoice ? (
                           <Loader2 className="w-4 h-4 animate-spin" />
@@ -399,7 +399,7 @@ export default function Step3Voice({
                             <div
                               className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full mt-0.5 ${
                                 msg.role === "assistant"
-                                  ? "bg-[#ff7e67]/15 text-[#ff7e67]"
+                                  ? "bg-[#fc6e56]/15 text-[#fc6e56]"
                                   : "bg-stone-200 text-stone-600"
                               }`}
                             >
@@ -413,7 +413,7 @@ export default function Step3Voice({
                               className={`rounded-2xl px-4 py-2.5 text-sm ${
                                 msg.role === "assistant"
                                   ? "bg-white text-stone-800 rounded-tl-sm border border-stone-100"
-                                  : "bg-[#ff7e67] text-white rounded-tr-sm"
+                                  : "bg-[#fc6e56] text-white rounded-tr-sm"
                               }`}
                             >
                               {msg.content}
@@ -441,12 +441,12 @@ export default function Step3Voice({
                           }
                         }}
                         disabled={voiceChatLoading}
-                        className="flex-1 px-4 py-3 bg-stone-50 border border-stone-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#ff7e67]/20 focus:border-[#ff7e67]"
+                        className="flex-1 px-4 py-3 bg-stone-50 border border-stone-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#fc6e56]/20 focus:border-[#fc6e56]"
                       />
                       <button
                         onClick={onSendVoiceChat}
                         disabled={voiceChatLoading || !voiceChatInput.trim()}
-                        className="p-3 bg-[#ff7e67] text-white rounded-xl disabled:opacity-50"
+                        className="p-3 bg-[#fc6e56] text-white rounded-xl disabled:opacity-50"
                       >
                         <Send className="w-4 h-4" />
                       </button>
@@ -457,7 +457,7 @@ export default function Step3Voice({
                         <button
                           onClick={onFinalizeVoiceChat}
                           disabled={finalizingVoice}
-                          className="px-6 py-3 bg-[#ff7e67] text-white rounded-xl text-sm font-bold flex items-center gap-2 disabled:opacity-50"
+                          className="px-6 py-3 bg-[#fc6e56] text-white rounded-xl text-sm font-bold flex items-center gap-2 disabled:opacity-50"
                         >
                           {finalizingVoice ? (
                             <Loader2 className="w-4 h-4 animate-spin" />
@@ -481,7 +481,7 @@ export default function Step3Voice({
                   <div className="flex flex-col sm:flex-row gap-3">
                     <button
                       onClick={() => setVoiceMode("paste")}
-                      className="flex-1 rounded-2xl border-2 border-dashed border-stone-200 p-6 text-center hover:border-[#ff7e67]/50 hover:bg-[#fff5f2] transition-colors"
+                      className="flex-1 rounded-2xl border-2 border-dashed border-stone-200 p-6 text-center hover:border-[#fc6e56]/50 hover:bg-[#fff5f2] transition-colors"
                     >
                       <ClipboardPaste className="h-8 w-8 mx-auto mb-2 text-stone-400" />
                       <p className="text-sm font-bold">
@@ -496,7 +496,7 @@ export default function Step3Voice({
                         setVoiceMode("chat");
                         onStartVoiceChat();
                       }}
-                      className="flex-1 rounded-2xl border-2 border-dashed border-stone-200 p-6 text-center hover:border-[#ff7e67]/50 hover:bg-[#fff5f2] transition-colors"
+                      className="flex-1 rounded-2xl border-2 border-dashed border-stone-200 p-6 text-center hover:border-[#fc6e56]/50 hover:bg-[#fff5f2] transition-colors"
                     >
                       <MessageCircle className="h-8 w-8 mx-auto mb-2 text-stone-400" />
                       <p className="text-sm font-bold">Chat with AI</p>
@@ -507,7 +507,7 @@ export default function Step3Voice({
                   </div>
                 )}
 
-                <div className="flex items-center gap-2 mt-4 text-[#ff7e67]">
+                <div className="flex items-center gap-2 mt-4 text-[#fc6e56]">
                   <Info className="w-4 h-4" />
                   <span className="text-[11px] font-bold uppercase tracking-widest">
                     This helps Clinchd match your authentic voice
@@ -520,7 +520,7 @@ export default function Step3Voice({
             <div className="lg:col-span-5">
               <div className="sticky top-32 space-y-6">
                 <div className="bg-stone-900 rounded-[2.5rem] p-8 text-white relative overflow-hidden">
-                  <div className="absolute -right-20 -top-20 w-64 h-64 bg-[#ff7e67]/20 rounded-full blur-3xl" />
+                  <div className="absolute -right-20 -top-20 w-64 h-64 bg-[#fc6e56]/20 rounded-full blur-3xl" />
 
                   <div className="relative z-10">
                     <div className="flex items-center justify-between mb-8">
@@ -546,10 +546,10 @@ export default function Step3Voice({
                               </div>
                             </div>
                             <div className="flex items-start gap-3 justify-end">
-                              <div className="bg-[#ff7e67] p-4 rounded-2xl rounded-tr-none text-xs text-white max-w-[85%] leading-relaxed">
+                              <div className="bg-[#fc6e56] p-4 rounded-2xl rounded-tr-none text-xs text-white max-w-[85%] leading-relaxed">
                                 {pr.reply}
                               </div>
-                              <div className="w-8 h-8 rounded-full bg-[#ff7e67]/30 flex-shrink-0 flex items-center justify-center">
+                              <div className="w-8 h-8 rounded-full bg-[#fc6e56]/30 flex-shrink-0 flex items-center justify-center">
                                 <Zap className="w-3 h-3 text-white" />
                               </div>
                             </div>
@@ -568,13 +568,13 @@ export default function Step3Voice({
                               </div>
                             </div>
                             <div className="flex items-start gap-3 justify-end">
-                              <div className="bg-[#ff7e67] p-4 rounded-2xl rounded-tr-none text-xs text-white max-w-[85%] leading-relaxed">
+                              <div className="bg-[#fc6e56] p-4 rounded-2xl rounded-tr-none text-xs text-white max-w-[85%] leading-relaxed">
                                 Great question! The base plan is $49/mo and it
                                 basically pays for itself with the first call you
                                 book. Would you like to see the full breakdown?
                                 {traits.emojis ? " \ud83d\ude0a" : ""}
                               </div>
-                              <div className="w-8 h-8 rounded-full bg-[#ff7e67]/30 flex-shrink-0 flex items-center justify-center">
+                              <div className="w-8 h-8 rounded-full bg-[#fc6e56]/30 flex-shrink-0 flex items-center justify-center">
                                 <Zap className="w-3 h-3 text-white" />
                               </div>
                             </div>
@@ -590,13 +590,13 @@ export default function Step3Voice({
                               </div>
                             </div>
                             <div className="flex items-start gap-3 justify-end">
-                              <div className="bg-[#ff7e67] p-4 rounded-2xl rounded-tr-none text-xs text-white max-w-[85%] leading-relaxed">
+                              <div className="bg-[#fc6e56] p-4 rounded-2xl rounded-tr-none text-xs text-white max-w-[85%] leading-relaxed">
                                 It&apos;s super simple. Clinchd stays on top of
                                 your DMs around the clock, qualifies leads based
                                 on your script, and drops your Calendly link when
                                 they&apos;re ready to talk!{traits.emojis ? " \ud83d\ude80" : ""}
                               </div>
-                              <div className="w-8 h-8 rounded-full bg-[#ff7e67]/30 flex-shrink-0 flex items-center justify-center">
+                              <div className="w-8 h-8 rounded-full bg-[#fc6e56]/30 flex-shrink-0 flex items-center justify-center">
                                 <Zap className="w-3 h-3 text-white" />
                               </div>
                             </div>
@@ -664,7 +664,7 @@ export default function Step3Voice({
                             </div>
                             <div className="h-1 bg-white/10 rounded-full">
                               <div
-                                className="h-full bg-[#ff7e67] rounded-full transition-all"
+                                className="h-full bg-[#fc6e56] rounded-full transition-all"
                                 style={{
                                   width:
                                     selectedTone === "friendly"
@@ -682,16 +682,16 @@ export default function Step3Voice({
                   </div>
                 </div>
 
-                <div className="bg-[#fff5f2] p-6 rounded-3xl border border-[#ff7e67]/10">
+                <div className="bg-[#fff5f2] p-6 rounded-3xl border border-[#fc6e56]/10">
                   <div className="flex items-center gap-3">
                     <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center soft-shadow">
-                      <Lightbulb className="w-5 h-5 text-[#ff7e67]" />
+                      <Lightbulb className="w-5 h-5 text-[#fc6e56]" />
                     </div>
                     <div>
                       <p className="text-xs font-bold">Quick Tip</p>
                       <p className="text-[11px] text-stone-600 leading-relaxed">
                         Friendly tones typically see a{" "}
-                        <span className="text-[#ff7e67] font-bold">
+                        <span className="text-[#fc6e56] font-bold">
                           14% higher
                         </span>{" "}
                         response rate on Instagram.

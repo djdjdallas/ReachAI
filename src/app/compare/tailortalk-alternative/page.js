@@ -79,7 +79,7 @@ export default function TailorTalkAlternativePage() {
 
       <section className="pt-20 pb-16 md:pt-32 md:pb-24 bg-white">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-          <span className="inline-flex items-center px-4 py-1.5 rounded-full bg-[#fff5f2] text-[#ff7e67] text-[13px] font-bold tracking-tight mb-6">
+          <span className="inline-flex items-center px-4 py-1.5 rounded-full bg-[#fff5f2] text-[#fc6e56] text-[13px] font-bold tracking-tight mb-6">
             TailorTalk Alternative
           </span>
           <h1 className="text-4xl md:text-6xl font-black tracking-tight text-stone-900 mb-6 leading-[1.1]">
@@ -170,10 +170,10 @@ export default function TailorTalkAlternativePage() {
             Other comparisons
           </h3>
           <div className="flex flex-wrap gap-4">
-            <Link href="/compare/chatplace-alternative" className="text-sm font-bold text-[#ff7e67] hover:underline">ChatPlace alternative &rarr;</Link>
-            <Link href="/compare/setsmart-alternative" className="text-sm font-bold text-[#ff7e67] hover:underline">SetSmart alternative &rarr;</Link>
-            <Link href="/compare/best-ai-dm-tool-for-coaches-2026" className="text-sm font-bold text-[#ff7e67] hover:underline">Best AI DM tool for coaches 2026 &rarr;</Link>
-            <Link href="/ai-dm-setter-for-coaches" className="text-sm font-bold text-[#ff7e67] hover:underline">AI DM Setter for Coaches &rarr;</Link>
+            <Link href="/compare/chatplace-alternative" className="text-sm font-bold text-[#fc6e56] hover:underline">ChatPlace alternative &rarr;</Link>
+            <Link href="/compare/setsmart-alternative" className="text-sm font-bold text-[#fc6e56] hover:underline">SetSmart alternative &rarr;</Link>
+            <Link href="/compare/best-ai-dm-tool-for-coaches-2026" className="text-sm font-bold text-[#fc6e56] hover:underline">Best AI DM tool for coaches 2026 &rarr;</Link>
+            <Link href="/ai-dm-setter-for-coaches" className="text-sm font-bold text-[#fc6e56] hover:underline">AI DM Setter for Coaches &rarr;</Link>
           </div>
         </div>
       </section>
