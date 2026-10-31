@@ -3,8 +3,8 @@
 import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
 import Link from "next/link";
+import Image from "next/image";
 import {
-  Zap,
   Inbox,
   Users,
   Calendar,
@@ -77,9 +77,7 @@ function SidebarContent({
           expanded ? "px-6 gap-2.5" : "justify-center"
         }`}
       >
-        <div className="w-8 h-8 bg-[#ff7e67] rounded-lg flex items-center justify-center shadow-lg shadow-[#ff7e67]/20 shrink-0">
-          <Zap className="h-4 w-4 text-white" />
-        </div>
+        <Image src="/logo.png" alt="Clinchd logo" width={32} height={32} className="w-8 h-8 shrink-0" />
         {expanded && (
           <span className="text-xl font-extrabold tracking-tight whitespace-nowrap">
             Clinchd
@@ -276,9 +274,7 @@ export default function Sidebar() {
           </SheetContent>
         </Sheet>
         <div className="flex items-center gap-2 ml-2">
-          <div className="w-7 h-7 bg-[#ff7e67] rounded-lg flex items-center justify-center">
-            <Zap className="h-3.5 w-3.5 text-white" />
-          </div>
+          <Image src="/logo.png" alt="Clinchd logo" width={28} height={28} className="w-7 h-7" />
           <span className="text-base font-extrabold">Clinchd</span>
         </div>
       </div>
