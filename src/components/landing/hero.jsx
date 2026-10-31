@@ -139,7 +139,7 @@ export default function Hero() {
 
             {/* Trust microcopy */}
             <p className="text-[13px] font-medium text-stone-600 tracking-tight mb-7">
-              7 days free · Card required · Cancel anytime · No sales call
+              14 days free · Card required · Cancel anytime · No sales call
             </p>
 
             {/* Social proof strip */}

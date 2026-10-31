@@ -64,7 +64,7 @@ export function trialContinuesText(trialEndUnix, priceCents) {
   return `Your free trial continues until ${formatTrialDate(trialEndUnix)}. You won't be charged ${formatPrice(priceCents)} until then.`;
 }
 
-/** A brand-new card-required trial, e.g. "Your 7-day free trial starts today. ..." */
+/** A brand-new card-required trial, e.g. "Your 14-day free trial starts today. ..." */
 export function newTrialText(trialDays, priceCents, now = Date.now()) {
   const endUnix = Math.floor((now + trialDays * 24 * 60 * 60 * 1000) / 1000);
   return `Your ${trialDays}-day free trial starts today. You won't be charged ${formatPrice(priceCents)} until ${formatTrialDate(endUnix)}. Cancel anytime before then.`;

@@ -2,7 +2,7 @@
 // creation (/api/stripe/create-checkout) and the plan-selection page, which
 // show the same decision.
 //
-// Card-required trial: a new user gets a 7-day Stripe trial on the plan
+// Card-required trial: a new user gets a TRIAL_DAYS (14-day) Stripe trial on the plan
 // they pick, and Stripe owns the clock from then on. A second trial is
 // refused when ANY of these hold, checked in this order:
 //
@@ -20,12 +20,12 @@
 //      survives deletion. It stores only a one-way HMAC-SHA256 of the
 //      normalized email (keyed with TRIAL_LEDGER_SECRET), never the email.
 //
-// Otherwise: a 7-day trial.
+// Otherwise: a TRIAL_DAYS trial (14 days; was 7 until 2026-10-30).
 
 import crypto from "node:crypto";
 import { planCheckoutTrial } from "@/lib/checkout-trial";
 
-export const TRIAL_DAYS = 7;
+export const TRIAL_DAYS = 14;
 
 /**
  * Normalize an email for trial matching: lowercase, trim, drop a +suffix,

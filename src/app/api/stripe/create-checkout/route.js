@@ -92,7 +92,7 @@ export async function POST(request) {
       return NextResponse.json({ url: portal.url }, { status: 200 });
     }
 
-    // One trial per person (src/lib/billing/trial-policy.js): a 7-day trial
+    // One trial per person (src/lib/billing/trial-policy.js): a 14-day trial
     // for someone new, the remaining days for a legacy trial, otherwise
     // charge today. The plan page shows the same decision before the click.
     const offer = await decideCheckoutTrial({

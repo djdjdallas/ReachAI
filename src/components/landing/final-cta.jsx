@@ -23,7 +23,7 @@ export default function FinalCta() {
             </Link>
             <div className="flex flex-col gap-2">
               <p className="text-stone-600 font-bold uppercase tracking-widest text-xs">
-                7 days free &middot; Card required &middot; Setup in 5 minutes
+                14 days free &middot; Card required &middot; Setup in 5 minutes
               </p>
               <p className="text-stone-500 font-medium text-xs italic">
                 Your AI setter starts qualifying leads today.

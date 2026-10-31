@@ -67,7 +67,7 @@ export default function BillingPage() {
   // returned nothing / threw) or portal (manage-subscription link did the
   // same). Cleared the next time the user clicks either button.
   const [billingError, setBillingError] = useState(null);
-  // Each plan's offer line ("7-day free trial...", "charged today", ...),
+  // Each plan's offer line ("14-day free trial...", "charged today", ...),
   // decided on the server exactly as Checkout will (checkout-offer API).
   const [offerLines, setOfferLines] = useState(null);
   // The server's access decision (kind: stripe | comped | legacy_trial |

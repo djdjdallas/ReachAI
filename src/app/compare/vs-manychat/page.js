@@ -29,7 +29,7 @@ const comparisonRows = [
   { feature: "Objection handling", competitor: "Manual flow paths", clinchd: "AI-powered, dynamic" },
   { feature: "Calendar booking", competitor: "Manual link in flow", clinchd: "AI drops link at right moment" },
   { feature: "Human takeover", competitor: "Yes", clinchd: "Yes — with hot lead flagging" },
-  { feature: "Free trial", competitor: "Free plan (1K contacts)", clinchd: "7-day free trial for new accounts" },
+  { feature: "Free trial", competitor: "Free plan (1K contacts)", clinchd: "14-day free trial for new accounts" },
 ];
 
 const faqs = [
@@ -43,7 +43,7 @@ const faqs = [
   },
   {
     q: "What if I'm already paying for ManyChat Pro?",
-    a: "You can run both side by side during a trial period. Many coaches test Clinchd for 7 days while keeping ManyChat active, compare the booking rates, and then make the switch. We see most coaches cancel ManyChat within the first week.",
+    a: "You can run both side by side during a trial period. Many coaches test Clinchd for 14 days while keeping ManyChat active, compare the booking rates, and then make the switch. We see most coaches cancel ManyChat within the first week.",
   },
   {
     q: "Does Clinchd support comment-to-DM automation like ManyChat?",
@@ -280,7 +280,7 @@ export default function VsManyChat() {
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
           <CTABanner
             headline="Ready to switch from ManyChat?"
-            subheadline="7-day free trial for new accounts. Card required, cancel anytime before day 7 and you won't be charged. Set up in under 30 minutes."
+            subheadline="14-day free trial for new accounts. Card required, cancel anytime before day 14 and you won't be charged. Set up in under 30 minutes."
             buttonText="Start Free Trial"
             buttonHref="/signup"
             variant="dark"
