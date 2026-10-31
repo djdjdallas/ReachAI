@@ -413,7 +413,7 @@ export async function POST(request) {
           // Everything synced from the LIVE subscription: status as Stripe
           // reports it ('trialing' for a card-required trial), plan from its
           // price, current_period_end, trial_ends_at (a carried legacy trial
-          // or the new 7-day one).
+          // or the new 14-day one).
           const fields = subscriptionFields(liveSubscription, getPlanFromPriceId);
           const plan = fields.plan || "base";
           const updateData = {
@@ -553,8 +553,8 @@ export async function POST(request) {
 
           if (owner?.email) {
             // Live again since checkout carries the remaining trial
-            // (src/lib/checkout-trial.js). Names the real date and amount: the
-            // trial is whatever was left of the signup trial, not "7-day".
+            // (src/lib/checkout-trial.js). Names the real date and amount, never a
+            // trial length: a carried legacy trial is whatever was left of it.
             const price = subscription.items?.data?.[0]?.price?.unit_amount;
             const endDate = subscription.trial_end
               ? formatTrialDate(subscription.trial_end)

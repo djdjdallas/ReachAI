@@ -76,7 +76,7 @@ function deps({ subs = [], ledger = null, ledgerError = null } = {}) {
 const newUser = { email: "new.coach+ig@gmail.com", subscription_status: "inactive", trial_ends_at: null, stripe_subscription_id: null };
 
 describe("decideCheckoutTrial", () => {
-  it("a new person gets the 7-day trial", async () => {
+  it("a new person gets the 14-day trial", async () => {
     const d = deps();
     expect(await decideCheckoutTrial({ user: newUser, customerId: "cus_new", ...d, now: NOW })).toEqual({
       mode: "trial",

@@ -103,7 +103,7 @@ export default function Pricing() {
                 Start Free Trial
               </Link>
               <p className="text-[13px] text-stone-600 font-semibold">
-                7 days free · Card required · Cancel anytime
+                14 days free · Card required · Cancel anytime
               </p>
             </div>
           </div>
@@ -142,7 +142,7 @@ export default function Pricing() {
                 Start Free Trial
               </Link>
               <p className="text-[13px] text-white/85 font-semibold">
-                7 days free · Card required · Cancel anytime
+                14 days free · Card required · Cancel anytime
               </p>
             </div>
           </div>

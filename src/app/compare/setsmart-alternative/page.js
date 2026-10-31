@@ -52,7 +52,7 @@ const faqs = [
   },
   {
     q: "How fast can I switch from SetSmart to Clinchd?",
-    a: "Under 30 minutes. You connect Instagram, paste your offer details, link Calendly or Cal.com, and run a 7-day calibration window. Most coaches run both side-by-side during the 7-day Clinchd free trial and compare booked-call numbers before fully switching.",
+    a: "Under 30 minutes. You connect Instagram, paste your offer details, link Calendly or Cal.com, and run a 7-day calibration window. Most coaches run both side-by-side during the 14-day Clinchd free trial and compare booked-call numbers before fully switching.",
   },
   {
     q: "Does Clinchd offer the same comment-to-DM features as SetSmart?",
@@ -157,7 +157,7 @@ export default function SetSmartAlternativePage() {
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
           <CTABanner
             headline="Try the AI setter built only for coaches"
-            subheadline="7-day free trial for new accounts. Card required, cancel anytime before day 7 and you won't be charged. Set up in under 30 minutes."
+            subheadline="14-day free trial for new accounts. Card required, cancel anytime before day 14 and you won't be charged. Set up in under 30 minutes."
             buttonText="Start Free Trial"
             buttonHref="/signup"
             variant="dark"

@@ -86,7 +86,7 @@ export default async function ChoosePlanPage({ searchParams }) {
 
   const heading =
     offer.mode === "trial"
-      ? "Start your 7-day free trial"
+      ? "Start your 14-day free trial"
       : decision.reason === "legacy_trial_ended"
         ? "Your free trial has ended"
         : offer.mode === "carry"

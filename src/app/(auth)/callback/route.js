@@ -29,7 +29,7 @@ export async function GET(request) {
 
         if (!existing) {
           // No trial here: like handle_new_user, a new row starts 'inactive'
-          // (column default) and the 7-day trial comes from card-required
+          // (column default) and the 14-day trial comes from card-required
           // Stripe Checkout. This fallback used to grant a no-card trial.
           await admin.from("users").insert({
             id: user.id,

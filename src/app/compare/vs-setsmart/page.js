@@ -53,7 +53,7 @@ const faqs = [
   },
   {
     q: "Can I switch from SetSmart to Clinchd?",
-    a: "Yes. Clinchd does not require you to import anything from SetSmart. You connect your Instagram account, describe your coaching offer, and the AI is ready to go in under 30 minutes. Most coaches run both side by side during the 7-day free trial and compare booking rates before making the full switch.",
+    a: "Yes. Clinchd does not require you to import anything from SetSmart. You connect your Instagram account, describe your coaching offer, and the AI is ready to go in under 30 minutes. Most coaches run both side by side during the 14-day free trial and compare booking rates before making the full switch.",
   },
   {
     q: "Which AI is better for high-ticket coaches?",
@@ -212,7 +212,7 @@ export default function VsSetSmart() {
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
           <CTABanner
             headline="Ready to try the AI setter built for coaches?"
-            subheadline="7-day free trial for new accounts. Card required, cancel anytime before day 7 and you won't be charged. Set up in under 30 minutes."
+            subheadline="14-day free trial for new accounts. Card required, cancel anytime before day 14 and you won't be charged. Set up in under 30 minutes."
             buttonText="Start Free Trial"
             buttonHref="/signup"
             variant="dark"
